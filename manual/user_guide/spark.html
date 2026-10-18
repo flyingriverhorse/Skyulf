@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/spark.html">
+        <link rel="canonical" href="https://www.skyulf.com/manual/user_guide/spark.html">
       
       
-        <link rel="prev" href="installation.html">
+        <link rel="prev" href="inference_flow.html">
       
       
-        <link rel="next" href="inference_bundles.html">
+        <link rel="next" href="spark_benchmark.html">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Spark (Development) - Skyulf</title>
+        <title>Execution and Inference - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#spark-execution-and-environment-setup" class="md-skip">
+        <a href="#spark-choose-an-execution-path" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Spark (Development)
+              Execution and Inference
             
           </span>
         </div>
@@ -320,17 +320,37 @@
   
   
   
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
     
   
   
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="overview.html" class="md-tabs__link">
+        <a href="integrations.html" class="md-tabs__link">
           
   
   
-  User Guide
+  Integrations
 
         </a>
       </li>
@@ -1324,31 +1344,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1366,7 +1383,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1437,353 +1454,6 @@
                 
   
   
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Spark (Development)
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="spark.html" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Spark (Development)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#why-a-separate-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why a separate environment?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#install-from-the-repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install from the repository
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#minimal-runtime-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Minimal runtime example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#spark-engine-adapter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Spark engine adapter
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#execution-contracts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Execution contracts
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#keyed-spark-featureengineer-entry-point" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Keyed Spark FeatureEngineer entry point
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Keyed Spark FeatureEngineer entry point">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#validation-actions-and-metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Validation actions and metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#native-simpleimputer-fit-once-apply-without-relearning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Native SimpleImputer: fit once, apply without relearning
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#native-standardscaler-center-and-scale" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Native StandardScaler: center and scale
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#portable-learned-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Portable learned state
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#save-and-restore-a-fitted-feature-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Save and restore a fitted feature pipeline
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#model-inference-after-native-fe" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Model inference after native FE
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#measuring-inference-capacity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Measuring inference capacity
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Measuring inference capacity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#interpreting-measurements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Interpreting measurements
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#capability-declarations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Capability declarations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Capability declarations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#inspecting-declared-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Inspecting declared support
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#declaring-custom-operation-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Declaring custom operation support
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting-and-support-boundaries" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting and support boundaries
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="inference_bundles.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Inference Bundles (Development)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="inference_flow.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Inference Flow
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
   
   
     <li class="md-nav__item">
@@ -1795,258 +1465,6 @@
     
   
     Preprocessing Diagnostics and Context
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="mlflow_tracking.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    MLflow Tracking (Development)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="mlflow_models.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    MLflow Models (Development)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="mlflow_registry.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    MLflow Registry (Development)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="databricks_batch.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Databricks Batch (Development)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="databricks_sdk.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Databricks Python SDK
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="databricks_serving_rollout.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Gradual Serving Rollout
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="databricks_online_features.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Online Feature Lookup
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="databricks_bundle.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Databricks Bundle
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Databricks Bundle Operator Walkthrough
   
 
     
@@ -2659,6 +2077,148 @@
       
   
   
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="integrations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Databricks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
   
   
     
@@ -2677,10 +2237,1872 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_1" >
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7_2_1" id="__nav_7_2_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    End-to-End Project Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topic Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_choose.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choose a Project Shape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_project_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Setup and Preview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_workspace_tables.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tables in Your Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_source_tables.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Check or Create Source Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_deployment.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment and Access
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_project_upgrade.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_teardown.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remove a Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_2" id="__nav_7_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Train
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_training_data.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Data and Holdout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_training_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_model_catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model and Search-Space Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_ensembles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Voting and Stacking Ensembles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_2_6" id="__nav_7_2_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing YAML Catalog
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_7_2_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing YAML Catalog
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_yaml_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Preprocessing with YAML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Missing Values, Cleaning and Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling and Numeric Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bounds and Outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Categorical Encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_binning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Binning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Generation and Selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_time_geo.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time and Geography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_text.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text and Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_sampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Split, Sampling and Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_custom.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Factory Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_custom_steps.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Preprocessing Steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_custom_pre_split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Pre-Split Filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Tables and Merges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_decision_thresholds.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision Thresholds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_model_sets.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Sets (Multi-Target)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_3" id="__nav_7_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_training_reports.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Reports and Charts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_explanations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explanations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_lifecycle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Approve, Reject and Roll Back
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_lifecycle_recovery.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interrupted Alias Recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_4" id="__nav_7_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Score
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_scoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring and Publication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_spark_scoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score on Spark Workers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monthly Batch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_5" id="__nav_7_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitor
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Monitor
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store Setup and Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_enrollment.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enrollment and References
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_labels.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delayed Labels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_drift.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift and Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Loss
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_retraining.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automatic Retraining
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_dashboard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_6" id="__nav_7_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serve
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Serve
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Endpoint Setup and Queries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving Observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_7" id="__nav_7_2_7_label" tabindex="0">
             
   
   
@@ -2698,8 +4120,713 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_glossary.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    MLflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registry and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spark
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Inference Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution and Inference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="spark.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution and Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-path-before-configuring-compute" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the path before configuring compute
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites-for-the-runtime-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites for the runtime examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spark-engine-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spark engine adapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution contracts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keyed-spark-featureengineer-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keyed Spark FeatureEngineer entry point
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Keyed Spark FeatureEngineer entry point">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#validation-actions-and-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation actions and metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#native-simpleimputer-fit-once-apply-without-relearning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native SimpleImputer: fit once, apply without relearning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#native-standardscaler-center-and-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native StandardScaler: center and scale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#portable-learned-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable learned state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#save-and-restore-a-fitted-feature-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Save and restore a fitted feature pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-inference-after-native-fe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model inference after native FE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benchmark-and-local-runtime-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benchmark and local runtime check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capability-declarations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capability declarations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Capability declarations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-declared-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting declared support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#declaring-custom-operation-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declaring custom operation support
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-and-support-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting and support boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark_benchmark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Inference Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portable Inference Bundles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2843,10 +4970,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5" >
         
           
-          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8_5" id="__nav_8_5_label" tabindex="0">
             
   
   
@@ -2864,8 +4991,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2925,10 +5052,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5_2" >
         
           
-          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8_5_2" id="__nav_8_5_2_label" tabindex="0">
             
   
   
@@ -2946,8 +5073,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_5_2">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3015,10 +5142,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8_5_3" id="__nav_8_5_3_label" tabindex="0">
             
   
   
@@ -3036,8 +5163,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_5_3">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3553,10 +5680,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_8_5_4" id="__nav_8_5_4_label" tabindex="0">
             
   
   
@@ -3574,8 +5701,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_5_4">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3824,74 +5951,93 @@
   
 
 
-<h1 id="spark-execution-and-environment-setup">Spark: execution and environment setup</h1>
+<h1 id="spark-choose-an-execution-path">Spark: choose an execution path</h1>
 <p>Use Spark when the input should stay distributed. Native SimpleImputer
 <code>mean</code>/<code>constant</code> and StandardScaler support fit and apply; their portable state
 can be restored across pandas, Polars and Spark. A
 <a href="inference_bundles.html">portable inference bundle</a> combines supported preprocessing
 with a fitted Python regression or classification model on workers.</p>
-<p>The separate <a href="databricks_bundle.html#distributed-inference-settings">certified MLflow pyfunc route</a>
+<p>The separate <a href="databricks_spark_scoring.html">certified MLflow pyfunc route</a>
 uses inspected pandas fitted-pipeline packages and supports its own admitted
 recipes, estimators and model sets. Training those models still uses bounded
 pandas/Polars frames. Installing the Spark extra does not convert arbitrary
 Python preprocessing into distributed operations.</p>
 <p><a href="inference_flow.html">How inference works</a> explains how the saved FE and
 model are reused, with diagrams for local, native Spark and worker FE paths.</p>
-<h2 id="why-a-separate-environment">Why a separate environment?</h2>
-<p><code>.venv-spark</code> isolates PySpark and its dependencies from the web application's
-existing <code>.venv</code>. It is a local development convention, not a runtime requirement
-or a directory shipped with Skyulf. Both environments are excluded from Git.
-Use your own environment name if preferred.</p>
-<p>The initial test target is Python 3.12, PySpark 4.0.3 and Java 17. Java must be
-installed separately. <code>JAVA_HOME</code> should point to the JDK directory. Consult
-the <a href="https://spark.apache.org/docs/4.0.3/api/python/getting_started/install.html">Spark installation documentation</a>
-for runtime requirements. Databricks Runtime and Connect require their own
-validated dependency profiles; do not replace a managed runtime's PySpark
-installation with this development environment.</p>
-<h2 id="install-from-the-repository">Install from the repository</h2>
-<p>Run these commands from the repository root. Create the environment only once.</p>
-<div class="highlight"><pre><span></span><code><span class="n">uv</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv-spark</span> <span class="p">-</span><span class="n">-python</span> <span class="n">3</span><span class="p">.</span><span class="n">12</span>
-<span class="n">uv</span> <span class="n">pip</span> <span class="n">install</span> <span class="p">-</span><span class="n">-python</span> <span class="p">.</span><span class="n">venv-spark</span><span class="p">/</span><span class="n">Scripts</span><span class="p">/</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-r</span> <span class="n">requirements-spark</span><span class="p">.</span><span class="n">txt</span>
-<span class="nv">$env:JAVA_HOME</span> <span class="p">=</span> <span class="s1">'C:\path\to\jdk-17'</span>
-<span class="nv">$env:SKYULF_REQUIRE_SPARK</span> <span class="p">=</span> <span class="s1">'1'</span>
-<span class="p">.</span><span class="n">venv-spark</span><span class="p">/</span><span class="n">Scripts</span><span class="p">/</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">pytest</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">tests</span><span class="p">/</span><span class="n">spark</span> <span class="n">-q</span> <span class="n">-o</span> <span class="n">addopts</span><span class="p">=</span>
+<h2 id="choose-the-path-before-configuring-compute">Choose the path before configuring compute</h2>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Entry point and artifact</th>
+<th>Where the work runs</th>
+<th>Current boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fit/apply supported feature engineering on a distributed frame</td>
+<td><code>FeatureEngineer</code> with <code>ExecutionOptions("spark")</code> and <code>FrameSpec</code></td>
+<td>Native Spark expressions and aggregates</td>
+<td>SimpleImputer mean/constant and StandardScaler; no model training</td>
+</tr>
+<tr>
+<td>Score a portable model with native preprocessing</td>
+<td><code>predict_spark(..., mode="native_features")</code>, <code>InferenceBundle</code></td>
+<td>Native FE, then Python estimator in workers</td>
+<td>Raw input and the portable FE subset</td>
+</tr>
+<tr>
+<td>Score portable preprocessing and model together in workers</td>
+<td><code>predict_spark(..., mode="python_pipeline")</code>, <code>InferenceBundle</code></td>
+<td>Python FE/model per independent worker batch</td>
+<td>Same portable FE subset; arbitrary Python nodes are not admitted</td>
+</tr>
+<tr>
+<td>Score an inspected fitted pandas pipeline from MLflow</td>
+<td>Certified fitted pyfunc / generated Bundle <code>inference_mode: spark</code></td>
+<td>Saved Python preprocessing and model in workers</td>
+<td>Exact fitted recipe, estimator, source and runtime must pass certification</td>
+</tr>
+</tbody>
+</table>
+<p>Choose the certified route when the required fitted recipe is outside the
+portable FE subset and that exact recipe passes its admission checks. Its
+catalog differs from the native Spark catalog; local fit/save/apply success for
+a built-in transformation does not prove worker eligibility. See the
+<a href="mlflow_models.html">MLflow packaging guide</a> and
+<a href="preprocessing_recipes.html">preprocessing recipe catalog</a>.</p>
+<p>Model fitting for these Python estimators happens in one Python process with a
+bounded training frame. Distributed prediction does not turn that training step
+into Spark ML training. Native FE can fit its supported statistics on Spark,
+while Python model training still needs an explicitly prepared bounded dataset.</p>
+<h2 id="prerequisites-for-the-runtime-examples">Prerequisites for the runtime examples</h2>
+<p>Use an <strong>existing caller-owned <code>spark</code> session</strong> on compatible classic Spark or
+Databricks compute. Every runtime block below assumes that variable already
+exists; Skyulf neither creates nor stops your session. Input examples declare
+flat schemas, unique non-null row keys and floating-point model features.</p>
+<p>For a separate local environment, the package installation is:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12
+<span class="c1"># Activate your environment using your shell.</span>
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"skyulf-core[spark]"</span>
 </code></pre></div>
-<p>On Linux/macOS:</p>
-<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>venv<span class="w"> </span>.venv-spark<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12
-uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv-spark/bin/python<span class="w"> </span>-r<span class="w"> </span>requirements-spark.txt
-<span class="nb">export</span><span class="w"> </span><span class="nv">JAVA_HOME</span><span class="o">=</span>/path/to/jdk-17
-<span class="nv">SKYULF_REQUIRE_SPARK</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>.venv-spark/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>skyulf-core/tests/spark<span class="w"> </span>-q<span class="w"> </span>-o<span class="w"> </span><span class="nv">addopts</span><span class="o">=</span>
-</code></pre></div>
-<p>The tests execute a distributed aggregate and an Arrow/Python worker transform.
-The mandatory lane fails when PySpark is missing. In the ordinary core suite,
-the optional runtime tests skip if PySpark is not installed. A skip does not
-prove Spark compatibility.</p>
-<h2 id="minimal-runtime-example">Minimal runtime example</h2>
-<p>This is a plain PySpark example, not a Skyulf feature-engineering pipeline.
-Run it using the Spark environment's Python interpreter.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span><span class="p">,</span> <span class="n">functions</span> <span class="k">as</span> <span class="n">F</span>
-
-<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"PYSPARK_PYTHON"</span><span class="p">]</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">executable</span>
-<span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">master</span><span class="p">(</span><span class="s2">"local[2]"</span><span class="p">)</span><span class="o">.</span><span class="n">appName</span><span class="p">(</span><span class="s2">"spark-check"</span><span class="p">)</span><span class="o">.</span><span class="n">getOrCreate</span><span class="p">()</span>
-<span class="k">try</span><span class="p">:</span>
-    <span class="n">frame</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
-    <span class="n">total</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="s2">"id"</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">"total"</span><span class="p">))</span><span class="o">.</span><span class="n">first</span><span class="p">()[</span><span class="s2">"total"</span><span class="p">]</span>
-    <span class="k">assert</span> <span class="n">total</span> <span class="o">==</span> <span class="mi">4950</span>
-<span class="k">finally</span><span class="p">:</span>
-    <span class="n">spark</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
-</code></pre></div>
-<p>Only one aggregate row is returned to Python. Supported native FE operations
-keep the dataset in Spark and transfer bounded learned state when supported.
-Python model inference on Spark workers is a separate capability from native
-Spark model training.</p>
+<p>Java must be installed separately for classic local Spark. On Databricks, keep
+the managed PySpark/Connect environment and use the project's matching dependency
+profile; installing another PySpark into a managed runtime can break it. Install
+the artifact's recorded dependencies on every process that loads it, including
+workers. The local development setup and focused checks appear in the
+<a href="spark_benchmark.html#local-development-environment-and-runtime-check">Spark capacity guide</a>.</p>
+<p>Start with the native imputation example below to learn a mean of 2.0 and reuse
+it for a missing value in a new batch. Continue to the portable inference example
+for keyed model predictions of 40.0 and 20.0. Any <code>collect</code>/<code>first</code> calls in the
+examples materialize only their tiny demonstration data or aggregate result;
+production callers select their own action or distributed output sink.</p>
 <h2 id="spark-engine-adapter">Spark engine adapter</h2>
 <p>The adapter detects real Spark dataframes without changing the default local
 engine. Importing Skyulf does not import PySpark or MLflow. Requesting the Spark
 engine without its optional dependency raises an explicit installation error.</p>
 <p>After creating your own <code>spark</code> session, you can run:</p>
+<!-- skyulf-example: spark_runtime engine-adapter -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineRegistry</span><span class="p">,</span> <span class="n">SparkEngine</span><span class="p">,</span> <span class="n">get_engine</span>
 
 <span class="n">local_default</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">()</span>
@@ -3908,15 +6054,14 @@ engine without its optional dependency raises an explicit installation error.</p
 <code>select</code> and <code>to_native</code>. Projection treats names literally, including dots and
 backticks; an empty projection keeps the rows. Schema access can require query
 analysis, but these adapter operations do not collect rows or count them.</p>
-<p>The local <code>SkyulfDataFrame</code> protocol remains for pandas/Polars. Spark wrappers
-reject <code>len</code>, <code>shape</code>, <code>to_pandas</code>, <code>to_numpy</code> and <code>to_arrow</code> with
-<code>DistributedMaterializationError</code>. <code>SparkEngine.to_numpy</code> and <code>SklearnBridge</code>
-also reject distributed features or targets. Worker inference uses the separate <code>predict_spark</code> or certified MLflow entry
-point; wrapping a DataFrame does not enable model execution.</p>
-<p>Skyulf neither creates nor retains a Spark session. Use your own
-<code>spark.createDataFrame(...)</code> to create input; <code>SparkEngine.from_pandas</code> and
-<code>create_dataframe</code> reject calls with this guidance. <code>to_native()</code> returns the
-original distributed frame: native actions you call explicitly remain your
+<p>The local <code>SkyulfDataFrame</code> protocol remains for pandas/Polars. Spark wrappers reject <code>len</code>,
+<code>shape</code>, <code>to_pandas</code>, <code>to_numpy</code> and <code>to_arrow</code> with <code>DistributedMaterializationError</code>.
+<code>SparkEngine.to_numpy</code> and <code>SklearnBridge</code> also reject distributed features or targets. Worker
+inference uses the separate <code>predict_spark</code> or certified MLflow entry point; wrapping a DataFrame
+does not enable model execution.</p>
+<p>Skyulf neither creates nor retains a Spark session. Use your own <code>spark.createDataFrame(...)</code> to
+create input; <code>SparkEngine.from_pandas</code> and <code>create_dataframe</code> reject calls with this guidance.
+<code>to_native()</code> returns the original distributed frame: native actions you call explicitly remain your
 responsibility. In particular, Spark's
 <a href="https://spark.apache.org/docs/4.0.3/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toPandas.html"><code>toPandas</code></a>
 collects data into driver memory.</p>
@@ -3929,6 +6074,7 @@ checks; unrelated connection and permission failures still propagate.</p>
 <h2 id="execution-contracts">Execution contracts</h2>
 <p>The execution API can validate an execution request without starting
 Spark or changing the current pandas/Polars engine:</p>
+<!-- skyulf-example: native spark-contracts -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
 
 <span class="n">options</span> <span class="o">=</span> <span class="n">ExecutionOptions</span><span class="o">.</span><span class="n">from_config</span><span class="p">({</span>
@@ -3951,6 +6097,7 @@ array/map/struct, Decimal and other unsupported types are rejected. Column names
 must be unambiguous under the session's case-sensitivity setting.</p>
 <p>This working example exercises the input boundary with an empty pipeline;
 it does not perform feature transformations:</p>
+<!-- skyulf-example: spark_runtime keyed-engineer -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureEngineer</span>
 
@@ -3977,18 +6124,16 @@ The <code>on_split</code> callback is unavailable on this single-frame entry poi
 <p>Automatic feature selection excludes keys and target. Explicit <code>columns</code> cannot
 select either. Names are exact and literal, including dots/backticks. Raw inputs
 produce raw Spark outputs; wrapped inputs retain their wrapper convention.</p>
-<p>Every step must declare both fit and apply support before fitting starts. Apply
-also checks all fitted steps before execution. This path accepts native,
-row-preserving operations with row-local apply behavior. This native FeatureEngineer path does not run worker Python, window,
-filtering or expansion operations. SimpleImputer
-mean/constant and StandardScaler are available; unsupported nodes or strategies fail before any
-validation action or fit. The runner normalizes registered node defaults before
-checking capabilities, so an omitted SimpleImputer strategy means <code>mean</code>, and
-StandardScaler defaults to <code>with_mean=True, with_std=True</code>.
-Custom native nodes use the existing engine-keyed dispatcher mapping with a
-<code>"spark"</code> implementation. It receives the full native frame, <code>y=None</code> and the
-resolved feature names in <code>config["columns"]</code>; the returned frame retains keys
-and any target. Fitted parameters must contain what its applier needs.</p>
+<p>Every step must declare both fit and apply support before fitting starts. Apply also checks all
+fitted steps before execution. This path accepts native, row-preserving operations with row-local
+apply behavior. This native FeatureEngineer path does not run worker Python, window, filtering or
+expansion operations. SimpleImputer mean/constant and StandardScaler are available; unsupported
+nodes or strategies fail before any validation action or fit. The runner normalizes registered node
+defaults before checking capabilities, so an omitted SimpleImputer strategy means <code>mean</code>, and
+StandardScaler defaults to <code>with_mean=True, with_std=True</code>. Custom native nodes use the existing
+engine-keyed dispatcher mapping with a <code>"spark"</code> implementation. It receives the full native frame,
+<code>y=None</code> and the resolved feature names in <code>config["columns"]</code>; the returned frame retains keys and
+any target. Fitted parameters must contain what its applier needs.</p>
 <h3 id="validation-actions-and-metrics">Validation actions and metrics</h3>
 <p>Key validation performs a distributed group/count and returns at most one
 invalid group to the driver. After each step, distributed multiset comparisons
@@ -4010,6 +6155,7 @@ available. The portable learned-state codec is described below.</p>
 <h2 id="native-simpleimputer-fit-once-apply-without-relearning">Native SimpleImputer: fit once, apply without relearning</h2>
 <p>The following pipeline learns the mean on training data and applies that same
 value to an unlabeled batch. Use a caller-owned Spark session as above:</p>
+<!-- skyulf-example: spark_runtime native-imputer -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureEngineer</span>
 
@@ -4060,6 +6206,7 @@ performs the key/target validation actions described above.</p>
 </ul>
 <p>Learned state can also cross engines explicitly. This example fits on pandas and
 applies to Spark; swapping the fit/apply engines follows the same codec contract:</p>
+<!-- skyulf-example: spark_runtime cross-engine-state -->
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.portable_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">encode_state</span><span class="p">,</span> <span class="n">decode_state</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.imputation.simple</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -4081,12 +6228,13 @@ Existing input column order is retained; direct apply appends missing learned
 columns when a usable fill value exists. The keyed pipeline requires configured
 input feature columns to be present. Output rows must still be matched by keys.</p>
 <h2 id="native-standardscaler-center-and-scale">Native StandardScaler: center and scale</h2>
-<p>StandardScaler learns per-column statistics on Spark and applies them with native
-expressions. Its population variance matches the local node's <code>ddof=0</code> convention,
-as documented by <a href="https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html">scikit-learn</a>.
+<p>StandardScaler learns per-column statistics on Spark and applies them with native expressions. Its
+population variance matches the local node's <code>ddof=0</code> convention, as documented by
+<a href="https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html">scikit-learn</a>.
 It uses Spark's native
 <a href="https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.var_pop.html"><code>var_pop</code></a>
 on shifted values to reduce numerical error.</p>
+<!-- skyulf-example: spark_runtime native-scaler -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureEngineer</span>
 
@@ -4100,6 +6248,7 @@ on shifted values to reduce numerical error.</p>
     <span class="n">execution_options</span><span class="o">=</span><span class="n">ExecutionOptions</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">"spark"</span><span class="p">,</span> <span class="n">state_max_bytes</span><span class="o">=</span><span class="mi">8192</span><span class="p">),</span>
 <span class="p">)</span>
 <span class="n">scaled_train</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">scaler</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">train</span><span class="p">)</span>
+<span class="c1"># Materialize only the two-row demonstration. Production output stays distributed.</span>
 <span class="k">assert</span> <span class="p">[</span><span class="n">r</span><span class="o">.</span><span class="n">amount</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">scaled_train</span><span class="o">.</span><span class="n">orderBy</span><span class="p">(</span><span class="s2">"id"</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span><span class="p">()]</span> <span class="o">==</span> <span class="p">[</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]</span>
 <span class="n">batch</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">([(</span><span class="mi">10</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">)],</span> <span class="s2">"id long, amount double"</span><span class="p">)</span>
 <span class="k">assert</span> <span class="n">scaler</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span><span class="o">.</span><span class="n">amount</span> <span class="o">==</span> <span class="mf">3.0</span>
@@ -4184,6 +6333,7 @@ environment used by your job.</p>
 versioned UTF-8 JSON bytes. It currently supports <code>StandardScaler</code> and
 <code>SimpleImputer</code> with <code>mean</code> or <code>constant</code> strategies, including empty no-op
 artifacts. This example works in the base environment without Spark:</p>
+<!-- skyulf-example: native spark-contracts -->
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span>
@@ -4201,7 +6351,9 @@ artifacts. This example works in the base environment without Spark:</p>
 <span class="n">payload</span> <span class="o">=</span> <span class="n">encode_state</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="n">budget</span><span class="p">)</span>
 <span class="n">node_type</span><span class="p">,</span> <span class="n">restored</span> <span class="o">=</span> <span class="n">decode_state</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="n">budget</span><span class="p">)</span>
 <span class="k">assert</span> <span class="n">node_type</span> <span class="o">==</span> <span class="s2">"SimpleImputer"</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">SimpleImputerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"amount"</span><span class="p">:</span> <span class="p">[</span><span class="kc">None</span><span class="p">]}),</span> <span class="n">restored</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">SimpleImputerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+    <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"amount"</span><span class="p">:</span> <span class="p">[</span><span class="kc">None</span><span class="p">]},</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"float64"</span><span class="p">),</span> <span class="n">restored</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="k">assert</span> <span class="n">result</span><span class="p">[</span><span class="s2">"amount"</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">==</span> <span class="p">[</span><span class="mf">3.0</span><span class="p">]</span>
 </code></pre></div>
 <p>The v1 envelope contains <code>format_version</code>, <code>codec_version</code>, <code>node_type</code>,
@@ -4239,6 +6391,7 @@ Codec tests also run without starting a JVM.</p>
 chain. <code>FeatureEngineer.from_state(...)</code> validates those bytes and restores the
 learned transformations without fitting. Both methods work without Spark installed
 when the destination is local. With a caller-owned <code>spark</code> session:</p>
+<!-- skyulf-example: spark_runtime restored-engineer -->
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
@@ -4298,13 +6451,7 @@ before parsing. Compact UTF-8 wire encoding and escaped JSON have the same seman
 checksum. Unknown versions, malformed fields, configuration/state disagreement and
 checksum mismatches are rejected. The checksum covers step order and configuration;
 it detects corruption but does not authenticate a producer.</p>
-<p>The runnable repository example also exercises Spark fit and application-owned
-file persistence. From the repository root, with Java configured as above:</p>
-<div class="highlight"><pre><span></span><code><span class="p">.</span><span class="n">venv-spark</span><span class="p">/</span><span class="n">Scripts</span><span class="p">/</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">examples</span><span class="p">/</span><span class="n">spark_feature_engineering</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-state-path</span> <span class="n">features</span><span class="p">.</span><span class="n">json</span>
-</code></pre></div>
-<p><code>skyulf-core/examples/spark_feature_engineering.py</code> owns and closes its local Spark
-session. Its <code>run_example(spark, state_path)</code> function accepts an existing session.
-Use representative nulls, dtypes and partitions when checking your own recipe;
+<p>Use representative nulls, dtypes and partitions when checking your own recipe;
 verify prediction output by record key rather than relying on Spark row order.</p>
 <h2 id="model-inference-after-native-fe">Model inference after native FE</h2>
 <p>Use <code>predict_spark(..., mode="native_features")</code> with a raw-input inference
@@ -4324,73 +6471,17 @@ with the documented portable FE restrictions. Local training can use pandas or
 Polars. <a href="mlflow_models.html">MLflow packaging</a>, <a href="mlflow_registry.html">registry loading</a>
 and <a href="databricks_batch.html">Delta publication</a> have separate contracts. Check them
 on the selected compute with the fitted recipe and producer dependencies.</p>
-<h2 id="measuring-inference-capacity">Measuring inference capacity</h2>
-<p>The reproducible notebook <code>skyulf-core/benchmarks/bench_spark_inference.py</code>
-compares <code>native_features</code>, <code>python_pipeline</code> and certified MLflow pyfunc UDF
-on the same fitted SimpleImputer/StandardScaler/LinearRegression pipeline.
-It uses Spark-generated data, including nulls, and verifies every prediction
-against an independent expression. Only aggregate diagnostics reach the driver.</p>
-<p>Notebook parameters:</p>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>schema</code></td>
-<td>Dedicated <code>catalog.schema</code> for benchmark models and report volume</td>
-</tr>
-<tr>
-<td><code>experiment</code></td>
-<td>MLflow experiment path for benchmark artifacts</td>
-</tr>
-<tr>
-<td><code>compute</code></td>
-<td><code>classic</code> or <code>serverless</code>; must match the actual job compute</td>
-</tr>
-<tr>
-<td><code>env_manager</code></td>
-<td><code>virtualenv</code> for validated classic environments; <code>local</code> for the declared serverless worker environment</td>
-</tr>
-<tr>
-<td><code>suite</code></td>
-<td><code>full</code> for the scale matrix; <code>smoke</code> for a small runner verification</td>
-</tr>
-</tbody>
-</table>
-<p>The full matrix covers 1 and 5 million rows, 2 and 64 input features, 8 and 32
-requested partitions, and 1,000/10,000-row model calls. It reports observed
-source partitions and both first/repeat action timings. Timings include source
-generation, inference and a correctness aggregate, not Delta publication.
-Preparation and model registration are outside action throughput. Fixed route
-order and managed serverless allocation mean these are workload observations,
-not a universal ranking or latency guarantee.</p>
-<p>Full reports are saved under <code>/Volumes/&lt;catalog&gt;/&lt;schema&gt;/benchmark/&lt;id&gt;.json</code>
-and returned from the notebook. Action checkpoints survive later scoring errors;
-the job still fails. Separate worker probes measure package restore time and
-Python-process RSS. Their process lifetime high-water mark is not an incremental
-allocation measurement or a complete executor-memory measurement.</p>
-<p>On classic compute, enable <code>spark.executor.processTreeMetrics.enabled=true</code>
-and <code>spark.executor.metrics.pollingInterval=1000</code> before starting the cluster.
-Executor peaks are cumulative across the application. Disabled or unobserved
-process counters are unknown, not zero. Serverless does not expose the executor
-status store or caller-controlled Arrow allocation; those metrics remain
-unavailable. Model-call batch size alone cannot bound worker memory.</p>
-<h3 id="interpreting-measurements">Interpreting measurements</h3>
-<p>Compare preparation, first action and repeated action separately. Changing
-partition count or model-call size can increase overhead as well as improve
-throughput; measure the actual feature width, model size and input distribution.
-Include publication when estimating end-to-end score-job latency.</p>
-<p>Keep benchmark outputs in your own schema or volume and record the runtime,
-package versions and parameters alongside the results. Worker process RSS includes
-libraries and the Python environment; its lifetime peak is not a per-call memory
-ceiling. A passing benchmark does not expand fitted-recipe admission.</p>
+<h2 id="benchmark-and-local-runtime-check">Benchmark and local runtime check</h2>
+<p><span id="measuring-inference-capacity"></span>
+<span id="local-development-environment-and-runtime-check"></span></p>
+<p><a href="spark_benchmark.html">Measure Spark inference capacity</a> covers the reproducible
+notebook that compares <code>native_features</code>, <code>python_pipeline</code> and certified MLflow
+pyfunc UDF on the same fitted pipeline, how to interpret its timings, and the
+separate <code>.venv-spark</code> local development environment with its runtime check.</p>
 <h2 id="capability-declarations">Capability declarations</h2>
 <h3 id="inspecting-declared-support">Inspecting declared support</h3>
 <p>A capability check distinguishes fit and apply and never falls back to pandas:</p>
+<!-- skyulf-example: native spark-contracts -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnsupportedExecutionError</span><span class="p">,</span> <span class="n">require_capability</span>
 
 <span class="n">require_capability</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"fit"</span><span class="p">,</span> <span class="s2">"spark"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">})</span>
@@ -4403,9 +6494,8 @@ ceiling. A passing benchmark does not expand fitted-recipe admission.</p>
     <span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">node_type</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">operation</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
 </code></pre></div>
 <p>Mean and StandardScaler succeed; median reports unsupported. The query requires explicit defaults.
-Existing local pipelines continue to work; this new preflight is not yet wired
-into their execution. A local node without an explicit declaration also fails
-this new query, even though its existing local pipeline path remains available.</p>
+Local pipeline execution does not call this query. A node without an explicit
+declaration fails the query, but its local pipeline path still runs.</p>
 <h3 id="declaring-custom-operation-support">Declaring custom operation support</h3>
 <p>Node authors can pass an immutable <code>execution_capabilities</code> tuple to
 <code>NodeRegistry.register</code>. Each <code>ExecutionCapability</code> records:</p>
@@ -4458,13 +6548,20 @@ Spark code, certify compatibility or make a window transform batch-independent.<
   child-process cleanup. A passing calculation does not prove clean shutdown;
   use an environment that permits the owned JVM processes to terminate.</li>
 <li><strong>Spark dependency unavailable:</strong> install the optional <code>skyulf-core[spark]</code>
-  dependency in a suitable environment, or use the repository requirements above.</li>
+  dependency in a suitable environment, or use the
+  <a href="spark_benchmark.html#install-from-the-repository">repository requirements</a>.</li>
 <li><strong>Unsupported node:</strong> SimpleImputer mean/constant and StandardScaler are available. Other built-in
   native FE nodes are still being implemented; installing Spark does not enable them.</li>
 </ul>
 <p><a href="mlflow_models.html">MLflow packaging</a>, <a href="mlflow_registry.html">registry resolution</a>,
 and <a href="databricks_bundle.html">Databricks Bundles</a> have separate integration contracts.
 Use their guides to configure deployment, publication and worker dependencies.</p>
+<h2 id="next-steps">Next steps</h2>
+<p>Use <a href="inference_bundles.html">inference bundles</a> to build/save/load the portable
+artifact, <a href="inference_flow.html">inference flow</a> to compare where saved state runs,
+and <a href="preprocessing_context.html">preprocessing context</a> before batching temporal
+or group-dependent transformations. <a href="databricks_batch.html">Databricks batch scoring</a>
+covers durable table publication, which is separate from returning a Spark frame.</p>
 
 
 

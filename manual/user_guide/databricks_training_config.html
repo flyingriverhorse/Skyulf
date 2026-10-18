@@ -1,0 +1,7227 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://www.skyulf.com/manual/user_guide/databricks_training_config.html">
+      
+      
+        <link rel="prev" href="databricks_training_data.html">
+      
+      
+        <link rel="next" href="databricks_model_catalog.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Training Configuration - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#training-yaml-fields-and-complete-examples" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Training Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="integrations.html" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pii_detection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PII Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verify Sampling and Weights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="integrations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Databricks
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_1" id="__nav_7_2_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    End-to-End Project Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Topic Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_choose.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Choose a Project Shape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_project_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Setup and Preview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_workspace_tables.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tables in Your Workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_source_tables.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Check or Create Source Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_deployment.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment and Access
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_project_upgrade.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_teardown.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remove a Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_2" id="__nav_7_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Train
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Train
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_training_data.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Data and Holdout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="databricks_training_config.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-ownership-and-inheritance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File ownership and inheritance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#root-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Root structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#training-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Training fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#identity-columns-and-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identity, columns and runtime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final-holdout-sampling-and-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final holdout, sampling and memory
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-windows-and-result-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source windows and result availability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-validation-on-training-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-validation on training rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quality-weights-and-bounded-reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quality, weights and bounded reports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#class-and-row-weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class and row weights
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-and-recipe-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model and recipe fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tuning-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nested-settings-and-conditional-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nested settings and conditional controls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-complete-training-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three complete training files
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Three complete training files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-model-for-one-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One model for one target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#several-algorithms-competing-for-one-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several algorithms competing for one target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#independent-models-for-two-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Independent models for two targets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-edits-before-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check edits before training
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_model_catalog.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model and Search-Space Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Search Strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_ensembles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Voting and Stacking Ensembles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_2_6" id="__nav_7_2_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing YAML Catalog
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_7_2_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing YAML Catalog
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_yaml_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build Preprocessing with YAML
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Missing Values, Cleaning and Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaling and Numeric Transforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bounds and Outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Categorical Encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_binning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Binning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Generation and Selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_time_geo.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time and Geography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_text.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text and Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_sampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Split, Sampling and Diagnostics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_recipes_custom.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Factory Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_custom_steps.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Preprocessing Steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_custom_pre_split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Pre-Split Filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feature Tables and Merges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_decision_thresholds.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decision Thresholds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_model_sets.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Sets (Multi-Target)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_3" id="__nav_7_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_training_reports.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Reports and Charts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_explanations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explanations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_lifecycle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Approve, Reject and Roll Back
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_lifecycle_recovery.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interrupted Alias Recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_4" id="__nav_7_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Score
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_scoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring and Publication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_spark_scoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score on Spark Workers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monthly Batch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_5" id="__nav_7_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitor
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Monitor
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Store Setup and Upgrades
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_enrollment.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enrollment and References
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_labels.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delayed Labels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_drift.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift and Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Loss
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_retraining.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automatic Retraining
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_monitoring_dashboard.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_6" id="__nav_7_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serve
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Serve
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Endpoint Setup and Queries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving Observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2_7" id="__nav_7_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_glossary.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    MLflow
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Packages
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registry and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Spark
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Inference Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution and Inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark_benchmark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure Inference Capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portable Inference Bundles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_5" id="__nav_8_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_5_2" id="__nav_8_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_5_3" id="__nav_8_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_5_4" id="__nav_8_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="training-yaml-fields-and-complete-examples">Training YAML: fields and complete examples</h1>
+<p>Use <code>config/training.yml</code> to choose the data, target, estimator, evaluation and
+promotion policy for each model. This reference explains every accepted training,
+model and tuning field, then supplies a complete file for each layout. The result
+of training is a fitted registered candidate with source/split/quality evidence;
+activation and scoring remain separate decisions.</p>
+<p>Use a Core package matching your generated project; see
+<a href="databricks_deployment.html#runtime-packaging">runtime packaging</a>. These local
+configuration examples do not create Delta tables, contact Databricks or prove
+cloud permissions. For first deployment and operator actions, follow the
+<a href="databricks_bundle_walkthrough.html">Bundle walkthrough</a>.</p>
+<h2 id="file-ownership-and-inheritance">File ownership and inheritance</h2>
+<table>
+<thead>
+<tr>
+<th>File or section</th>
+<th>What belongs here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>training.yml</code> &gt; <code>defaults</code></td>
+<td>Shared data, engine, split/CV, budgets, gates and optional model settings</td>
+</tr>
+<tr>
+<td><code>training.yml</code> &gt; <code>models.&lt;name&gt;</code></td>
+<td>One model or candidate's explicit overrides</td>
+</tr>
+<tr>
+<td><code>pre_split.yml</code></td>
+<td>Fixed training eligibility and normalization before splitting</td>
+</tr>
+<tr>
+<td><code>preprocessing.yml</code></td>
+<td>Ordered fitted transformations; selected recipes fit inside training folds</td>
+</tr>
+<tr>
+<td><code>inference.yml</code></td>
+<td>Scoring source, version selector, publication/change policy and score handoff; model-set activation/publication</td>
+</tr>
+<tr>
+<td><code>deployment/variables.yml</code> and target overrides</td>
+<td>Job compute, identities, schedules and environment bindings</td>
+</tr>
+<tr>
+<td><code>src/features/</code></td>
+<td>Trusted custom functions and scoring policy selected before training</td>
+</tr>
+</tbody>
+</table>
+<p>The tables below apply to shared defaults and individual model entries unless
+their conditions say otherwise. A model entry <strong>replaces the whole value</strong> of a
+shared field; nested mappings are not deep-merged. For example, overriding
+<code>model</code> replaces its type and entire params mapping. Repeat the parameters you
+still need. Do not define another Python model declaration or <code>workflow.json</code>
+beside these YAML owners.</p>
+<p>Competition candidates share one source, target, split, CV and selection policy.
+Their entries can override only <code>model</code>, <code>tuning</code>, <code>decision_threshold</code>,
+<code>preprocessing_recipe</code> and <code>explainability</code>. Competition does not accept
+<code>features_path</code> or <code>pre_split_recipe</code> in its defaults; use the default pre-split
+recipe. Independent target models can have different labels, inputs, recipes,
+models and gates, but must share the exact source snapshot and record keys.
+Never include any sibling target in a branch's inputs.</p>
+<h2 id="root-structure">Root structure</h2>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type/default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>version</code></td>
+<td>Integer; required <code>1</code></td>
+<td>Version of this YAML document, independent of the runtime config version below.</td>
+</tr>
+<tr>
+<td><code>defaults</code></td>
+<td>Mapping; <code>{}</code> if omitted</td>
+<td>Fields inherited by every named model. Complete effective settings still need the required fields.</td>
+</tr>
+<tr>
+<td><code>models</code></td>
+<td>Nonempty mapping; required</td>
+<td>Safe names starting with a letter, at most 64 ASCII letters/digits/underscore/hyphen. Single layout has one entry; competition needs at least two.</td>
+</tr>
+<tr>
+<td><code>pipeline</code></td>
+<td>Optional mapping; usually omit</td>
+<td>Only empty <code>preprocessing: []</code>, empty <code>modeling: {}</code> and shared <code>explainability</code> are accepted. Recipe lists belong in their own files. Do not duplicate explainability here and in defaults/models.</td>
+</tr>
+</tbody>
+</table>
+<p>YAML uses real numbers, booleans and <code>null</code>, rather than the string answers used
+by the init wizard. Quote dates such as <code>"2026-01-01T00:00:00Z"</code> so YAML does not
+turn them into timestamp objects. Unknown/duplicate keys, aliases, nonfinite
+numbers and documents larger than 64 KiB are rejected.</p>
+<h2 id="training-fields">Training fields</h2>
+<p><strong>Default</strong> means the generated quick-project value, or the runtime default
+where a field is omitted. Required fields must be present after inheritance.
+Inactive optional fields should be omitted or <code>null</code>, as specified. The last
+column identifies the corresponding init answer; <strong>YAML</strong> means edit the field
+directly. Detailed setup exposes more init answers than quick setup. Branch
+answers use the same question name with a <code>branch_N_</code> prefix.</p>
+<!-- training-fields:start -->
+
+<h3 id="identity-columns-and-runtime">Identity, columns and runtime</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default/required</th>
+<th>Values and conditions</th>
+<th>What changes</th>
+<th>Init answer or owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config_version</code></td>
+<td>Integer</td>
+<td>Required <code>1</code></td>
+<td>Runtime workflow contract</td>
+<td>Keep <code>1</code>; not a model version.</td>
+<td>Generated</td>
+</tr>
+<tr>
+<td><code>training_layout</code></td>
+<td>String</td>
+<td><code>single_model</code></td>
+<td><code>single_model</code>, <code>model_competition</code>, <code>multi_target</code></td>
+<td>Chooses one model, one-target competition or independent target branches. Changing it requires the matching generated task graph.</td>
+<td><code>training_layout</code></td>
+</tr>
+<tr>
+<td><code>task</code></td>
+<td>String</td>
+<td><code>regression</code></td>
+<td><code>regression</code>, <code>classification</code>; must match estimator</td>
+<td>Chooses label/metric semantics. Multi-target entries can differ.</td>
+<td><code>task</code></td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td>String</td>
+<td><code>pandas</code></td>
+<td><code>pandas</code>, <code>polars</code>; distributed fitted scoring requires pandas</td>
+<td>Chooses local training and fitted preprocessing engine, not compute size.</td>
+<td><code>engine</code></td>
+</tr>
+<tr>
+<td><code>training_table</code></td>
+<td>String</td>
+<td>Required</td>
+<td>Three-part Delta name after target binding</td>
+<td>Source of labeled rows; generation/deployment does not create it.</td>
+<td><code>source_table_name</code> plus catalog/input schema</td>
+</tr>
+<tr>
+<td><code>training_version</code></td>
+<td>Integer or null</td>
+<td>Omitted/null</td>
+<td>Nonnegative Delta version, including <code>0</code></td>
+<td>Null resolves latest once per invocation; an integer pins that snapshot.</td>
+<td><code>training_version</code></td>
+</tr>
+<tr>
+<td><code>training_label_table</code></td>
+<td>String or null</td>
+<td>Omitted/null</td>
+<td>Separate three-part Delta table; requires availability filtering and exact record-key types</td>
+<td>Left-joins actual targets and availability into the training snapshot. External values replace embedded targets. See <a href="databricks_training_data.html#train-from-separate-outcomes">separate outcomes</a>.</td>
+<td><code>source_layout=separate_outcomes</code>, or YAML</td>
+</tr>
+<tr>
+<td><code>training_label_version</code></td>
+<td>Integer or null</td>
+<td>Omitted/null</td>
+<td>Nonnegative Delta version; requires <code>training_label_table</code></td>
+<td>Null pins latest once per invocation; saved evidence also retains the immutable table identity. New labels can make an unchanged feature snapshot eligible for retraining.</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td><code>record_key_columns</code></td>
+<td>String list</td>
+<td>Required</td>
+<td>Nonempty, nonnull, unique source identities; distinct roles</td>
+<td>Stable row membership, split evidence and output alignment. Generated publication uses string/BIGINT keys.</td>
+<td><code>record_key_columns</code></td>
+</tr>
+<tr>
+<td><code>input_columns</code></td>
+<td>String list</td>
+<td>Required</td>
+<td>Ordered raw model inputs; excludes keys, targets, weights and time/group control roles</td>
+<td>Selects features before saved preprocessing.</td>
+<td><code>input_columns</code></td>
+</tr>
+<tr>
+<td><code>target_column</code></td>
+<td>String</td>
+<td>Required</td>
+<td>One source label, distinct from other roles</td>
+<td>Chooses the prediction target; omit it from future scoring input.</td>
+<td><code>target_column</code></td>
+</tr>
+<tr>
+<td><code>model_name</code></td>
+<td>String</td>
+<td>Required</td>
+<td>Three-part registry name in the active metadata schema; include deployment suffix</td>
+<td>Names the registered candidate. Multi-target branches need distinct names.</td>
+<td>Generated from project/branch name; YAML override</td>
+</tr>
+<tr>
+<td><code>tracking_uri</code></td>
+<td>String</td>
+<td>Runtime default <code>databricks</code>; usually omitted</td>
+<td>Tracking store setting, credentials supplied separately</td>
+<td>Chooses experiment/run storage.</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td><code>registry_uri</code></td>
+<td>String</td>
+<td>Runtime default <code>databricks-uc</code>; usually omitted</td>
+<td>Registry store setting, credentials supplied separately</td>
+<td>Chooses version/alias storage independently of tracking.</td>
+<td>YAML</td>
+</tr>
+</tbody>
+</table>
+<h3 id="final-holdout-sampling-and-memory">Final holdout, sampling and memory</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default/required</th>
+<th>Values and conditions</th>
+<th>What changes</th>
+<th>Init answer or owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>split_strategy</code></td>
+<td>String</td>
+<td><code>random</code></td>
+<td><code>random</code>, <code>temporal</code></td>
+<td>Random selects a fraction; temporal fits earlier rows and holds out the later interval.</td>
+<td><code>split_strategy</code></td>
+</tr>
+<tr>
+<td><code>test_size</code></td>
+<td>Number or null</td>
+<td><code>0.2</code></td>
+<td>Random: strictly between 0 and 1; temporal: omit/null or retain inactive <code>0.2</code></td>
+<td>Final holdout fraction, separate from CV folds.</td>
+<td><code>test_size</code></td>
+</tr>
+<tr>
+<td><code>random_state</code></td>
+<td>Integer or null</td>
+<td><code>42</code></td>
+<td>Random: 0 through 2**32-1; temporal: omit/null or retain inactive <code>42</code></td>
+<td>Random holdout seed.</td>
+<td><code>random_state</code></td>
+</tr>
+<tr>
+<td><code>stratify</code></td>
+<td>Boolean or null</td>
+<td><code>false</code></td>
+<td>True only for random classification; group holdout requires false</td>
+<td>Retains class proportions where supported.</td>
+<td><code>stratify</code></td>
+</tr>
+<tr>
+<td><code>training_sample_rows</code></td>
+<td>Integer or null</td>
+<td>Omitted/null</td>
+<td>At least 4 and at most <code>max_rows</code></td>
+<td>Seeded bounded Spark-side selection before local transfer and splitting; does not sample predictions.</td>
+<td><code>training_sample_rows</code></td>
+</tr>
+<tr>
+<td><code>training_sample_seed</code></td>
+<td>Integer</td>
+<td><code>42</code></td>
+<td>0 through 2**32-1</td>
+<td>Reproduces requested sample membership; saved evidence pins it for approval.</td>
+<td><code>training_sample_seed</code></td>
+</tr>
+<tr>
+<td><code>max_rows</code></td>
+<td>Integer</td>
+<td><code>10000</code></td>
+<td>Positive; aggregate fit/holdout input must fit</td>
+<td>Rejects a larger local training population instead of silently truncating it.</td>
+<td><code>max_rows</code></td>
+</tr>
+<tr>
+<td><code>max_input_mb</code></td>
+<td>Integer</td>
+<td><code>64</code></td>
+<td>Positive whole MiB; one unit is 1,048,576 bytes</td>
+<td>Bounds decoded/local training data, not Spark wire buffers or total process memory.</td>
+<td><code>max_input_mb</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="source-windows-and-result-availability">Source windows and result availability</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default/required</th>
+<th>Values and conditions</th>
+<th>What changes</th>
+<th>Init answer or owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>training_window_mode</code></td>
+<td>String</td>
+<td>Quick: <code>full_snapshot</code></td>
+<td><code>full_snapshot</code>, <code>fixed_window</code>, <code>rolling_calendar</code>, <code>rolling_days</code>; init-only <code>auto</code> resolves before emission</td>
+<td>Selects source rows independently of final splitting and scheduling.</td>
+<td><code>training_window_mode</code></td>
+</tr>
+<tr>
+<td><code>event_column</code></td>
+<td>String or null</td>
+<td>Omitted/null</td>
+<td>Required for window selection or temporal split; absent for full snapshot</td>
+<td>Observation clock used for selection/ordering, not label availability.</td>
+<td><code>event_column</code></td>
+</tr>
+<tr>
+<td><code>event_time_parsing</code></td>
+<td>Mapping or null</td>
+<td>Omitted/null</td>
+<td><code>format</code>, <code>timezone</code>, <code>date_only</code>; see nested table</td>
+<td>Explicitly interprets non-native event dates; no guessed string parsing.</td>
+<td><code>event_time_format</code>, <code>event_time_timezone</code>, <code>event_date_only</code></td>
+</tr>
+<tr>
+<td><code>start</code></td>
+<td>Quoted timestamp or null</td>
+<td>Omitted/null</td>
+<td>Aware ISO instant; required for fixed window</td>
+<td>Inclusive observation-window start. Rolling modes derive it at invocation.</td>
+<td><code>start</code></td>
+</tr>
+<tr>
+<td><code>cutoff</code></td>
+<td>Quoted timestamp or null</td>
+<td>Omitted/null</td>
+<td>Aware ISO instant, after start; required for fixed window</td>
+<td>Exclusive observation-window end; independent of source commit time.</td>
+<td><code>cutoff</code></td>
+</tr>
+<tr>
+<td><code>holdout_start</code></td>
+<td>Quoted timestamp or null</td>
+<td>Omitted/null</td>
+<td>Temporal: start &lt; holdout_start &lt; cutoff; null for random</td>
+<td>Boundary between earlier fit rows and final temporal holdout.</td>
+<td><code>holdout_start</code></td>
+</tr>
+<tr>
+<td><code>monthly_lookback_months</code></td>
+<td>Integer or null</td>
+<td>Rolling calendar: <code>4</code>; otherwise omitted</td>
+<td>1..120 for random, 2..120 for temporal; only rolling_calendar</td>
+<td>Number of complete calendar months read, including temporal holdout months.</td>
+<td><code>monthly_lookback_months</code></td>
+</tr>
+<tr>
+<td><code>holdout_months</code></td>
+<td>Integer or null</td>
+<td>Rolling temporal: <code>1</code>; otherwise omitted</td>
+<td>At least 1 and less than monthly_lookback_months</td>
+<td>Final complete months reserved for holdout.</td>
+<td><code>holdout_months</code></td>
+</tr>
+<tr>
+<td><code>window_timezone</code></td>
+<td>String or null</td>
+<td>Rolling calendar: <code>UTC</code>; otherwise omitted</td>
+<td>Valid IANA zone; only rolling_calendar</td>
+<td>Defines calendar-month boundaries, including DST. Cron timezone does not set this.</td>
+<td><code>window_timezone</code></td>
+</tr>
+<tr>
+<td><code>lookback_days</code></td>
+<td>Integer or null</td>
+<td>Rolling days: <code>90</code>; otherwise omitted</td>
+<td>1..36500; only rolling_days</td>
+<td>Number of elapsed UTC days before invocation.</td>
+<td><code>lookback_days</code></td>
+</tr>
+<tr>
+<td><code>holdout_days</code></td>
+<td>Integer or null</td>
+<td>Rolling-days temporal: <code>14</code>; otherwise omitted</td>
+<td>At least 1 and less than lookback_days; temporal only</td>
+<td>Latest elapsed days reserved for final holdout.</td>
+<td><code>holdout_days</code></td>
+</tr>
+<tr>
+<td><code>filter_unavailable_results</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Enable only with result column and cutoff policy</td>
+<td>Excludes unknown/not-yet-available labels from both train and holdout.</td>
+<td><code>filter_unavailable_results</code></td>
+</tr>
+<tr>
+<td><code>result_available_at_column</code></td>
+<td>String or null</td>
+<td>Omitted/null</td>
+<td>Required when filtering; distinct from event/key/input/target roles</td>
+<td>Records when each label became available.</td>
+<td><code>result_available_at_column</code></td>
+</tr>
+<tr>
+<td><code>result_cutoff</code></td>
+<td>Quoted timestamp or null</td>
+<td>Omitted/null</td>
+<td>Aware ISO instant; filtering only</td>
+<td>Keep labels available by this instant, including equality; null derives invocation minus lag.</td>
+<td><code>result_cutoff</code></td>
+</tr>
+<tr>
+<td><code>result_availability_lag_hours</code></td>
+<td>Integer or null</td>
+<td>Filtering: <code>0</code>; otherwise omitted</td>
+<td>0..87600; omit/null when filtering is off</td>
+<td>Delays the derived result cutoff; an explicit result_cutoff takes precedence.</td>
+<td><code>result_availability_lag_hours</code></td>
+</tr>
+<tr>
+<td><code>result_time_parsing</code></td>
+<td>Mapping or null</td>
+<td>Omitted/null</td>
+<td>Same nested fields as event parsing; filtering only</td>
+<td>Interprets label-availability values independently of event dates.</td>
+<td><code>result_time_format</code>, <code>result_time_timezone</code>, <code>result_date_only</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cross-validation-on-training-rows">Cross-validation on training rows</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default/required</th>
+<th>Values and conditions</th>
+<th>What changes</th>
+<th>Init answer or owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cv_enabled</code></td>
+<td>Boolean</td>
+<td><code>false</code>; competition forces true</td>
+<td>Competition requires true</td>
+<td>Fold-local model evaluation/search; final holdout stays outside it.</td>
+<td><code>cv_enabled</code></td>
+</tr>
+<tr>
+<td><code>cv_type</code></td>
+<td>String</td>
+<td><code>k_fold</code></td>
+<td>k_fold, stratified_k_fold, time_series_split, shuffle_split, nested_cv, group_k_fold, stratified_group_k_fold</td>
+<td>Chooses fold membership. Stratified methods require classification; temporal/group methods require their controls.</td>
+<td><code>cv_type</code></td>
+</tr>
+<tr>
+<td><code>cv_folds</code></td>
+<td>Integer</td>
+<td><code>5</code></td>
+<td>2..20</td>
+<td>Number of folds, or outer folds for nested CV. Each fold needs at least two fit and two validation rows.</td>
+<td><code>cv_folds</code></td>
+</tr>
+<tr>
+<td><code>cv_shuffle</code></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Temporal false; shuffle_split true</td>
+<td>Controls permitted fold randomization.</td>
+<td><code>cv_shuffle</code></td>
+</tr>
+<tr>
+<td><code>cv_random_state</code></td>
+<td>Integer</td>
+<td><code>42</code></td>
+<td>0 through 2**32-1</td>
+<td>CV seed, independent of the final holdout seed.</td>
+<td><code>cv_random_state</code></td>
+</tr>
+<tr>
+<td><code>cv_inner_folds</code></td>
+<td>Integer or null</td>
+<td>Omitted/null</td>
+<td>2..20; nested CV</td>
+<td>Explicit inner folds; omitted selects min(3, outer-1), with minimum 2.</td>
+<td><code>cv_inner_folds</code></td>
+</tr>
+<tr>
+<td><code>cv_nested_type</code></td>
+<td>String</td>
+<td><code>auto</code></td>
+<td>auto, k_fold, stratified_k_fold, time_series_split, group_k_fold, stratified_group_k_fold</td>
+<td>Inner/outer policy for nested CV; non-auto requires nested_cv.</td>
+<td><code>cv_nested_type</code></td>
+</tr>
+<tr>
+<td><code>cv_group_column</code></td>
+<td>String or null</td>
+<td>Omitted/null</td>
+<td>Required for group methods; otherwise null; distinct control column</td>
+<td>Keeps entities separate; final group holdout also excludes shared groups. Not a model input.</td>
+<td><code>cv_group_column</code></td>
+</tr>
+<tr>
+<td><code>cv_gap</code></td>
+<td>Integer</td>
+<td><code>0</code></td>
+<td>Nonnegative row count; temporal CV only</td>
+<td>Gap between fit and validation windows; not a duration.</td>
+<td><code>cv_gap</code></td>
+</tr>
+<tr>
+<td><code>cv_test_size</code></td>
+<td>Integer or null</td>
+<td>Omitted/null</td>
+<td>Positive rows; temporal CV only</td>
+<td>Explicit fold validation length; different from fractional final test_size.</td>
+<td><code>cv_test_size</code></td>
+</tr>
+<tr>
+<td><code>cv_max_train_size</code></td>
+<td>Integer or null</td>
+<td>Omitted/null</td>
+<td>Positive rows; temporal CV only</td>
+<td>Maximum training rows in each temporal fold.</td>
+<td><code>cv_max_train_size</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="quality-weights-and-bounded-reports">Quality, weights and bounded reports</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default/required</th>
+<th>Values and conditions</th>
+<th>What changes</th>
+<th>Init answer or owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>metric</code></td>
+<td>String</td>
+<td>heldout_rmse / heldout_accuracy</td>
+<td>Task-compatible supported heldout_ metric; competition has a stricter shared metric subset</td>
+<td>Primary final comparison objective; error/loss minimizes, other scores maximize.</td>
+<td><code>regression_metric</code> / <code>classification_metric</code></td>
+</tr>
+<tr>
+<td><code>min_improvement</code></td>
+<td>Number</td>
+<td><code>0.0</code></td>
+<td>Finite, nonnegative, absolute metric units</td>
+<td>Required improvement over champion; a tie never passes.</td>
+<td><code>min_improvement</code></td>
+</tr>
+<tr>
+<td><code>min_scored_fraction</code></td>
+<td>Number or null</td>
+<td><code>0.90</code></td>
+<td>0 to 1; <code>null</code> disables</td>
+<td>Minimum share of holdout rows a model that can exclude rows must score; see <a href="databricks_lifecycle.html#models-that-exclude-rows">models that exclude rows</a>.</td>
+<td><code>min_scored_fraction</code></td>
+</tr>
+<tr>
+<td><code>max_coverage_drop</code></td>
+<td>Number or null</td>
+<td><code>0.05</code></td>
+<td>0 to 1; <code>null</code> disables</td>
+<td>Largest allowed drop in scored share against the champion (0.05 = five percentage points).</td>
+<td><code>max_coverage_drop</code></td>
+</tr>
+<tr>
+<td><code>quality_threshold</code></td>
+<td>Number or null</td>
+<td>Omitted/null</td>
+<td>Finite task-valid bound; required for automatic promotion and first-champion approval</td>
+<td>Maximum acceptable error/loss or minimum acceptable score. Set before training; later edits cannot relax a saved candidate.</td>
+<td><code>quality_threshold</code></td>
+</tr>
+<tr>
+<td><code>quality_gates</code></td>
+<td>Mapping or null</td>
+<td>Omitted/null</td>
+<td>Additional task-compatible metric: bound pairs</td>
+<td>Every configured absolute gate must pass, including first activation.</td>
+<td>YAML; branch quality-gates answer where offered</td>
+</tr>
+<tr>
+<td><code>promotion_policy</code></td>
+<td>String</td>
+<td><code>manual_approval</code></td>
+<td>manual_approval, automatic</td>
+<td>Individual candidate activation. Multi-target branches stay manual; the complete set's policy belongs in inference.yml.</td>
+<td><code>promotion_policy</code></td>
+</tr>
+<tr>
+<td><code>champion_version</code></td>
+<td>String or null</td>
+<td>Omitted/null</td>
+<td>Concrete positive version string</td>
+<td>Optional expectation guard; generated lifecycle resolves current controlled champion and rejects a mismatching explicit value. Does not move an alias.</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td><code>weight_column</code></td>
+<td>String or null</td>
+<td>Omitted/null</td>
+<td>Existing numeric source column, distinct from all protected/input roles</td>
+<td>Supplies training sample weights; support depends on estimator. Holdout metrics and threshold selection remain unweighted.</td>
+<td><code>sample_weight_enabled</code>, <code>weight_column</code></td>
+</tr>
+<tr>
+<td><code>risk_category</code></td>
+<td>String or null</td>
+<td>Omitted</td>
+<td>At most 256 UTF-8 bytes</td>
+<td>Metadata tag only; does not change gates or compute policy.</td>
+<td><code>risk_category</code></td>
+</tr>
+<tr>
+<td><code>preprocessing_probe</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Explicit opt-in</td>
+<td>Saved/reloaded preprocessing diagnostic on at most 256 holdout rows, 8 MiB per frame; not worker admission.</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td><code>admit_probed_custom_steps</code></td>
+<td>Boolean</td>
+<td><code>false</code>; automatic with <code>inference_mode: spark</code> or <code>online_features</code></td>
+<td>Explicit opt-in for other projects, such as endpoint-only serving</td>
+<td>Seals partition evidence for eligible models, ensembles and built-in preprocessing; also lints and probes <code>column_step</code>/<code>fitted_step</code> steps and saved scoring rules. Checks use 16 to 256 holdout rows. A failing required check stops training before registration. See <a href="databricks_spark_scoring.html#built-in-recipes-and-model-evidence">Built-in evidence</a> and <a href="databricks_spark_scoring.html#admit-your-own-row-steps-opt-in">Custom row steps</a>.</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td><code>evaluation_charts</code></td>
+<td>Mapping or null</td>
+<td><code>{enabled: false}</code></td>
+<td>enabled plus bounded sample/display controls below</td>
+<td>Saves an evaluation sample for the independent chart task. Enabling a previously omitted task also requires matching resources/notebook.</td>
+<td><code>evaluation_charts_enabled</code>; detailed limits in YAML</td>
+</tr>
+<tr>
+<td><code>competition_max_candidates</code></td>
+<td>Integer</td>
+<td><code>8</code></td>
+<td>2..32 in loader; init wizard offers up to 8</td>
+<td>Bounds distinct candidate declarations in a one-target competition.</td>
+<td>Generated; YAML for explicit validated limits</td>
+</tr>
+<tr>
+<td><code>competition_max_trials</code></td>
+<td>Integer</td>
+<td>Generated <code>1000</code>; loader fallback <code>100</code></td>
+<td>1..10000; competition only</td>
+<td>Aggregate search-work bound including nested/halving work, not wall-clock seconds.</td>
+<td><code>competition_max_trials</code></td>
+</tr>
+<tr>
+<td><code>feature_lookup</code></td>
+<td>Mapping or null</td>
+<td>Omitted/null</td>
+<td>Native lookup declaration; pandas and admitted Spark/online path</td>
+<td>Adds explicit offline feature binding and source evidence; not an arbitrary join.</td>
+<td>Online opt-in creates placeholders; complete YAML</td>
+</tr>
+<tr>
+<td><code>online_features</code></td>
+<td>Mapping or null</td>
+<td>Omitted/null</td>
+<td>Requires feature_lookup, pandas, non-temporal supported request shape</td>
+<td>Saves required-feature and freshness guards with the model; does not create a store or endpoint.</td>
+<td><code>include_online_serving</code> creates placeholders; complete YAML</td>
+</tr>
+</tbody>
+</table>
+<!-- training-fields:end -->
+
+<h3 id="class-and-row-weights">Class and row weights</h3>
+<p>Set classifier class weights in <code>model.params</code>, for example
+<code>params: {class_weight: balanced}</code>. <code>null</code> disables them. Keep a class weight fixed
+by removing its search axis; to tune it, omit the fixed parameter and retain the
+axis under <code>tuning.search_space</code>. Supported classifiers may also use row weights.</p>
+<p>Set <code>weight_column: importance</code> in <code>defaults</code> or a target entry. Omit it or use
+<code>null</code> for unweighted fitting. Competition uses one shared column. Every active
+fold requires finite nonnegative values with positive total weight. Weights are
+not normalized. Declared weight columns remain reserved across branches and cannot
+be features, targets, keys, group columns or timestamps.</p>
+<p>Weights affect estimator fitting; selection, holdout and threshold metrics remain
+unweighted. Built-in row changes carry explicit row positions; unsupported custom
+row mapping fails. Synthetic sampling needs an explicit supported weight policy.
+Source snapshots preserve the training column and saved evidence records its
+aggregate statistics and ordered digest. Logs do not print raw weight vectors.
+Scoring uses the saved model and needs no weight column. Weight-only edits do not
+count as fresh labels for automatic retraining; train explicitly after such edits.</p>
+<h2 id="model-and-recipe-fields">Model and recipe fields</h2>
+<!-- model-fields:start -->
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default/required</th>
+<th>Choices and effect</th>
+<th>Init answer or owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>Mapping</td>
+<td>Required here or inherited</td>
+<td><code>type</code> is a registered task-compatible Core model ID; <code>params</code> is an optional mapping. Omit tuning to fit this model once.</td>
+<td>regression_model / classification_model and model_params; branch/candidate variants</td>
+</tr>
+<tr>
+<td><code>tuning</code></td>
+<td>Mapping</td>
+<td>Omitted disables search; generated projects normally include it</td>
+<td>Wraps the model in the existing tuner. Fields below use native search metrics, not heldout_ names.</td>
+<td>Search questions and YAML</td>
+</tr>
+<tr>
+<td><code>preprocessing_recipe</code></td>
+<td>String</td>
+<td><code>default</code></td>
+<td>Named list in preprocessing.yml. Each candidate/branch learns its own fitted state even when sharing a recipe.</td>
+<td>preprocessing_recipe; YAML</td>
+</tr>
+<tr>
+<td><code>pre_split_recipe</code></td>
+<td>String</td>
+<td><code>default</code></td>
+<td>Named fixed eligibility list in pre_split.yml. Competition always uses <code>recipes.default</code> and rejects this field.</td>
+<td>pre_split_recipe; YAML</td>
+</tr>
+<tr>
+<td><code>features_path</code></td>
+<td>String</td>
+<td>Generated src/features</td>
+<td>Alternative project feature package; supported only for multi-target model entries. Its source, assets and exact dependency pins are captured.</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td><code>decision_threshold</code></td>
+<td>Mapping</td>
+<td><code>{mode: off}</code></td>
+<td>Classification only: off, manual or auto. Changes hard-label decisions without changing probabilities; nested fields below.</td>
+<td>decision-threshold questions; YAML</td>
+</tr>
+<tr>
+<td><code>explainability</code></td>
+<td>Mapping</td>
+<td>Omitted disables it</td>
+<td>SHAP method and bounded sample/display limits below; packages and report task must be present.</td>
+<td>shap_enabled and SHAP limit questions</td>
+</tr>
+</tbody>
+</table>
+<!-- model-fields:end -->
+
+<p><code>model.params</code> uses the selected estimator's public parameters. For example,
+<code>ridge_regression</code> accepts <code>alpha</code>, while a random forest accepts <code>n_estimators</code>
+and <code>max_depth</code>. Parameters do not transfer automatically when model type
+changes. Use <code>python src/tools/preview.py --list-models</code> and the
+<a href="databricks_model_catalog.html">model catalog</a> for parameters, default search spaces,
+weights and ready-to-use YAML for each model. <code>class_weight</code> belongs in the compatible
+classifier's params; it is distinct from a source <code>weight_column</code>.</p>
+<h2 id="tuning-fields">Tuning fields</h2>
+<p>These keys go inside <code>models.&lt;name&gt;.tuning</code> or a shared <code>defaults.tuning</code>.
+Deleting the entire mapping disables search. An empty mapping still requests a
+tuner and needs a compatible objective. Learned preprocessing is refitted within
+the training folds; neither search nor calibration can use the final holdout.
+The <a href="databricks_tuning.html">search and ensemble guide</a> explains the five strategies,
+their additional controls, CV, competition budgets and complete examples.</p>
+<!-- tuning-fields:start -->
+
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default/required</th>
+<th>Choices and effect</th>
+<th>Init answer or owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>strategy</code></td>
+<td>String</td>
+<td><code>random</code></td>
+<td>grid, random, optuna, halving_grid, halving_random. Optuna needs the matching optional dependencies.</td>
+<td>search_strategy</td>
+</tr>
+<tr>
+<td><code>metric</code></td>
+<td>String</td>
+<td>Required; generated rmse / accuracy</td>
+<td>Native Core metric such as rmse, r2, accuracy or f1; not heldout_rmse. Must match task and competition objective where applicable.</td>
+<td>regression_search_metric / classification_search_metric</td>
+</tr>
+<tr>
+<td><code>n_trials</code></td>
+<td>Integer</td>
+<td><code>10</code></td>
+<td>1..1000; trial/candidate budget for the selected strategy. Grid enumeration additionally respects max_candidates.</td>
+<td>search_n_trials</td>
+</tr>
+<tr>
+<td><code>random_state</code></td>
+<td>Integer</td>
+<td><code>42</code></td>
+<td>0 through 2**32-1; search seed independent of final split/CV seeds.</td>
+<td>search_random_state</td>
+</tr>
+<tr>
+<td><code>max_candidates</code></td>
+<td>Integer</td>
+<td><code>1000</code></td>
+<td>1..10000; rejects exhaustive grids above this bound before fitting.</td>
+<td>search_max_candidates</td>
+</tr>
+<tr>
+<td><code>search_space</code></td>
+<td>Mapping</td>
+<td><code>{}</code></td>
+<td>Parameter to nonempty finite scalar candidate list; empty means registered default space with fixed params preserved. At most 128 axes, 100 values/axis and 64 KiB.</td>
+<td>search_space</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>Number or null</td>
+<td>Omitted/null</td>
+<td>Positive finite seconds, optuna only; not an overall job deadline.</td>
+<td>search_timeout</td>
+</tr>
+<tr>
+<td><code>strategy_params</code></td>
+<td>Mapping</td>
+<td><code>{}</code></td>
+<td>Optuna sampler/pruner/pruning or halving factor/resource/min/max controls below; nonempty rejected for grid/random.</td>
+<td>Advanced search questions</td>
+</tr>
+<tr>
+<td><code>tune_threshold</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Binary-classification nested-CV threshold search only; incompatible with an active decision_threshold. Prefer an explicit decision_threshold.</td>
+<td>search_tune_threshold</td>
+</tr>
+</tbody>
+</table>
+<!-- tuning-fields:end -->
+
+<p>For a fixed value use <code>model.params</code>, for searched values use candidate lists:
+<code>search_space: {alpha: [0.1, 1.0, 10.0]}</code>. A manual search axis cannot contradict
+a fixed parameter. Unknown parameter names fail instead of being silently
+ignored. The outer job's CPU/memory limits still apply; search uses one estimator
+worker to avoid nested parallel fits.</p>
+<h2 id="nested-settings-and-conditional-controls">Nested settings and conditional controls</h2>
+<table>
+<thead>
+<tr>
+<th>Mapping</th>
+<th>Fields, defaults and valid choices</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>event_time_parsing / result_time_parsing</td>
+<td><code>format: null</code>, <code>timezone: null</code>, <code>date_only: reject</code> (or midnight)</td>
+<td>Native timestamps need no format. Naive local clocks need an IANA timezone; offset-bearing formats must not also set one. Date-only values require midnight plus timezone. DST gaps/overlaps are rejected.</td>
+</tr>
+<tr>
+<td>decision_threshold, mode off</td>
+<td>Only <code>mode: off</code></td>
+<td>Keep the estimator's normal hard-label decision.</td>
+</tr>
+<tr>
+<td>decision_threshold, mode manual</td>
+<td>Binary: <code>value</code> in [0,1] plus typed <code>positive_class</code>; or <code>thresholds: [{class: ..., value: ...}, ...]</code> covering every class with positive values</td>
+<td>Bind original class labels, not probability column indexes. Per-class decisions use the saved threshold policy.</td>
+</tr>
+<tr>
+<td>decision_threshold, mode auto</td>
+<td><code>metric: balanced_accuracy</code> (also f1, f1_macro, f1_weighted, matthews_corrcoef), <code>validation_fraction: 0.2</code> strictly between 0 and 1, <code>random_state: 42</code>, optional <code>positive_class</code></td>
+<td>Uses separate training-side calibration; temporal models retain chronological ordering.</td>
+</tr>
+<tr>
+<td>explainability</td>
+<td>Required <code>method: shap</code>; max_samples 100 (1..200), max_features 30 (1..100), max_display_samples min(10,max_samples) (0..50 and no larger than max_samples)</td>
+<td>Bounded training explanation and report display.</td>
+</tr>
+<tr>
+<td>evaluation_charts</td>
+<td>Required boolean <code>enabled</code>; max_rows 2000 (2..10000), max_features 20 (1..50), max_classes 20 (2..50)</td>
+<td>Bounded saved holdout chart sample; does not change full holdout metrics.</td>
+</tr>
+<tr>
+<td>feature_lookup</td>
+<td><code>lookups</code> list, each with table_name, lookup_key and feature_names; optional timestamp fields only on supported offline paths</td>
+<td>Declare every fetched feature in input_columns. Keep lookup controls/source identities explicit. See online guide for exact native contract.</td>
+</tr>
+<tr>
+<td>online_features</td>
+<td><code>required_features</code> and <code>freshness: [{column: ..., max_age_seconds: ...}]</code></td>
+<td>Cover all fetched features; each lookup needs its saved DOUBLE UTC-epoch freshness input. The age bound is an explicit domain choice, not an automatic default.</td>
+</tr>
+<tr>
+<td>tuning.strategy_params for optuna</td>
+<td>sampler: tpe (random, cmaes); pruner: median (hyperband, none); optional boolean pruning</td>
+<td>Configures the installed Optuna integration.</td>
+</tr>
+<tr>
+<td>tuning.strategy_params for halving</td>
+<td>factor: 3 (2..10); resource: n_samples; min_resources and max_resources depend on resource</td>
+<td>Custom estimator resource needs a compatible parameter and explicit positive maximum. Bounds and supported count strings are validated before fitting.</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="databricks_online_features.html">online feature lookup</a>,
+<a href="databricks_bundle.html#optional-classification-decision-thresholds">classification threshold policy</a>
+and <a href="preprocessing_context.html">preprocessing context</a> for their complete execution
+contracts. A valid field set does not certify a fitted recipe for Spark or serving.</p>
+<h2 id="three-complete-training-files">Three complete training files</h2>
+<p>Start with a newly generated project of the <strong>same layout</strong>. Keep its
+<code>config/inference.yml</code>, <code>src/features/</code>, tool scripts and resource graph. Replace
+only training.yml with the chosen complete block below, and use these companion
+recipes. Both files require a <code>default</code> recipe, even if it is empty.</p>
+<p>In <code>config/pre_split.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">recipes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+</code></pre></div>
+<p>In <code>config/preprocessing.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">recipes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">default</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fill_numeric</span>
+<span class="w">      </span><span class="nt">transformer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimpleImputer</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">],</span><span class="nt"> strategy</span><span class="p">:</span><span class="w"> </span><span class="nv">mean</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scale_numeric</span>
+<span class="w">      </span><span class="nt">transformer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StandardScaler</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]}</span>
+</code></pre></div>
+<p>The examples use numeric regression targets to keep estimator/metric roles easy
+to compare. The source is an existing Delta table with nonnull unique BIGINT
+<code>customer_id</code>, DOUBLE <code>income</code>/<code>age</code>, and DOUBLE <code>revenue</code>/<code>cost</code> labels. For local
+fit verification you can create the following frame; it does not upload a table:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="n">frame</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"customer_id"</span><span class="p">:</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">41</span><span class="p">),</span>
+    <span class="s2">"income"</span><span class="p">:</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">41</span><span class="p">)],</span>
+    <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="mi">20</span> <span class="o">+</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">41</span><span class="p">)],</span>
+    <span class="s2">"revenue"</span><span class="p">:</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">41</span><span class="p">)],</span>
+    <span class="s2">"cost"</span><span class="p">:</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">41</span><span class="p">)],</span>
+<span class="p">})</span>
+<span class="k">assert</span> <span class="n">frame</span><span class="o">.</span><span class="n">customer_id</span><span class="o">.</span><span class="n">is_unique</span> <span class="ow">and</span> <span class="n">frame</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="one-model-for-one-target">One model for one target</h3>
+<p>Save this entire block as <code>config/training.yml</code> in a single_model project.
+The imputer/scaler are learned separately on training rows; the final 20%
+holdout does not fit them. The absolute RMSE gate is illustrative.</p>
+<!-- example:single_model -->
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">training_layout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">single_model</span>
+<span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
+<span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regression</span>
+<span class="w">  </span><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.customer_training"</span>
+<span class="w">  </span><span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">             </span><span class="c1"># Resolve latest once when invoked.</span>
+<span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]</span><span class="w">        </span><span class="c1"># Keys and labels are not features.</span>
+<span class="w">  </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue</span>
+<span class="w">  </span><span class="nt">model_name</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{metadata_schema}.revenue_model{resource_suffix}"</span>
+<span class="w">  </span><span class="nt">split_strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">random</span>
+<span class="w">  </span><span class="nt">training_window_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full_snapshot</span><span class="w"> </span><span class="c1"># No event timestamps are needed.</span>
+<span class="w">  </span><span class="nt">test_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
+<span class="w">  </span><span class="nt">random_state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+<span class="w">  </span><span class="nt">stratify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">filter_unavailable_results</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">max_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="w">  </span><span class="nt">max_input_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">  </span><span class="nt">cv_enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">heldout_rmse</span>
+<span class="w">  </span><span class="nt">min_improvement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<span class="w">  </span><span class="nt">quality_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5.0</span><span class="w">              </span><span class="c1"># Needed for first-champion approval.</span>
+<span class="w">  </span><span class="nt">promotion_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manual_approval</span>
+<span class="w">  </span><span class="nt">preprocessing_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">  </span><span class="nt">pre_split_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">revenue</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">model</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ridge_regression</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="nv">1.0</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p>There is no tuning mapping, so this example fits the stated fixed ridge model.
+A generated wizard project normally includes tuning; remove that mapping
+deliberately if a single fixed fit is intended.</p>
+<h3 id="several-algorithms-competing-for-one-target">Several algorithms competing for one target</h3>
+<p>Save this in a model_competition project. Candidates share final holdout and
+three-fold training CV. Candidate overrides change only model/search/recipe
+settings. The winner alone proceeds to final holdout comparison and registration.</p>
+<!-- example:model_competition -->
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">training_layout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model_competition</span>
+<span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
+<span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regression</span>
+<span class="w">  </span><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.customer_training"</span>
+<span class="w">  </span><span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue</span>
+<span class="w">  </span><span class="nt">model_name</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{metadata_schema}.revenue_competition{resource_suffix}"</span>
+<span class="w">  </span><span class="nt">split_strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">random</span>
+<span class="w">  </span><span class="nt">training_window_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full_snapshot</span>
+<span class="w">  </span><span class="nt">test_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
+<span class="w">  </span><span class="nt">random_state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+<span class="w">  </span><span class="nt">stratify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">filter_unavailable_results</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">max_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="w">  </span><span class="nt">max_input_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">  </span><span class="nt">cv_enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                   </span><span class="c1"># Required by competition.</span>
+<span class="w">  </span><span class="nt">cv_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">k_fold</span>
+<span class="w">  </span><span class="nt">cv_folds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">  </span><span class="nt">cv_shuffle</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">cv_random_state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+<span class="w">  </span><span class="nt">competition_max_candidates</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+<span class="w">  </span><span class="nt">competition_max_trials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">heldout_rmse</span><span class="w">               </span><span class="c1"># Shared objective, not training accuracy.</span>
+<span class="w">  </span><span class="nt">min_improvement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<span class="w">  </span><span class="nt">quality_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5.0</span>
+<span class="w">  </span><span class="nt">promotion_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manual_approval</span>
+<span class="w">  </span><span class="nt">preprocessing_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ridge</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="nv">ridge_regression</span><span class="p p-Indicator">,</span><span class="nt"> params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="nv">1.0</span><span class="p p-Indicator">}}</span>
+<span class="w">  </span><span class="nt">forest</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">model</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">random_forest_regressor</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">n_estimators</span><span class="p">:</span><span class="w"> </span><span class="nv">20</span><span class="p p-Indicator">,</span><span class="nt"> max_depth</span><span class="p">:</span><span class="w"> </span><span class="nv">4</span><span class="p p-Indicator">,</span><span class="nt"> random_state</span><span class="p">:</span><span class="w"> </span><span class="nv">42</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p>To search ridge alpha instead, remove fixed alpha from that candidate's params
+and add <code>tuning: {strategy: grid, metric: rmse, max_candidates: 10,
+search_space: {alpha: [0.1, 1.0, 10.0]}}</code>. Search metric is <code>rmse</code>; the final
+comparison metric remains <code>heldout_rmse</code>. Keep aggregate work inside the
+competition budget. Do not tune parameters against the final heldout rows.</p>
+<h3 id="independent-models-for-two-targets">Independent models for two targets</h3>
+<p>Save this in a multi_target project. Both branches share one source snapshot and
+keys; each has its own target, model and model name. Missing labels are excluded
+per target. No branch uses the sibling label as a feature.</p>
+<!-- example:multi_target -->
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">config_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">training_layout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">multi_target</span>
+<span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
+<span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regression</span>
+<span class="w">  </span><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.customer_training"</span>
+<span class="w">  </span><span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">split_strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">random</span>
+<span class="w">  </span><span class="nt">training_window_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full_snapshot</span>
+<span class="w">  </span><span class="nt">test_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
+<span class="w">  </span><span class="nt">random_state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+<span class="w">  </span><span class="nt">stratify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">filter_unavailable_results</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">max_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="w">  </span><span class="nt">max_input_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">  </span><span class="nt">cv_enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">heldout_rmse</span>
+<span class="w">  </span><span class="nt">min_improvement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<span class="w">  </span><span class="nt">quality_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5.0</span>
+<span class="w">  </span><span class="nt">promotion_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manual_approval</span><span class="w">    </span><span class="c1"># Set activation is separate in inference.yml.</span>
+<span class="w">  </span><span class="nt">preprocessing_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">  </span><span class="nt">pre_split_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">revenue</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue</span>
+<span class="w">    </span><span class="nt">model_name</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{metadata_schema}.revenue_model{resource_suffix}"</span>
+<span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="nv">linear_regression</span><span class="p p-Indicator">,</span><span class="nt"> params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}}</span>
+<span class="w">  </span><span class="nt">cost</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cost</span>
+<span class="w">    </span><span class="nt">model_name</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{metadata_schema}.cost_model{resource_suffix}"</span>
+<span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="nv">ridge_regression</span><span class="p p-Indicator">,</span><span class="nt"> params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="nv">0.5</span><span class="p p-Indicator">}}</span>
+</code></pre></div>
+<p>The <code>model_set</code> block in <code>inference.yml</code> owns complete-set activation and output
+storage; choose its output mode as described in
+<a href="databricks_model_sets.html#choose-the-output-mode">model sets</a>. Individual
+component aliases are not the set's release mechanism. Branches do not compete
+against each other: they predict
+different targets. A failed branch leaves earlier immutable candidates available
+but produces no complete successful set.</p>
+<p>For the generated graph, MLflow parameters, evaluation charts and SHAP reports,
+see <a href="databricks_training_reports.html">training reports</a>. Configure classification
+<a href="databricks_decision_thresholds.html">decision thresholds</a> separately from quality gates.</p>
+<h2 id="check-edits-before-training">Check edits before training</h2>
+<p>Run from the generated project with the matching Core installed:</p>
+<div class="highlight"><pre><span></span><code><span class="n">uv</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">-r</span> <span class="n">deployment</span><span class="p">/</span><span class="n">train-requirements</span><span class="p">.</span><span class="n">txt</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">smoke</span><span class="p">.</span><span class="n">py</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-action</span> <span class="n">train</span> <span class="p">-</span><span class="n">-catalog</span> <span class="n">workspace</span> <span class="p">-</span><span class="n">-input-schema</span> <span class="n">demo</span> <span class="p">-</span><span class="n">-output-schema</span> <span class="n">demo</span> <span class="p">-</span><span class="n">-metadata-schema</span> <span class="n">demo</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">refresh_training_graph</span><span class="p">.</span><span class="n">py</span>
+</code></pre></div>
+<p>Replace the preview bindings with the intended target's values; see the
+<a href="databricks_project_setup.html#local-tools-and-preview">local tools reference</a>
+for every flag and default. Preview does not read deployment/targets.yml for you.
+After changing model names, candidates
+or branch count, refresh the graph and validate/deploy it before running the job.
+Scoring source/model selector/model-set settings remain in the existing
+inference.yml; update them to the intended trained names and concrete versions.
+The training file alone is not a complete deployment or scoring configuration.</p>
+<p>Smoke checks configuration/source syntax; preview resolves trusted recipe
+builders and displays each candidate/branch's effective model, inputs, window,
+CV and metric. Neither fits a model or reads Delta data. Expect one model preview,
+two competition candidates or two target branches for the examples above.
+Use a real fit/save/predict check on representative rows before production.</p>
+<p>If a pre-split recipe reads the target, choose scoring behavior <strong>before</strong> preview:
+in config/scoring.yml set <code>skip_target_pre_split_steps: true</code> to retain
+feature-only reuse while skipping target-reading filters, or choose
+<code>mode: custom</code> for separately defined scoring eligibility. Mixed
+target/feature filters are skipped whole. An imputer does not override a scoring
+eligibility exclusion; excluded outcomes retain their keys and null predictions.</p>
+<table>
+<thead>
+<tr>
+<th>Error or surprising result</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unknown/duplicate key or multiple owners</td>
+<td>Correct the exact field or remove the competing declaration; values are not merged silently.</td>
+</tr>
+<tr>
+<td>Recipe missing/default recipe absent</td>
+<td>Add a default recipe and select an existing named list in the matching phase file.</td>
+</tr>
+<tr>
+<td>Target-reading pre-split recipe blocks preview</td>
+<td>Choose the explicit scoring switch/mode above; the examples' empty pre-split recipe needs neither change.</td>
+</tr>
+<tr>
+<td>First-champion approval requires a bound</td>
+<td>Set quality_threshold before training and create a new candidate with saved matching evidence.</td>
+</tr>
+<tr>
+<td>Automatic policy lacks quality_threshold</td>
+<td>Supply a domain-appropriate absolute bound before training.</td>
+</tr>
+<tr>
+<td>Window controls active in the wrong mode</td>
+<td>Omit/null inactive calendar/day/event/result fields; choose the intended window and split independently.</td>
+</tr>
+<tr>
+<td>No tuning intended but search runs</td>
+<td>Remove tuning mapping, rather than leaving an empty one.</td>
+</tr>
+<tr>
+<td>Budget exceeded</td>
+<td>Deliberately reduce the eligible source/sample or review a larger limit; prediction never samples automatically.</td>
+</tr>
+<tr>
+<td>Model/params changed but scoring is unchanged</td>
+<td>Train a new version, select/activate it deliberately, and run scoring; old artifacts keep their saved state.</td>
+</tr>
+</tbody>
+</table>
+<p>Continue to <a href="preprocessing_recipes.html">preprocessing recipes</a> for node choices,
+<a href="databricks_sdk.html">SDK workflows</a> for Python use, and the
+<a href="databricks_bundle_walkthrough.html">operator walkthrough</a> for actual run/task
+inspection and copyable approval/rollback fields.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
