@@ -53,7 +53,7 @@ def test_seeded_loader_propagates_through_passthrough() -> None:
             NodeConfig(
                 node_id="impute",
                 step_type="SimpleImputer",
-                params={"strategy": "mean"},
+                params={"strategy": "mean", "columns": ["a", "b"]},
                 inputs=["loader"],
             ),
         ],
@@ -62,7 +62,29 @@ def test_seeded_loader_propagates_through_passthrough() -> None:
     predicted = predict_schemas(config, initial_schemas={"loader": seed})
 
     assert predicted["loader"] == seed
-    assert predicted["impute"] == seed  # SimpleImputer is passthrough
+    assert predicted["impute"] == seed  # Explicit float64 imputation preserves known dtypes.
+
+
+def test_automatic_imputation_keeps_downstream_schema_unknown() -> None:
+    """Automatic selection needs runtime values, so a known source must not imply known output."""
+    seed = _seed_schema()
+    config = PipelineConfig(
+        pipeline_id="automatic-imputation",
+        nodes=[
+            NodeConfig(node_id="loader", step_type="data_loader", params={}, inputs=[]),
+            NodeConfig(
+                node_id="impute",
+                step_type="SimpleImputer",
+                params={"strategy": "mean"},
+                inputs=["loader"],
+            ),
+            NodeConfig(node_id="preview", step_type="data_preview", params={}, inputs=["impute"]),
+        ],
+    )
+
+    predicted = predict_schemas(config, initial_schemas={"loader": seed})
+
+    assert predicted == {"loader": seed, "impute": None, "preview": None}
 
 
 def test_drop_missing_columns_removes_column() -> None:

@@ -301,7 +301,7 @@ CASES: list[
         art.GeneralBinningArtifact,
         "general_binning",
         _numeric_df,
-        {"columns": ["a"], "strategy": "quantile", "n_bins": 4},
+        {"columns": ["a"], "strategy": "equal_frequency", "n_bins": 4},
     ),
     (
         CustomBinningCalculator,
@@ -461,6 +461,10 @@ def test_artifact_shape(
     assert isinstance(result, dict), (
         f"{calc_cls.__name__}.fit returned {type(result).__name__}, not dict"
     )
+    if calc_cls is GeneralBinningCalculator:
+        assert result["bin_edges"]["a"] == pytest.approx(
+            df["a"].quantile([0, 0.25, 0.5, 0.75, 1]).tolist()
+        )
 
     # 2) Empty-result early-exits are allowed (e.g. user picked no columns).
     if not result:
@@ -480,6 +484,14 @@ def test_artifact_shape(
         f"{calc_cls.__name__}.fit returned undeclared keys "
         f"{sorted(extra_keys)} (declared: {sorted(declared_keys)})"  # ty: ignore[invalid-argument-type]
     )
+
+
+def test_general_binning_rejects_sklearn_only_quantile_strategy() -> None:
+    """The shape fixture must not regain a silent empty artifact by accepting a foreign strategy."""
+    with pytest.raises(ValueError, match="quantile.*equal_frequency.*kbins"):
+        GeneralBinningCalculator().fit(
+            _numeric_df(), {"columns": ["a"], "strategy": "quantile", "n_bins": 4}
+        )
 
 
 # ---------- Split calculators (typed Artifact since C8) ----------

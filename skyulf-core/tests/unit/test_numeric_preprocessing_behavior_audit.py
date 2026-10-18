@@ -9,6 +9,7 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
+from skyulf.pipeline.seal import artifact_digest
 from skyulf.preprocessing.base import StatefulTransformer
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
@@ -202,10 +203,10 @@ def test_ordinal_bins_use_fitted_edges_for_singleton_and_reordered_batches(
 @pytest.mark.parametrize(
     "method,companion", [("box-cox", -1.0), ("box-cox", np.inf), ("yeo-johnson", np.inf)]
 )
-def test_invalid_power_batch_logs_its_policy_without_changing_replay(
+def test_invalid_power_batch_enforces_its_policy_without_changing_replay(
     engine, node_type, method, companion, caplog
 ):
-    """PowerTransformer invalid-row exclusion and GeneralTransformation fallback stay observable."""
+    """Invalid requests must preserve PowerTransformer exclusion and GeneralTransformation rejection."""
     train = _frame({"x": [1.0, 2.0, 4.0, 10.0, 30.0]}, engine)
     config = (
         {"columns": ["x"], "method": method}
@@ -213,23 +214,32 @@ def test_invalid_power_batch_logs_its_policy_without_changing_replay(
         else {"transformations": [{"column": "x", "method": method}]}
     )
     artifact = NodeRegistry.get_calculator(node_type)().fit(train, config)
+    before = artifact_digest(artifact)
     applier = NodeRegistry.get_applier(node_type)()
     alone = applier.apply(_frame({"x": [3.0]}, engine), artifact)
+    valid_batch = applier.apply(_frame({"x": [3.0, 6.0]}, engine), artifact)
+    assert valid_batch["x"].to_list()[0] == alone["x"].to_list()[0]
+    assert len(valid_batch) == 2
+    request = _frame({"x": [3.0, companion]}, engine)
+    original = deepcopy(request)
     caplog.clear()
-    batch = applier.apply(_frame({"x": [3.0, companion]}, engine), artifact)
 
     assert alone["x"].to_list()[0] != 3.0
     if node_type == "PowerTransformer":
+        batch = applier.apply(request, artifact)
         assert batch["x"].to_list()[0] == alone["x"].to_list()[0]
         assert len(batch) == 1
+        assert any(
+            record.name == "skyulf.preprocessing.transformations.power" and record.levelno >= 30
+            for record in caplog.records
+        )
     else:
-        _assert_frame_equal(batch, _frame({"x": [3.0, companion]}, engine), engine)
+        with pytest.raises(ValueError, match=f"Failed to apply {method} for column 'x'"):
+            applier.apply(request, artifact)
+    _assert_frame_equal(request, original, engine)
     replay = applier.apply(_frame({"x": [3.0]}, engine), artifact)
     _assert_frame_equal(replay, alone, engine)
-    expected_logger = "skyulf.preprocessing.transformations." + (
-        "power" if node_type == "PowerTransformer" else "general"
-    )
-    assert any(record.name == expected_logger and record.levelno >= 30 for record in caplog.records)
+    assert artifact_digest(artifact) == before
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

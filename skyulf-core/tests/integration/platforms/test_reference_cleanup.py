@@ -345,7 +345,7 @@ def test_cleanup_admission_excludes_new_dependency_after_final_plan(monkeypatch,
     receipt, source = _prepare_shared(spark, config, "1")
     state = {"owner": None}
 
-    def acquire(owner, holder=None):
+    def acquire(owner, holder, wait_timeout_s):
         """Represent the durable authority while exercising the real context and call ordering."""
         if state["owner"] is not None:
             raise RuntimeError("held by another operation")

@@ -106,6 +106,15 @@ async def test_all_transformers(sample_data, tmp_path):
             }
         elif node_id == "GroupImputer":
             pipeline_config["nodes"][1]["params"] = {"columns": ["A"], "group_by": "B"}
+        elif node_id == "ModelBasedSelection":
+            # Supervised selection requires the fixture's target and actual numeric candidates.
+            pipeline_config["nodes"][1]["params"] = {
+                "columns": ["A", "C"],
+                "target_column": "target",
+            }
+        elif node_id == "Normalizer":
+            # Row normalization needs finite input; A deliberately contains a missing value.
+            pipeline_config["nodes"][1]["params"] = {"columns": ["C"]}
         elif node_id == "ValueReplacement":
             pipeline_config["nodes"][1]["params"]["to_replace"] = {"a": "x"}
         elif node_id == "Casting":
