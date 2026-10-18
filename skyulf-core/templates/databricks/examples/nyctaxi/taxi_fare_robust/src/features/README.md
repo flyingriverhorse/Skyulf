@@ -98,6 +98,70 @@ for supported settings, minimum probe rows, exclusions and troubleshooting.
 Calculations that need other rows can instead run in a `groups/` Spark producer
 before the model.
 
+## Prefer a built-in when it expresses the same rule
+
+The custom factories below teach how to package your own code. New projects can
+use the following registered steps without maintaining those factories. These
+alternatives require the development changes for 0.9.4; use a wheel built from
+this checkout until that release is published, then change the requirements pin.
+Changing a recipe requires retraining and checking its new output schema.
+
+| Demonstration | Built-in alternative | Check before replacing it |
+| --- | --- | --- |
+| `pre_split.value_range` | `ManualBounds` with `bounds: {column: {lower: minimum, upper: maximum}}` | Bounds are inclusive. ManualBounds retains missing values; precede it with DropMissingRows when the custom filter rejects missing values. |
+| `trip_rules.known_zips` | `DropMissingRows` with `subset: [pickup_zip, dropoff_zip]` | This rejects nulls, not arbitrary invalid or unknown zone identifiers. |
+| `trip_rules.clip_outliers` / diagnostic `clip_measurements` | `Winsorize`, columns selected explicitly, percentiles 1 and 99 | Fit on training rows. Use float measurements; cast integer inputs explicitly if fractional limits are needed. |
+| Bike `weather_imputation` | `Casting` to float64, then `SimpleImputer` with median | Casting preserves the custom step's always-float64 output even if a training column has no missing values. |
+| Air-quality `missing_marker` | `ValueReplacement` with an explicit column list and `mapping: {-200: null}`, then SimpleImputer | Float columns stay numeric. Do this before fitting imputation, clipping or scaling statistics. |
+| Taxi `log_feature` | `ClipValues` with lower 0, then `SimpleTransformation` with method log | The built-in computes log1p but replaces the input; the custom factory adds log_column and keeps the original. Keep the factory if both columns are needed. |
+| `frequency_encoding` | `FrequencyEncoder` with `mode: frequency` | Both use the total training row count. The built-in treats null as a learned category; the demonstration always maps null to zero. |
+| `rare_categories` | `RareCategoryGrouping` with min_count 1 and the same min_share | The built-in groups rare or unseen nulls too; the demonstration always preserves null. |
+| Bike `clock_cycle` | `DateFeatures` with `features: [hour_sin, hour_cos]` on a timestamp | The example's hr is already a number, not a timestamp. Keep its numeric factory or select the real timestamp; generated names also differ. |
+| Air-quality `temperature_anomaly` | `FeatureMath` group_agg with method deviation | Saves group means and a global fallback; name the output to match downstream columns. |
+
+For a non-null zone policy, these are complete alternatives for the two worked
+recipes. Paste the first into `config/pre_split.yml`, the second into
+`config/preprocessing.yml`, then select them in `config/training.yml`.
+
+```yaml
+recipes:
+  builtin_eligibility:
+    - name: required_trip_fields
+      transformer: DropMissingRows
+      params: {subset: [trip_distance, duration_min, pickup_zip, dropoff_zip]}
+    - name: plausible_trip
+      transformer: ManualBounds
+      params:
+        bounds:
+          trip_distance: {lower: 0.01, upper: 100}
+          duration_min: {lower: 1, upper: 240}
+```
+
+```yaml
+recipes:
+  builtin_zones_and_trips:
+    - name: zone_shares
+      transformer: FrequencyEncoder
+      params: {columns: [pickup_zip, dropoff_zip], mode: frequency}
+    - name: float_measurements
+      transformer: Casting
+      params: {columns: [trip_distance, duration_min], target_type: float64}
+    - name: duration_limits
+      transformer: Winsorize
+      params: {columns: [duration_min], lower_percentile: 1, upper_percentile: 99}
+    - name: fill_numeric
+      transformer: SimpleImputer
+      params: {columns: [trip_distance, duration_min], strategy: median}
+    - name: scale
+      transformer: StandardScaler
+      params: {columns: [pickup_hour, pickup_dow, trip_distance, duration_min]}
+```
+
+Frequency learning sees only rows remaining after the eligibility filter. A
+scoring policy that permits null zones still differs from the custom factory;
+choose that behavior deliberately. Model versions already trained with custom
+code continue replaying their saved code until you train a replacement.
+
 ## Worked example: `taxi_high_fare`
 
 The `examples/nyctaxi/taxi_high_fare` project classifies whether a trip's fare

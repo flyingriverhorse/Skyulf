@@ -28,6 +28,15 @@ and scoring rules with flow diagrams.
 monitored on Databricks. The answer files next to the folders (`taxi_fare.json`
 and so on) record every setup answer that differs from the defaults.
 
+## Built-in alternatives to the teaching factories
+
+The examples retain custom factories to demonstrate packaging and saved-code
+replay. For a new recipe, see the [built-in alternatives](taxi_high_fare/src/features/README.md#prefer-a-built-in-when-it-expresses-the-same-rule):
+filters, learned clipping, imputation, missing markers, frequency/rare encoding,
+cyclical dates and group deviations. The guide includes runnable YAML and the
+null, dtype and output-name differences to check before retraining. These new
+built-ins require the 0.9.4 development wheel until that release is published.
+
 ## Run one
 
 1. Copy the project folder out of the repository.
