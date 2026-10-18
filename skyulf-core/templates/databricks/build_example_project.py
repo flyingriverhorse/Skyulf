@@ -12,6 +12,9 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -159,30 +162,68 @@ def project_files(project):
     }
 
 
+@contextmanager
+def offline_cli_environment():
+    """Answer CLI host discovery without network retries or workspace credentials.
+
+    Only the metadata document is available; workspace lookups return HTTP 404.
+    """
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            """Keep local host discovery out of generated example diagnostics."""
+
+        def do_GET(self):
+            """Expose only the empty metadata document needed by offline bundle init."""
+            self.send_response(200 if self.path == "/.well-known/databricks-config" else 404)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
+    )
+    thread.start()
+    environment = {
+        key: value for key, value in os.environ.items() if not key.startswith("DATABRICKS_")
+    }
+    environment.update(
+        DATABRICKS_HOST=f"http://127.0.0.1:{server.server_port}",
+        DATABRICKS_TOKEN="local-render-only",
+        DATABRICKS_AUTH_TYPE="pat",
+        DATABRICKS_CONFIG_FILE=os.devnull,
+        DATABRICKS_CLI_DISABLE_TELEMETRY="1",
+    )
+    try:
+        yield environment
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def generate_example(directory, name):
     """Render offline with the example answers, then apply only the documented example edits."""
     spec = PROJECTS[name]
-    environment = os.environ | {
-        "DATABRICKS_HOST": "https://127.0.0.1",
-        "DATABRICKS_TOKEN": "local-render-only",
-        "DATABRICKS_AUTH_TYPE": "pat",
-    }
-    result = subprocess.run(
-        [
-            "databricks",
-            "bundle",
-            "init",
-            str(ROOT),
-            "--config-file",
-            str(example_root(name) / f"{name}.json"),
-            "--output-dir",
-            str(directory),
-        ],
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    with offline_cli_environment() as environment:
+        result = subprocess.run(
+            [
+                "databricks",
+                "bundle",
+                "init",
+                str(ROOT),
+                "--config-file",
+                str(example_root(name) / f"{name}.json"),
+                "--output-dir",
+                str(directory),
+            ],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
     project = directory / name

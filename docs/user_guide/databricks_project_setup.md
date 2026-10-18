@@ -228,7 +228,7 @@ Both setup modes ask two monitoring questions, after the deployment questions:
 | Question | Answer | Result in `deployment/variables.yml` |
 | --- | --- | --- |
 | `monitoring_catalog` | Existing catalog for the shared monitoring store, or blank | Default of `monitoring_catalog` |
-| `monitoring_schema` | Schema in that catalog; required when a catalog is given, blank otherwise | Default of `monitoring_schema` |
+| `monitoring_schema` | Shared schema in that catalog; omitted or blank uses `skyulf_monitoring` | Shared schema when a catalog is set; blank when monitoring is off |
 
 Give every project the same catalog and schema, reserved for monitoring (for
 example `skyulf_monitoring`), not the project's own schema: all models then
@@ -241,10 +241,18 @@ jobs create and where each one belongs.
 A catalog answer sets `monitoring_enabled` to `"true"`: train and score enroll
 models and run monitoring. A blank catalog sets `monitoring_enabled` to
 `"false"`: train and score run without monitoring. A catalog without a schema
-stops `databricks bundle init` with a template error. Each answer is blank or
-one identifier. The schema is created on first use if the run-as identity may
+uses `skyulf_monitoring`. A user-selected schema is preserved, including an
+existing store. Each answer is blank or one identifier. The schema is created
+on first use if the run-as identity may
 create schemas. Personal development targets always set `monitoring_enabled`
 to `"false"`.
+
+Configured projects also include an independent weekly `monitoring_cleanup`
+job. It defaults to Sunday 04:00 UTC, confirmed cleanup and a 90-day minimum
+reference age. Its cron, confirmation and pause controls are editable per
+target; personal development keeps it paused. Review
+[reference retention](databricks_monitoring_setup.md#retain-or-clean-old-spark-references)
+before deployment. Setup does not move or delete tables in an existing store.
 
 To turn monitoring on later, set `monitoring_catalog`, `monitoring_schema` and
 `monitoring_enabled: "true"` in `deployment/variables.yml`, or per target under
@@ -483,7 +491,7 @@ table/column names and snapshot pins with real values.
 | An init example names columns absent from your table | Edit its source, keys, inputs and targets; initialization never validates source rows. |
 | A quick setup did not ask about a model or search | Edit `config/training.yml`, or choose detailed setup. Quick mode retains editable defaults. |
 | A newly enabled task has no notebook | Generate a separate comparison project and transfer the required notebook, dependencies and graph together. |
-| Init stops with `ERROR_monitoring_schema_is_required_with_monitoring_catalog` | Answer `monitoring_schema` as well, or leave `monitoring_catalog` blank to start without monitoring. |
+| Monitoring appears in a different schema than expected | A catalog with an omitted or blank schema uses `skyulf_monitoring`. Set the existing store's schema explicitly in target variables; setup never migrates tables. |
 | Train or score fails with `Set both monitoring_catalog and monitoring_schema.` | `monitoring_enabled` is `"true"`, or only one destination value is set. Set both values for that target and redeploy, or set `monitoring_enabled: "false"` and clear both. |
 
 Continue with [deployment and access](databricks_deployment.md), or

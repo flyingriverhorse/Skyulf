@@ -75,9 +75,9 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
         if issubclass(calculator, BaseModelCalculator) and calculator().problem_type == task:
             expected_models.add(name)
     assert set(properties[f"{task}_model"]["enum"]) == expected_models
-    assert set(properties[f"{task}_metric"]["enum"]) == (
-        _CLASSIFICATION if task == "classification" else _REGRESSION
-    )
+    # WAPE is a monitoring/holdout metric, not a model-search scorer in the wizard.
+    supported = _CLASSIFICATION if task == "classification" else _REGRESSION - {"heldout_wape"}
+    assert set(properties[f"{task}_metric"]["enum"]) == supported
     assert "preprocessing" not in properties
 
 
@@ -175,13 +175,15 @@ def test_data_settings_use_defaults_without_extra_prompts(task):
         "test_size",
         "random_state",
         "stratify",
-        "training_sample_rows",
-        "training_sample_seed",
         "min_improvement",
         "risk_category",
     ):
         assert "default" in properties[name]
         assert Draft7Validator(properties[name].get("skip_prompt_if", False)).is_valid(values)
+    assert not Draft7Validator(properties["training_sample_rows"]["skip_prompt_if"]).is_valid(
+        values
+    )
+    assert Draft7Validator(properties["training_sample_seed"]["skip_prompt_if"]).is_valid(values)
     assert properties["training_window_mode"]["default"] == "auto"
     assert not Draft7Validator(properties["training_window_mode"]["skip_prompt_if"]).is_valid(
         values
@@ -431,15 +433,39 @@ def test_generated_bundle_has_only_train_and_serialized_score_jobs():
     assert "timezone_id: ${var.retraining_timezone_id}" in template
 
 
-def test_preview_cli_exposes_one_training_action(monkeypatch, capsys):
+def test_preview_cli_exposes_one_training_action(tmp_path, monkeypatch, capsys):
     """Offline preview must present the same training action for every trigger."""
+    from test_databricks_bundle_generation import _generate_project
+
+    project = _generate_project(tmp_path)
     monkeypatch.setattr(sys, "argv", ["preview.py", "--help"])
     with pytest.raises(SystemExit) as stopped:
-        runpy.run_path(str(WORKFLOW.parent.parent / "tools/preview.py.tmpl"), run_name="__main__")
+        runpy.run_path(str(project / "src/tools/preview.py"), run_name="__main__")
     assert stopped.value.code == 0
     output = capsys.readouterr().out
-    assert "{score,train}" in output
+    assert "{score,train,sources}" in output
     assert "train_monthly" not in output
+
+
+def test_render_helper_skips_only_without_explicit_cli_opt_in(tmp_path, monkeypatch):
+    """Importing the helper must not bypass the opt-in guard in pure config test jobs."""
+    import test_databricks_bundle_generation as generation
+
+    monkeypatch.setattr(generation, "CLI", None)
+    monkeypatch.setattr(generation, "PROFILE", None)
+    monkeypatch.setattr(generation, "OFFLINE_CLI", False)
+    with pytest.raises(pytest.skip.Exception, match="opt into"):
+        generation._initialize_project(tmp_path)
+
+
+def test_render_helper_requires_cli_when_explicitly_enabled(tmp_path, monkeypatch):
+    """A broken CLI test job must fail rather than silently lose its generation coverage."""
+    import test_databricks_bundle_generation as generation
+
+    monkeypatch.setattr(generation, "CLI", None)
+    monkeypatch.setattr(generation, "OFFLINE_CLI", True)
+    with pytest.raises(pytest.fail.Exception, match="Databricks CLI"):
+        generation._initialize_project(tmp_path)
 
 
 def test_init_exposes_both_model_change_modes_and_editable_training_cadence():

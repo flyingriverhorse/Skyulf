@@ -13,6 +13,7 @@ from ....mlflow.lifecycle.validation import ModelComparisonReport
 from ...lifecycle._lifecycle_state import LifecycleContext, LifecyclePhaseResult, PhaseStore
 from ...model_sets.model_set_project import package_training_model_set, project_endpoints
 from ...model_sets.model_set_release import pin_model_set_baseline
+from ...observability.monitoring.monitoring_registration import monitoring_destination
 from ...training.branches import (
     BranchTrainingResult,
     branch_training_payload,
@@ -24,6 +25,7 @@ from ...training.branches import (
 from ...training.fitting.candidate import CandidateResult
 from ...training.shared.training_evidence import evidence_digest
 from ..lifecycle.lifecycle_tasks import record_phase_failure, validate_active_phase
+from ..shared.reference_mutations import phase_reference_mutation, prepare_reference_mutations
 
 
 def _training_request(spark: Any, configs: dict, settings: dict | None) -> dict:
@@ -80,6 +82,7 @@ def initialize_branch_training(
     }
     if action == "train":
         request.update(_training_request(spark, configs, settings))
+    prepare_reference_mutations(spark, monitoring_destination(operator_values or {}))
     store = PhaseStore(tracking_uri, context)
     _create_parent(store, request, experiment_name)
     if action == "train":
@@ -197,6 +200,18 @@ def register_branch_set(
     validate_active_phase(store, "train")
     branches = restore_training_branches(store.request["branch_plan"])
     outcome = _completed_branches(store, branches)
+    with phase_reference_mutation(spark, store, "register_model_set"):
+        return _register_branch_set(spark, store, branches, outcome, reference)
+
+
+def _register_branch_set(
+    spark: Any,
+    store: PhaseStore,
+    branches: tuple,
+    outcome: BranchTrainingResult,
+    reference: dict,
+) -> LifecyclePhaseResult:
+    """Keep nomination and its failure evidence inside reference admission."""
     store.begin("register_model_set")
     try:
         store.log("branch_training_result.json", asdict(outcome))
@@ -278,11 +293,17 @@ def run_branch_operator(
     reference: dict,
 ) -> LifecyclePhaseResult:
     """Run an explicit set action from pinned settings without loading editable recipes."""
+    store = _bound_store(context, tracking_uri, reference)
+    validate_active_phase(store, "operator")
+    with phase_reference_mutation(spark, store, "operator"):
+        return _run_branch_operator(spark, store, reference)
+
+
+def _run_branch_operator(spark: Any, store: PhaseStore, reference: dict) -> LifecyclePhaseResult:
+    """Retain the owner through both a set alias request and failure bookkeeping."""
     from ...model_sets.model_set_project import run_model_set_operator  # noqa: PLC0415
     from ..shared.job_runtime import operator_options  # noqa: PLC0415  # noqa: PLC0415
 
-    store = _bound_store(context, tracking_uri, reference)
-    validate_active_phase(store, "operator")
     store.begin("operator")
     try:
         values = store.request["operator_values"]

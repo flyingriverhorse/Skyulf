@@ -80,6 +80,11 @@ jobs:
       - name: Format check (Ruff)
         run: bash .github/scripts/run_check.sh "Ruff format" ruff format --check backend skyulf-core tests run_skyulf.py celery_worker.py
 
+      - name: Format Markdown Python examples (Ruff)
+        run: |
+          git ls-files -z -- 'backend/**/*.md' 'skyulf-core/**/*.md' 'tests/**/*.md' | \
+            xargs -0 -r ruff format --preview --check
+
       - name: Type check (Ty)
         run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 
@@ -118,12 +123,20 @@ jobs:
             ${{ runner.os }}-uv-3.12-
       - name: Install dependencies (uv)
         run: uv pip install --system -q -r requirements-ci.txt
-      - name: Compare rendered template snapshots
+      - name: Check CLI-dependent template contracts and render snapshots
         env:
           SKYULF_BUNDLE_OFFLINE_CLI: "1"
         run: |
-          bash .github/scripts/run_check.sh "Databricks render snapshots" \
-            python -m pytest skyulf-core/tests/integration/platforms/test_databricks_render_snapshots.py -q
+          bash .github/scripts/run_check.sh "Databricks template CLI contracts" \
+            python -m pytest \
+              skyulf-core/tests/integration/platforms/test_template_source_setup.py \
+              skyulf-core/tests/integration/platforms/test_template_operational_controls.py \
+              skyulf-core/tests/integration/platforms/test_databricks_bundle_template.py \
+              skyulf-core/tests/integration/platforms/test_databricks_bundle_generation.py \
+              skyulf-core/tests/integration/platforms/test_bundle_runtime_packaging.py \
+              skyulf-core/tests/integration/platforms/test_databricks_example_project.py \
+              skyulf-core/tests/integration/platforms/test_monitoring_defaults_cleanup.py \
+              skyulf-core/tests/integration/platforms/test_databricks_render_snapshots.py -q
 
   backend-tests:
     name: Backend Tests

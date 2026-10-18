@@ -74,7 +74,7 @@ These stay, because the Bundle never created them as resources:
 | Training and scoring source tables | Never created by the project |
 | Prediction tables, generation tables and model-set views | Created by the score job at run time |
 | Feature group outputs and the merged feature table | Created by the `features` job at run time |
-| Monitoring store tables and views | `model_inventory`, `monitoring_results`, `performance_actions`, `retraining_requests`, the views and the `monitor_ref_*` reference tables; shared with other projects |
+| Monitoring store tables and views | `model_inventory`, `monitoring_results`, `performance_actions`, `retraining_requests`, the views, `reference_cleanup_audit`, `monitor_ref_*` references and shared `monitor_src_*` populations; shared with other projects |
 | Monitoring enrollment rows | Stay in `model_inventory`; paused if you followed the steps above |
 | Registered models, versions, aliases and tags | Unity Catalog objects |
 | Monitoring experiment named by `monitoring_experiment_name` | Outside the project folder when set to a path such as `/Shared/...` |

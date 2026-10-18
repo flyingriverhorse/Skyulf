@@ -19,6 +19,7 @@ from ...observability.monitoring.spark.spark_monitoring_reference import (
 )
 from ...observability.monitoring.spark.spark_monitoring_windows import revisit_performance_windows
 from ..shared.notebook_diagnostics import result_summary
+from ..shared.reference_mutations import notebook_reference_holder, reference_mutation_scope
 
 
 def dispatch_monitoring_job(request: dict, values: dict, *, workspace: Any = None) -> dict:
@@ -68,8 +69,9 @@ def prepare_project_references(
         return {"status": "disabled"}
     configs = project_configs(spark, namespace, values)
     selected = [config for config in configs if model_ids is None or config.monitor_id in model_ids]
+    holder = notebook_reference_holder(values)
     for config in selected:
-        prepare_spark_monitoring_reference(spark, config)
+        prepare_spark_monitoring_reference(spark, config, reference_holder=holder)
     return {"status": "prepared", "models": len(selected)}
 
 
@@ -129,7 +131,8 @@ def run_project_monitoring_notebook(spark: Any, dbutils: Any) -> dict:
     if namespace is None or values.get("monitoring_enabled", "true") != "true":
         return {"status": "disabled"}
     if action == "enroll_serving":
-        return enroll_serving_configs(spark, namespace, values)
+        with reference_mutation_scope(spark, namespace, **notebook_reference_holder(values)):
+            return enroll_serving_configs(spark, namespace, values)
     if action == "prepare_references":
         return prepare_project_references(spark, values)
     if action != "observe":

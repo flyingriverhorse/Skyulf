@@ -19,6 +19,7 @@ from ...lifecycle.workflow import (
     workflow_policies,
 )
 from ...observability.monitoring.monitoring_registration import (
+    monitoring_destination,
     publish_monitoring_request,
     register_scoring_monitor,
     validate_monitoring_settings,
@@ -369,6 +370,8 @@ def _prepared_notebook_request(
         "config": config,
         "action": action,
         "operator_options": options,
+        "monitoring_namespace": monitoring_destination(values),
+        "workspace_host": values.get("workspace_host") or None,
         "experiment_name": values.get("experiment_name"),
         "tracking_uri": config.get("tracking_uri", "databricks"),
     }

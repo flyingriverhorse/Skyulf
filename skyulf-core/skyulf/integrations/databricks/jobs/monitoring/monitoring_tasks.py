@@ -22,6 +22,7 @@ from ..shared.job_runtime import (
     saved_notebook_request,
 )
 from ..shared.notebook_diagnostics import result_summary
+from ..shared.reference_mutations import enrollment_reference_holder
 
 
 def deployment_store(values: dict[str, str], *, expected_phase: str = "result") -> PhaseStore:
@@ -48,12 +49,14 @@ def run_monitor_enrollment_notebook(spark: Any, dbutils: Any) -> dict:
     if monitoring_destination(values) is None:
         return {"status": "disabled"}
     store = deployment_store(values)
+    holder = enrollment_reference_holder(store, values, "register_monitor")
     result = register_deployed_monitor(
         spark,
         store.request["config"],
         values,
         store.receipt("result")["output"],
         activation_started_ms=store.client.get_run(store.run_id).info.start_time,
+        reference_holder=holder,
     )
     output = {"status": "enrolled", **result} if result else {"status": "no_activation"}
     return output

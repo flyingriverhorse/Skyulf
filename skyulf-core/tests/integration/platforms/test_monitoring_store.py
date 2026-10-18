@@ -2,7 +2,9 @@
 
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from threading import Barrier
 from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import uuid4
@@ -242,6 +244,29 @@ def test_inventory_read_is_bounded_and_rejects_tampered_config(monkeypatch):
         store.load_enrolled_models(spark, "ops.monitoring")
 
 
+def test_project_monitoring_selects_only_its_enabled_environment(monkeypatch):
+    """Sharing the physical store must not make one project's job observe another project's rows."""
+    from skyulf.integrations.databricks.jobs.monitoring import spark_monitoring_job as job
+
+    base = config().payload() | {
+        "execution_engine": "spark",
+        "reference_namespace": "ops.skyulf_monitoring",
+    }
+    entries = [
+        MonitorConfig.from_dict(base | changes)
+        for changes in ({}, {"project": "sales"}, {"environment": "prod"}, {"enabled": False})
+    ]
+    monkeypatch.setattr(
+        job, "load_enrolled_models", lambda *args: [item.payload() for item in entries]
+    )
+    selected = job.project_configs(
+        Mock(),
+        "ops.skyulf_monitoring",
+        {"monitoring_project": "risk", "monitoring_environment": "test"},
+    )
+    assert [item.monitor_id for item in selected] == [entries[0].monitor_id]
+
+
 @pytest.fixture
 def native_store_namespace(delta_spark):
     """Isolate real store initialization and clean only this test's owned objects."""
@@ -269,6 +294,71 @@ def native_store_namespace(delta_spark):
                     assert store.ensure_owned_object(delta_spark, f"{namespace}.{item.name}")
             delta_spark.sql(f"DROP SCHEMA {table_name(namespace)} CASCADE").collect()
             assert not delta_spark.catalog.databaseExists(namespace)
+
+
+def test_native_two_projects_share_first_bootstrap_and_keep_distinct_inventory(
+    delta_spark, native_store_namespace
+):
+    """Two fresh projects must create twelve shared objects and retain isolated enrollment identities."""
+    from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import project_configs
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    namespace = store.ensure_monitoring_store(delta_spark, *native_store_namespace)
+    entries = [
+        MonitorConfig.from_dict(
+            config().payload()
+            | {"project": project, "execution_engine": "spark", "reference_namespace": namespace}
+        )
+        for project in ("risk", "sales")
+    ]
+    for entry in entries:
+        assert store.ensure_monitoring_store(delta_spark, *native_store_namespace) == namespace
+        store.enroll_monitor(delta_spark, namespace, entry)
+    assert len(delta_spark.catalog.listTables(namespace)) == 12
+    assert len(store.load_enrolled_models(delta_spark, namespace)) == 2
+    for entry in entries:
+        selected = project_configs(
+            delta_spark,
+            namespace,
+            {"monitoring_project": entry.project, "monitoring_environment": entry.environment},
+        )
+        assert [item.monitor_id for item in selected] == [entry.monitor_id]
+
+
+def test_native_concurrent_first_bootstrap_reuses_owned_objects(
+    delta_spark, native_store_namespace
+):
+    """Simultaneous first use must retain one compatible store without replacing a winning creator's objects."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    start = Barrier(2)
+
+    def concurrent_sql(statement):
+        """Force both creators to reach each conditional DDL before either executes it."""
+        if statement.startswith("CREATE "):
+            start.wait(timeout=30)
+        return delta_spark.sql(statement)
+
+    concurrent = SimpleNamespace(
+        sql=concurrent_sql,
+        catalog=delta_spark.catalog,
+        table=delta_spark.table,
+        createDataFrame=delta_spark.createDataFrame,
+    )
+
+    def bootstrap():
+        """Release both first-time callers against the same empty namespace."""
+        return store.ensure_monitoring_store(concurrent, *native_store_namespace)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(bootstrap) for _ in range(2)]
+        namespaces = [future.result(timeout=180) for future in futures]
+    assert namespaces[0] == namespaces[1]
+    objects = delta_spark.catalog.listTables(namespaces[0])
+    assert len(objects) == 12
+    assert all(
+        store.ensure_owned_object(delta_spark, f"{namespaces[0]}.{item.name}") for item in objects
+    )
 
 
 def test_native_nullable_counts_preserve_zero_health_and_legacy_replays(

@@ -7,8 +7,9 @@ receipt survives an uncertain mutation, which requires operator reconciliation.
 
 import hashlib
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -47,6 +48,24 @@ _HISTORY_TAG = "previous_challenger_current_event"
 _ACTIVE_TAG = "champion_current_event"
 _CHALLENGER_TAG = "challenger_current_event"
 _PENDING_TAG = "pending_alias_event"
+_BEFORE_ALIAS_WRITE: ContextVar[Callable[[], None] | None] = ContextVar(
+    "skyulf_before_alias_write", default=None
+)
+
+
+@contextmanager
+def guard_alias_mutations(before_write: Callable[[], None]) -> Iterator[None]:
+    """Scope an optional platform check to actual alias writes, preserving nested callers.
+
+    The callback runs after transaction validation and immediately before each
+    alias network request. A refusal prevents that request. Callers own their
+    external admission and recovery; ordinary SDK calls need no callback.
+    """
+    token = _BEFORE_ALIAS_WRITE.set(before_write)
+    try:
+        yield
+    finally:
+        _BEFORE_ALIAS_WRITE.reset(token)
 
 
 class AliasConflictError(RegistryError):
@@ -754,6 +773,9 @@ def _apply_alias_updates(
     changed = False
     for update in updates:
         alias, new_version = update[:2]
+        before_write = _BEFORE_ALIAS_WRITE.get()
+        if before_write is not None:
+            before_write()
         try:
             if new_version is None:
                 client.delete_registered_model_alias(receipt.model_name, alias)

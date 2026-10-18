@@ -39,20 +39,29 @@ def cleanup_store(delta_spark):
         delta_spark.sql(f"DROP SCHEMA {namespace} CASCADE")
 
 
-def _reference(spark, namespace, version="1"):
+def _reference(spark, namespace, version="1", *, layout=1, project="retention"):
     """Write the same owned version-zero Delta populations and receipt as the producer."""
+    import pandas as pd
+
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
         MonitorConfig,
         json_digest,
     )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_source_evidence import (
+        source_evidence,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.reference_layout import (
+        shared_source_table_name,
+        source_snapshot_identity,
+    )
     from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_reference import (
-        _reference_name,
         _write_population,
+        reference_table_name,
     )
 
     config = MonitorConfig(
         environment="test",
-        project="retention",
+        project=project,
         model_name=f"{namespace}.model",
         model_version=version,
         source_table=f"{namespace}.source",
@@ -70,22 +79,47 @@ def _reference(spark, namespace, version="1"):
         "dataset_id": "fixture",
         "training_evidence_sha256": "c" * 64,
     }
+    rows = [(1, 2.0), (1, 2.0), (2, None), (3, 7.0)]
+    source = spark.createDataFrame(rows, "id long, x double")
+    frames = {
+        "train": spark.createDataFrame(rows[:3], "id long, x double"),
+        "seen": source,
+        "source": source,
+    }
+    source_identity = source_snapshot_identity(
+        "fixture",
+        0,
+        source_evidence(pd.DataFrame(rows, columns=["id", "x"]), ("id", "x"), "fixture"),
+        source.schema.jsonValue(),
+    )
+    if layout == 2:
+        frames = {
+            "population": spark.createDataFrame(
+                [(key, value, i < 3) for i, (key, value) in enumerate(rows)],
+                "id long, x double, is_train boolean",
+            ),
+            "source": source,
+        }
     tables = {
         key: _write_population(
             spark,
-            _reference_name(config, evidence, key),
-            spark.createDataFrame([(1, 2.0)], "id long, x double"),
+            shared_source_table_name(namespace, source_identity)
+            if layout == 2 and key == "source"
+            else reference_table_name(config, evidence, key),
+            frame,
         )
-        for key in ("train", "seen", "source")
+        for key, frame in frames.items()
     }
     receipt = {
-        "format": 1,
+        "format": layout,
         "evidence": evidence,
         "tables": tables,
         "source_table_id": "fixture",
         "holdout": {},
     }
-    name = _reference_name(config, evidence, "receipt")
+    if layout == 2:
+        receipt.update(source_identity=source_identity, membership_column="is_train")
+    name = reference_table_name(config, evidence, "receipt")
     _write_population(
         spark,
         name,
@@ -94,6 +128,92 @@ def _reference(spark, namespace, version="1"):
         ),
     )
     return config, name, tables
+
+
+@pytest.mark.parametrize("layout", [1, 2])
+def test_native_reference_formats_roundtrip_exact_logical_populations(
+    delta_spark, cleanup_store, layout
+):
+    """Real format-1 receipts remain readable and format-2 projections preserve duplicates and nulls."""
+    from collections import Counter
+
+    from skyulf.integrations.databricks.observability.monitoring.reference_layout import (
+        reference_population_records,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_reference import (
+        read_reference_metadata,
+        read_reference_population,
+    )
+
+    config, receipt_name, _ = _reference(delta_spark, cleanup_store, layout=layout)
+    stored = json.loads(delta_spark.table(receipt_name).first()["payload"])
+    receipt = read_reference_metadata(delta_spark, config, stored["evidence"])
+    records = reference_population_records(receipt)
+    train = read_reference_population(delta_spark, records["train"])
+    seen = read_reference_population(delta_spark, records["seen"])
+    assert train.columns == seen.columns == ["id", "x"]
+    assert Counter(tuple(row) for row in train.collect()) == Counter(
+        [(1, 2.0), (1, 2.0), (2, None)]
+    )
+    assert Counter(tuple(row) for row in seen.collect()) == Counter(
+        [(1, 2.0), (1, 2.0), (2, None), (3, 7.0)]
+    )
+
+
+def test_native_shared_source_retires_only_after_other_project(delta_spark, cleanup_store):
+    """Actual Delta IDs and store-wide reverse references protect a source until its last retirement."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+        enroll_monitor,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.reference_cleanup import (
+        cleanup_references,
+    )
+
+    first, receipt_one, tables_one = _reference(delta_spark, cleanup_store, layout=2)
+    second, receipt_two, tables_two = _reference(
+        delta_spark, cleanup_store, layout=2, project="other"
+    )
+    assert tables_one["source"] == tables_two["source"]
+    enroll_monitor(delta_spark, cleanup_store, replace(first, enabled=False))
+    enroll_monitor(delta_spark, cleanup_store, replace(second, enabled=False))
+    catalog, schema = cleanup_store.split(".")
+    values = {
+        "monitoring_catalog": catalog,
+        "monitoring_schema": schema,
+        "monitoring_environment": "test",
+        "monitoring_project": "retention",
+        "cleanup_confirm": "true",
+    }
+    later = datetime.now(UTC) + timedelta(days=91)
+    result_one = cleanup_references(delta_spark, values, registry=lambda _: {}, now=later)
+    assert result_one["deleted"] == [receipt_one]
+    assert delta_spark.catalog.tableExists(tables_one["source"]["name"])
+    assert delta_spark.catalog.tableExists(receipt_two)
+    result_two = cleanup_references(
+        delta_spark, values | {"monitoring_project": "other"}, registry=lambda _: {}, now=later
+    )
+    assert result_two["deleted"] == [receipt_two]
+    assert not delta_spark.catalog.tableExists(tables_one["source"]["name"])
+
+
+def test_native_reader_and_reuse_reject_modified_shared_source(delta_spark, cleanup_store):
+    """Append-only protection permits INSERT, so latest-version validation must reject it explicitly."""
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_reference import (
+        _write_population,
+        read_reference_population,
+    )
+
+    _, _, tables = _reference(delta_spark, cleanup_store, layout=2)
+    source = tables["source"]
+    delta_spark.sql(f"INSERT INTO {source['name']} VALUES (4, 8.0)")
+    with pytest.raises(ValueError, match="modified after creation"):
+        read_reference_population(delta_spark, source)
+    with pytest.raises(ValueError, match="modified after creation"):
+        _write_population(
+            delta_spark,
+            source["name"],
+            delta_spark.createDataFrame([(1, 2.0)], "id long, x double"),
+        )
 
 
 def test_native_reference_retention_dry_run_protections_and_confirmed_delete(

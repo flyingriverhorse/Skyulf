@@ -4,9 +4,11 @@ import hashlib
 import json
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -17,10 +19,11 @@ from skyulf.integrations.databricks.projects.yaml_config import read_workflow_co
 PROFILE = os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE")
 OFFLINE_CLI = os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
 CLI = shutil.which("databricks")
-pytestmark = pytest.mark.skipif(
+CLI_ONLY = pytest.mark.skipif(
     not (PROFILE or OFFLINE_CLI) or not CLI,
     reason="Set SKYULF_BUNDLE_CLI_TEST_PROFILE to explicitly opt into installed CLI generation.",
 )
+pytestmark = CLI_ONLY
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
@@ -104,6 +107,10 @@ def _initialize_project(tmp_path, *, omit_fields=(), **overrides):
     Identical successful renders are reused within a pytest session (see the
     platforms conftest); each caller still gets its own copy to modify.
     """
+    if not (PROFILE or OFFLINE_CLI):
+        pytest.skip("Set SKYULF_BUNDLE_OFFLINE_CLI=1 to opt into CLI generation.")
+    if not CLI:
+        pytest.fail("Databricks CLI is required when CLI generation is enabled.")
     root = TEMPLATE_ROOT
     schema = json.loads((root / "databricks_template_schema.json").read_text())
     values = {key: spec["default"] for key, spec in schema["properties"].items()}
@@ -143,22 +150,21 @@ def _render_with_cli(root, inputs, output):
         "--output-dir",
         str(output),
     ]
-    environment = os.environ.copy()
+    environment = nullcontext(os.environ.copy())
     if OFFLINE_CLI:
-        environment.update(
-            DATABRICKS_HOST="https://127.0.0.1",
-            DATABRICKS_TOKEN="local-render-only",
-            DATABRICKS_AUTH_TYPE="pat",
-        )
+        builder = runpy.run_path(str(root / "build_example_project.py"))
+        environment = builder["offline_cli_environment"]()
     else:
         command.extend(["--profile", str(PROFILE)])
-    return subprocess.run(
-        command,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    with environment as env:
+        return subprocess.run(
+            command,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
 
 
 def _generate_project(tmp_path, **overrides):
@@ -166,6 +172,43 @@ def _generate_project(tmp_path, **overrides):
     generated, project = _initialize_project(tmp_path, **overrides)
     assert generated.returncode == 0, generated.stdout + generated.stderr
     return project
+
+
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+def test_optional_runtime_pins_are_unique_across_selected_models(tmp_path, layout):
+    """Repeated tuning and ensemble choices must install each exact optional pin only once."""
+    settings = {
+        "training_layout": layout,
+        "task": "regression",
+        "regression_model": "stacking_regressor",
+        "search_strategy": "optuna",
+        "single_ensemble_regression_base_1": "lightgbm",
+        "single_ensemble_regression_base_2": "xgboost",
+        "single_ensemble_regression_final": "lightgbm",
+        "competition_candidate_count": "2",
+        "competition_regression_model_1": "lgbm_regressor",
+        "competition_regression_model_2": "xgboost_regressor",
+        "branch_count": "3",
+    }
+    for slot, model in enumerate(["lgbm_regressor", "xgboost_regressor", "lgbm_regressor"], 1):
+        settings.update(
+            {
+                f"branch_{slot}_task": "regression",
+                f"branch_{slot}_regression_model": model,
+                f"branch_{slot}_search_strategy": "optuna",
+            }
+        )
+    project = _generate_project(tmp_path, **settings)
+    lines = (project / "deployment/requirements.txt").read_text().splitlines()
+    for pin in (
+        "optuna==4.5.0",
+        "optuna-integration==4.5.0",
+        "cmaes==0.13.0",
+        "lightgbm==4.6.0",
+        "xgboost==3.0.5",
+    ):
+        assert lines.count(pin) == 1
+    assert "-r ../src/features/requirements.txt" in lines
 
 
 def _read_bundle(project):

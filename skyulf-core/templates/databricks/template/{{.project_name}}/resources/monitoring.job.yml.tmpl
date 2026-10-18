@@ -38,6 +38,9 @@ resources:
           notebook_task:
             notebook_path: ../src/jobs/monitor_project.py
             base_parameters:
+              job_run_id: '{{"{{job.run_id}}"}}'
+              task_key: monitor_model
+              workspace_host: ${workspace.host}
               on_drift: ${var.on_drift}
               on_drift_cooldown_hours: ${var.on_drift_cooldown_hours}
               on_drift_min_new_training_rows: ${var.on_drift_min_new_training_rows}

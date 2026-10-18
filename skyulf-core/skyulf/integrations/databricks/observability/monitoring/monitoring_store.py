@@ -306,24 +306,32 @@ def enroll_monitor(
     *,
     activation_started_ms: int | None = None,
     preserve_activation: bool = False,
+    reference_holder: dict | None = None,
 ) -> None:
     """Upsert one producer's enrollment without creating or replacing central objects."""
+    from .reference_admission import (  # noqa: PLC0415 - module cycle
+        hold_reference_mutation,
+        require_reference_mutation,
+    )
+
     row = inventory_row(config, datetime.now(UTC))
     if activation_started_ms is not None:
         validate_activation_order(activation_started_ms)
         row["config_json"] = _json(
             config.payload() | {"_activation_started_ms": activation_started_ms}
         )
-    _merge_row(
-        spark,
-        f"{namespace}.model_inventory",
-        row,
-        INVENTORY_SCHEMA,
-        "monitor_id",
-        update=True,
-        activation_started_ms=activation_started_ms,
-        preserve_activation=preserve_activation,
-    )
+    with hold_reference_mutation(spark, namespace, **(reference_holder or {})) as owner:
+        require_reference_mutation(spark, namespace, owner)
+        _merge_row(
+            spark,
+            f"{namespace}.model_inventory",
+            row,
+            INVENTORY_SCHEMA,
+            "monitor_id",
+            update=True,
+            activation_started_ms=activation_started_ms,
+            preserve_activation=preserve_activation,
+        )
 
 
 def persist_report(spark: Any, namespace: str, row: dict[str, Any]) -> None:

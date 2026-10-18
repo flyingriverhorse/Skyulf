@@ -33,6 +33,9 @@ resources:
               deployed_score_handoff: "after_alias_change"
               deployed_auto_rebuild_on_cdf_expiry: "false"
               score_model_version: '{{job.parameters.score_model_version}}'
+              job_run_id: '{{job.run_id}}'
+              task_key: score
+              workspace_host: ${workspace.host}
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
@@ -76,6 +79,9 @@ resources:
           notebook_task:
             notebook_path: ../src/jobs/prepare_monitoring.py
             base_parameters:
+              job_run_id: '{{job.run_id}}'
+              task_key: prepare_monitoring
+              workspace_host: ${workspace.host}
               workflow_contract: "3"
               deployed_score_handoff: "after_alias_change"
               deployed_auto_rebuild_on_cdf_expiry: "false"

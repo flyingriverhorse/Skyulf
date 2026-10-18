@@ -6,7 +6,7 @@ Repairs and retries are rejected; uncertain outcomes require operator inspection
 """
 
 import json
-from contextlib import suppress
+from contextlib import nullcontext, suppress
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +39,7 @@ from ...training.competition.competition import (
 from ...training.fitting import candidate as training
 from ...training.shared.training_evidence import evidence_digest, validate_training_evidence
 from ...training.tuning.cv import CVSpec
+from ..shared.reference_mutations import phase_reference_mutation, prepare_reference_mutations
 
 __all__ = ["LifecycleContext", "LifecyclePhaseResult", "run_lifecycle_phase"]
 
@@ -158,6 +159,8 @@ def _prepare(
     now: datetime | None,
     *,
     graph_version: int = 2,
+    monitoring_namespace: str | None = None,
+    workspace_host: str | None = None,
 ) -> LifecyclePhaseResult:
     """Resolve source and champion once, then persist the complete immutable invocation."""
     if action not in {"train", "approve", "reject", "rollback"}:
@@ -173,11 +176,14 @@ def _prepare(
         "config": config,
         "action": action,
         "operator_options": options,
+        "monitoring_namespace": monitoring_namespace,
+        "workspace_host": workspace_host,
     }
     if graph_version == 3:
         request["graph_version"] = 3
     if action == "train":
         _prepare_training_request(spark, request, config, options, policy, now)
+    prepare_reference_mutations(spark, monitoring_namespace)
     # JSON normalization also detaches all caller-owned editable dictionaries.
     request = json.loads(json.dumps(request, allow_nan=False))
     experiment = get_or_create_experiment(store.client, experiment_name)
@@ -729,6 +735,19 @@ def _execute_phase(
     spark: Any, store: PhaseStore, phase: str, reference: dict[str, str]
 ) -> LifecyclePhaseResult:
     """Execute one phase and persist its receipt, termination or failure evidence."""
+    scope = (
+        phase_reference_mutation(spark, store, phase)
+        if phase in {"evaluate_register", "compare", "decide", "operator", "finalize"}
+        else nullcontext()
+    )
+    with scope:
+        return _execute_admitted_phase(spark, store, phase, reference)
+
+
+def _execute_admitted_phase(
+    spark: Any, store: PhaseStore, phase: str, reference: dict[str, str]
+) -> LifecyclePhaseResult:
+    """Keep failure restoration inside the same admission as the attempted alias mutation."""
     store.begin(phase)
     try:
         if phase == "finalize":
@@ -765,6 +784,8 @@ def _validate_phase_inputs(
     experiment_name: str | None,
     operator_options: dict[str, Any] | None,
     now: datetime | None,
+    monitoring_namespace: str | None,
+    workspace_host: str | None,
 ) -> None:
     """Reject inputs that do not belong to the selected fixed phase."""
     if phase not in {
@@ -779,7 +800,16 @@ def _validate_phase_inputs(
     if phase != "complete" and task_states is not None:
         raise ValueError("Task states are accepted only by complete.")
     if phase not in {"prepare", "initialize"} and any(
-        value is not None for value in (config, action, experiment_name, operator_options, now)
+        value is not None
+        for value in (
+            config,
+            action,
+            experiment_name,
+            operator_options,
+            now,
+            monitoring_namespace,
+            workspace_host,
+        )
     ):
         raise ValueError("Downstream lifecycle phases must use only the pinned invocation.")
 
@@ -795,6 +825,8 @@ def _run_prepare_phase(
     now: datetime | None,
     tracking_uri: str,
     graph_version: int = 2,
+    monitoring_namespace: str | None = None,
+    workspace_host: str | None = None,
 ) -> LifecyclePhaseResult:
     """Validate prepare inputs before persisting the pinned invocation."""
     if reference is not None or config is None or action is None or not experiment_name:
@@ -810,6 +842,8 @@ def _run_prepare_phase(
         operator_options or {},
         now,
         graph_version=graph_version,
+        monitoring_namespace=monitoring_namespace,
+        workspace_host=workspace_host,
     )
 
 
@@ -826,6 +860,8 @@ def run_lifecycle_phase(
     operator_options: dict[str, Any] | None = None,
     now: datetime | None = None,
     task_states: dict[str, str] | None = None,
+    monitoring_namespace: str | None = None,
+    workspace_host: str | None = None,
 ) -> LifecyclePhaseResult:
     """Run fixed notebook phases with durable references and no cross-task local state.
 
@@ -841,7 +877,15 @@ def run_lifecycle_phase(
     """
     context.validate()
     _validate_phase_inputs(
-        phase, task_states, config, action, experiment_name, operator_options, now
+        phase,
+        task_states,
+        config,
+        action,
+        experiment_name,
+        operator_options,
+        now,
+        monitoring_namespace,
+        workspace_host,
     )
     if phase in _GROUPED_PHASES:
         for internal_phase in _GROUPED_PHASES[phase]:
@@ -867,6 +911,8 @@ def run_lifecycle_phase(
             now,
             tracking_uri,
             graph_version=3 if phase == "initialize" else 2,
+            monitoring_namespace=monitoring_namespace,
+            workspace_host=workspace_host,
         )
     if reference is None:
         raise ValueError("Lifecycle phase requires its predecessor reference.")

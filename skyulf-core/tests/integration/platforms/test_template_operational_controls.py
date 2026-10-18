@@ -8,13 +8,14 @@ from types import SimpleNamespace
 import pytest
 import yaml
 from jsonschema import Draft7Validator
-from test_databricks_bundle_generation import _generate_project
+from test_databricks_bundle_generation import CLI_ONLY, _generate_project
 from test_databricks_deployment import _resolve
 from test_databricks_deployment import offline_workspace as offline_workspace
 
 ROOT = Path(__file__).resolve().parents[3] / "templates/databricks"
 
 
+@CLI_ONLY
 def test_monitoring_notifications_resolve_in_real_bundle(tmp_path, offline_workspace):
     """Monitoring failures need the same native job notification controls as scoring."""
     project = _generate_project(tmp_path)

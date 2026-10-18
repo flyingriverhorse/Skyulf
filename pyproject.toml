@@ -116,7 +116,7 @@ dev = [
     "Werkzeug>=3.1.9",  # Reject Windows device paths in safe_join
 
     # Linters/formatters/typecheckers (>=0.15: PLC0415 rule, audit finding F-11)
-    "ruff>=0.15,<1.0",
+    "ruff==0.15.16",
     "lizard>=1.23.0",  # Same CCN 10 gate as CI and pre-commit
 
     # Dev helpers

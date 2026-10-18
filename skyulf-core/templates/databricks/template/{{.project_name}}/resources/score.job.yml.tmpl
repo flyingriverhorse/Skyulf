@@ -40,6 +40,9 @@ resources:
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
+              job_run_id: '{{"{{job.run_id}}"}}'
+              task_key: score
+              workspace_host: ${workspace.host}
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
@@ -86,6 +89,9 @@ resources:
             notebook_path: ../src/jobs/recover_predictions.py
             base_parameters:
               workflow_contract: "3"
+              job_run_id: '{{"{{job.run_id}}"}}'
+              task_key: recover_predictions
+              workspace_host: ${workspace.host}
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               config_path: ${workspace.file_path}/config/training.yml
@@ -177,6 +183,9 @@ resources:
           notebook_task:
             notebook_path: ../src/jobs/prepare_monitoring.py
             base_parameters:
+              job_run_id: '{{"{{job.run_id}}"}}'
+              task_key: prepare_monitoring
+              workspace_host: ${workspace.host}
               workflow_contract: "3"
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"

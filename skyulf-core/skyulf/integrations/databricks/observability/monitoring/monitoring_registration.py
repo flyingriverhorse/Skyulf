@@ -4,6 +4,7 @@ from typing import Any
 
 from ...scoring.shared.prediction_output import scoring_target
 from ...shared._contracts import input_budget_bytes
+from . import reference_admission
 from .monitoring_config import (
     MAX_MONITOR_BYTES,
     MAX_MONITOR_ROWS,
@@ -29,6 +30,14 @@ def monitoring_destination(values: dict[str, str]) -> str | None:
     if not catalog or not schema:
         raise ValueError("Set both monitoring_catalog and monitoring_schema.")
     return store_namespace(catalog, schema)
+
+
+def monitoring_reference_holder(values: dict) -> dict:
+    """Use complete generated provenance; legacy jobs retain explicit manual recovery."""
+    fields = {"job_run_id", "task_key", "workspace_host"}
+    if not fields.issubset(values):
+        return {}
+    return reference_admission.reference_mutation_holder({key: values[key] for key in fields})
 
 
 def _monitor_budget(value: Any, maximum: int) -> Any:
@@ -100,7 +109,13 @@ def register_scoring_monitor(
     version = result.get("selected_model_version")
     config = build_monitor_enrollment_config(workflow, values, version)
     ensure_monitoring_store(spark, *namespace.split("."))
-    enroll_monitor(spark, namespace, config, preserve_activation=True)
+    enroll_monitor(
+        spark,
+        namespace,
+        config,
+        preserve_activation=True,
+        reference_holder=monitoring_reference_holder(values),
+    )
     return {
         "monitor_id": config.monitor_id,
         "inventory_table": f"{namespace}.model_inventory",
@@ -115,6 +130,7 @@ def register_deployed_monitor(
     payload: dict[str, Any],
     *,
     activation_started_ms: int,
+    reference_holder: dict | None = None,
 ) -> dict[str, Any] | None:
     """Enroll only a completed activation, including approvals and rollbacks, before scoring."""
     namespace = monitoring_destination(values)
@@ -130,7 +146,13 @@ def register_deployed_monitor(
     config = build_monitor_enrollment_config(workflow, values, receipt["new_version"])
     validate_activation_order(activation_started_ms)
     ensure_monitoring_store(spark, *namespace.split("."))
-    enroll_monitor(spark, namespace, config, activation_started_ms=activation_started_ms)
+    enroll_monitor(
+        spark,
+        namespace,
+        config,
+        activation_started_ms=activation_started_ms,
+        reference_holder=reference_holder,
+    )
     if config.execution_engine == "spark" and config.enabled:
         from .spark.spark_monitoring_reference import (  # noqa: PLC0415
             prepare_spark_monitoring_reference,
@@ -141,6 +163,7 @@ def register_deployed_monitor(
             config,
             tracking_uri=workflow.get("tracking_uri", "databricks"),
             registry_uri=workflow.get("registry_uri", "databricks-uc"),
+            reference_holder=reference_holder,
         )
     return {"monitor_id": config.monitor_id, "inventory_table": f"{namespace}.model_inventory"}
 

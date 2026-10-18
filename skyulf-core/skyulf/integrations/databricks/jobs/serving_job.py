@@ -37,6 +37,7 @@ from ..serving.rollout_promotion import approval_config_digest, promote_complete
 from ..serving.rollout_store import MLflowRolloutStore
 from ..shared.json_contracts import finite_json_digest
 from ..training.shared.training_evidence import load_candidate_evidence
+from .shared.reference_mutations import notebook_reference_holder, reference_mutation_scope
 
 
 def _enabled(settings: dict[str, Any]) -> bool:
@@ -141,13 +142,18 @@ def _output(
     approval: dict[str, Any],
     store: MLflowRolloutStore,
     result: RolloutResult,
+    settings: dict[str, Any],
 ) -> dict[str, Any]:
     """Automatically request guarded promotion only after durable final completion."""
     output = asdict(result)
     if result.promotion_pending:
-        receipt = promote_completed_rollout(
-            client, spark, approval, store=store, admission=SingleWriterAdmission()
-        )
+        namespace = settings.get("monitoring", {}).get("reference_namespace") or None
+        with reference_mutation_scope(
+            spark, namespace, deferred=True, **settings.get("reference_holder", {})
+        ):
+            receipt = promote_completed_rollout(
+                client, spark, approval, store=store, admission=SingleWriterAdmission()
+            )
         output["promotion"] = asdict(receipt)
     return output
 
@@ -172,13 +178,13 @@ def run_daily_rollout(
     if before["status"] == "PREPARED" or result.status != "COMMITTED":
         return asdict(result)
     if result.state.phase != "ACTIVE":
-        return _output(client, spark, approval, store, result)
+        return _output(client, spark, approval, store, result, settings)
     observation = _observe(spark, client, registry_client, settings, record, result, approval)
     persist_rollout_observation(store, observation)
     changed = advance_rollout(
         client, store=store, admission=SingleWriterAdmission(), evidence=observation.evidence
     )
-    output = _output(client, spark, approval, store, changed)
+    output = _output(client, spark, approval, store, changed, settings)
     output["observation_sha256"] = observation.details_digest
     return output
 
@@ -338,7 +344,9 @@ def run_daily_rollout_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         tracking_uri=settings.get("tracking_uri", "databricks"),
         registry_uri=settings.get("registry_uri", "databricks-uc"),
     )
-    settings = _bind_rollout_target(settings, dbutils.widgets.getAll().get("bundle_target", ""))
+    values = dbutils.widgets.getAll()
+    settings = _bind_rollout_target(settings, values.get("bundle_target", ""))
+    settings = {**settings, "reference_holder": notebook_reference_holder(values)}
     return run_daily_rollout(spark, settings, client=WorkspaceClient(), registry_client=registry)
 
 

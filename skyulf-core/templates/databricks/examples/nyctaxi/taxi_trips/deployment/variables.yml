@@ -56,6 +56,15 @@ variables:
   monitoring_pause_status:
     description: Explicitly unpause after reference preparation and verification
     default: "PAUSED"
+  monitoring_cleanup_cron:
+    description: Independent UTC schedule for old reference cleanup
+    default: "0 0 4 ? * SUN"
+  monitoring_cleanup_confirm:
+    description: Set false to report eligible references without deleting them
+    default: "true"
+  monitoring_cleanup_pause_status:
+    description: Pause reference cleanup independently of observation and retraining
+    default: "UNPAUSED"
   monitoring_enabled:
     description: Enroll activated models and measure drift after scoring; set true only with catalog and schema
     default: "true"
@@ -117,7 +126,7 @@ variables:
     type: complex
     default: {}
   monitoring_reference_retention_days:
-    description: Minimum reference age in days for explicit cleanup_references; 1 to 3650, dry-run by default
+    description: Minimum reference age in days for scheduled or manual cleanup; 1 to 3650
     default: "90"
   monitoring_webhook_notifications:
     description: Optional monitoring job events with existing notification destination IDs

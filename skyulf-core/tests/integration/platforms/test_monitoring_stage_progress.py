@@ -1,5 +1,6 @@
 """Slow monitoring preparation must expose its last operation before completion."""
 
+from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -7,9 +8,21 @@ import pandas as pd
 import pytest
 
 from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.monitoring_source_evidence import (
+    source_evidence,
+)
 from skyulf.integrations.databricks.observability.monitoring.spark import (
     spark_monitoring_reference as reference,
 )
+from skyulf.integrations.databricks.training.fitting.candidate import TrainingSpec
+
+
+@pytest.fixture(autouse=True)
+def reference_admission(monkeypatch):
+    """Keep progress tests at the artifact boundary; admission has separate concurrency tests."""
+    monkeypatch.setattr(reference, "ensure_monitoring_store", lambda *a: "a.monitoring")
+    monkeypatch.setattr(reference, "hold_reference_mutation", lambda *a: nullcontext("owner"))
+    monkeypatch.setattr(reference, "require_reference_mutation", Mock())
 
 
 def _config():
@@ -40,16 +53,17 @@ def test_reference_load_failure_identifies_stage_and_preserves_exception(monkeyp
 
 
 def test_reference_progress_covers_each_population_and_holdout(monkeypatch, capsys):
-    """Four persisted populations and holdout measurement need separate observable timings."""
-    frame = pd.DataFrame({"x": [1, 2, 3], "y": [2, 4, 6]})
+    """Combined population, shared source and holdout measurement need separate timings."""
+    frame = pd.DataFrame({"id": [10, 20, 30], "x": [1, 2, 3], "y": [2, 4, 6]})
     artifact = SimpleNamespace(
         manifest=SimpleNamespace(fitted_engine="pandas", project_source_sha256="source")
     )
-    spec = SimpleNamespace(
+    spec = TrainingSpec(
         table="a.b.training",
         version=1,
-        source_columns=("x", "y"),
-        dataset_id="dataset",
+        record_key_columns=("id",),
+        max_rows=100,
+        max_bytes=10000,
         split_strategy="random",
         input_columns=("x",),
         target_column="y",
@@ -63,14 +77,23 @@ def test_reference_progress_covers_each_population_and_holdout(monkeypatch, caps
     monkeypatch.setattr(reference, "read_training_snapshot", lambda *a: frame)
     monkeypatch.setattr(reference, "make_registry_client", Mock())
     monkeypatch.setattr(reference, "require_mlflow", Mock())
-    monkeypatch.setattr(reference, "reference_document", lambda *a: {})
-    monkeypatch.setattr(reference, "validate_source_evidence", Mock())
+    monkeypatch.setattr(
+        reference,
+        "reference_document",
+        lambda *a: source_evidence(frame, spec.source_columns, spec.dataset_id),
+    )
     monkeypatch.setattr(reference, "validate_training_evidence", Mock())
     monkeypatch.setattr(
         reference, "split_labeled_snapshot", lambda *a, **k: (frame.head(2), frame.tail(1), None)
     )
     monkeypatch.setattr(reference, "read_snapshot", lambda *a: SimpleNamespace(schema=None))
-    monkeypatch.setattr(reference, "_prepared_frame", lambda spark, data, *a: data)
+    monkeypatch.setattr(
+        reference,
+        "_prepared_frame",
+        lambda spark, data, *a: SimpleNamespace(
+            schema=SimpleNamespace(jsonValue=lambda: {"columns": list(data.columns)})
+        ),
+    )
     write = Mock(side_effect=lambda spark, name, data: {"name": name, "id": "id", "version": 0})
     monkeypatch.setattr(reference, "_write_population", write)
     monkeypatch.setattr(reference, "measure_holdout_values", lambda *a: {"values": {"rmse": 0.1}})
@@ -81,15 +104,14 @@ def test_reference_progress_covers_each_population_and_holdout(monkeypatch, caps
     for stage in (
         "load_model",
         "read_training",
-        "write_train",
+        "write_population",
         "write_source",
-        "write_seen",
         "measure_holdout",
         "write_receipt",
     ):
         assert f"STARTED | reference.{stage} a.b.model/1" in output
         assert f"COMPLETED | reference.{stage} a.b.model/1" in output
-    assert write.call_count == 4
+    assert write.call_count == 3
     assert receipt["holdout"]["values"]["rmse"] == 0.1
 
 

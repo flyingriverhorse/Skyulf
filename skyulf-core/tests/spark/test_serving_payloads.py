@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from skyulf.integrations.databricks.observability.monitoring.monitoring_dashboard_views import (
+    complete_observations_query,
+    dashboard_views,
+)
 from skyulf.integrations.databricks.observability.monitoring.serving import serving_payloads
 from skyulf.integrations.databricks.observability.monitoring.serving.serving_payloads import (
     parse_serving_payloads,
@@ -684,11 +688,21 @@ def test_latency_distribution_query_keeps_only_valid_scoped_samples(spark):
         f"('m','1','{name}',TIMESTAMP '2026-10-12 12:00:00',TIMESTAMP '2026-10-12 13:00:00',TIMESTAMP '2026-10-12 14:00:00','{status}','{json.dumps({'serving': summary})}','config')"
         for name, status, summary in cases
     )
+    observations = complete_observations_query("test.monitoring").replace(
+        "`test`.`monitoring`.`monitoring_results`", "monitoring_results"
+    )
+    windows = (
+        dashboard_views("test.monitoring")["serving_windows"]
+        .replace("`test`.`monitoring`.`model_inventory`", "model_inventory")
+        .replace("`test`.`monitoring`.`complete_observations`", "complete_observations")
+    )
     source = (
         "WITH model_inventory(monitor_id, model_name, enabled, updated_at, config_digest, environment, project, config_json) AS ("
         "SELECT * FROM VALUES ('m','model',true,1,'config','demo','serving','{\"model_version\":\"1\",\"serving_endpoint\":\"endpoint\"}')), "
         "monitoring_results(monitor_id, model_version, report_id, window_start, window_end, measured_at, status, report_json, config_digest) AS ("
-        f"SELECT * FROM VALUES {reports}), " + sql.removeprefix("WITH ")
+        f"SELECT * FROM VALUES {reports}), "
+        f"complete_observations AS ({observations}), serving_windows AS ({windows}), "
+        + sql.removeprefix("WITH ")
     )
     params = {"serving_model": "", "serving_version": "", "serving_monitor": ""}
     rows = spark.sql(source, args=params).collect()

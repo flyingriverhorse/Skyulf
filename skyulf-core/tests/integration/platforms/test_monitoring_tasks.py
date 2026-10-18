@@ -356,7 +356,22 @@ def test_activation_metadata_preserves_legacy_config_identity():
         store._inventory_config(row)
 
 
-def test_scoring_merge_protects_active_selection_and_preserves_activation_order(monkeypatch):
+@pytest.fixture
+def reference_authority(monkeypatch):
+    """Keep MERGE SQL tests on real admission contexts while isolating Delta authority transport."""
+    from skyulf.integrations.databricks.observability.monitoring import reference_admission
+
+    authority = Mock()
+    monkeypatch.setattr(reference_admission, "_Authority", lambda *args: authority)
+    yield authority
+    authority.acquire.assert_called_once()
+    authority.require.assert_called_once()
+    authority.release.assert_called_once()
+
+
+def test_scoring_merge_protects_active_selection_and_preserves_activation_order(
+    monkeypatch, reference_authority
+):
     """The version guard must execute inside Delta MERGE, not through a racy read-before-write."""
     from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
@@ -378,7 +393,7 @@ def test_scoring_merge_protects_active_selection_and_preserves_activation_order(
     assert "_activation_started_ms" in sql and "substring(s.config_json, 2)" in sql
 
 
-def test_old_activation_repair_cannot_replace_a_later_activation(monkeypatch):
+def test_old_activation_repair_cannot_replace_a_later_activation(monkeypatch, reference_authority):
     """Rollback versions remain supported while old invocation replays cannot regress ownership."""
     from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (

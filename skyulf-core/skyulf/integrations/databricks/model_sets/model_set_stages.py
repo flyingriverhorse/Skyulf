@@ -1,5 +1,6 @@
 """Visible, durable registration, quality and alias decision stages for model sets."""
 
+from contextlib import nullcontext
 from dataclasses import asdict
 from typing import Any
 
@@ -8,6 +9,7 @@ from skyulf.integrations.mlflow.shared._client import make_registry_client, requ
 from ...mlflow.models.model_set import load_registered_model_set
 from ...mlflow.registration.registry import resolve_model
 from ..jobs.lifecycle.lifecycle_tasks import record_phase_failure
+from ..jobs.shared.reference_mutations import phase_reference_mutation
 from ..jobs.training.branch_notebook import set_next_actions
 from ..jobs.training.branch_tasks import register_branch_set, run_branch_operator
 from ..lifecycle._lifecycle_state import LifecycleContext, LifecyclePhaseResult, PhaseStore
@@ -137,6 +139,19 @@ def run_model_set_phase(
 
 def _execute(spark: Any, store: PhaseStore, phase: str, reference: dict) -> LifecyclePhaseResult:
     """Record attempt intent and never retry an uncertain alias mutation."""
+    scope = (
+        phase_reference_mutation(spark, store, phase)
+        if phase == "model_decision"
+        else nullcontext()
+    )
+    with scope:
+        return _execute_admitted(spark, store, phase, reference)
+
+
+def _execute_admitted(
+    spark: Any, store: PhaseStore, phase: str, reference: dict
+) -> LifecyclePhaseResult:
+    """Keep failed alias changes under the original admission owner."""
     store.begin(phase)
     try:
         action = _evaluate if phase == "evaluate_model_set" else _decide

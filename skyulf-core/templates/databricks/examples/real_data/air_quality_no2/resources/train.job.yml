@@ -42,6 +42,7 @@ resources:
               workflow_contract: "3"
               job_id: '{{job.id}}'
               job_run_id: '{{job.run_id}}'
+              workspace_host: ${workspace.host}
               repair_count: '{{job.repair_count}}'
               execution_count: '{{task.execution_count}}'
               deployed_score_handoff: "after_alias_change"

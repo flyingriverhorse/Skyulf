@@ -167,12 +167,27 @@ from databricks.sdk import WorkspaceClient
 from skyulf.integrations.databricks.serving import query_named_records
 
 records = [
-    {"pickup_hour": 10.0, "pickup_dow": 3.0, "trip_distance": 2.0,
-     "duration_min": 12.0, "pickup_zip": "10001"},
-    {"pickup_hour": 10.0, "pickup_dow": 3.0, "trip_distance": 99.0,
-     "duration_min": 12.0, "pickup_zip": "10001"},
-    {"pickup_hour": 10.0, "pickup_dow": 3.0, "trip_distance": None,
-     "duration_min": None, "pickup_zip": "10001"},
+    {
+        "pickup_hour": 10.0,
+        "pickup_dow": 3.0,
+        "trip_distance": 2.0,
+        "duration_min": 12.0,
+        "pickup_zip": "10001",
+    },
+    {
+        "pickup_hour": 10.0,
+        "pickup_dow": 3.0,
+        "trip_distance": 99.0,
+        "duration_min": 12.0,
+        "pickup_zip": "10001",
+    },
+    {
+        "pickup_hour": 10.0,
+        "pickup_dow": 3.0,
+        "trip_distance": None,
+        "duration_min": None,
+        "pickup_zip": "10001",
+    },
 ]
 print(query_named_records(WorkspaceClient(), function.endpoint, records).predictions)
 ```

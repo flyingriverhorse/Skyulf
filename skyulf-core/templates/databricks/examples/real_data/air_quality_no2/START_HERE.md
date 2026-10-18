@@ -19,7 +19,7 @@ check that the data exists before you deploy:
 | Commands below | `YOUR_PROFILE`: an authenticated Databricks CLI profile for that workspace. |
 | Unity Catalog | The catalog, schemas and source table must exist. The table needs the record key, input and target columns from setup, and Change Data Feed on before the first score. |
 | `config/training.yml` | A numeric `quality_threshold`, if you will approve the first champion or promote automatically. Set it before training; a trained version keeps its policy. |
-| `deployment/variables.yml` (optional) | Monitoring runs only when `monitoring_enabled` is `"true"` and `monitoring_catalog`/`monitoring_schema` name the store. Use the same store in every project (a schema reserved for monitoring, not this project's schema) so all models appear in one dashboard; only one project creates the dashboard, the others connect with `src/tools/configure_monitoring_dashboard.py --dashboard-url`. |
+| `deployment/variables.yml` (optional) | Monitoring runs only when `monitoring_enabled` is `"true"` and `monitoring_catalog`/`monitoring_schema` name the store. A catalog answer defaults the shared schema to `skyulf_monitoring`; a blank catalog disables monitoring. Use the same store in every project so all models appear in one dashboard; only one project creates the dashboard, the others connect with `src/tools/configure_monitoring_dashboard.py --dashboard-url`. |
 
 For the shared `test` target, check that `test_root_path` in `deployment/variables.yml`
 is a workspace folder your team can write to. The local checks below do not flag

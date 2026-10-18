@@ -36,7 +36,9 @@ does not migrate saved models or rewrite already generated project files.
 
 Quick setup accepts editable defaults. Detailed setup asks applicable model,
 branch, competition and deployment choices. Both ask for the monitoring store;
-blank answers start without monitoring. Neither mode inspects source rows.
+a blank catalog starts without monitoring. When a catalog is set, an omitted
+schema uses `skyulf_monitoring`; choose another schema to reuse an existing store.
+Neither mode inspects source rows.
 Empty `config/features.yml` groups create no feature job or merged table;
 training and scoring read their configured sources directly.
 
@@ -65,9 +67,12 @@ Monitoring job failures can notify through `monitoring_email_notifications`,
 `monitoring_webhook_notifications` and `monitoring_health_rules`. Measured drift
 does not fail the job; use a separate SQL alert over `monitoring_issues` for it.
 See [notifications](https://www.skyulf.com/manual/user_guide/databricks_drift.html#notifications).
-Optional old-reference cleanup uses the monitoring job's `cleanup_references`
-action and defaults to a dry run. Review its plan and pause producers before
-explicit confirmation; see [reference retention](https://www.skyulf.com/manual/user_guide/databricks_monitoring_setup.html#retain-or-clean-old-spark-references).
+This project has no automatic reference-cleanup job because monitoring was
+disabled during setup. After enabling a store, use the monitoring job's
+`cleanup_references` action for a dry run, or regenerate a project with a
+monitoring catalog to obtain the separate cleanup resource.
+Review [reference retention](https://www.skyulf.com/manual/user_guide/databricks_monitoring_setup.html#retain-or-clean-old-spark-references)
+and its lifecycle-writer requirements before enabling deletion.
 
 These short guides ship with this project revision and link to detailed topic
 pages. Public documentation can describe a newer release; use the release

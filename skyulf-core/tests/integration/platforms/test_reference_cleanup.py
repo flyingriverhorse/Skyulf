@@ -2,6 +2,7 @@
 
 import json
 import re
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -17,7 +18,7 @@ from skyulf.integrations.databricks.observability.monitoring.monitoring_store im
     OWNER,
 )
 from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_reference import (
-    _reference_name,
+    reference_table_name,
 )
 
 NS = "workspace.skyulf_monitoring"
@@ -29,6 +30,15 @@ VALUES = {
     "monitoring_environment": "test",
     "monitoring_project": "air",
 }
+
+
+@pytest.fixture(autouse=True)
+def storage_admission_boundary(monkeypatch):
+    """Keep catalog decision tests independent of the separately tested Delta lock transport."""
+    monkeypatch.setattr(
+        reference_cleanup, "hold_reference_mutation", lambda *a: nullcontext("owner")
+    )
+    monkeypatch.setattr(reference_cleanup, "require_reference_mutation", lambda *a: None)
 
 
 class Frame:
@@ -208,11 +218,11 @@ def _prepare(spark: FakeSpark, config: MonitorConfig, version: str, **table) -> 
     evidence = {"model_name": config.model_name, "model_version": version, "run": version}
     tables = {}
     for key in reference_cleanup.CHILDREN:
-        name = _reference_name(config, evidence, key)
+        name = reference_table_name(config, evidence, key)
         spark.add(name, **table)
         tables[key] = {"name": name, "id": f"id-{name}", "version": 0}
     receipt = {"format": 1, "evidence": evidence, "tables": tables, "holdout": {}}
-    name = _reference_name(config, evidence, "receipt")
+    name = reference_table_name(config, evidence, "receipt")
     spark.add(name, [{"payload": json.dumps(receipt), "digest": json_digest(receipt)}], **table)
     return name
 
@@ -220,6 +230,225 @@ def _prepare(spark: FakeSpark, config: MonitorConfig, version: str, **table) -> 
 def _store(spark: FakeSpark, requests: list[dict] | None = None) -> None:
     """Add owned request and inventory tables to the store."""
     spark.add(f"{NS}.retraining_requests", requests or [])
+
+
+def _prepare_shared(spark, config, version):
+    """Persist two format-2 tables while reusing one verifiable shared source identity."""
+    from skyulf.integrations.databricks.observability.monitoring.reference_layout import (
+        shared_source_table_name,
+    )
+
+    evidence = {"model_name": config.model_name, "model_version": version, "run": version}
+    identity = {
+        "format": 2,
+        "table_id": "source-id",
+        "version": 0,
+        "columns": ["x"],
+        "rows": 1,
+        "content_sha256": "a" * 64,
+        "schema": {"type": "struct", "fields": []},
+    }
+    source = shared_source_table_name(NS, identity)
+    population = reference_table_name(config, evidence, "population")
+    if source not in spark.tables:
+        spark.add(source)
+    spark.add(population)
+    tables = {
+        key: {"name": name, "id": f"id-{name}", "version": 0}
+        for key, name in (("population", population), ("source", source))
+    }
+    receipt = {
+        "format": 2,
+        "evidence": evidence,
+        "tables": tables,
+        "holdout": {},
+        "source_identity": identity,
+        "source_table_id": "source-id",
+        "membership_column": "is_train",
+    }
+    name = reference_table_name(config, evidence, "receipt")
+    spark.add(name, [{"payload": json.dumps(receipt), "digest": json_digest(receipt)}])
+    return name, source
+
+
+def test_shared_source_survives_another_projects_receipt(monkeypatch):
+    """One project's retirement cannot invalidate a reference owned by another project."""
+    spark = FakeSpark()
+    _store(spark)
+    config = _config()
+    old, source = _prepare_shared(spark, config, "1")
+    foreign = _config(project="other", model_name="workspace.other.model", model_version="1")
+    other, same_source = _prepare_shared(spark, foreign, "1")
+    result = _run(spark, monkeypatch, [config, foreign], cleanup_confirm="true")
+    assert result["deleted"] == [old]
+    assert same_source == source
+    assert source in spark.tables and other in spark.tables
+
+
+def test_shared_source_drops_once_with_last_retiring_receipt(monkeypatch):
+    """A batch can retire every user and delete the source once while retaining retry receipts."""
+    spark = FakeSpark()
+    _store(spark)
+    config = _config()
+    first, source = _prepare_shared(spark, config, "1")
+    second, _ = _prepare_shared(spark, config, "2")
+    result = _run(spark, monkeypatch, [config], cleanup_confirm="true")
+    assert set(result["deleted"]) == {first, second}
+    assert spark.log.count(f"DROP {source}") == 1
+    last_receipt = result["deleted"][-1]
+    assert spark.log.index(f"DROP {source}") < spark.log.index(f"DROP {last_receipt}")
+    assert source not in spark.tables
+
+
+def test_source_survives_receipt_excluded_by_first_plan(monkeypatch):
+    """Intersecting plans must also protect the source when the second plan retires more users."""
+    spark = FakeSpark()
+    _store(spark)
+    config = _config()
+    first, source = _prepare_shared(spark, config, "1")
+    second, _ = _prepare_shared(spark, config, "2")
+    retained, retiring = sorted([first, second])
+    version = json.loads(spark.tables[retained]["rows"][0]["payload"])["evidence"]["model_version"]
+    plans = iter([{"champion": version}, {}])
+    monkeypatch.setattr(reference_cleanup, "load_enrolled_models", lambda *a: [config.payload()])
+    result = reference_cleanup.cleanup_references(
+        spark, VALUES | {"cleanup_confirm": "true"}, registry=lambda _: next(plans), now=NOW
+    )
+    assert result["deleted"] == [retiring]
+    assert retained in spark.tables and source in spark.tables
+
+
+def test_malformed_foreign_receipt_blocks_shared_source_retirement(monkeypatch):
+    """Unknown reverse references must fail closed instead of turning uncertainty into deletion."""
+    spark = FakeSpark()
+    _store(spark)
+    config = _config()
+    receipt, source = _prepare_shared(spark, config, "1")
+    spark.add(f"{NS}.monitor_ref_corrupt_receipt", [{"payload": "broken", "digest": "bad"}])
+    result = _run(spark, monkeypatch, [config], cleanup_confirm="true")
+    assert result["deleted"] == []
+    assert result["references"][0]["decision"] == "protected"
+    assert "unknown" in result["references"][0]["reason"]
+    assert receipt in spark.tables and source in spark.tables
+
+
+@pytest.mark.parametrize("mutation", ["alias", "receipt"])
+def test_cleanup_admission_excludes_new_dependency_after_final_plan(monkeypatch, mutation):
+    """The original final-plan race must be rejected before a cooperating writer publishes."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from skyulf.integrations.databricks.observability.monitoring import reference_admission
+
+    spark = FakeSpark()
+    _store(spark)
+    config = _config()
+    receipt, source = _prepare_shared(spark, config, "1")
+    state = {"owner": None}
+
+    def acquire(owner, holder=None):
+        """Represent the durable authority while exercising the real context and call ordering."""
+        if state["owner"] is not None:
+            raise RuntimeError("held by another operation")
+        state["owner"] = owner
+
+    def require(owner):
+        """Check that each destructive operation still belongs to the original holder."""
+        assert state["owner"] == owner
+
+    authority = SimpleNamespace(
+        acquire=acquire, require=require, release=lambda owner: state.update(owner=None)
+    )
+    monkeypatch.setattr(reference_admission, "_Authority", lambda *a: authority)
+    monkeypatch.setattr(
+        reference_cleanup, "hold_reference_mutation", reference_admission.hold_reference_mutation
+    )
+    monkeypatch.setattr(
+        reference_cleanup,
+        "require_reference_mutation",
+        reference_admission.require_reference_mutation,
+    )
+    original = reference_cleanup._record
+    blocked = []
+    aliases = {}
+
+    def concurrent_writer():
+        """Attempt the operation at the exact point that previously admitted a lost dependency."""
+        with reference_admission.hold_reference_mutation(spark, NS):
+            if mutation == "alias":
+                aliases[config.model_name] = {"champion": "1"}
+            else:
+                _prepare_shared(spark, _config(project="other"), "2")
+
+    def audited(*args):
+        """Start a separate caller after both plans, before any DROP is issued."""
+        original(*args)
+        if args[-2] == "intent":
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                with pytest.raises(RuntimeError, match="held by another"):
+                    pool.submit(concurrent_writer).result()
+                blocked.append(mutation)
+
+    monkeypatch.setattr(reference_cleanup, "_record", audited)
+    result = _run(spark, monkeypatch, [config], aliases=aliases, cleanup_confirm="true")
+    assert blocked == [mutation]
+    assert result["deleted"] == [receipt]
+    assert source not in spark.tables and aliases == {}
+
+
+def test_confirmed_cleanup_carries_job_holder_into_admission(monkeypatch):
+    """Scheduled cleanup failures must retain enough provenance for verified recovery."""
+    spark = FakeSpark()
+    _store(spark)
+    holders = []
+
+    def hold(spark, namespace, **holder):
+        """Capture the real widget conversion at the admission boundary."""
+        holders.append(holder)
+        return nullcontext("owner")
+
+    monkeypatch.setattr(reference_cleanup, "hold_reference_mutation", hold)
+    _run(
+        spark,
+        monkeypatch,
+        [_config()],
+        cleanup_confirm="true",
+        job_run_id="42",
+        task_key="cleanup_references",
+        workspace_host="https://workspace.example/",
+    )
+    assert holders == [
+        {
+            "job_run_id": 42,
+            "task_key": "cleanup_references",
+            "workspace_host": "https://workspace.example",
+        }
+    ]
+
+
+def test_recovery_audit_shares_owned_table_and_keeps_terminal_proof():
+    """Explicit recovery must record which durable holder was released and why."""
+    spark = FakeSpark()
+    owner = "b" * 32
+    proof = {"job_run_id": 42, "life_cycle_state": "TERMINATED"}
+    for status in ("intent", "released"):
+        reference_cleanup.append_reference_recovery(
+            spark, NS, owner=owner, status=status, evidence=proof
+        )
+    rows = spark.tables[f"{NS}.{reference_cleanup.AUDIT_TABLE}"]["rows"]
+    assert [row["status"] for row in rows] == ["intent", "released"]
+    assert all(
+        row["action"] == "release_admission" and row["reference_id"] == owner for row in rows
+    )
+    assert all(json.loads(row["reason"]) == proof for row in rows)
+
+
+def test_recovery_intent_is_not_a_reference_deletion_intent():
+    """A recovered guard token must never authorize resuming an incomplete reference deletion."""
+    spark = FakeSpark()
+    reference_cleanup.append_reference_recovery(
+        spark, NS, owner="b" * 32, status="intent", evidence={}
+    )
+    assert reference_cleanup._audit_intents(spark, NS) == set()
 
 
 def _run(spark, monkeypatch, configs, *, aliases=None, run_state=None, **values):

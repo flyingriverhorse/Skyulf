@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from ..jobs.shared.notebook_diagnostics import notebook_task
+from ..jobs.shared.reference_mutations import enrollment_reference_holder
 from ..observability.monitoring.monitoring_config import (
     MonitorConfig,
     parse_drift_thresholds,
@@ -12,6 +13,7 @@ from ..observability.monitoring.monitoring_config import (
 from ..observability.monitoring.monitoring_registration import (
     build_monitor_enrollment_config,
     monitoring_destination,
+    monitoring_reference_holder,
 )
 from ..observability.monitoring.monitoring_store import (
     enroll_monitor,
@@ -81,12 +83,14 @@ def register_set_monitors(
     artifact: Any,
     *,
     activation_started_ms: int | None = None,
+    reference_holder: dict | None = None,
 ) -> dict | None:
     """Enroll saved component versions; never infer them from mutable component aliases."""
     namespace = monitoring_destination(values)
     if namespace is None:
         return None
     configs = validate_component_monitoring(workflow, values, settings, resolved, artifact)
+    holder = monitoring_reference_holder(values) if reference_holder is None else reference_holder
     if activation_started_ms is not None:
         validate_activation_order(activation_started_ms)
     with notebook_task("monitoring.ensure_store", None):
@@ -100,6 +104,7 @@ def register_set_monitors(
                 config,
                 preserve_activation=activation_started_ms is None,
                 activation_started_ms=activation_started_ms,
+                reference_holder=holder,
             )
         if (
             activation_started_ms is not None
@@ -115,6 +120,7 @@ def register_set_monitors(
                 config,
                 tracking_uri=workflow.get("tracking_uri", "databricks"),
                 registry_uri=workflow.get("registry_uri", "databricks-uc"),
+                reference_holder=holder,
             )
     return {
         "inventory_table": f"{namespace}.model_inventory",
@@ -145,6 +151,7 @@ def run_set_monitor_enrollment_notebook(spark: Any, dbutils: Any) -> dict:
     endpoints = project_endpoints(request["config"])
     resolved = resolve_model(settings["model_name"], version=receipt["new_version"], **endpoints)
     artifact = load_registered_model_set(resolved, **endpoints)
+    holder = enrollment_reference_holder(store, values, "register_monitor")
     registration = register_set_monitors(
         spark,
         request["config"],
@@ -153,5 +160,6 @@ def run_set_monitor_enrollment_notebook(spark: Any, dbutils: Any) -> dict:
         resolved,
         artifact,
         activation_started_ms=store.client.get_run(store.run_id).info.start_time,
+        reference_holder=holder,
     )
     return {"status": "enrolled", **(registration or {})}

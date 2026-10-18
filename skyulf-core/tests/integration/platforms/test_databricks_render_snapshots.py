@@ -42,11 +42,13 @@ def _digests(project: Path) -> dict[str, str]:
     }
 
 
-@pytest.mark.parametrize("answers", ["defaults", *EXAMPLES])
+@pytest.mark.parametrize("answers", ["defaults", "shared-monitoring", *EXAMPLES])
 def test_rendered_project_matches_snapshot(tmp_path, answers, snapshot):
     """A template change that alters a common project must arrive with a refreshed snapshot."""
     overrides = {}
-    if answers != "defaults":
+    if answers == "shared-monitoring":
+        overrides = {"monitoring_catalog": "ops"}
+    elif answers != "defaults":
         overrides = json.loads((TEMPLATE_ROOT / "examples" / answers).read_text(encoding="utf-8"))
         overrides.pop("project_name", None)
     assert _digests(_generate_project(tmp_path, **overrides)) == snapshot

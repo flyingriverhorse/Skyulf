@@ -1,7 +1,7 @@
 """Retire prepared Spark monitoring references that no monitored model still needs.
 
-Every monitored model version gets four ``monitor_ref_<id>_*`` tables in the shared store, and
-nothing removed them. ``cleanup_references`` lists one project's references and, only with
+Legacy references have train/seen/source tables; format 2 combines train/seen and shares
+identical source populations. ``cleanup_references`` lists one project's references and, only with
 ``cleanup_confirm=true``, drops those that are provably owned, unneeded and old:
 
 - Ownership is the reference identity recomputed from the project's own inventory rows and
@@ -11,11 +11,16 @@ nothing removed them. ``cleanup_references`` lists one project's references and,
   younger than ``reference_retention_days``.
 - Unreadable inventory, registry or request state aborts the run. A foreign, tampered or
   incomplete reference is reported and left alone.
-- Deletion recomputes the plan first. It writes an audit intent, drops the three population
+- Shared sources remain while any surviving receipt in any project references them. Unknown
+  receipt state protects format-2 references. The last retiring receipt retains its shared
+  source until its own deletion starts; the receipt stays until all dependent drops succeed.
+- Deletion recomputes the plan first. It writes an audit intent, drops the population
   tables and then the receipt, and records the result. Population-drop failures retain the
   receipt; only an earlier intent permits resuming a partial deletion. The final audit write
   can fail after all tables are gone. Inspect table state after failure; there is no rollback
-  or atomicity across tables and concurrent producers. Pause activations while it runs.
+  or atomicity across tables. A non-expiring store admission excludes participating
+  preparation and activation writers throughout confirmed cleanup. External writers must
+  respect the documented exclusive-writer boundary.
 """
 
 import json
@@ -32,6 +37,13 @@ from .monitoring_config import MonitorConfig, json_digest, qualified_name
 from .monitoring_registration import monitoring_destination
 from .monitoring_sources import read_snapshot
 from .monitoring_store import OWNER, PROPERTY, ensure_owned_object, load_enrolled_models
+from .reference_admission import (
+    hold_reference_mutation,
+    is_reference_control_row,
+    reference_mutation_holder,
+    require_reference_mutation,
+)
+from .reference_layout import shared_source_table_name
 
 CHILDREN = ("train", "seen", "source")
 AUDIT_TABLE = "reference_cleanup_audit"
@@ -57,6 +69,7 @@ class Reference:
     ids: dict[str, str]
     created_at: datetime
     size_bytes: int
+    shared_source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -128,13 +141,17 @@ def cleanup_references(
         now or datetime.now(UTC),
         days,
     )
-    planned = context.plan()
     if not confirm:
-        return planned | {"status": "dry_run", "deleted": []}
-    rechecked = context.plan()
-    allowed = _deletable(planned) & _deletable(rechecked)
-    references = [item for item in rechecked["references"] if item["receipt"] in allowed]
-    return rechecked | {"status": "deleted", "deleted": _delete(spark, namespace, references)}
+        return context.plan() | {"status": "dry_run", "deleted": []}
+    with hold_reference_mutation(spark, namespace, **reference_mutation_holder(values)) as owner:
+        planned = context.plan()
+        rechecked = context.plan()
+        allowed = _deletable(planned) & _deletable(rechecked)
+        references = [item for item in rechecked["references"] if item["receipt"] in allowed]
+        return rechecked | {
+            "status": "deleted",
+            "deleted": _delete(spark, namespace, references, owner),
+        }
 
 
 def _deletable(plan: dict) -> set[str]:
@@ -162,7 +179,7 @@ class _Context:
         ]
         owners = _owners(configs, self.namespace, self.values)
         intents = _audit_intents(self.spark, self.namespace)
-        references, skipped = _references(self.spark, self.namespace, owners, intents)
+        references, skipped, source_users = _references(self.spark, self.namespace, owners, intents)
         protection = Protection(
             enrolled=_enrolled(configs),
             baselines=_baselines(configs),
@@ -173,6 +190,7 @@ class _Context:
             unresolved=_unresolved(self.spark, self.namespace, self.run_state),
         )
         decided = [_decision(item, protection, self.now, self.days) for item in references]
+        _shared_deletions(decided, source_users, bool(skipped))
         return {"namespace": self.namespace, "references": decided, "skipped": skipped}
 
 
@@ -189,9 +207,9 @@ def _owners(configs: list[MonitorConfig], namespace: str, values: dict) -> list[
     return list(owners.values())
 
 
-def _references(spark, namespace, owners, intents) -> tuple[list[Reference], list[dict]]:
+def _references(spark, namespace, owners, intents) -> tuple[list[Reference], list[dict], dict]:
     """Load the owned receipts in the store; report invalid ones without touching them."""
-    from .spark.spark_monitoring_reference import _reference_name  # noqa: PLC0415
+    from .spark.spark_monitoring_reference import reference_table_name  # noqa: PLC0415
 
     rows = spark.sql(f"SHOW TABLES IN {table_name(namespace)} LIKE '{_PREFIX}*{_SUFFIX}'")
     names = sorted(
@@ -200,19 +218,58 @@ def _references(spark, namespace, owners, intents) -> tuple[list[Reference], lis
     )
     if len(names) > MAX_REFERENCES:
         raise ValueError("Monitoring store has too many references to plan at once.")
-    references, skipped = [], []
+    references, skipped, source_users = [], [], {}
     for name in names:
         try:
             receipt, receipt_id = _receipt(spark, name)
+            source = _shared_source(receipt, namespace)
+            if source is not None:
+                source_users.setdefault(source, set()).add(name)
             owner = next(
-                (o for o in owners if _reference_name(o, receipt["evidence"], "receipt") == name),
+                (
+                    o
+                    for o in owners
+                    if reference_table_name(o, receipt["evidence"], "receipt") == name
+                ),
                 None,
             )
             if owner is not None:
                 references.append(_reference(spark, name, owner, receipt, receipt_id, intents))
         except ValueError as error:
             skipped.append({"receipt": name, "reason": str(error)})
-    return references, skipped
+    return references, skipped, source_users
+
+
+def _shared_source(receipt: dict, namespace: str) -> str | None:
+    """Verify a shared source binding before allowing it to contribute reverse references."""
+    layout = receipt.get("format", 1)
+    if layout == 1:
+        return None
+    if layout != 2:
+        raise ValueError("Unsupported prepared monitoring reference format.")
+    identity = receipt["source_identity"]
+    if identity["format"] != 2 or identity["table_id"] != receipt["source_table_id"]:
+        raise ValueError("Shared source identity differs from its receipt.")
+    name = shared_source_table_name(namespace, identity)
+    record = receipt["tables"]["source"]
+    if record.get("name") != name or record.get("version") != 0 or not record.get("id"):
+        raise ValueError("Shared source binding differs from its receipt.")
+    return name
+
+
+def _shared_deletions(references: list[dict], source_users: dict, unknown: bool) -> None:
+    """Drop a shared source only with its final retiring receipt, under the store admission."""
+    deleting = _deletable({"references": references})
+    remaining = {name: users.copy() for name, users in source_users.items()}
+    for item in references:
+        source = item["shared_source"]
+        if source is None:
+            continue
+        if unknown:
+            item.update(decision="protected", reason="shared source reverse references are unknown")
+        remaining[source].discard(item["receipt"])
+        if item["decision"] != "deletable" or source_users[source] - deleting or remaining[source]:
+            item["tables"] = [name for name in item["tables"] if name != source]
 
 
 def _receipt(spark: Any, name: str) -> tuple[dict, str]:
@@ -233,13 +290,20 @@ def _receipt(spark: Any, name: str) -> tuple[dict, str]:
 
 def _reference(spark, name, owner, receipt, receipt_id, intents) -> Reference:
     """Verify the receipt's population tables against the names the owner would use."""
+    from .spark.spark_monitoring_reference import reference_table_name  # noqa: PLC0415
+
     evidence = receipt["evidence"]
     reference_id = name.rsplit(".", 1)[1].removeprefix(_PREFIX).removesuffix(_SUFFIX)
     detail = immutable_detail(spark, name, receipt_id)
     existing, size = [], int(detail["sizeInBytes"])
     ids = {name: str(detail["id"])}
-    for key in CHILDREN:
-        child = _child(spark, owner, evidence, key, receipt["tables"].get(key) or {})
+    source = _shared_source(receipt, str(owner.reference_namespace))
+    keys = CHILDREN if source is None else ("population", "source")
+    for key in keys:
+        child_name = (
+            source if key == "source" and source else reference_table_name(owner, evidence, key)
+        )
+        child = _child(spark, child_name, receipt["tables"].get(key) or {})
         if child is not None:
             existing.append(child[0])
             ids[child[0]] = child[1]
@@ -255,14 +319,12 @@ def _reference(spark, name, owner, receipt, receipt_id, intents) -> Reference:
         ids=ids,
         created_at=detail["createdAt"],
         size_bytes=size,
+        shared_source=source,
     )
 
 
-def _child(spark, owner, evidence, key, record) -> tuple[str, str, int] | None:
+def _child(spark, name, record) -> tuple[str, str, int] | None:
     """Return an existing population table's name, id and size, or None when dropped."""
-    from .spark.spark_monitoring_reference import _reference_name  # noqa: PLC0415
-
-    name = _reference_name(owner, evidence, key)
     if record.get("name") != name:
         raise ValueError(f"Reference table name differs from its receipt: {name}.")
     if record.get("version") != 0:
@@ -326,8 +388,11 @@ def _unresolved(spark: Any, namespace: str, run_state: Callable[[int], str]) -> 
     name = qualified_name(f"{namespace}.retraining_requests")
     if not ensure_owned_object(spark, name):
         raise ValueError("retraining_requests is missing, so retraining dependencies are unknown.")
-    rows = _bounded(spark.table(name).select("request_id", "status", "run_id"), name)
-    return tuple(sorted(str(row["request_id"]) for row in rows if not _finished(row, run_state)))
+    rows = _bounded(spark.table(name), name)
+    requests = (row for row in rows if not is_reference_control_row(row))
+    return tuple(
+        sorted(str(row["request_id"]) for row in requests if not _finished(row, run_state))
+    )
 
 
 def _finished(row: Any, run_state: Callable[[int], str]) -> bool:
@@ -355,6 +420,7 @@ def _decision(reference: Reference, protection: Protection, now: datetime, days:
         "size_bytes": reference.size_bytes,
         "decision": "protected" if reason else "deletable",
         "reason": reason or f"unused and older than {days} days",
+        "shared_source": reference.shared_source,
     }
 
 
@@ -399,8 +465,12 @@ def _audit_intents(spark: Any, namespace: str) -> set[str]:
     name = qualified_name(f"{namespace}.{AUDIT_TABLE}")
     if not ensure_owned_object(spark, name):
         return set()
-    rows = _bounded(spark.table(name).select("reference_id", "status"), name)
-    return {str(row["reference_id"]) for row in rows if row["status"] == "intent"}
+    rows = _bounded(spark.table(name).select("reference_id", "status", "action"), name)
+    return {
+        str(row["reference_id"])
+        for row in rows
+        if row["status"] == "intent" and row["action"] == "delete"
+    }
 
 
 def _bounded(frame: Any, name: str) -> list:
@@ -411,10 +481,33 @@ def _bounded(frame: Any, name: str) -> list:
     return rows
 
 
-def _delete(spark: Any, namespace: str, references: list[dict]) -> list[str]:
+def _delete(spark: Any, namespace: str, references: list[dict], owner: str) -> list[str]:
     """Drop each reference's tables, receipt last, between audit intent and result rows."""
     if not references:
         return []
+    require_reference_mutation(spark, namespace, owner)
+    audit = _audit_table(spark, namespace)
+    cleanup_id, deleted = uuid4().hex, []
+    for item in references:
+        require_reference_mutation(spark, namespace, owner)
+        _record(spark, audit, cleanup_id, item, "intent", item["reason"])
+        try:
+            for name in [*item["tables"], item["receipt"]]:
+                if name == item["shared_source"] and _source_still_used(spark, namespace, item):
+                    continue
+                immutable_detail(spark, name, item["ids"][name])
+                require_reference_mutation(spark, namespace, owner)
+                spark.sql(f"DROP TABLE {table_name(name)}")
+        except Exception as error:
+            _record(spark, audit, cleanup_id, item, "failed", str(error)[:1000])
+            raise
+        _record(spark, audit, cleanup_id, item, "deleted", item["reason"])
+        deleted.append(item["receipt"])
+    return deleted
+
+
+def _audit_table(spark: Any, namespace: str) -> str:
+    """Create or validate the same owned audit destination for retirement and guard recovery."""
     audit = qualified_name(f"{namespace}.{AUDIT_TABLE}")
     if not ensure_owned_object(spark, audit):
         spark.sql(
@@ -426,29 +519,56 @@ def _delete(spark: Any, namespace: str, references: list[dict]) -> list[str]:
         spark.table(audit).schema.simpleString() != expected
     ):
         raise ValueError(f"Cleanup audit table differs: {audit}.")
-    cleanup_id, deleted = uuid4().hex, []
-    for item in references:
-        _record(spark, audit, cleanup_id, item, "intent", item["reason"])
-        try:
-            for name in [*item["tables"], item["receipt"]]:
-                immutable_detail(spark, name, item["ids"][name])
-                spark.sql(f"DROP TABLE {table_name(name)}")
-        except Exception as error:
-            _record(spark, audit, cleanup_id, item, "failed", str(error)[:1000])
-            raise
-        _record(spark, audit, cleanup_id, item, "deleted", item["reason"])
-        deleted.append(item["receipt"])
-    return deleted
+    return audit
 
 
-def _record(spark, audit, cleanup_id, item, status, reason) -> None:
+def append_reference_recovery(
+    spark: Any, namespace: str, *, owner: str, status: str, evidence: dict
+) -> None:
+    """Audit explicit admission recovery without impersonating the failed operation's owner.
+
+    The recovery caller must independently verify the holder has terminated and append
+    intent before conditionally clearing that exact token, then append released afterward.
+    Audit schema and ownership validation are identical to reference retirement.
+    """
+    if not re.fullmatch(r"[0-9a-f]{32}", owner) or status not in {"intent", "released"}:
+        raise ValueError("Invalid reference admission recovery audit identity or status.")
+    reason = json.dumps(evidence, sort_keys=True, allow_nan=False)
+    item = {"reference_id": owner, "receipt": qualified_name(f"{namespace}.retraining_requests")}
+    _record(
+        spark,
+        _audit_table(spark, namespace),
+        owner,
+        item,
+        status,
+        reason,
+        action="release_admission",
+    )
+
+
+def _source_still_used(spark: Any, namespace: str, item: dict) -> bool:
+    """Re-derive surviving users under admission, including receipts excluded by either plan."""
+    rows = spark.sql(f"SHOW TABLES IN {table_name(namespace)} LIKE '{_PREFIX}*{_SUFFIX}'")
+    names = rows.limit(MAX_REFERENCES + 1).collect()
+    if len(names) > MAX_REFERENCES:
+        raise ValueError("Monitoring store has too many references to plan at once.")
+    for row in names:
+        name = qualified_name(f"{namespace}.{row['tableName']}")
+        if name != item["receipt"]:
+            receipt, _ = _receipt(spark, name)
+            if _shared_source(receipt, namespace) == item["shared_source"]:
+                return True
+    return False
+
+
+def _record(spark, audit, cleanup_id, item, status, reason, *, action="delete") -> None:
     """Append one immutable audit row for a reference."""
     row = {
         "audit_id": uuid4().hex,
         "cleanup_id": cleanup_id,
         "reference_id": item["reference_id"],
         "table_name": item["receipt"],
-        "action": "delete",
+        "action": action,
         "status": status,
         "reason": reason,
         "recorded_at": datetime.now(UTC),

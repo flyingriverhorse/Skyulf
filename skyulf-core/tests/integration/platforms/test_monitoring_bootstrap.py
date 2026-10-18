@@ -26,6 +26,7 @@ class StoreSpark:
             tableExists=lambda name: name in self.objects, dropTempView=lambda name: None
         )
         self.race_owner = None
+        self.control = None
 
     def createDataFrame(self, rows, schema):
         """Keep schema comparisons exact and support the real typed merge path."""
@@ -39,14 +40,21 @@ class StoreSpark:
         frame = Mock()
         frame.schema.simpleString.return_value = self.objects[name]["schema"]
         frame.select.return_value.limit.return_value.collect.return_value = []
+        frame.where.return_value.limit.return_value.collect.side_effect = lambda: (
+            [] if self.control is None else [dict(self.control)]
+        )
         return frame
 
-    def sql(self, statement):
+    def sql(self, statement, args=None):
         """Record DDL and simulate another creator winning CREATE IF NOT EXISTS."""
         self.statements.append(statement)
         result = Mock()
         result.collect.return_value = []
-        if statement.startswith("SHOW TBLPROPERTIES"):
+        if statement.startswith("DESCRIBE DETAIL"):
+            result.first.return_value = {"format": "delta", "id": "control-table-id"}
+        elif args is not None and "retraining_requests" in statement:
+            self._control_statement(statement, args)
+        elif statement.startswith("SHOW TBLPROPERTIES"):
             match = re.search(r"SHOW TBLPROPERTIES ([^ ]+)", statement)
             assert match is not None, "Property inspection must identify a concrete object"
             name = match[1].replace("`", "")
@@ -68,6 +76,24 @@ class StoreSpark:
                 },
             )
         return result
+
+    def _control_statement(self, statement, args):
+        """Model the guard's conditional control row without replacing production admission."""
+        if statement.startswith("MERGE"):
+            assert self.control is None or self.control["status"] == "free"
+            self.control = {
+                "row_id": "control:reference_mutation",
+                "job_id": None,
+                "request_id": args["owner"],
+                "status": "held",
+                "evidence_json": args["evidence"],
+                "created_at_ms": args["created_at"],
+                "submitted_at_ms": None,
+                "run_id": None,
+            }
+        else:
+            assert self.control is not None and self.control["request_id"] == args["owner"]
+            self.control.update(status="free", request_id=None)
 
 
 def ensure(spark):
@@ -96,7 +122,7 @@ def existing_store():
 
 def mutations(spark):
     """Exclude read-only metadata inspection from the side-effect assertions."""
-    return [sql for sql in spark.statements if not sql.startswith("SHOW")]
+    return [sql for sql in spark.statements if not sql.startswith(("SHOW", "DESCRIBE"))]
 
 
 def test_fresh_store_is_created_once_and_second_producer_needs_no_ddl():
@@ -224,7 +250,9 @@ def test_scoring_producer_bootstraps_before_first_inventory_merge(layout):
     assert result is not None
     assert result["inventory_table"] == "ops.monitoring.model_inventory"
     assert len(spark.objects) == 12
-    assert mutations(spark)[-1].startswith("MERGE")
+    assert any(sql.startswith("MERGE") and "model_inventory" in sql for sql in mutations(spark))
+    assert spark.control is not None
+    assert spark.control["status"] == "free"
 
 
 def test_existing_shared_store_accepts_producer_without_creation_or_replacement():
@@ -238,8 +266,11 @@ def test_existing_shared_store_accepts_producer_without_creation_or_replacement(
         "result": {"selected_model_name": "models.risk.model", "selected_model_version": "2"}
     }
     register_scoring_monitor(spark, workflow(), settings(), payload)
-    assert len(mutations(spark)) == 1
-    assert mutations(spark)[0].startswith("MERGE")
+    assert len(mutations(spark)) == 3
+    assert mutations(spark)[1].startswith("MERGE")
+    assert "model_inventory" in mutations(spark)[1]
+    assert spark.control is not None
+    assert spark.control["status"] == "free"
 
 
 @pytest.mark.parametrize("changes", [{"monitoring_deployment_mode": "development"}, {}])
@@ -324,7 +355,18 @@ def test_model_set_validates_all_components_before_shared_bootstrap(invalid_seco
         result = register_set_monitors(spark, workflow(), settings(), parent, resolved, artifact)
         assert result is not None
         assert len(result["configs"]) == 2
-        assert len([sql for sql in mutations(spark) if sql.startswith("MERGE")]) == 2
+        assert (
+            len(
+                [
+                    sql
+                    for sql in mutations(spark)
+                    if sql.startswith("MERGE") and "model_inventory" in sql
+                ]
+            )
+            == 2
+        )
+        assert spark.control is not None
+        assert spark.control["status"] == "free"
 
 
 def test_fresh_scheduled_project_creates_empty_store_without_models():
