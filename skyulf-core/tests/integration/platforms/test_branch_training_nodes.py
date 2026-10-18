@@ -140,6 +140,33 @@ def test_branch_operator_uses_frozen_configuration(workflow_config, tracked, mon
     assert client.get_run(initialized.reference["run_id"]).info.status == "FINISHED"
 
 
+@pytest.mark.parametrize("invalid_config", [None, [], "config/training.yml"])
+def test_branch_request_rejects_non_object_config_before_replay(tracked, invalid_config):
+    """An intact digest must not let malformed saved config select editable-file fallback."""
+    from skyulf.integrations.databricks.jobs.training import branch_tasks
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import (
+        LifecycleContext,
+        PhaseStore,
+    )
+
+    uri, _ = tracked
+    context = LifecycleContext("10", "20")
+    initialized = branch_tasks.initialize_branch_training(
+        None,
+        configs={"amount": invalid_config},
+        settings={"model_name": "workspace.test.set"},
+        composition_source="",
+        context=context,
+        tracking_uri=uri,
+        experiment_name="branches",
+        action="approve",
+        operator_values={"lifecycle_action": "approve"},
+    )
+    store = PhaseStore(uri, context)
+    with pytest.raises(ValueError, match="pinned request"):
+        store.bind(initialized.reference)
+
+
 def test_set_registration_evaluation_and_decision_are_separate(
     workflow_config, tracked, monkeypatch
 ):

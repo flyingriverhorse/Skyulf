@@ -55,6 +55,22 @@ describe('OutlierNode public settings', () => {
     // Imported malformed maps must surface a configuration issue before wire conversion or fitting.
     expect(OutlierNode.validate({ ...OutlierNode.getDefaultConfig(), method: 'winsorize', columns: ['age'], percentiles_by_column: value as unknown as Config['percentiles_by_column'] }).isValid).toBe(false);
   });
+  it.each([
+    { name: 'lower first', pair: { lower: 1, upper: 99 }, valid: true },
+    { name: 'upper first', pair: { upper: 99, lower: 1 }, valid: true },
+    { name: 'unrelated hidden key', pair: Object.defineProperty({ lower: 1, upper: 99 }, 'extra', { value: true }), valid: true },
+    { name: 'inherited lower', pair: Object.assign(Object.create({ lower: 1 }), { upper: 99, extra: true }), valid: false },
+    { name: 'hidden upper', pair: Object.defineProperty({ lower: 1, extra: true }, 'upper', { value: 99 }), valid: false },
+    { name: 'unrelated Unicode key', pair: { lower: 1, '\u00fcpper': 99 }, valid: false },
+    { name: 'combined key', pair: { 'lower,upper': 1 }, valid: false },
+    { name: 'combined key with inherited endpoints', pair: Object.assign(Object.create({ lower: 1, upper: 99 }), { 'lower,upper': 1 }), valid: false },
+  ])('checks exact enumerable percentile keys: $name', ({ pair, valid }) => {
+    // Imported overrides must use both own enumerable endpoints, independent of insertion order.
+    const result = OutlierNode.validate({ ...OutlierNode.getDefaultConfig(), method: 'winsorize', columns: ['age'], percentiles_by_column: { age: pair } as Config['percentiles_by_column'] });
+    expect(result).toEqual(valid ? { isValid: true } : {
+      isValid: false, field: 'percentiles_by_column', message: 'Enter lower and upper percentiles for age.',
+    });
+  });
   it('configures actual joint detectors without losing selected columns', () => {
     // The new methods must reach editable model controls rather than the per-column envelope.
     const { onChange } = setup({ columns: ['age', 'score'] });

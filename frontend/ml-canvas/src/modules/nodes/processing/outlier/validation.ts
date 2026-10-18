@@ -22,7 +22,8 @@ function winsorizeIssue(config: OutlierConfig) {
 
 function columnPercentileIssue(pair: { lower: number; upper: number } | undefined, column: string) {
   if (pair === undefined) return undefined;
-  if (pair === null || typeof pair !== 'object' || Object.keys(pair).sort().join(',') !== 'lower,upper')
+  const keys = pair !== null && typeof pair === 'object' ? Object.keys(pair) : [];
+  if (keys.length !== 2 || !keys.includes('lower') || !keys.includes('upper'))
     return { isValid: false, field: 'percentiles_by_column', message: `Enter lower and upper percentiles for ${column}.` };
   return percentileIssue(pair.lower, pair.upper, `percentiles_by_column.${column}.`);
 }
