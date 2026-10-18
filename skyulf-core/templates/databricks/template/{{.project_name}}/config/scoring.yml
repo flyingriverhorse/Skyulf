@@ -51,6 +51,7 @@ skip_target_pre_split_steps: false
 # Built-in checks (no Python needed):
 #   required_values  the listed columns must not be empty     reason: missing:<columns>
 #   value_range      a number within inclusive limits         reason: outside_range:<column>
+#                    (minimum, maximum, or only one of them)
 #                    (missing or non-numeric values are rejected too)
 # Anything else: custom: scoring.<function>, returning a reason or null per row.
 # Example (remove the leading # to use it, and set mode: combined):
@@ -66,6 +67,7 @@ eligibility: []
 # outputs (custom/combined): extra columns after the model. Declare each column
 # and its dtype. Built-in: prediction_band puts a number into labelled bands
 # (a value equal to a threshold goes to the higher band).
+# column defaults to prediction, output defaults to band.
 # Example: probability_1 below 0.3 -> low, below 0.7 -> medium, else high.
 # outputs:
 #   - name: risk_band
@@ -80,7 +82,15 @@ outputs: []
 
 # combined (model sets only): read predictions of several models, named
 # <model>__prediction, and list those models in required_components.
-# Built-in operations: weighted_sum, weighted_mean.
+# Built-in operations: weighted_sum, weighted_mean. They use operation: instead of
+# custom:, params with exactly inputs and weights (same length, weighted_mean needs
+# nonnegative weights) and one float64 column:
+# combined:
+#   - name: blended
+#     operation: weighted_mean
+#     required_components: [revenue, cost]
+#     params: {inputs: [revenue__prediction, cost__prediction], weights: [0.7, 0.3]}
+#     columns: [{name: blended, dtype: float64}]
 # Example: profit = revenue - cost, with profit() in src/features/scoring.py.
 # combined:
 #   - name: profit
