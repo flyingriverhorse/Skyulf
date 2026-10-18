@@ -1,6 +1,7 @@
 """Feature-generation (math) node."""
 
 import logging
+import math
 from copy import deepcopy
 from decimal import Decimal
 from numbers import Real
@@ -13,21 +14,57 @@ from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import FeatureGenerationArtifact
+from .._category_keys import category_key, uses_category_keys
 from .._fitted_validation import local_scalar, local_state_fields
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import (
+    ALLOWED_DATETIME_FEATURES,
     DEFAULT_EPSILON,
     FEATURE_MATH_ALLOWED_TYPES,
+    _resolve_datetime_output_col,
     _resolve_group_agg_cols,
+    _resolve_output_col,
     _similarity_backend,
     _validate_similarity_backend,
+    uses_operation_contract,
 )
 from ._pandas_ops import _PANDAS_AGG_METHODS, _featgen_apply_pandas
 from ._polars_ops import _featgen_apply_polars
 
 logger = logging.getLogger(__name__)
+
+
+def feature_operation_output_columns(
+    op: dict, index: int, existing: list[str], allow_overwrite: bool = False
+) -> list[str]:
+    """Describe generated names for static operand checks using the runtime naming rules."""
+    kind = op.get("operation_type", "arithmetic")
+    if not isinstance(kind, str) or kind not in FEATURE_MATH_ALLOWED_TYPES:
+        return []
+    if kind != "datetime_extract":
+        return [_resolve_output_col(op, index, existing, allow_overwrite)]
+    return _calendar_output_columns(op, existing, allow_overwrite)
+
+
+def _calendar_output_columns(op: dict, existing: list[str], allow_overwrite: bool) -> list[str]:
+    """Predict calendar names only for well-shaped lists in imported preview configuration."""
+    columns = op.get("input_columns", [])
+    features = op.get("datetime_features", [])
+    if not all(
+        isinstance(values, list) and all(isinstance(value, str) for value in values)
+        for values in (columns, features)
+    ):
+        return []
+    names = []
+    available = list(existing)
+    for column in columns:
+        for feature in features:
+            name = _resolve_datetime_output_col(op, column, feature, available, allow_overwrite)
+            names.append(name)
+            available.append(name)
+    return names
 
 
 def _check_similarity_runtime(operations: list[dict[str, Any]]) -> None:
@@ -59,23 +96,60 @@ def _validate_operation_types(operations: list[dict[str, Any]]) -> None:
             )
 
 
+def _validate_operation_choices(operations: list[dict[str, Any]]) -> None:
+    """Reject named-method typos before any new fit can publish incomplete operations."""
+    methods = {
+        "arithmetic": {"add", "subtract", "multiply", "divide"},
+        "similarity": {"ratio", "token_sort_ratio", "token_set_ratio"},
+        "group_agg": {*_PANDAS_AGG_METHODS, "deviation"},
+    }
+    for op in operations:
+        kind = op.get("operation_type", "arithmetic")
+        method = op.get("method")
+        if kind in methods and method is not None and method not in methods[kind]:
+            raise_invalid_choice(method, methods[kind], f"FeatureMath {kind} method")
+        if kind == "datetime_extract":
+            for feature in op.get("datetime_features", []):
+                if feature not in ALLOWED_DATETIME_FEATURES:
+                    raise_invalid_choice(
+                        feature, ALLOWED_DATETIME_FEATURES, "FeatureMath datetime feature"
+                    )
+
+
 def _validate_group_mapping(op: dict) -> None:
     """Require fitted lookup dimensions while retaining unresolved fit-time no-ops."""
     if "group_agg_mapping" not in op:
         raise ValueError("FeatureGeneration group_agg requires fitted statistics; refit the node.")
     mapping = op["group_agg_mapping"]
-    if mapping is None:
+    if mapping is None and op.get("method") != "deviation":
         return
-    if type(mapping) is not dict or set(mapping) != {
+    fields = {
         "group_column",
         "keys",
         "values",
         "null_value",
-    }:
+    }
+    if op.get("method") == "deviation":
+        fields.update({"category_key_version", "global_value"})
+    if type(mapping) is not dict or set(mapping) != fields:
         raise ValueError("Fitted group aggregation mapping has unexpected fields.")
     if not isinstance(mapping["group_column"], str):
         raise ValueError("Fitted group aggregation requires a named group column.")
     _validate_group_values(mapping)
+    if op.get("method") == "deviation":
+        _validate_deviation_mapping(mapping)
+
+
+def _validate_deviation_mapping(mapping: dict) -> None:
+    """Bind the new deviation method to unique canonical keys and its saved global mean."""
+    if not uses_category_keys(mapping):
+        raise ValueError("Fitted group deviation requires category key version 1.")
+    keys = mapping["keys"]
+    if any(type(key) is not str for key in keys) or len(keys) != len(set(keys)):
+        raise ValueError("Fitted deviation keys must be unique canonical strings.")
+    for value in [*mapping["values"], mapping["global_value"], mapping["null_value"]]:
+        if value is not None and (type(value) not in (int, float) or not math.isfinite(value)):
+            raise ValueError("Fitted deviation means must be finite numbers or missing.")
 
 
 def _validate_group_values(mapping: dict) -> None:
@@ -119,9 +193,11 @@ class FeatureGenerationApplier(BaseApplier):
     @staticmethod
     def validate_inference_state(raw: dict) -> dict:
         """Inspect saved operations, pinned similarity and learned group lookup shapes."""
-        local_state_fields(
-            raw, "feature_generation", {"type", "operations", "epsilon", "allow_overwrite"}
-        )
+        fields = {"type", "operations", "epsilon", "allow_overwrite"}
+        strict = uses_operation_contract(raw)
+        if strict:
+            fields.add("operation_contract_version")
+        local_state_fields(raw, "feature_generation", fields)
         operations = raw["operations"]
         if type(operations) not in (list, tuple) or any(type(op) is not dict for op in operations):
             raise ValueError(
@@ -130,6 +206,8 @@ class FeatureGenerationApplier(BaseApplier):
         if not isinstance(raw["allow_overwrite"], Decimal):
             local_scalar(raw["allow_overwrite"], "allow_overwrite")
         _validate_operation_types(operations)
+        if strict:
+            _validate_operation_choices(operations)
         for op in operations:
             if op.get("operation_type") == "group_agg":
                 _validate_group_mapping(op)
@@ -155,8 +233,8 @@ class FeatureGenerationApplier(BaseApplier):
 
         Operations run in order, so a later one can read a column an earlier one
         created. Unsupported operation types raise ``ValueError`` before any
-        operation runs. A failure inside a supported operation is logged and
-        skipped, and an output name that already exists is suffixed until
+        operation runs. New versioned fits raise operation failures; historical
+        states retain their logged-skip behavior. An existing output name is suffixed until
         unique unless ``allow_overwrite`` says otherwise.
 
         Datetime extraction uses ``output_column`` exactly for one configured
@@ -171,6 +249,8 @@ class FeatureGenerationApplier(BaseApplier):
         lacking those mappings must be refitted before inference.
         """
         _validate_operation_types(params.get("operations", []))
+        if uses_operation_contract(params):
+            _validate_operation_choices(params.get("operations", []))
         _check_similarity_runtime(params.get("operations", []))
         if any(
             op.get("operation_type") == "group_agg" and "group_agg_mapping" not in op
@@ -190,6 +270,8 @@ def _fit_group_aggregation(X: Any, op: dict[str, Any]) -> dict[str, Any] | None:
     if resolved is None:
         return None
     group_col, target_col, method = resolved
+    if method == "deviation":
+        return _fit_group_deviation(X, group_col, target_col)
     if method not in _PANDAS_AGG_METHODS:
         return None
 
@@ -214,6 +296,30 @@ def _fit_group_aggregation(X: Any, op: dict[str, Any]) -> dict[str, Any] | None:
         else:
             fitted["keys"].append(group_key.item() if hasattr(group_key, "item") else group_key)
             fitted["values"].append(numeric)
+    return fitted
+
+
+def _fit_group_deviation(X: Any, group_col: str, target_col: str) -> dict[str, Any]:
+    """Learn a canonical group mean and global fallback without coercing group identities."""
+    frame = select_then_to_pandas(X, [group_col, target_col])
+    native = X.to_native() if hasattr(X, "to_native") else X
+    keys = pd.Series(
+        [category_key(value) for value in native[group_col].to_list()], index=frame.index
+    )
+    target = pd.to_numeric(frame[target_col], errors="coerce")
+    if not target.dropna().map(math.isfinite).all():
+        raise ValueError("Group deviation requires finite observed training values.")
+    means = target.groupby(keys, sort=True).mean()
+    global_mean = target.mean()
+    fitted = {
+        "group_column": group_col,
+        "keys": list(means.index),
+        "values": [None if pd.isna(value) else float(value) for value in means],
+        "null_value": None,
+        "category_key_version": 1,
+        "global_value": None if pd.isna(global_mean) else float(global_mean),
+    }
+    _validate_deviation_mapping(fitted)
     return fitted
 
 
@@ -248,11 +354,13 @@ class FeatureGenerationCalculator(BaseCalculator):
         belongs in the separate ``PolynomialFeatures`` node.
         """
         _validate_operation_types(config.get("operations", []))
+        _validate_operation_choices(config.get("operations", []))
         params: FeatureGenerationArtifact = {
             "type": "feature_generation",
             "operations": deepcopy(config.get("operations", [])),
             "epsilon": config.get("epsilon", DEFAULT_EPSILON),
             "allow_overwrite": config.get("allow_overwrite", False),
+            "operation_contract_version": 1,
         }
         for op in params["operations"]:
             if op.get("operation_type") == "similarity":

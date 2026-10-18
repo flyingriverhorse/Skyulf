@@ -25,6 +25,7 @@ from skyulf.registry import NodeRegistry
     "node,config",
     [
         ("MinMaxScaler", {"columns": ["x"], "feature_range": [-2, 7]}),
+        ("MinMaxScaler", {"columns": ["x"], "feature_range": [-2, 7], "clip": True}),
         ("ClipValues", {"bounds": {"x": {"lower": 1, "upper": 7}}}),
         ("ClipValues", {"bounds": {"x": {"lower": 0.5, "upper": 7.5}}}),
     ],

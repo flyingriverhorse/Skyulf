@@ -196,8 +196,13 @@ def test_real_fit_keeps_all_null_columns_untouched_and_accepts_numpy_settings(
     "estimator", ["DecisionTree", "ExtraTrees", "KNeighbors", np.str_("unknown-fallback")]
 )
 def test_iterative_real_estimator_choices_replay_without_predictor_fit(estimator, monkeypatch):
-    """Every existing estimator alias keeps its fitted predictors instead of fitting at apply."""
-    record = _record("IterativeImputer", "pandas", {"columns": ["a", "b"], "estimator": estimator})
+    """Valid aliases and legacy fallback artifacts keep their already fitted predictors."""
+    fitted_name = "BayesianRidge" if estimator == "unknown-fallback" else estimator
+    record = _record(
+        "IterativeImputer", "pandas", {"columns": ["a", "b"], "estimator": fitted_name}
+    )
+    record["params"]["estimator"] = estimator
+    record["artifact"]["estimator"] = estimator
     imputer = record["artifact"]["imputer_object"]
     for step in imputer.imputation_sequence_:
         monkeypatch.setattr(type(step.estimator), "fit", _forbidden)

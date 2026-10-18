@@ -20,9 +20,10 @@ are in [read the step cards](preprocessing_recipes.md#read-the-step-cards).
 | Parameter | Type | Default | Allowed values | What it changes |
 | --- | --- | --- | --- | --- |
 | `columns` | list[string] | [] | Existing column names. | Select explicitly; no automatic detection. |
-| `features` | list[string] | [year, month, day, dayofweek] | year, month, day, dayofweek, dayofyear, quarter, weekofyear, hour, minute, is_weekend, is_month_start, is_month_end. | Choose calendar features; null/empty uses default, unknown names omitted. |
+| `features` | list[string] | [year, month, day, dayofweek] | year, month, day, dayofweek, dayofyear, quarter, weekofyear, hour, minute, second, is_weekend, is_month_start, is_month_end; hour_sin/hour_cos, dayofweek_sin/dayofweek_cos, month_sin/month_cos, dayofyear_sin/dayofyear_cos. | Choose calendar parts or cycles; null/empty uses default, unknown names fail during fit with supported choices listed. |
 | `drop_original` | boolean | false | true, false | Remove source date columns. |
 | `epoch_unit` | string/null | null | s, ms, us, ns; required for numeric epochs. | Interpret numeric timestamps. |
+| `timezone` | string | UTC | IANA name, such as Europe/Istanbul or Europe/Copenhagen. | Extract parts and cycles in the selected local calendar. |
 
 **Minimal YAML:**
 
@@ -33,15 +34,37 @@ are in [read the step cards](preprocessing_recipes.md#read-the-step-cards).
 ```
 
 **Common mistake:** Numeric epochs require epoch_unit; new artifacts normalize timestamp
-interpretation to UTC.
+interpretation to UTC before converting to the selected timezone. A naive local
+clock string must carry its offset if it represents a non-UTC instant.
 
-**Details:** Newly fitted artifacts interpret naive dates as UTC and convert
-offset-aware dates to UTC; there is no public timezone-selection knob. Stores
-selection/calendar rules. Adds `<column>_<feature>` values, with null features
+**Details:** Newly fitted artifacts interpret naive dates and numeric epochs as
+UTC, then convert each instant to `timezone`; offset-aware dates describe the
+same instant regardless of their written offset. DST jumps and repeated hours
+follow that conversion without localizing an ambiguous wall clock. The fitted
+state stores the timezone and calendar selections. Adds `<column>_<feature>` values, with null features
 for unparseable timestamps; dtype representation of nullable calendar values
 can differ across engines. dayofweek is Monday=0. Empty apply retains generated
 columns. Context row. Base dependencies. Legacy artifacts retain their old
-timestamp interpretation until the whole pipeline is refitted.
+timestamp interpretation when their saved state lacks a timezone, until the
+whole pipeline is refitted. Existing artifacts with `timezone: UTC` retain UTC.
+
+The explicit `_sin` and `_cos` options emit Float64 values using
+`sin(2*pi*position/period)` and `cos(2*pi*position/period)`. Hour uses integer
+hours 0–23 and period 24; weekday uses Monday=0 and period 7. Month subtracts
+one (January=0) and uses period 12. Day-of-year subtracts one (January 1=0) and
+uses 365 or 366 according to each row's local calendar year. These are calendar
+components, so minutes do not contribute a fractional hour. Select both members
+of a pair to preserve circular position; each output can also be selected alone.
+
+```yaml
+- name: local_calendar
+  transformer: DateFeatures
+  params:
+    columns: [observation_time]
+    timezone: Europe/Copenhagen
+    features: [second, hour_sin, hour_cos, dayofweek_sin, dayofweek_cos]
+    drop_original: true
+```
 
 ## LagFeatures
 
@@ -79,6 +102,11 @@ bounded seed observations in carry mode. Context window; base dependencies.
 Target lags require careful availability handling and are forbidden in carry
 mode; use only prediction-available inputs in Bundle features.
 
+Schema preview retains known shift-stable types, including nullable integers,
+Boolean extensions, strings and floats. Native integer and Boolean labels can
+change when missing lags are inserted, so ambiguous types return an unknown
+schema. Apply keeps the engine's native behavior, including empty batches.
+
 ## RollingAggregate
 
 **Purpose and effect:** `[10, 20, 30]` with window 2 and mean adds `[10, 15, 25]`: **the current row
@@ -90,7 +118,7 @@ is included**.
 | --- | --- | --- | --- | --- |
 | `columns` | list[string] | [] | Existing column names. | Select explicitly; no automatic detection. |
 | `window` | integer | 3 | Positive. | Set rolling row-count window. |
-| `aggregations` | string/list[string] | [mean] | mean, sum, min, max, std, median; unknown names omitted. | Choose summary features. |
+| `aggregations` | string/list[string] | [mean] | mean, sum, min, max, std, median. | Choose summary features; unknown names fail during fit with supported choices listed. |
 | `min_periods` | integer | 1 | No greater than window. | Require enough nonmissing observations. |
 | `group_by` | string/list[string]/null | null | Existing grouping columns; use a list in carry mode. | Maintain separate entity sequences. |
 | `sort_by` | string/null | null | Existing numeric/typed datetime clock for carry. | Order observations; absent uses batch input order. |
@@ -115,12 +143,17 @@ is included**.
 **Common mistake:** The current row is included; rolling the known target would leak its label and
 is rejected.
 
-**Details:** Unrecognized aggregations are removed from the selection. Adds
-`<column>_roll_<aggregation>_<window>` floating columns, keeping originals.
+**Details:** Unknown aggregation names fail during fit. Adds
+`<column>_roll_<aggregation>_<window>` columns, keeping originals.
 Missing observations affect min_periods; sample std needs enough observations.
 Rolling the known target is rejected to prevent same-row label leakage.
 Batch mode may reorder rows/y through sorting. Saves rules and optionally
 bounded training history. Context window; base dependencies.
+
+Pandas rolling outputs are double precision. Polars can retain float32 and
+integer types for some aggregates. Schema preview predicts only known double
+outputs: double inputs, or integer mean/median/std. Other combinations return
+an unknown schema; this does not change their fitted or native apply behavior.
 
 ## Carry history for LagFeatures and RollingAggregate
 

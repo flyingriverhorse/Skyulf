@@ -151,7 +151,11 @@ def test_datetime_names_replay_without_mutating_artifact_or_config(frame_factory
     repeated = _native(applier.apply(first, params))
     legacy = _native(applier.apply(frame, saved_config))
 
-    assert first.equals(replay) and first.equals(legacy)
+    assert first.equals(replay)
+    assert first["named_1"].to_list() == legacy["named_1"].to_list()
+    assert str(first["named_1"].dtype) == "Int64"
+    if isinstance(legacy, pd.DataFrame):
+        assert str(legacy["named_1"].dtype) == "int32"
     assert list(first.columns) == ["dt", "named", "named_1"]
     assert list(repeated.columns) == ["dt", "named", "named_1", "named_2"]
     assert repeated["named_2"].to_list() == [2024]

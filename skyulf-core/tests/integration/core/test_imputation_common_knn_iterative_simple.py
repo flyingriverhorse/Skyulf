@@ -169,12 +169,17 @@ def test_resolve_simple_columns_most_frequent_includes_all_columns() -> None:
 
 
 @pytest.mark.parametrize(*_iterative_estimator_cases)
-def test_build_iterative_estimator_alias(alias: str, module: str, class_name: str) -> None:
-    """Each estimator alias (and the unrecognized-name default) must map to the
-    expected sklearn regressor class.
-    """
+def test_build_iterative_estimator_alias(
+    alias: str, module: str | None, class_name: str | None
+) -> None:
+    """Valid estimator aliases resolve exactly; typos must not substitute another predictor."""
     import importlib
 
+    if class_name is None:
+        with pytest.raises(ValueError, match="Supported estimators"):
+            _build_iterative_estimator(alias)
+        return
+    assert module is not None
     expected_cls = getattr(importlib.import_module(module), class_name)
     estimator = _build_iterative_estimator(alias)
     assert isinstance(estimator, expected_cls)

@@ -299,11 +299,12 @@ Learned params:
 Fills missing values from the statistic of the row's own group, for example the
 median employee count of the same industry. Statistics are learned on training
 rows only; a group that was not seen in training (or had no observed value) uses
-the overall training value. The group column itself is never filled.
+the overall training value. The grouping columns themselves are never filled.
 
 Config:
 
-- `group_by`: str (required; the column that defines the groups)
+- `group_by`: str or ordered list[str] (required; one or more group columns)
+- `fallback`: `global` (default) or `hierarchical`; the latter requires a list and tries successively shorter leading key prefixes before the global statistic.
 - `strategy`: `mean` | `median` | `most_frequent` (also accepts `mode`; `constant` is rejected — use `SimpleImputer`)
 - `columns`: list[str] (optional; numeric auto-detection for mean/median, all other columns for most_frequent)
 
@@ -312,6 +313,7 @@ Learned params:
 - `group_by`, `strategy`, `columns`
 - `group_values`: dict[col -> list of [group, value]]
 - `fill_values`: dict[col -> overall value]
+- Explicit list-based grouping additionally saves versioned canonical composite keys, prefix statistics and fallback order; missing key components skip inapplicable prefix levels.
 
 Example step:
 
@@ -416,6 +418,11 @@ Config:
 - `columns`: list[str]
 - `handle_unknown`: str (default `use_encoded_value`)
 - `unknown_value`: int/float (default -1)
+- `categories_order`: multiline string or list of comma-separated strings,
+  one line per selected column; empty input uses automatic ordering.
+
+Malformed explicit orders and unsupported `handle_unknown` policies raise a
+descriptive error at fit instead of choosing a different order or policy.
 
 Learned params:
 
@@ -452,7 +459,7 @@ Requires a target series (`y`).
 In a `FeatureEngineer` or `SkyulfPipeline`, training rows are encoded with
 sklearn's cross-fitted `TargetEncoder.fit_transform` behavior. Test,
 validation, and inference rows use the fitted encoder's `transform`
-behavior. Skyulf uses deterministic five-fold cross-fitting with seed 42
+behavior. Skyulf defaults to five-fold cross-fitting with shuffling and seed 42
 whenever the training split supports it; smaller leakage-safe splits
 deterministically shrink to the largest supported fold count (for
 classification, capped by the smallest class size; for regression, capped by
@@ -472,26 +479,63 @@ Config:
 - `columns`: list[str]
 - `smooth`: `auto` or numeric
 - `target_type`: `auto` or explicit type
+- `cv`: integer at least 2 (default 5); an upper bound, reduced for small splits.
+- `shuffle`: bool (default True); False keeps the existing row order for folds.
+- `random_state`: integer or null (default 42); ignored when shuffle is False.
+
+These options do not implement grouped or chronological cross-validation.
 
 Learned params:
 
 - `columns`
 - `encoder_object` (sklearn TargetEncoder)
+- `category_key_version` (new artifacts only)
+
+New fits normalize `None`, `NaN`, pandas `NA` and Polars null to one category,
+keeping literal missing-value spellings distinct. Both cross-fitted training and
+saved inference use these keys. Artifacts without the version retain their
+original sklearn category behavior.
 
 ### HashEncoder
 
 Config:
 
 - `columns`: list[str]
-- `n_features`: int (default 10)
+- `n_features`: positive int (default 8); floats and booleans are rejected at fit.
+
+Each selected column becomes one bucket index. Saved artifacts retain their
+original bucket count, including the earlier default of 10.
 
 Learned params:
 
 - `columns`, `n_features`
 
+### FrequencyEncoder
+
+Configure `columns` and `mode`: `frequency` (default) returns training count
+divided by the full training row count; `count` returns the integer count.
+Missing values have their own learned category and count in the denominator.
+Unseen categories produce zero. The saved counts are reused independently of
+request size. Frequency output is float64; count output is int64.
+
+### RareCategoryGrouping
+
+Configure textual `columns`, `min_count` (positive integer, default 2),
+`min_share` (number in [0, 1], default 0), and `replacement` (nonempty string,
+default `Other`). A category remains only if both inclusive thresholds pass
+during training. Rare and unseen values become the replacement; frequent nulls
+remain null. Output columns are nullable strings. Numeric categories require
+explicit Casting first. An existing category equal to the replacement shares
+that label with grouped values.
+
+See the [encoding recipes](../user_guide/preprocessing_recipes_encoding.md) for
+YAML and a complete rare-grouping, imputation, and OneHot sequence.
+
 ## Scaling
 
-All scaling nodes accept `columns` (optional; numeric auto-detect) and return learned numeric arrays.
+Scaling nodes accept `columns` (optional; numeric auto-detect). Simple scalers
+store learned arrays; QuantileTransformer and Normalizer retain a fitted sklearn
+object. Their saved application does not fit on prediction rows.
 
 ### StandardScaler
 
@@ -511,6 +555,7 @@ Config:
 
 - `columns`: list[str]
 - `feature_range`: tuple (default (0, 1))
+- `clip`: bool (default False); bounds predictions to the fitted output range.
 
 Learned params:
 
@@ -524,6 +569,7 @@ Config:
 - `quantile_range`: tuple (default (25.0, 75.0))
 - `with_centering`: bool (default True)
 - `with_scaling`: bool (default True)
+- `unit_variance`: bool (default False); adjusts the quantile scale for a normal distribution.
 
 Learned params:
 
@@ -538,6 +584,25 @@ Config:
 Learned params:
 
 - `columns`, `scale`, `max_abs`
+
+### QuantileTransformer
+
+Maps each selected feature using its training quantiles. Configure `columns`,
+`n_quantiles` (positive integer, default 1000), `output_distribution` (`uniform`
+or `normal`, default `uniform`), `subsample` (positive integer, default 10000),
+and `random_state` (integer or null, default 42). sklearn caps the effective
+quantile count to the training sample count. The fitted object and column order
+are saved; selected output columns are float64.
+
+### Normalizer
+
+Normalizes each row across its selected columns. Configure `columns` and `norm`
+(`l1`, `l2`, or `max`; default `l2`). Zero rows remain zero. Selected columns
+become float64; missing or infinite inputs are rejected. Unlike StandardScaler,
+this controls each row's magnitude rather than each column's distribution.
+
+For runnable YAML and persistence details, see the
+[scaling recipes](../user_guide/preprocessing_recipes_scaling.md).
 
 ## Outliers
 
@@ -567,6 +632,23 @@ Learned params:
 - `stats`: dict[col -> {mean, std}]
 - `threshold`, `warnings`
 
+### IsolationForest and LocalOutlierFactor
+
+Learn one joint numeric detector across `columns`. Both accept `contamination`
+(default 0.01; `auto` or a number in (0, 0.5]). IsolationForest additionally
+accepts `n_estimators` (100), `max_samples` (`auto`) and `random_state` (42).
+LocalOutlierFactor accepts `n_neighbors` (20) and uses Euclidean distance with
+novelty scoring enabled. Training LOF uses its fitted training scores; new rows
+use its saved neighbor population.
+
+Training requires at least two complete finite rows. Nonfinite rows remain for
+explicit downstream imputation or validation. Persisted state stores selected
+columns, the fitted detector and warnings. Prediction publishes exclusions with
+original row positions and reasons; it never relearns from request batches.
+Spark and serving require the fitted recipe's sealed admission checks. See
+[outlier recipes](../user_guide/preprocessing_recipes_outliers.md) for complete
+YAML, saved-state checks and the distinction from per-column EllipticEnvelope.
+
 ### Winsorize
 
 Clips values into per-column percentile bounds.
@@ -576,6 +658,7 @@ Config:
 - `columns`: list[str]
 - `lower_percentile`: float (default 5.0)
 - `upper_percentile`: float (default 95.0)
+- `percentiles_by_column`: optional mapping such as `{revenue: {lower: 1, upper: 99}}`; other selected columns use the global defaults. Both tails are required and ordered within 0..100.
 
 Learned params:
 
@@ -1005,9 +1088,28 @@ Learned params:
 
 - `selected_columns`, `candidate_columns`, and method-specific metadata
 
+RFECV and sequential selection are also available through `method: rfecv` or
+`sequential_feature_selection`. Configure integer `cv` (default 5, at least 2)
+and an optional sklearn `scoring` name. RFECV uses `step` and
+`min_features_to_select`; sequential selection uses `direction` and
+`n_features_to_select`. Selection is learned during fit; inference reuses the
+saved names and does not run CV. See the
+[feature selection recipes](../user_guide/preprocessing_recipes_features.md).
+
 ### feature_selection
 
 A higher-level facade node that dispatches to the selection implementations.
+
+## Text vocabularies
+
+`count_vectorizer` and `tfidf_vectorizer` accept `column_mode: joined` (default)
+or `per_column`. Joined mode learns one vocabulary from concatenated text.
+Per-column mode saves independent vocabularies, and TF-IDF statistics, for each
+selected source. `max_features` applies separately to each vocabulary; output
+names include the source prefix. An empty per-column vocabulary or a missing
+fitted input column fails clearly. Legacy joined artifacts replay unchanged.
+`hashing_vectorizer` has no learned vocabulary and remains joined. See
+[text recipes](../user_guide/preprocessing_recipes_text.md) for examples.
 
 ## Resampling
 

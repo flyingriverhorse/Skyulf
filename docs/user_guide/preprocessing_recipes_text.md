@@ -11,8 +11,10 @@ are in [read the step cards](preprocessing_recipes.md#read-the-step-cards).
 
 These steps use `config/preprocessing.yml`, not `config/pre_split.yml`. `columns` is an explicit
 list default `[]`; absent, empty or wholly absent names give no-op state, not text auto-detection.
-The target is excluded. Count/TF-IDF/hash/embed combine multiple selected columns into one document
-per row, with spaces and a source-name prefix joined by `_`. Tokenizer processes each source
+The target is excluded. Count/TF-IDF default to `column_mode: joined`: selected columns become
+one document per row with spaces and a source-name prefix joined by `_`. Opt into
+`per_column` for independent vocabularies and source prefixes. Hashing and embeddings remain
+joined; Hashing has no learned vocabulary or per-column vocabulary option. Tokenizer processes each source
 separately. Null text becomes empty text. Text outputs are attached to the original engine; sklearn
 operations can cross through bounded NumPy/pandas data. Output-name collisions raise.
 
@@ -61,6 +63,7 @@ count 2 for blue.
 | Parameter | Type | Default | Allowed values | What it changes |
 | --- | --- | --- | --- | --- |
 | `columns` | list[string] | [] | Existing column names. | Select explicitly; no automatic detection. |
+| `column_mode` | string | joined | joined, per_column | Learn one shared vocabulary or a separate vocabulary per source. |
 | `min_df` | integer/number | 1 | Integer count or share in [0, 1]. | Remove tokens rarer than this training frequency. |
 | `max_df` | integer/number | 1.0 | Integer count or share in [0, 1]. | Remove tokens more common than this training frequency. |
 | `max_features` | integer/null | null | Positive; falsy 0 is treated as unset. | Limit vocabulary size. |
@@ -85,8 +88,12 @@ type.
 the training corpus. Saves vocabulary and fitted vectorizer. Adds dense
 `<prefix>__count__<token>` counts (binary clips presence to 1); `"blue blue"`
 has count 2 for blue. Unknown tokens add nothing. Empty/stopword-only training
-vocabulary produces no useful vectorizer (inspect the warning/state); empty
-apply preserves learned width. Context row for text inputs. Base/sklearn.
+vocabulary in joined mode produces no useful vectorizer (inspect the warning/state).
+In `per_column` mode each source learns its own vocabulary, emits
+`<source>__count__<token>` columns, and applies `max_features` independently. N-grams
+cannot cross sources. If any selected source has no usable vocabulary, fitting raises
+with its name. Missing fitted sources also raise at inference. Null text is an empty
+document; empty apply preserves learned width. Context row for text inputs. Base/sklearn.
 
 ## tfidf_vectorizer
 
@@ -98,6 +105,7 @@ common-word influence.
 | Parameter | Type | Default | Allowed values | What it changes |
 | --- | --- | --- | --- | --- |
 | `columns` | list[string] | [] | Existing column names. | Select explicitly; no automatic detection. |
+| `column_mode` | string | joined | joined, per_column | Learn shared vocabulary/IDF or independent vocabulary/IDF per source. |
 | `min_df` | integer/number | 1 | Integer count or share in [0, 1]. | Remove tokens rarer than this training frequency. |
 | `max_df` | integer/number | 1.0 | Integer count or share in [0, 1]. | Remove tokens more common than this training frequency. |
 | `max_features` | integer/null | null | Positive; falsy 0 is treated as unset. | Limit vocabulary size. |
@@ -122,6 +130,8 @@ and vectorizer. Adds dense floating `<prefix>__tfidf__<token>` values; frequent
 words across the training corpus receive less inverse-document weight. Unknown
 tokens are ignored; empty text is the zero vector. Normalization follows the
 wrapped sklearn default L2; `norm`, use_idf and smooth_idf are not exposed here.
+With `per_column`, each source has independent IDF statistics and normalization,
+emits `<source>__tfidf__<token>` columns, and gets its own `max_features` limit.
 Empty-vocabulary/empty-apply behavior follows count_vectorizer. Context row for
 text inputs; base/sklearn.
 

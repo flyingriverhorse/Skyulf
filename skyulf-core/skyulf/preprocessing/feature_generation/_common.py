@@ -1,5 +1,6 @@
 """Shared helpers and constants for feature-generation nodes."""
 
+import logging
 import math
 from difflib import SequenceMatcher
 from typing import Any
@@ -44,6 +45,30 @@ ALLOWED_DATETIME_FEATURES = {
     "season",
     "time_of_day",
 }
+NUMERIC_DATETIME_FEATURES = ALLOWED_DATETIME_FEATURES - {
+    "month_name",
+    "day_name",
+    "season",
+    "time_of_day",
+}
+
+
+def uses_operation_contract(params: dict) -> bool:
+    """Recognize the new strict operation contract without changing unversioned replay."""
+    if "operation_contract_version" not in params:
+        return False
+    version = params["operation_contract_version"]
+    if type(version) is not int or version != 1:
+        raise ValueError("Unsupported FeatureMath operation contract version.")
+    return True
+
+
+def report_operation_failure(error: Exception, strict: bool, message: str) -> None:
+    """Propagate failures in new artifacts and retain historical logged skips for old ones."""
+    if strict:
+        raise error
+    logging.getLogger(__name__).warning("%s: %s", message, error)
+
 
 _FUZZ_METHODS: dict[str, str] = {
     "token_sort_ratio": "token_sort_ratio",

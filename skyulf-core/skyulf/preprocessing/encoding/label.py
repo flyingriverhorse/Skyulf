@@ -19,6 +19,7 @@ from .._category_keys import category_key_expr, category_keys_pandas, uses_categ
 from .._fitted_validation import local_scalar, local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ._common import encoded_columns_schema
 from ._target import apply_target_encoder, fit_target_encoder
 
 logger = logging.getLogger(__name__)
@@ -404,11 +405,11 @@ class LabelEncoderCalculator(BaseCalculator):
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
-    ) -> SkyulfSchema:
-        """Pass the input schema through: encoded columns keep their name and position."""
-        # Label encoding replaces categorical values with ints in place;
-        # column set is preserved.
-        return input_schema
+    ) -> SkyulfSchema | None:
+        """Describe selected integer labels, retaining the target-only empty-selection default."""
+        target = config.get("target_column")
+        columns = config.get("columns") or ([target] if isinstance(target, str) else [])
+        return encoded_columns_schema(input_schema, columns, "int64")
 
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> LabelEncoderArtifact:  # pylint: disable=arguments-differ

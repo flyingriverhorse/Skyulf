@@ -10,7 +10,7 @@ raising an error.
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
@@ -33,6 +33,14 @@ from ._common import (
     resolve_fit_text_columns,
     validate_text_output_names,
 )
+from ._per_column import (
+    apply_per_column_pandas,
+    apply_per_column_polars,
+    build_per_column_artifact,
+    column_mode,
+    per_column_uses_callbacks,
+    validate_per_column_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +60,8 @@ def _count_apply_pandas(
 class CountVectorizerApplier(BaseApplier):
     """Attach one token-count column per vocabulary term to the frame.
 
-    The configured text columns are joined into a single corpus string before
-    transforming, the dense result is concatenated on, and the source columns
+    The default joins text columns into one corpus string; ``per_column`` uses
+    each source's saved vocabulary. Dense blocks are attached together; sources
     survive unless ``drop_original`` is set. This node uses the text-specific
     dispatcher: the polars path runs natively, so only the text payload crosses
     into sklearn, and it falls back to a full pandas round-trip when a text
@@ -63,6 +71,10 @@ class CountVectorizerApplier(BaseApplier):
     @staticmethod
     def validate_inference_state(raw: dict) -> dict:
         """Inspect saved vocabulary and binary settings without fitting or transforming."""
+        if validate_per_column_state(
+            raw, "count_vectorizer", CountVectorizerApplier.validate_inference_state
+        ):
+            return raw
         vectorizer = _validate_local_vectorizer(
             raw, "count_vectorizer", CountVectorizer, {"vocabulary", "max_features", "binary"}
         )
@@ -79,6 +91,12 @@ class CountVectorizerApplier(BaseApplier):
         if engine not in ("pandas", "polars"):
             return None
         CountVectorizerApplier.validate_inference_state(state)
+        if state.get("column_mode") == "per_column":
+            return (
+                None
+                if per_column_uses_callbacks(state)
+                else ExecutionCapability(engine, "apply", "local", "preserve", "row")
+            )
         if state and _vectorizer_uses_callbacks(state["vectorizer_object"]):
             return None
         return ExecutionCapability(engine, "apply", "local", "preserve", "row")
@@ -86,6 +104,11 @@ class CountVectorizerApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Dispatch through the text-specific dual-engine path; ``y`` passes through."""
+        if "column_mode" in params:
+            self.validate_inference_state(params)
+            return apply_text_dual_engine(
+                X, params, apply_per_column_pandas, apply_per_column_polars
+            )
         return apply_text_dual_engine(
             X, params, _count_apply_pandas, _sklearn_vectorizer_apply_polars
         )
@@ -169,12 +192,13 @@ def _build_count_artifact(
         "stop_words": None,
         "binary": False,
         "drop_original": False,
+        "column_mode": "joined",
     },
     tags=["text", "nlp", "vectorizer", "bag-of-words"],
     learns_from_data=True,
 )
 class CountVectorizerCalculator(BaseCalculator):
-    """Fit a ``CountVectorizer`` vocabulary on the joined text of the resolved columns.
+    """Fit joined text or one independent ``CountVectorizer`` per source column.
 
     The vocabulary — and therefore the output width — is learned from the
     training corpus, so the artifact is not derivable from config alone. A
@@ -187,17 +211,26 @@ class CountVectorizerCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CountVectorizerArtifact:  # pylint: disable=arguments-differ
-        """Narrow to the configured text columns and fit the vocabulary on their joined text.
+        """Fit the selected text with a shared or per-column vocabulary.
 
         An empty or wholly-absent column selection yields an empty artifact so
-        the applier no-ops. An empty vocabulary also yields an empty artifact
-        with a warning; source columns are retained even with ``drop_original``.
+        the applier no-ops. In joined mode an empty vocabulary returns an empty
+        artifact with a warning, retaining sources even with ``drop_original``.
+        In per-column mode any empty vocabulary raises with its source name.
         """
+        mode = column_mode(config)
         resolved = resolve_fit_text_columns(X, config, _y)
         if resolved is None:
             return {}
         text_frame, valid_cols = resolved
 
-        artifact = _build_count_artifact(config, text_frame, valid_cols)
+        artifact = (
+            cast(
+                CountVectorizerArtifact,
+                build_per_column_artifact(config, text_frame, valid_cols, _build_count_artifact),
+            )
+            if mode == "per_column"
+            else _build_count_artifact(config, text_frame, valid_cols)
+        )
         validate_text_output_names(X, artifact, valid_cols)
         return artifact

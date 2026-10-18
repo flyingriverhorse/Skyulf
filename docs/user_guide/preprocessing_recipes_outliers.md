@@ -11,8 +11,8 @@ are in [read the step cards](preprocessing_recipes.md#read-the-step-cards).
 
 `ManualBounds` removes rows; `ClipValues` changes values and preserves rows.
 The learned outlier filters below belong in training, never pre-split. Their appliers
-can remove rows; ordinary prediction rejects row-count loss rather than silently
-returning fewer predictions. A scoring eligibility policy must be explicit.
+can remove rows. Saved pipeline scoring retains each request row and reports
+excluded rows with a null prediction and an `outlier:<step>` reason.
 
 ## ManualBounds
 
@@ -139,6 +139,7 @@ saved percentile, retaining every row.
 | `columns` | list[string]/null | null | Existing numeric columns; [] selects none. | Select features; omitted selection uses numeric detection. |
 | `lower_percentile` | number | 5.0 | 0–100; no greater than upper_percentile. | Learn the lower cap. |
 | `upper_percentile` | number | 95.0 | 0–100; no less than lower_percentile. | Learn the upper cap. |
+| `percentiles_by_column` | mapping | omitted | Selected column → {lower, upper}; both finite, ordered percentages required. | Override the global tails for individual measurements. |
 
 **Minimal YAML:**
 
@@ -148,11 +149,47 @@ saved percentile, retaining every row.
   params: {columns: [income], lower_percentile: 5, upper_percentile: 95}
 ```
 
+Different measurements can use different tails while other selected columns
+keep the global settings:
+
+```yaml
+- name: measurement_tails
+  transformer: Winsorize
+  params:
+    columns: [income, tenure]
+    lower_percentile: 5
+    upper_percentile: 95
+    percentiles_by_column:
+      income: {lower: 1, upper: 99}
+```
+
 **Common mistake:** Use percent values such as 5 and 95, not shares such as 0.05 and 0.95.
+Integer columns require finite, integral bounds within their dtype's range. Add an explicit
+Casting step to float64 before Winsorize when fractional percentile bounds are intended;
+the node does not silently round the bounds or promote integer values.
+
+When `columns` is omitted, automatic numeric selection also includes integer IDs
+and counts. If a selected integer column has fractional percentile bounds, the
+whole fit raises.
+Set `columns` explicitly to keep IDs out of clipping. Cast only the measurements
+that should support fractional bounds, for example:
+
+```yaml
+- name: fractional_income
+  transformer: Casting
+  params: {columns: [income], target_type: float64}
+- name: cap_income
+  transformer: Winsorize
+  params: {columns: [income], lower_percentile: 5, upper_percentile: 95}
+```
+
+This recipe leaves a separate `customer_id` column unchanged, including integers
+above `2**53`; it does not cast every numeric column to float.
 
 **Details:** Saves bounds; applies clipping in place. Missing values remain missing, constant
-columns retain their constant and numeric percentile bounds may require float
-output. Context: row. Dependencies: base.
+columns retain their constant. Integer 0th/100th-percentile endpoints remain exact; interpolated
+integer quantiles outside the exact float64 range also require explicit Casting. Automatic column
+selection follows the same precision rule. Context: row. Dependencies: base.
 
 ## EllipticEnvelope
 
@@ -184,3 +221,72 @@ all selected columns. Saves these models. Apply filters rows and paired y;
 missing values are handled separately from finite fit observations. Small or
 degenerate fits can be skipped with a warning. Context: row against saved
 models; training fit is population-dependent. Dependencies: base/sklearn.
+
+## IsolationForest
+
+**Purpose and effect:** fit one joint isolation forest across the selected
+features and exclude rows classified as outliers. This can detect unusual
+combinations that separate per-column filters miss.
+
+**File:** `config/preprocessing.yml`; this learned node does not belong before
+the train/test split.
+
+| Parameter | Type | Default | Allowed values | What it changes |
+| --- | --- | --- | --- | --- |
+| `columns` | list[string]/null | null | Numeric features; [] selects none. | Select joint axes; implicit target excluded. |
+| `contamination` | number/string | 0.01 | (0, 0.5] or auto. | Set the learned outlier threshold. |
+| `n_estimators` | integer | 100 | Positive integer. | Set the number of isolation trees. |
+| `max_samples` | integer/number/string | auto | Positive count, fraction in (0, 1], or auto. | Set each tree's training population. |
+| `random_state` | integer/null | 42 | Valid sklearn seed or null. | Control training randomness. |
+
+```yaml
+- name: joint_outliers
+  transformer: IsolationForest
+  params: {columns: [income, tenure], contamination: 0.01, random_state: 42}
+```
+
+**Details:** learns from complete finite training rows and requires at least two
+such rows. At training and apply, a row with a missing or infinite value in **any**
+selected column is retained without outlier screening, even if another selected
+value is extreme. Retention does not mean the detector judged that row normal.
+Normalize infinite values and impute missing values before this step if partially
+observed rows must also be screened. Fit failures propagate. Saved trees never
+refit on request data. Row filtering preserves paired targets and sample-weight
+positions, including duplicate indexes. Saved scoring publishes excluded outcomes
+in their original positions. Context: local row/filter; native Spark training is
+not supported. Worker execution still requires the existing artifact admission.
+
+## LocalOutlierFactor
+
+**Purpose and effect:** learn joint local-density outliers, then compare new
+rows with the fixed learned neighbor population.
+
+**File:** `config/preprocessing.yml`; fit only on training data.
+
+| Parameter | Type | Default | Allowed values | What it changes |
+| --- | --- | --- | --- | --- |
+| `columns` | list[string]/null | null | Numeric features; [] selects none. | Select joint Euclidean-distance axes. |
+| `contamination` | number/string | 0.01 | (0, 0.5] or auto. | Set the learned outlier threshold. |
+| `n_neighbors` | integer | 20 | Positive integer; sklearn caps to available neighbors. | Set the local density neighborhood. |
+
+```yaml
+- name: density_outliers
+  transformer: LocalOutlierFactor
+  params: {columns: [income, tenure], n_neighbors: 20, contamination: 0.01}
+```
+
+**Common mistake:** training rows and new rows use different sklearn scores.
+The pipeline training hook uses `negative_outlier_factor_` against the learned
+offset. Saved apply uses novelty prediction for new data. Direct SDK callers
+should use `fit_transform_train` for their training representation; calling
+novelty apply on training rows is not equivalent.
+
+**Details:** requires two complete finite training rows. At training and apply,
+a missing or infinite value in **any** selected column keeps the row without
+outlier screening; other observed values in that row are not checked separately.
+Normalize infinite values and impute missing values before this step if those
+rows must also be screened. Scale features when their units require it. The
+model retains its learned neighbor population, so saved artifacts grow with
+training size. Targets and sample weights follow the actual training mask;
+scoring preserves request positions and exclusion reasons. Context: local
+row/filter; worker admission remains explicit, with no native Spark fit support.

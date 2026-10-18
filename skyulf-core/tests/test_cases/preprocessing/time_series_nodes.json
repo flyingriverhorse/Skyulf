@@ -17,20 +17,20 @@
         }
       }
     },
-    "rolling_calculator_fit_filters_aggregations": {
+    "rolling_calculator_fit_validates_aggregations": {
       "params": "aggregations_input, expected_aggregations",
       "test_cases": {
-        "filters_unknown_names": {
+        "rejects_mixed_unknown_names": {
           "aggregations_input": ["mean", "nonsense"],
-          "expected_aggregations": ["mean"]
+          "expected_aggregations": null
         },
         "single_valid_string_wrapped": {
           "aggregations_input": "sum",
           "expected_aggregations": ["sum"]
         },
-        "all_unknown_returns_empty": {
+        "rejects_all_unknown_names": {
           "aggregations_input": ["bogus", "nonsense"],
-          "expected_aggregations": []
+          "expected_aggregations": null
         }
       }
     }

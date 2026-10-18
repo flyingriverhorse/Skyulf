@@ -44,13 +44,17 @@ def test_coerce_lags(lags_input: int | list[int] | None, expected: list[int]) ->
 
 @pytest.mark.parametrize(*_coerce_aggregations_cases)
 def test_coerce_aggregations(
-    aggregations_input: str | list[str] | None, expected: list[str]
+    aggregations_input: str | list[str] | None, expected: list[str] | None
 ) -> None:
-    """``coerce_aggregations`` normalises string/list/None input, filtering unknown names.
+    """``coerce_aggregations`` normalises valid input and rejects unknown names.
 
     Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``coerce_aggregations``).
     """
-    assert coerce_aggregations(aggregations_input) == expected
+    if expected is None:
+        with pytest.raises(ValueError, match="Supported aggregations"):
+            coerce_aggregations(aggregations_input)
+    else:
+        assert coerce_aggregations(aggregations_input) == expected
 
 
 @pytest.mark.parametrize(*_sort_pandas_cases)

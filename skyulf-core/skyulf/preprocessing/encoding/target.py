@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Mapping
+from numbers import Integral
 from typing import Any, cast
 
 import numpy as np
@@ -18,12 +19,18 @@ from ...registry import NodeRegistry
 from ...types import DEFAULT_RANDOM_STATE
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import TargetEncoderArtifact
+from .._category_keys import category_key_expr, category_keys_pandas, uses_category_keys
 from .._fitted_validation import local_state_fields
 from .._output_names import validate_generated_column_names
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine, fit_transform_train_dual_engine
-from ._common import _exclude_target_column, _extract_target, detect_categorical_columns
+from ._common import (
+    _exclude_target_column,
+    _extract_target,
+    detect_categorical_columns,
+    encoded_columns_schema,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +48,16 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], An
     if not valid_cols or not encoder:
         return [], None
     return valid_cols, encoder
+
+
+def _target_subset_pandas(X: Any, cols: list[str]) -> pd.DataFrame:
+    """Normalize raw feature scalars before sklearn infers any category dtype."""
+    return pd.DataFrame({col: category_keys_pandas(X[col]) for col in cols})
+
+
+def _target_subset_polars(X: Any, cols: list[str]) -> Any:
+    """Use the same versioned missing and numeric keys on the Polars fit/apply paths."""
+    return X.select([category_key_expr(col).alias(col) for col in cols])
 
 
 def _validate_multiclass_names(X: Any, cols: list[str], n_classes: int) -> None:
@@ -96,7 +113,9 @@ def _target_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     if not valid_cols:
         return X, y
 
-    X_subset = X.select(valid_cols)
+    X_subset = (
+        _target_subset_polars(X, valid_cols) if uses_category_keys(params) else X.select(valid_cols)
+    )
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     encoded = encoder.transform(X_np) if len(X) else np.empty((0, len(encoder.encodings_)))
     return _replace_target_encoded_polars(X, y, valid_cols, encoded)
@@ -107,7 +126,7 @@ def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     if not valid_cols:
         return X, y
 
-    X_subset = X[valid_cols]
+    X_subset = _target_subset_pandas(X, valid_cols) if uses_category_keys(params) else X[valid_cols]
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     encoded = encoder.transform(X_input) if len(X) else np.empty((0, len(encoder.encodings_)))
     return _replace_target_encoded_pandas(X, y, valid_cols, encoded)
@@ -171,15 +190,19 @@ class TargetEncoderApplier(BaseApplier):
     multiclass target drops the originals and emits one ``{col}_cls{i}`` column
     per class. Multiclass output names must not collide with retained columns;
     conflicts raise ``ValueError`` before any input values are replaced.
+    New artifacts use canonical missing and numeric feature keys on both
+    engines; artifacts without a key version retain raw sklearn replay.
     """
 
     @staticmethod
     def validate_inference_state(raw: dict) -> dict:
         """Inspect the saved full-data encoder while leaving cross-fitted training values alone."""
-        if not local_state_fields(
-            raw, "target_encoder", {"type", "columns", "encoder_object"}, allow_empty=True
-        ):
+        fields = {"type", "columns", "encoder_object"}
+        if isinstance(raw, dict):
+            fields.update({"category_key_version"}.intersection(raw))
+        if not local_state_fields(raw, "target_encoder", fields, allow_empty=True):
             return raw
+        uses_category_keys(raw)
         columns = raw["columns"]
         if not isinstance(columns, (list, tuple)) or any(not isinstance(c, str) for c in columns):
             raise ValueError("Fitted target encoder columns must be ordered strings.")
@@ -253,18 +276,37 @@ def _translate_target_encoder_error(exc: ValueError) -> None:
     raise exc
 
 
+def _cross_fit_options(config: dict) -> tuple[int, bool, int | None]:
+    """Validate user controls while retaining the historical deterministic defaults."""
+    cv = config.get("cv", 5)
+    shuffle = config.get("shuffle", True)
+    seed = config.get("random_state", DEFAULT_RANDOM_STATE)
+    if isinstance(cv, (bool, np.bool_)) or not isinstance(cv, Integral) or cv < 2:
+        raise ValueError("TargetEncoder cv must be an integer of at least 2.")
+    if type(shuffle) is not bool:
+        raise ValueError("TargetEncoder shuffle must be a boolean.")
+    if seed is not None:
+        if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, Integral):
+            raise ValueError("TargetEncoder random_state must be a nonnegative integer or None.")
+        if not 0 <= seed < 2**32:
+            raise ValueError("TargetEncoder random_state must be in [0, 2**32 - 1].")
+        seed = int(seed)
+    return int(cv), shuffle, seed if shuffle else None
+
+
 def _build_target_encoder(
-    X_subset: Any, y: Any, config: dict[str, Any], *, cv: int = 5
+    X_subset: Any, y: Any, config: dict[str, Any]
 ) -> tuple[TargetEncoder, Any]:
     """Build the sklearn encoder and normalize the target array."""
     _ = X_subset
     target_type = config.get("target_type", "auto")
+    cv, shuffle, seed = _cross_fit_options(config)
     encoder = TargetEncoder(
         smooth=config.get("smooth", "auto"),
         target_type=target_type,
         cv=cv,
-        shuffle=True,
-        random_state=DEFAULT_RANDOM_STATE,
+        shuffle=shuffle,
+        random_state=seed,
     )
     y_np = _y_to_numpy(y)
 
@@ -277,7 +319,7 @@ def _build_target_encoder(
     return encoder, y_np
 
 
-def _resolve_target_encoder_training_cv(y_np: Any, target_type: str) -> int:
+def _resolve_target_encoder_training_cv(y_np: Any, target_type: str, requested_cv: int = 5) -> int:
     """Return the highest deterministic non-leaky fold count for training rows."""
     y_array = np.asarray(y_np)
     n_samples = len(y_array)
@@ -287,7 +329,7 @@ def _resolve_target_encoder_training_cv(y_np: Any, target_type: str) -> int:
             f"leakage-safe cross-fitting; got {n_samples}."
         )
 
-    safe_cv = min(5, n_samples)
+    safe_cv = min(requested_cv, n_samples)
     if y_array.ndim != 1:
         return safe_cv
 
@@ -329,9 +371,9 @@ def _fit_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> Target
 def _fit_transform_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> tuple[Any, Any]:
     """Fit sklearn ``TargetEncoder`` and cross-fit the training rows."""
     encoder, y_np = _build_target_encoder(X_subset, y, config)
-    train_cv = _resolve_target_encoder_training_cv(y_np, str(config.get("target_type", "auto")))
-    if train_cv != 5:
-        encoder, y_np = _build_target_encoder(X_subset, y, config, cv=train_cv)
+    encoder.cv = _resolve_target_encoder_training_cv(
+        y_np, str(config.get("target_type", "auto")), encoder.cv
+    )
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
     try:
@@ -351,10 +393,15 @@ def _target_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     if not cols:
         return {}
 
-    encoder = _fit_target_encoder(X.select(cols), y, config)
+    encoder = _fit_target_encoder(_target_subset_polars(X, cols), y, config)
     if encoder.target_type_ == "multiclass" and encoder.classes_ is not None:
         _validate_multiclass_names(X, cols, len(encoder.classes_))
-    return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
+    return {
+        "type": "target_encoder",
+        "columns": cols,
+        "encoder_object": encoder,
+        "category_key_version": 1,
+    }
 
 
 def _target_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
@@ -367,10 +414,15 @@ def _target_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     if not cols:
         return {}
 
-    encoder = _fit_target_encoder(X[cols], y, config)
+    encoder = _fit_target_encoder(_target_subset_pandas(X, cols), y, config)
     if encoder.target_type_ == "multiclass" and encoder.classes_ is not None:
         _validate_multiclass_names(X, cols, len(encoder.classes_))
-    return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
+    return {
+        "type": "target_encoder",
+        "columns": cols,
+        "encoder_object": encoder,
+        "category_key_version": 1,
+    }
 
 
 def _target_fit_transform_train_polars(
@@ -386,9 +438,18 @@ def _target_fit_transform_train_polars(
     if not cols:
         return {}, X, y
 
-    encoder, encoded = _fit_transform_target_encoder(X.select(cols), fit_y, config)
+    encoder, encoded = _fit_transform_target_encoder(_target_subset_polars(X, cols), fit_y, config)
     X_out, y_out = _replace_target_encoded_polars(X, y, cols, encoded)
-    return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}, X_out, y_out
+    return (
+        {
+            "type": "target_encoder",
+            "columns": cols,
+            "encoder_object": encoder,
+            "category_key_version": 1,
+        },
+        X_out,
+        y_out,
+    )
 
 
 def _target_fit_transform_train_pandas(
@@ -404,9 +465,18 @@ def _target_fit_transform_train_pandas(
     if not cols:
         return {}, X, y
 
-    encoder, encoded = _fit_transform_target_encoder(X[cols], fit_y, config)
+    encoder, encoded = _fit_transform_target_encoder(_target_subset_pandas(X, cols), fit_y, config)
     X_out, y_out = _replace_target_encoded_pandas(X, y, cols, encoded)
-    return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}, X_out, y_out
+    return (
+        {
+            "type": "target_encoder",
+            "columns": cols,
+            "encoder_object": encoder,
+            "category_key_version": 1,
+        },
+        X_out,
+        y_out,
+    )
 
 
 @NodeRegistry.register("TargetEncoder", TargetEncoderApplier)
@@ -415,7 +485,14 @@ def _target_fit_transform_train_pandas(
     name="Target Encoder",
     category="Preprocessing",
     description="Encode categorical features using target statistics.",
-    params={"smooth": "auto", "target_type": "auto", "columns": []},
+    params={
+        "smooth": "auto",
+        "target_type": "auto",
+        "columns": [],
+        "cv": 5,
+        "shuffle": True,
+        "random_state": DEFAULT_RANDOM_STATE,
+    },
     learns_from_data=True,
 )
 class TargetEncoderCalculator(BaseCalculator):
@@ -469,34 +546,20 @@ class TargetEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
-        """Predict the schema only when ``target_type`` is explicitly binary or continuous.
+        """Describe explicit floating features for binary or continuous targets.
 
-        Anything else — ``"auto"`` included — can resolve to multiclass at fit
-        time, which changes the column set in a data-dependent way, so ``None``
-        is returned and callers fall back to runtime introspection.
+        Automatic category selection and multiclass feature expansion depend on
+        training values, so they return ``None`` for runtime introspection.
+        An explicit empty selection is always a no-op.
         """
-        # For binary/continuous targets, the encoder replaces values in
-        # source columns in place — same column names, dtype becomes float
-        # (per-column dtype is best-effort so we don't bother rewriting it).
-        #
-        # For multiclass targets, the apply logic (see
-        # ``_target_apply_polars``/``_target_apply_pandas``) drops the
-        # original columns and creates ``{col}_cls{i}`` columns instead — the
-        # number of classes is data-dependent and unknown here, so we can't
-        # confidently predict the output columns. The default/"auto"
-        # target_type is resolved to multiclass at fit time whenever y has
-        # more than two classes, so we must also treat "auto" as unknown
-        # rather than assuming binary/continuous. Only the explicit
-        # "binary"/"continuous" config values are confidently in-place.
-        #
-        # "continuous" is sklearn's name for a regression target. The value is
-        # forwarded to ``TargetEncoder(target_type=...)`` verbatim and its
-        # accepted set is {auto, binary, multiclass, continuous}, so the more
-        # natural-sounding "regression" raises InvalidParameterError at fit and
-        # could never reach this check through a working config.
+        columns = config.get("columns")
+        if columns == []:
+            return input_schema
         if config.get("target_type", "auto") not in ("binary", "continuous"):
             return None
-        return input_schema
+        if columns is not None:
+            columns = [col for col in columns if col != config.get("target_column")]
+        return encoded_columns_schema(input_schema, columns, "float64")
 
 
 __all__ = ["TargetEncoderApplier", "TargetEncoderCalculator"]

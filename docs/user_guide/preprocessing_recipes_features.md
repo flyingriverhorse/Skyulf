@@ -51,7 +51,8 @@ Aliases: `PolynomialFeaturesNode` selects this same owner.
 | Parameter | Type | Default | Allowed values | What it changes |
 | --- | --- | --- | --- | --- |
 | `columns` | list[string] | [] | Existing column names. | Select explicitly; no automatic detection. |
-| `auto_detect` | boolean | false | true, false | Detect numeric columns when none are selected. |
+| `auto_detect` | boolean | false | true, false | Detect numeric columns when none are selected, excluding target_column. |
+| `target_column` | string/null | null | Existing label name. | Exclude the target from automatic discovery; the pipeline supplies this name. |
 | `degree` | integer/pair[integer] | 2 | Nonnegative degree or ordered [min_degree, max_degree]. | Set generated term degrees. |
 | `interaction_only` | boolean | false | true, false | Exclude repeated-input powers when true. |
 | `include_bias` | boolean | false | true, false | Add a constant term. |
@@ -111,8 +112,8 @@ arithmetic and fitted group operations can share one list.
       - {operation_type: group_agg, input_columns: [segment], secondary_columns: [total], method: mean, output_column: segment_mean}
 ```
 
-**Common mistake:** A fitted group aggregate reuses training lookups; unseen groups yield missing
-rather than a fresh request average.
+**Common mistake:** A fitted group aggregate reuses training lookups. Unseen groups yield missing
+for existing aggregate methods; `deviation` uses the saved global training mean.
 
 **Details:** Additional fields and choices:
 
@@ -122,7 +123,7 @@ rather than a fresh request average.
 | `ratio` | Sums input columns as numerator and secondary columns as denominator; near-zero/missing denominator uses signed epsilon. |
 | `similarity` | First input and first secondary (or second input); `method` ratio, token_sort_ratio or token_set_ratio. Backend is selected and saved at fit, not a user-supplied artifact field. |
 | `datetime_extract` | `datetime_features` list default `[]`: year, quarter, month, month_name, week, day, day_name, weekday, is_weekend, hour, minute, second, season, time_of_day. |
-| `group_agg` | First input is group key, first secondary is numeric value; `method` default mean, also sum, min, max, count, std, median. |
+| `group_agg` | First input is group key, first secondary is numeric value; `method` default mean, also sum, min, max, count, std, median, deviation. |
 
 The fitted artifact also stores these fields **inside each operation**. They are
 created during fit, not configurable YAML parameters. Supplying them in a recipe
@@ -135,17 +136,44 @@ does not override fitting: fit replaces them with its own values.
 
 Operations run in order; later operations can read earlier outputs. A group
 aggregate learns a training lookup (including missing-key group) and reuses it;
-an unseen group yields missing. There is no request-time refit. Default generated
+an unseen group yields missing for ordinary aggregate methods. There is no
+request-time refit. Default generated
 names use `<operation_type>_<index>` with optional prefix; datetime outputs use
 source/feature names, expanding a supplied name when multiple sources/features
 are requested. Existing names receive a numeric suffix unless overwrite is true.
-Unsupported operation types raise; failures inside supported operations can be
-logged and skipped, so inspect output columns. `polynomial` is not a supported
+New fits validate operation types, named methods and calendar choices before
+publishing state; errors while evaluating supported operations propagate.
+`polynomial` is not a supported
 operation_type: use PolynomialFeatures. Similarity uses optional rapidfuzz when
 available, otherwise difflib; a saved rapidfuzz artifact requires that package
 on replay. Null/empty string pairs score 100 when both empty, 0 when one empty.
 Context is row for supported numeric/group lookup operations; pandas similarity
 can be global due to string rendering. Other dependencies: base.
+
+New fits save `operation_contract_version: 1`. Numeric `datetime_extract`
+outputs use nullable `Int64` on both local engines, including invalid dates,
+singletons and empty batches. Missing numeric calendar values remain missing.
+Unversioned saved artifacts retain their historical dtypes and logged-skip
+behavior; refit to adopt the checked operation contract. Arithmetic zero/null
+defaults and signed-epsilon division are unchanged.
+
+For `method: deviation`, each output is the source value minus its group's
+training mean. Unseen groups and groups with no usable mean use the global
+training mean. A learned missing-key group keeps its own mean; a missing source
+value stays missing. All outputs are floating point. For example, training
+values `[2, 4]` in group A produce mean 3, so a later value 8 produces 5 even
+when scored alone. The saved mapping adds `category_key_version: 1` and
+`global_value`; typed group keys distinguish Boolean, numeric and text values.
+This extends the existing operation; old saved aggregate methods retain their
+lookup representation and behavior.
+
+```yaml
+- name: income_deviation
+  transformer: FeatureMath
+  params:
+    operations:
+      - {operation_type: group_agg, method: deviation, input_columns: [segment], secondary_columns: [income], output_column: income_deviation}
+```
 
 ## VarianceThreshold
 
@@ -256,15 +284,19 @@ inputs down to a requested count.
 | --- | --- | --- | --- | --- |
 | `columns` | list[string]/null | null | Numeric candidates, including binary; [] also auto-selects. | Choose candidate features; target is excluded. |
 | `target_column` | string/null | null | Existing label name; paired y can supply the label. | Identify the supervised target, normally supplied by the pipeline. |
-| `method` | string | select_from_model | select_from_model, rfe | Choose importance threshold or recursive elimination. |
+| `method` | string | select_from_model | select_from_model, rfe, rfecv, sequential_feature_selection | Choose importance, recursive or sequential selection. |
 | `estimator` | string | auto | auto, logistic_regression/logisticregression, linear_regression/linearregression, random_forest/randomforest. | Choose fitted importance estimator. |
 | `problem_type` | string | auto | auto, classification, regression | Resolve suitable estimator. |
 | `drop_columns` | boolean | true | true, false | Remove rejected candidates. |
 | `threshold` | number/string | mean | Sklearn threshold expression, such as mean, median or a multiplier. | Select-from-model importance cutoff. |
 | `max_features` | integer/null | null | Select-from-model only. | Cap selected features. |
-| `n_features_to_select` | integer/null | null | RFE; null uses sklearn half of features. | Set retained feature count. |
+| `n_features_to_select` | integer/number/string/null | RFE: null; sequential: auto | RFE count/fraction/null; sequential count, fraction in (0,1), or auto. | Set retained features; sequential auto selects half. |
 | `k` | integer/null | null | Legacy RFE fallback when n_features_to_select is unset. | Set retained feature count. |
-| `step` | integer/number | 1 | Positive count or fraction for RFE. | Set elimination size. |
+| `step` | integer/number | 1 | Positive count or fraction for RFE/RFECV. | Set elimination size. |
+| `cv` | integer | 5 | At least 2; RFECV/sequential only. | Set unshuffled cross-validation folds. |
+| `scoring` | string/null | null | sklearn scorer name or estimator default. | Choose the CV selection criterion. |
+| `min_features_to_select` | integer | 1 | Positive; RFECV only. | Set the smallest evaluated feature subset. |
+| `direction` | string | forward | forward, backward; sequential only. | Add or remove features greedily. |
 
 **Minimal YAML:**
 
@@ -274,14 +306,31 @@ inputs down to a requested count.
   params: {columns: [age, income, tenure], method: select_from_model, estimator: random_forest, threshold: mean}
 ```
 
-**Common mistake:** Missing y or an unsupported estimator can leave no selector; verify the resolved
-state.
+**Common mistake:** Supply training y or target_column; a missing target or unsupported estimator
+raises an error instead of disabling selection.
 
-**Details:** Uses a resolved estimator suitable for the problem type; invalid/unsupported choices
-can yield no selector, so use the explicit spellings above. Saves selected columns/importance
-evidence. Requires numeric inputs and training y; missing y produces no fitted selector. Candidate
+**Details:** Uses a resolved estimator suitable for the problem type. Unknown methods, estimators
+and problem types raise with supported choices; estimator fit errors propagate. Logistic regression
+is supported only for classification. Saves selected columns/importance evidence. Requires numeric
+inputs and training y; no candidate columns remains an empty no-op. Candidate
 NaNs are filled with zero for selection fitting only; output values are not imputed. Apply preserves
 unrelated columns and drops saved rejected candidates only. Context row; base/sklearn dependencies.
+
+RFECV chooses the subset size by cross-validation. Sequential selection chooses
+each next feature using cross-validation; its separate `n_features_to_select`
+setting does not inherit the legacy RFE `k`. Integer CV uses sklearn's
+unshuffled stratified folds for classification and ordinary folds otherwise.
+Folds are not automatically reduced: small training populations must choose a
+valid lower `cv`. These methods repeat estimator fits and can be expensive on
+wide data. Saved inference only uses fixed selected names and does not repeat CV.
+Sequential selection has no fitted feature-importance report, so it saves an
+empty importance mapping instead of inventing scores.
+
+```yaml
+- name: recursive_cv
+  transformer: ModelBasedSelection
+  params: {method: rfecv, cv: 3, min_features_to_select: 1, step: 1}
+```
 
 ## feature_selection
 
@@ -308,7 +357,9 @@ add another algorithm.
 
 **Details:** `variance`/`variance_threshold` route to VarianceThreshold; `correlation_threshold` to
 CorrelationThreshold; `select_k_best`, `select_percentile`, `select_fpr`, `select_fdr`,
-`select_fwe`, `generic_univariate_select` to UnivariateSelection; `select_from_model`, `rfe` to
+`select_fwe`, `generic_univariate_select` to UnivariateSelection; `select_from_model`, `rfe`,
+`rfecv`, `sequential_feature_selection` to
 ModelBasedSelection. The matching card defines required target, defaults, state, output and context.
-Unknown methods warn and return a passthrough artifact. Prefer the concrete selector ID when
+Unknown methods raise with supported choices. Existing saved artifacts still replay their fitted
+selection without resolving the fit method again. Prefer the concrete selector ID when
 readability is more valuable than a single dispatcher field.

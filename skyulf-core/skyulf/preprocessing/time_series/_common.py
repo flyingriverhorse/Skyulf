@@ -36,6 +36,7 @@ DATE_FEATURE_ACCESSORS: dict[str, str] = {
     "weekofyear": "isocalendar.week",
     "hour": "hour",
     "minute": "minute",
+    "second": "second",
     "is_weekend": "is_weekend",
     "is_month_start": "is_month_start",
     "is_month_end": "is_month_end",
@@ -68,10 +69,17 @@ def coerce_lags(lags: Any) -> list[int]:
 
 
 def coerce_aggregations(aggs: Any) -> list[str]:
-    """Keep only recognised rolling aggregation names, preserving order."""
+    """Validate rolling aggregation names and normalize a scalar, preserving order."""
     if isinstance(aggs, str):
         aggs = [aggs]
-    return [a for a in (aggs or []) if a in ROLLING_AGGREGATIONS]
+    aggs = list(aggs or [])
+    for aggregation in aggs:
+        if aggregation not in ROLLING_AGGREGATIONS:
+            raise ValueError(
+                f"Unknown RollingAggregate aggregation {aggregation!r}. "
+                f"Supported aggregations: {', '.join(ROLLING_AGGREGATIONS)}."
+            )
+    return aggs
 
 
 def sort_with_positions_pandas(df: pd.DataFrame, sort_by: str | None) -> tuple[pd.DataFrame, Any]:

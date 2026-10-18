@@ -269,15 +269,19 @@ def test_power_transformer_apply_pandas_raises_unexpected_exception(
 
 @pytest.mark.parametrize(*_simple_method_cases)
 def test_simple_transformation_method(
-    values: list[float], method: str, extra_params: dict, expected: list[float | None]
+    values: list[float], method: str, extra_params: dict, expected: list[float | None] | None
 ) -> None:
-    """Verifies per-method transform math and edge-case handling (NaN masking, clipping, unknown methods).
+    """Valid methods retain their math; unknown methods cannot be fitted silently.
 
     Loaded from ``tests/test_cases/preprocessing/transformations_power_simple.json``
     (group ``simple_methods``).
     """
     df = pd.DataFrame({"a": values})
     config = {"column": "a", "method": method, **extra_params}
+    if expected is None:
+        with pytest.raises(ValueError, match="Supported methods"):
+            SimpleTransformationCalculator().fit(df, {"transformations": [config]})
+        return
     art = SimpleTransformationCalculator().fit(df, {"transformations": [config]})
     out = SimpleTransformationApplier().apply(df, art)
     result = out["a"].tolist()
@@ -327,13 +331,14 @@ def test_simple_transformation_polars_missing_column_skipped() -> None:
     assert list(out.columns) == ["a"]
 
 
-def test_simple_transformation_polars_unknown_method_skipped() -> None:
-    """An unrecognised method must be skipped on the polars apply path (line 36)."""
+def test_simple_transformation_polars_legacy_unknown_method_skipped() -> None:
+    """Already saved no-op rules must retain their replay despite stricter new fitting."""
     df = pd.DataFrame({"a": [1.0, 2.0]})
     pl_df = pl.from_pandas(df)
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "bogus_method"}]}
-    )
+    art = {
+        "type": "simple_transformation",
+        "transformations": [{"column": "a", "method": "bogus_method"}],
+    }
     out = SimpleTransformationApplier().apply(pl_df, art)
     assert out["a"].to_list() == [1.0, 2.0]
 

@@ -3,7 +3,7 @@
 import hashlib
 import logging
 from decimal import Decimal
-from numbers import Real
+from numbers import Integral, Real
 from typing import Any
 
 import numpy as np
@@ -20,7 +20,7 @@ from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _exclude_target_column, detect_categorical_columns
+from ._common import _exclude_target_column, detect_categorical_columns, encoded_columns_schema
 
 logger = logging.getLogger(__name__)
 
@@ -207,10 +207,13 @@ class HashEncoderCalculator(BaseCalculator):
         if not cols:
             return {}
 
+        n_features = config.get("n_features", 8)
+        if isinstance(n_features, bool) or not isinstance(n_features, Integral) or n_features <= 0:
+            raise ValueError("HashEncoder n_features must be a positive integer.")
         return {
             "type": "hash_encoder",
             "columns": cols,
-            "n_features": config.get("n_features", 10),
+            "n_features": int(n_features),
             "numeric_normalization_version": 2,
         }
 
@@ -219,10 +222,17 @@ class HashEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
-        """Pass the input schema through: bucket indices replace values in place."""
-        # Hash encoder replaces values in source columns in place
-        # (`pl.col(col)...alias(col)`). Schema is unchanged.
-        return input_schema
+        """Describe explicit signed integer buckets; abstain for automatic or unbounded output."""
+        columns = config.get("columns")
+        if columns is None:
+            return None
+        columns = [col for col in columns if col != config.get("target_column")]
+        width = config.get("n_features", 8)
+        if columns and not (
+            isinstance(width, Integral) and not isinstance(width, bool) and 0 < width <= 2**63
+        ):
+            return None
+        return encoded_columns_schema(input_schema, columns, "int64")
 
 
 __all__ = ["HashEncoderApplier", "HashEncoderCalculator"]

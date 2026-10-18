@@ -709,12 +709,12 @@ def test_fit_target_encoder_reraises_unrelated_value_error() -> None:
 
 
 def test_infer_output_schema_preserves_columns_for_binary_target() -> None:
-    """Binary/regression target encoding replaces values in place — schema unchanged."""
+    """Explicit binary target encoding preserves columns and advertises numeric feature values."""
     input_schema = SkyulfSchema.from_columns(["city", "target"])
     output_schema = TargetEncoderCalculator().infer_output_schema(
         input_schema, {"target_type": "binary", "columns": ["city"]}
     )
-    assert output_schema is input_schema
+    assert output_schema == input_schema.with_dtype("city", "float64")
 
 
 def test_infer_output_schema_returns_none_for_multiclass_target() -> None:

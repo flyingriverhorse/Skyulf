@@ -164,17 +164,21 @@ def _build_iterative_estimator(name: str) -> Any:
     The alias is matched case-insensitively and tolerant of ``_``/``-``/spaces
     so the canvas UI values (``decision_tree``, ``extra_trees``, ``knn``) and
     the documented aliases (``DecisionTree``, ``ExtraTrees``, ``KNeighbors``)
-    both resolve to the same regressor. Unknown names fall back to
-    ``BayesianRidge``.
+    both resolve to the same regressor. Unknown names fail before fitting.
     """
-    key = re.sub(r"[^a-z0-9]", "", name.lower())
+    key = re.sub(r"[^a-z0-9]", "", name.lower()) if isinstance(name, str) else None
     if key == "decisiontree":
         return DecisionTreeRegressor(max_features="sqrt", random_state=0)
     if key == "extratrees":
         return ExtraTreesRegressor(n_estimators=10, random_state=0)
     if key in {"kneighbors", "knn"}:
         return KNeighborsRegressor(n_neighbors=5)
-    return BayesianRidge()
+    if key == "bayesianridge":
+        return BayesianRidge()
+    raise ValueError(
+        f"Unknown IterativeImputer estimator {name!r}. Supported estimators: "
+        "BayesianRidge, DecisionTree/decision_tree, ExtraTrees/extra_trees, KNeighbors/knn."
+    )
 
 
 def _imputation_config(node: str, params: dict, state: dict) -> dict:
@@ -184,6 +188,8 @@ def _imputation_config(node: str, params: dict, state: dict) -> dict:
         defaults["fill_value"] = None
     resolved = {**defaults, **params}
     fields = {"columns", "strategy", "group_by" if node == "GroupImputer" else "fill_value"}
+    if node == "GroupImputer":
+        resolved = _group_config(resolved, state, fields)
     _fields(resolved, fields)
     if resolved["strategy"] == "mode":
         resolved["strategy"] = "most_frequent"
@@ -193,6 +199,21 @@ def _imputation_config(node: str, params: dict, state: dict) -> dict:
         raise ValueError("Configured group key disagrees with fitted key.")
     if node == "SimpleImputer" and resolved["fill_value"] is not None:
         raise ValueError("Mode imputation does not use a configured constant.")
+    return resolved
+
+
+def _group_config(resolved: dict, state: dict, fields: set[str]) -> dict:
+    """Bind the opt-in hierarchy order while keeping old single-key configuration valid."""
+    fallback = resolved.get("fallback", "global")
+    if "group_key_version" in state:
+        fields.add("fallback")
+        resolved["fallback"] = fallback
+        if fallback != state["fallback"]:
+            raise ValueError("Configured group fallback disagrees with fitted fallback.")
+    else:
+        if fallback != "global":
+            raise ValueError("Legacy group imputation only supports global fallback.")
+        resolved.pop("fallback", None)
     return resolved
 
 

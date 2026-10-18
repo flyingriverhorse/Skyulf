@@ -24,8 +24,8 @@ from skyulf.registry import NodeRegistry
 _lag_coerces_lags_cases = TestCaseLoader(
     "preprocessing/time_series_nodes", group="lag_calculator_fit_coerces_lags"
 ).load()
-_rolling_filters_aggregations_cases = TestCaseLoader(
-    "preprocessing/time_series_nodes", group="rolling_calculator_fit_filters_aggregations"
+_rolling_aggregations_cases = TestCaseLoader(
+    "preprocessing/time_series_nodes", group="rolling_calculator_fit_validates_aggregations"
 ).load()
 
 
@@ -83,17 +83,20 @@ def test_rolling_aggregate_parity():
     assert "v_roll_sum_2" in pandas_out.columns
 
 
-@pytest.mark.parametrize(*_rolling_filters_aggregations_cases)
-def test_rolling_aggregate_filters_unknown_aggs(aggregations_input, expected_aggregations):
-    """``RollingAggregateCalculator.fit`` filters unrecognised aggregation names.
+@pytest.mark.parametrize(*_rolling_aggregations_cases)
+def test_rolling_aggregate_validates_aggs(aggregations_input, expected_aggregations):
+    """``RollingAggregateCalculator.fit`` rejects unrecognised aggregation names.
 
     Loaded from ``tests/test_cases/preprocessing/time_series_nodes.json``
-    (group ``rolling_calculator_fit_filters_aggregations``).
+    (group ``rolling_calculator_fit_validates_aggregations``).
     """
-    art = RollingAggregateCalculator().fit(
-        _frame(), {"columns": ["v"], "aggregations": aggregations_input}
-    )
-    assert art["aggregations"] == expected_aggregations
+    config = {"columns": ["v"], "aggregations": aggregations_input}
+    if expected_aggregations is None:
+        with pytest.raises(ValueError, match="Supported aggregations"):
+            RollingAggregateCalculator().fit(_frame(), config)
+    else:
+        art = RollingAggregateCalculator().fit(_frame(), config)
+        assert art["aggregations"] == expected_aggregations
 
 
 def test_date_features_parity():

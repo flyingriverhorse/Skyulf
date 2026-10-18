@@ -33,7 +33,12 @@ from .._helpers import select_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine, fit_transform_train_dual_engine
-from ._common import _exclude_target_column, _extract_target, detect_categorical_columns
+from ._common import (
+    _exclude_target_column,
+    _extract_target,
+    detect_categorical_columns,
+    encoded_columns_schema,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -174,14 +179,16 @@ class WOEEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 
 
-def _binary_target(y: Any) -> np.ndarray | None:
-    """Coerce ``y`` to a 0/1 numpy array, or ``None`` if not binary."""
+def _binary_target(y: Any) -> np.ndarray:
+    """Coerce a complete binary target to a 0/1 array, rejecting other class counts."""
     arr = y.to_numpy() if hasattr(y, "to_numpy") else np.asarray(y)
     if _is_null_mask(arr).any():
         raise ValueError("WOEEncoder requires a complete binary target without missing values.")
     classes = np.unique(arr)
     if len(classes) != 2:
-        return None
+        raise ValueError(
+            f"WOEEncoder requires a binary target with exactly 2 classes; got {len(classes)}."
+        )
     positive = classes[-1]
     return (arr == positive).astype(float)
 
@@ -205,6 +212,12 @@ def _column_woe(
         mask = values == cat
         pos = float(y_bin[mask].sum())
         neg = float(mask.sum() - pos)
+        if reg == 0 and (pos == 0 or neg == 0):
+            raise ValueError(
+                "WOEEncoder regularization=0 requires both target classes in every "
+                "observed category, including cross-fitting complements; use positive "
+                "regularization when a category has only one class."
+            )
         dist_pos = (pos + reg) / (total_pos + smoothing)
         dist_neg = (neg + reg) / (total_neg + smoothing)
         woe = math.log(dist_neg / dist_pos)
@@ -237,9 +250,6 @@ def _woe_fit_common(
 ) -> Mapping[str, Any]:
     """Shared fit: validate binary target, then build the artifact."""
     y_bin = _binary_target(y)
-    if y_bin is None:
-        logger.warning("WOEEncoder requires a binary target (exactly 2 classes). Skipping.")
-        return {}
     reg = float(config.get("regularization", 0.5))
     return _build_woe_artifact(frame, y_bin, cols, reg)
 
@@ -328,9 +338,6 @@ def _woe_fit_transform_train_common(
         return {}, [], None
     frame = _categorical_frame_for_fit(X, cols)
     y_bin = _binary_target(fit_y)
-    if y_bin is None:
-        logger.warning("WOEEncoder requires a binary target (exactly 2 classes). Skipping.")
-        return {}, [], None
     reg = float(config.get("regularization", 0.5))
     artifact = _build_woe_artifact(frame, y_bin, cols, reg)
     encoded = _cross_fit_woe_values(frame, y_bin, cols, reg, _resolve_woe_cv(y_bin))
@@ -376,8 +383,8 @@ def _woe_fit_transform_train_polars(
 class WOEEncoderCalculator(BaseCalculator):
     """Fit the WOE mapping and per-column Information Value from a binary target.
 
-    Supervised and binary-only: a target without exactly two classes logs a
-    warning and yields an empty artifact rather than failing. The target column
+    Supervised and binary-only: a target without exactly two classes raises a
+    descriptive error before fitting. The target column
     is excluded from the encoded set, since WOE computed against itself is
     near-perfect separation. The math is engine-agnostic, so fit funnels both
     engines through one narrow pandas boundary while ``apply`` stays in the
@@ -425,10 +432,11 @@ class WOEEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
-        """Pass the input schema through: WOE values replace the source columns in place."""
-        # WOE replaces values in source columns in place (now float-valued);
-        # column names are unchanged.
-        return input_schema
+        """Describe explicit floating WOE values while preserving the excluded target."""
+        columns = config.get("columns")
+        if columns is not None:
+            columns = [col for col in columns if col != config.get("target_column")]
+        return encoded_columns_schema(input_schema, columns, "float64")
 
 
 __all__ = ["WOEEncoderApplier", "WOEEncoderCalculator"]

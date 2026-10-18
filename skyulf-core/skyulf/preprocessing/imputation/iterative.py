@@ -186,11 +186,12 @@ class IterativeImputerCalculator(BaseCalculator):
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> IterativeImputerArtifact:  # pylint: disable=arguments-differ
         """Fit chained-equations imputation, dropping all-missing columns sklearn cannot impute."""
+        estimator_name = config.get("estimator", "BayesianRidge")
+        estimator = _build_iterative_estimator(estimator_name)
         if user_picked_no_columns(config):
             return {}
 
         max_iter = config.get("max_iter", 10)
-        estimator_name = config.get("estimator", "BayesianRidge")
         random_state = config.get("random_state", 0)
 
         # KNN/Iterative imputers always fit through numpy — engine choice
@@ -205,7 +206,6 @@ class IterativeImputerCalculator(BaseCalculator):
         if not cols:
             return {}
 
-        estimator = _build_iterative_estimator(estimator_name)
         imputer = IterativeImputer(
             estimator=estimator, max_iter=max_iter, random_state=random_state
         )

@@ -52,9 +52,9 @@
           "aggregations_input": "mean",
           "expected": ["mean"]
         },
-        "filters_unknown_names": {
+        "rejects_unknown_names": {
           "aggregations_input": ["mean", "bogus", "sum"],
-          "expected": ["mean", "sum"]
+          "expected": null
         },
         "none_returns_empty": {
           "aggregations_input": null,

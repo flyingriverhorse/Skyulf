@@ -498,7 +498,7 @@ def test_arithmetic_divide_by_only_constants() -> None:
 def test_feature_generation_noop_skips(
     engine: str, data: dict[str, list], operation: dict[str, Any], expected_columns: list
 ) -> None:
-    """Unresolvable or malformed supported ops remain no-ops on both engines.
+    """Unresolvable ops stay no-ops; malformed execution raises only for the new contract.
 
     Covers no columns/constants, unresolvable ratio/similarity pairs and bad
     ``round_digits``. Unsupported operation types have separate error tests.
@@ -509,6 +509,10 @@ def test_feature_generation_noop_skips(
 
         df = pl.from_pandas(df)
     params = _CALC.fit(df, {"operations": [operation]})
+    if isinstance(operation.get("round_digits"), str):
+        with pytest.raises(TypeError):
+            _APPLIER.apply(df, params)
+        params.pop("operation_contract_version")
     out = _APPLIER.apply(df, params)
     assert list(out.columns) == expected_columns
 

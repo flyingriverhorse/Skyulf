@@ -77,12 +77,18 @@ def test_coerce_lags(lags_input: int | list[int], expected: list[int]) -> None:
 
 
 @pytest.mark.parametrize(*_coerce_aggregations_cases)
-def test_coerce_aggregations(aggregations_input: str | list[str], expected: list[str]) -> None:
-    """``coerce_aggregations`` normalises string/list input, filtering unknown names.
+def test_coerce_aggregations(
+    aggregations_input: str | list[str], expected: list[str] | None
+) -> None:
+    """``coerce_aggregations`` normalises valid input and rejects unknown names.
 
     Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``coerce_aggregations``).
     """
-    assert coerce_aggregations(aggregations_input) == expected
+    if expected is None:
+        with pytest.raises(ValueError, match="Supported aggregations"):
+            coerce_aggregations(aggregations_input)
+    else:
+        assert coerce_aggregations(aggregations_input) == expected
 
 
 @pytest.mark.parametrize(*_sort_pandas_cases)
@@ -316,13 +322,13 @@ def test_date_features_default_features_when_unspecified() -> None:
     assert art["features"] == ["year", "month", "day", "dayofweek"]
 
 
-def test_date_features_invalid_feature_name_filtered_out() -> None:
-    """Unknown feature names are silently dropped at fit time."""
-    art = DateFeaturesCalculator().fit(
-        pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])}),
-        {"columns": ["d"], "features": ["bogus", "year"]},
-    )
-    assert art["features"] == ["year"]
+def test_date_features_invalid_feature_name_rejected() -> None:
+    """Unknown calendar names must not silently save a partial selection."""
+    with pytest.raises(ValueError, match="bogus.*Supported features"):
+        DateFeaturesCalculator().fit(
+            pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])}),
+            {"columns": ["d"], "features": ["bogus", "year"]},
+        )
 
 
 def test_date_features_infer_output_schema_skips_unresolved_columns() -> None:

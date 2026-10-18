@@ -145,9 +145,17 @@ class SimpleTransformationCalculator(BaseCalculator):
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> SimpleTransformationArtifact:
-        """Return the ``transformations`` config as-is; nothing is fitted."""
+        """Validate requested math methods and save the ordered rules without fitting."""
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
+        transformations = config.get("transformations", [])
+        for item in transformations or []:
+            method = item.get("method")
+            if not isinstance(method, str) or method not in _PANDAS_OPS:
+                raise ValueError(
+                    f"Unknown SimpleTransformation method {method!r}. "
+                    f"Supported methods: {', '.join(_PANDAS_OPS)}."
+                )
         return {
             "type": "simple_transformation",
-            "transformations": config.get("transformations", []),
+            "transformations": transformations,
         }

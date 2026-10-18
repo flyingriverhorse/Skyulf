@@ -109,10 +109,11 @@ def test_woe_null_row_hits_learned_mapping_cross_engine():
     assert np.isclose(out_pl["city"].to_list()[1], pd_params["mappings"]["city"]["A"])
 
 
-def test_woe_non_binary_target_is_skipped():
+def test_woe_non_binary_target_is_rejected():
+    """Unsupported targets must fail clearly instead of leaving raw text in the model input."""
     df = pd.DataFrame({"city": ["A", "B", "C"], "target": [0, 1, 2]})
-    params = WOEEncoderCalculator().fit((df[["city"]], df["target"]), {"columns": ["city"]})
-    assert params == {}
+    with pytest.raises(ValueError, match="WOEEncoder.*binary target.*exactly 2 classes"):
+        WOEEncoderCalculator().fit((df[["city"]], df["target"]), {"columns": ["city"]})
 
 
 def test_woe_excludes_target_column_when_explicitly_selected():

@@ -28,8 +28,8 @@ Missing and values outside the outer edges have no bin unless missing label mode
 is enabled. Label mode produces strings in Polars, including ordinal code strings,
 while pandas can retain numeric codes alongside a string sentinel in object
 dtype. Duplicate edges and mismatched custom-label counts must be resolved;
-unfittable columns may be skipped, while output-name collisions raise. Do not
-assume the number of bins always equals the requested count.
+fit failures and output-name collisions raise. All-missing columns have no learned
+edges. Do not assume the number of bins always equals the requested count.
 
 ## GeneralBinning
 
@@ -70,8 +70,9 @@ bins put 10 and 90 in opposite end bins for 0–100 data.
 output.
 
 **Details:** Noncustom strategies save learned edges. For values 0–100 and five equal-width
-bins, 10 belongs to the first and 90 to the last. Per-column failure is warned
-and skipped. The runtime default is equal_width, despite older metadata saying
+bins, 10 belongs to the first and 90 to the last. Unknown strategies and per-column fit failures
+raise instead of saving a partial fit. All-missing columns still have no learned edges.
+Saved artifacts keep their fitted edges at apply time. The runtime default is equal_width, despite older metadata saying
 uniform (these two select the same width strategy).
 
 ## CustomBinning

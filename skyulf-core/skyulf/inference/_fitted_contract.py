@@ -4,6 +4,7 @@ from typing import Any
 
 from ..core.portable_state import _pack
 from ..pipeline.seal import artifact_digest
+from ..preprocessing.column_selection import uses_column_selection, with_resolved_columns
 from .fitted_pipeline import FittedPipelineArtifact
 
 
@@ -31,6 +32,7 @@ def resolve_fitted_step(
     """Delegate strict worker validation or explicitly abstain for local-only state."""
     if config["name"] != record["name"] or config["transformer"] != record["type"]:
         raise ValueError("Configured step disagrees with fitted name/type.")
+    config = _resolved_column_recipe(record, config)
     owner = type(record["applier"])
     validate = getattr(owner, "validate_fitted_state", None)
     resolve = getattr(owner, "resolve_fitted_config", None)
@@ -49,6 +51,20 @@ def resolve_fitted_step(
     if require_portable:
         raise ValueError("Required fitted validation hooks are missing.")
     return _local_record(record, config)
+
+
+def _resolved_column_recipe(record: dict, config: dict) -> dict:
+    """Bind training-only column rules to their saved configuration and resolved parameters."""
+    if "column_selection_config" not in record:
+        return config
+    if not uses_column_selection(config.get("params", {})):
+        raise ValueError("Column selection binding requires explicit selection rules.")
+    if artifact_digest(record["column_selection_config"]) != artifact_digest(config):
+        raise ValueError("Column selection configuration disagrees with fitted parameters.")
+    return {
+        **config,
+        "params": with_resolved_columns(config["params"], record["params"]["columns"]),
+    }
 
 
 def _local_record(record: dict, config: dict) -> tuple[Any, dict, bool]:

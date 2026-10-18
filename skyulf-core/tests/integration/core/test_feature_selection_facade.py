@@ -2,7 +2,7 @@
 
 Covers:
 - Dispatcher routes each `method` string to the correct concrete Calculator.
-- Unknown method logs a warning and returns {}.
+- Unknown methods raise with the supported choices.
 - FeatureSelectionApplier routes by the `type` tag in params.
 - Identity passthrough when params `type` is unrecognised.
 - Full fit→apply cycle for variance_threshold and correlation_threshold.
@@ -103,10 +103,10 @@ class TestFeatureSelectionCalculatorDispatch:
         params = _CALC.fit(X, config)
         assert params.get("type") == expected_type
 
-    def test_unknown_method_returns_empty(self) -> None:
-        """An unrecognised method must return {} — no exception."""
-        params = _CALC.fit(_make_df(), {"method": "telepathy"})
-        assert params == {}
+    def test_unknown_method_raises(self) -> None:
+        """An unrecognised method must not silently disable feature selection."""
+        with pytest.raises(ValueError, match="Unknown feature selection method.*telepathy"):
+            _CALC.fit(_make_df(), {"method": "telepathy"})
 
     def test_default_method_is_select_k_best(self) -> None:
         """When no method is provided, select_k_best is the default."""

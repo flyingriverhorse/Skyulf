@@ -170,11 +170,12 @@ class TestResolveEstimator:
     def test_resolve_estimator(
         self, key: str, problem_type: str, expected_class_name: str | None
     ) -> None:
-        """Known estimator keys must resolve to the right estimator class; unknown keys to None."""
-        est = _resolve_estimator(key, problem_type)
+        """Known estimator aliases resolve while unsupported choices fail at fit preparation."""
         if expected_class_name is None:
-            assert est is None
+            with pytest.raises(ValueError, match="estimator"):
+                _resolve_estimator(key, problem_type)
         else:
+            est = _resolve_estimator(key, problem_type)
             assert isinstance(est, _ESTIMATOR_CLASS_REGISTRY[expected_class_name])
 
 
@@ -357,12 +358,13 @@ class TestBuildModelSelector:
         attr_name: str | None,
         attr_value: object,
     ) -> None:
-        """Each method must build the right selector class (or None if unrecognised)."""
+        """Unsupported selector methods must not become an implicit passthrough."""
         est = _ESTIMATOR_FACTORIES[estimator_name]()
-        sel = _build_model_selector(method, est, config)
         if expected_class_name is None:
-            assert sel is None
+            with pytest.raises(ValueError, match="method"):
+                _build_model_selector(method, est, config)
             return
+        sel = _build_model_selector(method, est, config)
         assert isinstance(sel, _MODEL_SELECTOR_CLASSES[expected_class_name])
         if attr_name is not None:
             assert getattr(sel, attr_name) == attr_value

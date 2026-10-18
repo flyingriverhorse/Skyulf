@@ -1,14 +1,15 @@
 """Polars-engine op handlers for FeatureGeneration."""
 
-import logging
 from collections.abc import Callable
 from typing import Any
 
 import polars as pl
 
+from .._category_keys import category_key_expr
 from ..time_series._common import parse_datetime_scalar
 from ._common import (
     DEFAULT_EPSILON,
+    NUMERIC_DATETIME_FEATURES,
     SEASON_BY_MONTH,
     TIME_OF_DAY_BUCKETS,
     TIME_OF_DAY_DEFAULT,
@@ -17,9 +18,9 @@ from ._common import (
     _resolve_group_agg_cols,
     _resolve_output_col,
     _resolve_similarity_pair,
+    report_operation_failure,
+    uses_operation_contract,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[Any], list[float]]:
@@ -190,7 +191,12 @@ def _register_polars_dt() -> None:
 
 
 def _build_polars_dt_exprs(
-    op: dict[str, Any], col: str, base_dt: Any, existing: list[str], allow_overwrite: bool
+    op: dict[str, Any],
+    col: str,
+    base_dt: Any,
+    existing: list[str],
+    allow_overwrite: bool,
+    strict: bool = False,
 ) -> list[Any]:
     """Return the per-feature Polars expressions for one datetime column."""
     exprs: dict[str, Any] = {}
@@ -198,12 +204,17 @@ def _build_polars_dt_exprs(
         builder = _POLARS_DT_FEATURES.get(feat)
         if builder is not None:
             output_col = _resolve_datetime_output_col(op, col, feat, existing, allow_overwrite)
-            exprs[output_col] = builder(base_dt).alias(output_col)
+            expr = builder(base_dt)
+            if strict and feat in NUMERIC_DATETIME_FEATURES:
+                expr = expr.cast(pl.Int64)
+            exprs[output_col] = expr.alias(output_col)
             existing.append(output_col)
     return list(exprs.values())
 
 
-def _polars_datetime_apply(op: dict[str, Any], X_out: Any, allow_overwrite: bool = False) -> Any:
+def _polars_datetime_apply(
+    op: dict[str, Any], X_out: Any, allow_overwrite: bool = False, strict: bool = False
+) -> Any:
     """Materialise datetime-extract feature columns onto ``X_out`` (Polars)."""
     if not _POLARS_DT_FEATURES:
         _register_polars_dt()
@@ -219,12 +230,14 @@ def _polars_datetime_apply(op: dict[str, Any], X_out: Any, allow_overwrite: bool
             elif X_out.schema[col] == pl.Null:
                 base_dt = base_dt.cast(pl.Datetime)
             col_exprs = _build_polars_dt_exprs(
-                op, col, base_dt, list(X_out.columns), allow_overwrite
+                op, col, base_dt, list(X_out.columns), allow_overwrite, strict
             )
             if col_exprs:
                 X_out = X_out.with_columns(col_exprs)
         except Exception as e:  # noqa: BLE001 - per-column datetime feature failure is logged and skipped
-            logger.warning(f"Failed to extract datetime features for column {col}: {e}")
+            report_operation_failure(
+                e, strict, f"Failed to extract datetime features for column {col}"
+            )
     return X_out
 
 
@@ -268,6 +281,13 @@ def _polars_group_agg(
         group_col = fitted.get("group_column")
         if group_col not in existing:
             return None
+        if op.get("method") == "deviation":
+            mean = category_key_expr(group_col).replace_strict(
+                fitted["keys"], fitted["values"], default=None, return_dtype=pl.Float64
+            )
+            if fitted["global_value"] is not None:
+                mean = mean.fill_null(fitted["global_value"])
+            return pl.col(op["secondary_columns"][0]).cast(pl.Float64, strict=False) - mean
         group_expr = pl.col(group_col)
         if group_dtype in (pl.Float32, pl.Float64):
             group_expr = group_expr.fill_nan(None)
@@ -305,13 +325,14 @@ def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
         return X, y
     epsilon = params.get("epsilon", DEFAULT_EPSILON)
     allow_overwrite = params.get("allow_overwrite", False)
+    strict = uses_operation_contract(params)
 
     X_out = X
     for i, op in enumerate(operations, start=params.get("_operation_offset", 0)):
         op_type = op.get("operation_type", "arithmetic")
         try:
             if op_type == "datetime_extract":
-                X_out = _polars_datetime_apply(op, X_out, allow_overwrite)
+                X_out = _polars_datetime_apply(op, X_out, allow_overwrite, strict)
                 continue
             handler = _POLARS_OP_HANDLERS.get(op_type)
             if handler is None:
@@ -331,5 +352,5 @@ def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
                 expr = expr.round(round_digits)
             X_out = X_out.with_columns(expr.alias(output_col))
         except Exception as e:  # noqa: BLE001 - per-operation failure is logged and skipped
-            logger.warning(f"Failed to apply {op_type} operation (index {i}): {e}")
+            report_operation_failure(e, strict, f"Failed to apply {op_type} operation (index {i})")
     return X_out, y

@@ -59,7 +59,7 @@ from skyulf.preprocessing.vectorization import (
 )
 
 cfg = {
-    "columns": ["text"],     # one or more text columns (joined with a space)
+    "columns": ["text"],     # multiple sources are joined by default
     "max_features": 5000,    # keep the 5000 most frequent words
     "min_df": 2,             # ignore words appearing in < 2 documents
     "ngram_range": [1, 1],   # unigrams only
@@ -107,11 +107,37 @@ test_X = app.apply(test_df, art)
 The artifact stores both the vocabulary and the learned IDF weights, so test data is
 transformed with exactly the weights learned on train.
 
+### Separate vocabularies for separate fields
+
+Count and TF-IDF default to `column_mode: "joined"`, preserving the existing
+shared-document behavior and saved artifacts. Choose `"per_column"` when the
+same word in a title and a body should produce distinct features:
+
+```python
+cfg = {
+    "columns": ["title", "body"],
+    "column_mode": "per_column",
+    "max_features": 1000,  # up to 1000 terms from each source
+    "drop_original": True,
+}
+art = TfidfVectorizerCalculator().fit(train_df, cfg)
+test_X = TfidfVectorizerApplier().apply(test_df, art)
+# title__tfidf__blue and body__tfidf__blue are independent features.
+title_vocabulary = art["column_artifacts"]["title"]["vocabulary"]
+```
+
+Settings apply to each selected source independently. Document-frequency limits,
+IDF weights and TF-IDF normalization use that source's documents; n-grams never
+cross from one field into another. Feature blocks follow the selected source
+order. A missing fitted source raises at inference, while null text and unseen
+tokens produce zeros. Empty input preserves the learned feature width.
+Canvas exposes this choice as **Vocabulary columns** on Count and TF-IDF nodes.
+
 ### When there are no usable tokens
 
 Count and TF-IDF Vectorizers can find an empty vocabulary when the selected text
 is blank, missing, contains only stop words, or produces no tokens under the
-chosen n-gram settings. In that case, fitting emits a warning and returns an
+chosen n-gram settings. In default joined mode, fitting emits a warning and returns an
 empty artifact. Applying it leaves the input unchanged, including the source
 text columns even when **Drop original** is enabled. Rows and targets are kept.
 Canvas displays the warning through its existing notification center.
@@ -121,6 +147,11 @@ learns a replacement vocabulary. Check the training text and token settings,
 then refit to generate numeric features. Invalid settings and frequency limits
 that remove every learned term (`min_df` / `max_df`) still raise an error.
 
+In `per_column` mode every selected source must yield a vocabulary. An empty
+vocabulary raises with the source name so a partial feature set cannot silently
+replace the requested configuration. Check that source's text and token settings,
+then refit. This opt-in behavior does not change old joined artifacts.
+
 ---
 
 ## Hashing Vectorizer — no vocabulary needed
@@ -129,6 +160,9 @@ Both vectorizers above must **store** a vocabulary, which can be large and must 
 front. The Hashing Vectorizer instead pushes every word through a hash function into a fixed
 number of columns (`n_features`). It is **stateless** — there is nothing to learn — so it is
 ideal for streaming data or vocabularies too big to keep in memory.
+
+Hashing always joins selected source columns into one document per row. It has
+no learned vocabulary and does not expose `column_mode`.
 
 ```python
 from skyulf.preprocessing.vectorization import (

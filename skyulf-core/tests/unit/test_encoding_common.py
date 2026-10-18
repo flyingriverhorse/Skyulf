@@ -35,7 +35,12 @@ class TestParseCategoriesOrder:
         ids=_parse_categories_order_cases[2],
     )
     def test_parse_categories_order(self, raw: object, n_cols: int, expected: object) -> None:
-        assert _parse_categories_order(raw, n_cols) == expected
+        """Explicit order errors must be visible while empty input retains automatic ordering."""
+        if expected is None:
+            with pytest.raises(ValueError, match="OrdinalEncoder.*categories_order"):
+                _parse_categories_order(raw, n_cols)
+        else:
+            assert _parse_categories_order(raw, n_cols) == expected
 
 
 class TestExcludeTargetColumn:

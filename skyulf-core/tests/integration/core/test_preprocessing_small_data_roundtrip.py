@@ -42,6 +42,8 @@ _RECIPES: dict[str, dict[str, Any]] = {
             "MaxAbsScaler",
             "StandardScaler",
             "RobustScaler",
+            "QuantileTransformer",
+            "Normalizer",
             "PowerTransformer",
             "IQR",
             "ZScore",
@@ -56,10 +58,12 @@ _RECIPES: dict[str, dict[str, Any]] = {
             "OrdinalEncoder",
             "LabelEncoder",
             "HashEncoder",
+            "FrequencyEncoder",
             "TargetEncoder",
             "WOEEncoder",
         )
     },
+    "RareCategoryGrouping": {"columns": ["cat"], "min_count": 11},
     **{
         name: {"columns": ["missing", "b"]}
         for name in (
@@ -130,6 +134,8 @@ _RECIPES: dict[str, dict[str, Any]] = {
     "DropMissingRows": {"subset": ["missing"]},
     "MissingIndicator": {"columns": ["missing"]},
     "EllipticEnvelope": {"columns": ["x", "b"], "contamination": 0.125, "random_state": 42},
+    "IsolationForest": {"columns": ["x", "b"], "contamination": 0.125, "random_state": 42},
+    "LocalOutlierFactor": {"columns": ["x", "b"], "contamination": 0.125, "n_neighbors": 5},
     "GeoDistance": {"lat1_col": "lat", "lon1_col": "lon", "lat2_col": "lat2", "lon2_col": "lon2"},
     "H3Index": {"lat_col": "lat", "lon_col": "lon", "resolution": 5},
     "GroupImputer": {"columns": ["missing"], "group_by": "cat", "strategy": "mean"},
@@ -296,8 +302,8 @@ def _assert_selected_values(node, output):
 def test_small_data_recipes_cover_the_complete_registry():
     """New registrations cannot escape actual fit/apply coverage behind a static count."""
     assert set(_RECIPES) == set(NodeRegistry.list_transformers())
-    assert len(_RECIPES) == 67
-    assert len({NodeRegistry.get_applier(node) for node in _RECIPES}) == 63
+    assert len(_RECIPES) == 73
+    assert len({NodeRegistry.get_applier(node) for node in _RECIPES}) == 69
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

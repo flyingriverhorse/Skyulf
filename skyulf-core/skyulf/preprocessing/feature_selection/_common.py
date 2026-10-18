@@ -4,6 +4,7 @@ import contextlib
 import logging
 from collections.abc import Callable
 from decimal import Decimal
+from numbers import Integral
 from typing import Any, cast
 
 import numpy as np
@@ -11,6 +12,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.feature_selection import (
     RFE,
+    RFECV,
     GenericUnivariateSelect,
     SelectFdr,
     SelectFpr,
@@ -18,6 +20,7 @@ from sklearn.feature_selection import (
     SelectFwe,
     SelectKBest,
     SelectPercentile,
+    SequentialFeatureSelector,
     chi2,
     f_classif,
     f_regression,
@@ -95,6 +98,9 @@ def _resolve_score_function(name: str | None, problem_type: str) -> Any:
 
 
 def _resolve_estimator(key: str | None, problem_type: str) -> Any:
+    """Resolve supported estimator aliases or reject a configuration that cannot be fitted."""
+    if problem_type not in {"classification", "regression"}:
+        raise ValueError("ModelBasedSelection problem_type must be classification or regression.")
     key = (key or "auto").lower()
     if problem_type == "classification":
         if key in {"auto", "logistic_regression", "logisticregression"}:
@@ -108,7 +114,13 @@ def _resolve_estimator(key: str | None, problem_type: str) -> Any:
             return LinearRegression()
         if key in {"random_forest", "randomforest"}:
             return RandomForestRegressor(n_estimators=100, random_state=0, n_jobs=-1)
-    return None
+    choices = "auto, linear_regression, random_forest"
+    if problem_type == "classification":
+        choices += ", logistic_regression"
+    raise ValueError(
+        f"Unsupported ModelBasedSelection estimator {key!r} for {problem_type}; "
+        f"choose from {choices} (compact aliases are also accepted)."
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -266,7 +278,7 @@ def _resolve_rfe_n_features(config: dict[str, Any]) -> int | None:
     return config.get("k") if n_features is None else n_features
 
 
-def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -> Any | None:
+def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -> Any:
     """Construct the sklearn model-based selector named by ``method``."""
     if method == "select_from_model":
         threshold = config.get("threshold", "mean")
@@ -285,7 +297,37 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
             n_features_to_select=_resolve_rfe_n_features(config),
             step=config.get("step", 1),
         )
-    return None
+    if method in {"rfecv", "sequential_feature_selection"}:
+        return _build_cv_selector(method, estimator, config)
+    raise ValueError(
+        f"Unsupported ModelBasedSelection method {method!r}; choose from select_from_model, "
+        "rfe, rfecv, sequential_feature_selection."
+    )
+
+
+def _build_cv_selector(method: str, estimator: Any, config: dict[str, Any]) -> Any:
+    """Keep cross-validation controls serializable and let sklearn validate estimator options."""
+    cv = config.get("cv", 5)
+    if isinstance(cv, (bool, np.bool_)) or not isinstance(cv, Integral) or cv < 2:
+        raise ValueError("ModelBasedSelection cv must be an integer of at least 2.")
+    scoring = config.get("scoring")
+    if scoring is not None and not isinstance(scoring, str):
+        raise ValueError("ModelBasedSelection scoring must be a scorer name or None.")
+    if method == "rfecv":
+        return RFECV(
+            estimator,
+            cv=int(cv),
+            scoring=scoring,
+            step=config.get("step", 1),
+            min_features_to_select=config.get("min_features_to_select", 1),
+        )
+    return SequentialFeatureSelector(
+        estimator,
+        cv=int(cv),
+        scoring=scoring,
+        direction=config.get("direction", "forward"),
+        n_features_to_select=config.get("n_features_to_select", "auto"),
+    )
 
 
 def _fillna_zero_with_warning(X_pd: pd.DataFrame, cols: list[str]) -> pd.DataFrame:

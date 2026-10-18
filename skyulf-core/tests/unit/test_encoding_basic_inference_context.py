@@ -290,12 +290,13 @@ def test_empty_training_frames_produce_inspectable_native_states(node, engine, m
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("count", [8, True, 2**63])
 def test_hash_empty_integer_buckets_keep_populated_schema(engine, count):
-    """Empty replay must retain integer buckets without changing inputs or saved choices."""
+    """Legacy integer/bool artifacts retain their schema and saved choices on empty replay."""
     frame = _frame(engine)
     if engine == "pandas":
         frame.index = pd.Index([8, 2, 2, 5], name="row")
-    record = _record("HashEncoder", engine, {"columns": ["category"], "n_features": count})
+    record = _record("HashEncoder", engine, {"columns": ["category"], "n_features": int(count)})
     state = record["artifact"]
+    state["n_features"] = count
     before = artifact_digest(state)
     populated = record["applier"].apply(frame, state)
     empty = frame.head(0)
@@ -329,6 +330,8 @@ def test_hash_numpy_bucket_scalar_keeps_native_engine_boundary(engine, monkeypat
     """NumPy modulo dtype differences must not be hidden by normalizing saved parameters."""
     config = {"columns": (np.str_("category"),), "n_features": np.int64(8)}
     record = _record("HashEncoder", engine, config, _frame(engine, ["a", "b"]))
+    # New fits normalize Integral counts; an old artifact must keep its saved scalar.
+    record["artifact"]["n_features"] = config["n_features"]
     frame = _frame(engine, ["a", "b", "unseen", None])
     # NumPy 2 rejects oversized Python integers instead of promoting modulo to float.
     error = OverflowError if np.lib.NumpyVersion(np.__version__) >= "2.0.0" else None

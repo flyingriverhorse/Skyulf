@@ -10,7 +10,7 @@ YAML blocks are list fragments to paste under a selected recipe unless a card
 marks them as standalone Core configuration. Shared column, row and runtime rules
 are in [read the step cards](preprocessing_recipes.md#read-the-step-cards).
 
-All four scalers below replace selected numeric columns and save the fitted
+StandardScaler, MinMaxScaler, MaxAbsScaler and RobustScaler replace selected numeric columns and save the fitted
 statistics. `columns` is an optional list with numeric auto-detection when
 absent and no selection for `[]`. Constant scales use 1 instead of dividing by
 zero; NaN is not an imputed value. State and column order stay fixed on apply.
@@ -58,6 +58,7 @@ other scalers or arbitrary downstream steps.
 | --- | --- | --- | --- | --- |
 | `columns` | list[string]/null | null | Existing numeric columns; [] selects none. | Select features; omitted selection uses numeric detection. |
 | `feature_range` | pair[number] | [0, 1] | Lower strictly less than upper. | Map training extrema to this range. |
+| `clip` | boolean | false | true, false | Clip scoring output to the saved feature range. |
 
 **Minimal YAML:**
 
@@ -67,11 +68,12 @@ other scalers or arbitrary downstream steps.
   params: {columns: [income], feature_range: [0, 1]}
 ```
 
-**Common mistake:** Future values can lie outside the requested range; this wrapper does not clip.
+**Common mistake:** Future values can lie outside the requested range when `clip` is false.
 
 **Details:** Saves fitted minima and scale. Training values
-`[10, 20]` become `[0, 1]`; a future 30 becomes 2 because there is no public
-clipping option. Constant columns use a nonzero denominator. No native Spark
+`[10, 20]` become `[0, 1]`; a future 30 becomes 2 by default, or 1 with `clip: true`.
+Clipping uses the fitted range and preserves missing values. Previously saved artifacts
+without this option remain unclipped. Constant columns use a nonzero denominator. No native Spark
 fit/apply declaration for this node.
 
 ## MaxAbsScaler
@@ -111,6 +113,7 @@ extreme observations.
 | `quantile_range` | pair[number] | [25.0, 75.0] | Ordered percentiles in 0–100. | Choose the fitted spread. |
 | `with_centering` | boolean | true | true, false | Subtract the fitted median. |
 | `with_scaling` | boolean | true | true, false | Divide by the fitted quantile span. |
+| `unit_variance` | boolean | false | true, false | Adjust the saved scale for unit variance on normally distributed data. |
 
 **Minimal YAML:**
 
@@ -120,11 +123,79 @@ extreme observations.
   params: {columns: [income], quantile_range: [25, 75], with_centering: true, with_scaling: true}
 ```
 
-**Common mistake:** Percentiles use 0–100, and unit_variance is not an exposed option.
+**Common mistake:** Percentiles use 0–100. `unit_variance` targets normally distributed data;
+it does not guarantee variance one for every input distribution.
 
 **Details:** Saves medians and quantile spans. The fitted median becomes 0 when
 centered; an observation one fitted interquantile span above it becomes 1.
-There is no exposed `unit_variance` option.
+With `unit_variance: true`, sklearn adjusts the learned scale using the corresponding
+standard-normal quantile span. Apply reuses that adjusted scale without relearning it.
+Old artifacts without the option retain their saved numerical behavior.
+
+## QuantileTransformer
+
+**Purpose and effect:** Map each numeric feature's training distribution to uniform
+values in [0, 1] or a standard-normal marginal distribution. This is a nonlinear
+transformation and can change distances and correlations between features.
+
+**File:** `config/preprocessing.yml`; also available in the Canvas Scaling method menu.
+
+| Parameter | Type | Default | Allowed values | What it changes |
+| --- | --- | --- | --- | --- |
+| `columns` | list[string]/null | null | Existing numeric columns; [] selects none. | Select features; automatic detection excludes target_column. |
+| `n_quantiles` | integer | 1000 | Positive integer, not boolean. | Requested distribution landmarks; fitted count is capped at training rows. |
+| `output_distribution` | string | uniform | uniform, normal | Choose the output marginal distribution. |
+| `subsample` | integer/null | 10000 | Positive integer or null. | Limit rows used to estimate quantiles; null disables subsampling. |
+| `random_state` | integer/null | 42 | Integer seed or null. | Control deterministic subsampling; null permits random sampling. |
+
+**Minimal YAML:**
+
+```yaml
+- name: income_quantiles
+  transformer: QuantileTransformer
+  params: {columns: [income], n_quantiles: 100, output_distribution: normal}
+```
+
+**Common mistake:** The configured `n_quantiles` cannot exceed a non-null `subsample`,
+even when the eventual fitted count would be capped by a small training set.
+
+**Details:** Fits a real sklearn transformer and persists its learned quantiles and
+reference probabilities. Apply uses that saved transformer, never scoring-batch ranks.
+Values beyond the learned range reach distribution endpoints; normal output uses
+sklearn's finite endpoint limits. Missing values are ignored when estimating quantiles
+and remain missing at apply. Selected outputs are float64; names, other columns, row
+order and labels remain unchanged. Local pandas/Polars replay has row context; native
+Spark fitting is not declared. Dependencies: base/sklearn.
+
+## Normalizer
+
+**Purpose and effect:** Normalize each row across the selected feature vector. With
+L2 normalization, `[3, 4]` becomes `[0.6, 0.8]`.
+
+**File:** `config/preprocessing.yml`; also available in the Canvas Scaling method menu.
+
+| Parameter | Type | Default | Allowed values | What it changes |
+| --- | --- | --- | --- | --- |
+| `columns` | list[string]/null | null | Existing numeric columns; [] selects none. | Define the feature vector; automatic detection excludes target_column. |
+| `norm` | string | l2 | l1, l2, max | Divide each row by its absolute sum, Euclidean length or maximum absolute value. |
+
+**Minimal YAML:**
+
+```yaml
+- name: normalize_vector
+  transformer: Normalizer
+  params: {columns: [x, y], norm: l2}
+```
+
+**Common mistake:** Fill missing values first; sklearn rejects NaN and infinity.
+Selecting a single feature usually reduces nonzero values to their sign.
+
+**Details:** Rows containing only zeros remain zero. Fit validates the feature width
+and saves sklearn's normalizer; apply uses the saved norm and selected columns without
+learning population statistics. Outputs are float64, preserving other columns, row order
+and labels. Missing fitted feature columns raise. Empty requests keep the same schema.
+Local pandas/Polars replay has row context; native Spark fitting is not declared.
+Dependencies: base/sklearn.
 
 ## SimpleTransformation
 
@@ -153,7 +224,8 @@ There is no exposed `unit_variance` option.
 **Details:** Rules run in order and replace their columns. Numeric text
 is coerced; invalid text becomes missing. Negative log/sqrt inputs and zero
 reciprocals become missing; cube root supports negatives; exp clips above its
-threshold. Unknown methods/missing source names are skipped. Saves rules only;
+threshold. Unknown methods fail during fit with the supported choices listed;
+missing source names are skipped. Previously saved rules retain their replay. Saves rules only;
 context row. Dependencies: base. The registry's old `func`/`columns` metadata
 does not configure this node: use the actual `transformations` list above.
 

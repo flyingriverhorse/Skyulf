@@ -5,8 +5,6 @@ Run with:
     pytest skyulf-core/tests/test_feature_generation_full.py -v
 """
 
-import math
-
 import pandas as pd
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
@@ -583,7 +581,8 @@ class TestEdgeCases:
         # Non-null rows must be correct; NaT row can be NaN
         assert out["dt_year"].iloc[0] == 2024
         assert out["dt_year"].iloc[2] == 2023
-        assert math.isnan(out["dt_year"].iloc[1])
+        assert pd.isna(out["dt_year"].iloc[1])
+        assert str(out["dt_year"].dtype) == "Int64"
 
 
 class TestRealShapedDataset:

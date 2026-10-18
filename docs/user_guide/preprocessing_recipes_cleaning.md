@@ -42,6 +42,25 @@ for such columns. Most-frequent ties use the smallest comparable value. Context:
 row. Dependencies: base. Native Spark accepts numeric mean and compatible
 constant fills (text/Boolean need explicit matching values), not all local strategies.
 
+Schema preview preserves known double-precision targets with numeric-compatible
+fills. It returns an unknown schema for automatic selection, non-double targets
+or constants whose output can depend on values and the engine. This includes
+nullable float32 mode/constant fills and Boolean constants in double columns. Explicit empty
+or missing-only selections remain a no-op. Fitted values and native apply dtypes
+are unchanged.
+
+For local pandas/Polars fits, an explicit text `fill_value` is converted for
+each selected integer, floating-point or Boolean column, including pandas Arrow
+dtypes. Text columns retain the literal text. Use an explicit Casting step for
+Decimal, date and other unsupported scalar types. Integer conversion preserves
+exact values
+above `2**53` and rejects fractional or out-of-range constants. Boolean columns
+accept `true` or `false` (case-insensitive), never general text truthiness or
+numeric Boolean strings. Nonfinite numeric constants fail during fit with the
+column name. The artifact stores the resolved values, so inference does not
+reinterpret request dtypes. Existing saved fills remain unchanged. Canvas keeps
+the input as text to avoid JavaScript rounding large integers before fitting.
+
 ## GroupImputer
 
 **Purpose and effect:** missing income in group A receives A's training mean; an unseen group
@@ -51,9 +70,10 @@ receives the global training mean.
 
 | Parameter | Type | Default | Allowed values | What it changes |
 | --- | --- | --- | --- | --- |
-| `group_by` | string | required | One existing column. | Select the group lookup key. |
+| `group_by` | string/list[string] | required | One existing column or a nonempty ordered list of distinct columns. | Select the group lookup keys. |
 | `columns` | list[string]/null | null | Empty/omitted selects eligible columns automatically. | Choose columns to fill; group key and target are excluded. |
 | `strategy` | string | mean | mean, median, most_frequent, mode | Learn per-group fills and global fallbacks. |
+| `fallback` | string | global | global, hierarchical | For a list of keys, optionally try successively shorter prefixes before the global training value. |
 
 **Minimal YAML:**
 
@@ -74,6 +94,28 @@ saved global value; an entirely unobserved column can remain missing. Replaces
 selected missing cells, preserves observed values, and uses floating values for
 numeric statistics. Context: row after fit, not request-time group aggregation.
 Dependencies: base. No native Spark fit/apply claim.
+
+An explicit list opts into versioned tuple keys. With `group_by: [region,
+industry]` and `fallback: hierarchical`, an unseen pair tries the region's
+training statistic before the global value. A null component skips its level;
+`[known_region, null]` can still use the region. Every prefix learns its statistic
+directly from training rows, including for median and mode. The global statistic
+includes observed values from rows with missing group keys. Key order matters:
+`[industry, region]` falls back to industry instead. `fallback: global` uses only
+the complete tuple and the global value.
+
+The saved list-based state contains `group_key_version: 1`, ordered `levels`,
+and global `fill_values`. Canonical tuple components preserve exact integers
+and distinguish Boolean, numeric, text and missing values. Existing string
+`group_by` configurations and saved single-key artifacts retain their original
+representation. Canvas keeps old graphs unchanged until multiple group columns
+are enabled and shows controls for reordering the selected keys.
+
+```yaml
+- name: regional_income
+  transformer: GroupImputer
+  params: {columns: [income], group_by: [region, industry], strategy: median, fallback: hierarchical}
+```
 
 ## KNNImputer
 
@@ -105,6 +147,9 @@ matrix and left untouched in the output, with a warning. The full frame retains
 its columns. Outputs numeric fills, including float promotion for nullable
 integers; null/NaN are missing. Empty apply preserves fitted output width.
 Context: row against saved training neighbors. Dependencies: base/sklearn.
+Distances use sklearn's `nan_euclidean` metric over jointly observed features.
+No metric option is exposed: sklearn's other metric extension is a Python
+callable, which is not a portable YAML or Canvas setting.
 
 ## IterativeImputer
 
@@ -117,7 +162,7 @@ replay the fitted chained models.
 | --- | --- | --- | --- | --- |
 | `columns` | list[string]/null | null | Existing numeric columns; [] selects none. | Select features; omitted selection uses numeric detection. |
 | `max_iter` | integer | 10 | Nonnegative. | Limit chained imputation rounds. |
-| `estimator` | string | BayesianRidge | BayesianRidge, DecisionTree/decision_tree, ExtraTrees/extra_trees, KNeighbors/knn. | Choose the fitted predictor; unrecognized names fall back to BayesianRidge. |
+| `estimator` | string | BayesianRidge | BayesianRidge, DecisionTree/decision_tree, ExtraTrees/extra_trees, KNeighbors/knn. | Choose the fitted predictor; unknown names fail during fit with the supported choices listed. |
 | `random_state` | integer/null | 0 | Integer seed or null. | Control estimator randomness. |
 
 **Minimal YAML:**
@@ -340,7 +385,7 @@ row. Dependencies: base. Use Casting separately for actual Boolean dtype.
 
 | Parameter | Type | Default | Allowed values | What it changes |
 | --- | --- | --- | --- | --- |
-| `columns` | list[string]/null | null | Core: all columns; pre_split: explicit names. | Choose replacement scope. |
+| `columns` | list[string]/null | [] | Existing explicit names; empty/omitted selects none. | Choose replacement scope; pre_split requires explicit names. |
 | `mapping` | mapping/null | unset | Old→new map, or column→map. | Declare replacements in mapping form. |
 | `replacements` | list[mapping]/null | unset | Each item has old and new. | Declare replacements as pairs; Core gives this mode precedence. |
 | `to_replace` | scalar | unset | Nonnull old value for pre_split scalar mode. | Select scalar mode when no pair/map mode is active. |
@@ -366,6 +411,23 @@ Matched cells are replaced, unmatched/null cells otherwise remain. Numeric
 replacement preserves integer precision; fractional/out-of-range replacement
 of an integer column requires an explicit cast first. Saves rules only.
 Context: row. Dependencies: base.
+
+For a numeric missing-value marker, replace it with YAML `null` before imputation:
+
+```yaml
+- name: missing_measurements
+  transformer: ValueReplacement
+  params: {columns: [co_gt], mapping: {-200: null}}
+- name: fill_measurements
+  transformer: SimpleImputer
+  params: {columns: [co_gt], strategy: mean}
+```
+
+On pandas and Polars, a floating `co_gt` column remains floating after replacement;
+existing nullable storage is preserved. The imputer learns its mean from the
+remaining training values and reuses that mean when scoring. Other columns and
+unmatched values remain unchanged. Text and object columns retain their native
+replacement semantics; use `Casting` if a text column must become numeric.
 
 ## InvalidValueReplacement
 
@@ -433,6 +495,11 @@ coercion enabled.
 ```
 
 **Common mistake:** Category casts learn a vocabulary and are not admitted in pre_split.
+
+Category values follow native engine semantics: numeric pandas categories keep
+numeric labels, while Polars categories are strings. For matching text labels
+across engines, cast to string first, then category, and refit; an existing
+fitted category vocabulary is not rewritten.
 
 **Details:** Supported cross-engine names:
 `float32`, `float64` (`float`, `double`, `numeric`); `int32`, `int64` (`int`,

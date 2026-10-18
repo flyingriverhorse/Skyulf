@@ -29,6 +29,47 @@ from ..dispatcher import apply_dual_engine
 from ._common import validate_fitted_bounds
 
 
+def _percentile_pair(raw: Any) -> dict[str, float]:
+    """Require explicit finite ordered tails without coercing invalid booleans."""
+    if type(raw) is not dict or set(raw) != {"lower", "upper"}:
+        raise ValueError("Each percentile override requires lower and upper values.")
+    for value in raw.values():
+        if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
+            raise ValueError("Winsorize percentiles must be finite numeric values.")
+        if not isfinite(value) or not 0 <= value <= 100:
+            raise ValueError("Winsorize percentiles must be between zero and 100.")
+    if raw["lower"] > raw["upper"]:
+        raise ValueError("Winsorize lower percentile must not exceed upper percentile.")
+    return {key: float(value) for key, value in raw.items()}
+
+
+def _column_percentiles(config: dict, columns: list[str]) -> dict[str, dict[str, float]]:
+    """Resolve configured overrides once while retaining global defaults for other columns."""
+    defaults = _percentile_pair(
+        {
+            "lower": config.get("lower_percentile", 5.0),
+            "upper": config.get("upper_percentile", 95.0),
+        }
+    )
+    overrides = config.get("percentiles_by_column", {})
+    if type(overrides) is not dict or set(overrides) - set(columns):
+        raise ValueError("Winsorize percentile overrides must name selected columns.")
+    resolved = dict.fromkeys(columns, defaults)
+    resolved.update({column: _percentile_pair(pair) for column, pair in overrides.items()})
+    return resolved
+
+
+def _validate_saved_percentiles(raw: dict) -> None:
+    """Check optional new metadata without changing historical scalar-percentile artifacts."""
+    if "percentiles_by_column" not in raw:
+        return
+    overrides = raw["percentiles_by_column"]
+    if type(overrides) is not dict or set(overrides) != set(raw["bounds"]):
+        raise ValueError("Fitted percentile axes must match learned bounds.")
+    for pair in overrides.values():
+        _percentile_pair(pair)
+
+
 def _integer_bounds(bound: dict, column: str) -> dict[str, float]:
     """Reject limits that cannot retain integer values before any rows are matched."""
     if any(not isfinite(value) or value != int(value) for value in bound.values()):
@@ -108,14 +149,18 @@ class WinsorizeApplier(BaseApplier):
     @staticmethod
     def validate_inference_state(raw: dict) -> dict:
         """Inspect learned bounds and metadata without recomputing request quantiles."""
+        fields = {"type", "bounds", "lower_percentile", "upper_percentile", "warnings"}
+        if isinstance(raw, dict):
+            fields.update({"percentiles_by_column"}.intersection(raw))
         if not local_state_fields(
             raw,
             "winsorize",
-            {"type", "bounds", "lower_percentile", "upper_percentile", "warnings"},
+            fields,
             allow_empty=True,
         ):
             return raw
         validate_fitted_bounds(raw["bounds"], partial=False)
+        _validate_saved_percentiles(raw)
         for field in ("lower_percentile", "upper_percentile"):
             value = raw[field]
             if isinstance(value, bool) or not isinstance(value, Real) or not 0 <= value <= 100:
@@ -181,7 +226,12 @@ class WinsorizeApplier(BaseApplier):
     name="Winsorization",
     category="Preprocessing",
     description="Limit extreme values in the data.",
-    params={"lower_percentile": 5.0, "upper_percentile": 95.0, "columns": []},
+    params={
+        "lower_percentile": 5.0,
+        "upper_percentile": 95.0,
+        "columns": [],
+        "percentiles_by_column": {},
+    },
     learns_from_data=True,
 )
 class WinsorizeCalculator(BaseCalculator):
@@ -211,6 +261,7 @@ class WinsorizeCalculator(BaseCalculator):
         cols = resolve_columns(X, config, detect_numeric_columns)
         if not cols:
             return {}
+        percentiles = _column_percentiles(config, cols)
 
         bounds: dict[str, dict[str, float]] = {}
         warnings = []
@@ -220,16 +271,19 @@ class WinsorizeCalculator(BaseCalculator):
                 warnings.append(f"Column '{col}': Empty or non-numeric")
                 continue
             bounds[col] = {
-                "lower": _fit_bound(series, lower_p, col, integer=integer),
-                "upper": _fit_bound(series, upper_p, col, integer=integer),
+                "lower": _fit_bound(series, percentiles[col]["lower"], col, integer=integer),
+                "upper": _fit_bound(series, percentiles[col]["upper"], col, integer=integer),
             }
             if integer:
                 bounds[col] = _pandas_integer_bounds(series, bounds[col], col)
 
-        return {
+        artifact: WinsorizeArtifact = {
             "type": "winsorize",
             "bounds": bounds,
             "lower_percentile": lower_p,
             "upper_percentile": upper_p,
             "warnings": warnings,
         }
+        if "percentiles_by_column" in config:
+            artifact["percentiles_by_column"] = {col: percentiles[col] for col in bounds}
+        return artifact

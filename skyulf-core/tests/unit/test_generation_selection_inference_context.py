@@ -249,8 +249,8 @@ def test_group_aggregation_unresolved_fit_is_noop_but_unfitted_legacy_is_rejecte
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_datetime_generation_retains_native_null_dependent_dtype_diagnostics(engine, monkeypatch):
-    """Calendar values remain native while strict diagnostics retain pandas dtype differences."""
+def test_datetime_generation_keeps_nullable_dtypes_in_partition_diagnostics(engine, monkeypatch):
+    """New fitted calendar values must retain their nullable dtypes in every diagnostic partition."""
     record = _record(
         "FeatureGeneration",
         engine,
@@ -274,11 +274,7 @@ def test_datetime_generation_retains_native_null_dependent_dtype_diagnostics(eng
         None,
         None,
     ]
-    if engine == "pandas":
-        assert detail["status"] == "failed"
-        assert any(check.get("reason") == "output_mismatch" for check in detail["checks"])
-    else:
-        assert detail["status"] == "passed", detail
+    assert detail["status"] == "passed", detail
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -338,8 +334,8 @@ def test_legacy_similarity_backend_remains_unknown_and_missing_dependency_reject
         record["applier"].validate_inference_state(record["artifact"])
 
 
-def test_nonnumeric_fill_is_usable_without_an_independent_partition_promise():
-    """A pandas operation-level failure can omit an output only for batches containing nulls."""
+def test_legacy_nonnumeric_fill_has_no_independent_partition_promise():
+    """An unversioned pandas operation retains its historical batch-dependent skip behavior."""
     record = _record(
         "FeatureGeneration",
         "pandas",
@@ -349,6 +345,7 @@ def test_nonnumeric_fill_is_usable_without_an_independent_partition_promise():
             ]
         },
     )
+    record["artifact"].pop("operation_contract_version")
     sample = _frame("pandas", {"a": [1.0, None]})
     assert (
         get_inference_capability("FeatureGeneration", {}, record["artifact"], engine="pandas")
@@ -386,9 +383,18 @@ def test_model_selection_replays_only_saved_membership(method, drop, engine, mon
     ["variance", "correlation_threshold", "select_k_best", "select_from_model", "rfe", "unknown"],
 )
 def test_facade_replays_actual_child_states_without_relearning(method, engine, monkeypatch):
-    """All four selector families and the genuine unknown-method no-op retain their own state."""
+    """Fitted children and legacy unknown-method no-op states replay without refitting."""
     config = {"columns": ["a", "b"], "method": method, "k": 1, "n_features_to_select": 1}
-    record = _record("feature_selection", engine, config)
+    if method == "unknown":
+        record: dict[str, Any] = {
+            "name": "features",
+            "type": "feature_selection",
+            "params": config,
+            "artifact": {},
+            "applier": NodeRegistry.get_applier("feature_selection")(),
+        }
+    else:
+        record = _record("feature_selection", engine, config)
     sample = _frame(engine, {"b": [None, 90.0, -8.0, 10.0], "a": [8.0, None, -4.0, 0.0]})
     expected = record["applier"].apply(sample, record["artifact"])
     detail, output = _probe(record, sample, engine, monkeypatch)

@@ -215,6 +215,55 @@ losing prediction rows; scoring eligibility is a separate workflow.
 
 ## Read the step cards
 
+### Select columns from the training schema
+
+In `config/preprocessing.yml`, a step that accepts `columns` can also select
+columns by name pattern, dtype, or exclusions:
+
+```yaml
+version: 1
+recipes:
+  default:
+    - name: scale_measurements
+      transformer: StandardScaler
+      params:
+        columns_regex: '^measure_'
+        dtype: numeric
+        exclude_columns: [measure_id]
+```
+
+The pipeline resolves these rules once against the training features and saves
+the resulting column names. Prediction reuses those names; a new column in a
+request does not change the fitted selection. The same options work in a
+`SkyulfPipeline` preprocessing step or `FeatureEngineer` configuration.
+
+| Option | Meaning |
+| --- | --- |
+| `columns_regex` | Python regular expression searched within each column name. Use `^` to match the beginning. |
+| `dtype` | One of `numeric`, `categorical`, `datetime`, or `boolean`. Numeric includes real numeric and Decimal columns, but excludes booleans, durations, and complex values. |
+| `exclude_columns` | List of columns to remove from the selection. |
+| `columns` with rules | A nonempty list limits candidates and determines their order. Without one, candidates follow the training frame's order, excluding the target. |
+
+Regex matching uses `re.search`: `amt` selects both `amt` and `max_amt`.
+Use `^amt$` to select only the complete name. `dtype: numeric` can also select
+integer IDs and counts; use `exclude_columns: [customer_id]` or an explicit
+`columns` list to limit the operation to intended measurements.
+
+Name and dtype rules are combined with AND. Exclusions apply before dtype
+inspection. An empty result raises an error instead of invoking the node's
+automatic selection. An explicit empty `columns` list combined with these rules
+starts from all feature columns; without rules, each node keeps its existing
+empty-list behavior. Schema preview returns an unknown schema when object values
+must be inspected to distinguish Decimal numbers from categories.
+
+These are ordinary preprocessing rules, not `pre_split.yml` options. Native
+Spark training currently requires explicit column names. Spark worker inference
+from an admitted pandas/Polars-trained model uses the saved resolved selection.
+The Canvas continues to use its explicit column picker. Direct Calculator calls
+do not resolve pipeline rules automatically; pass explicit `columns` there.
+
+### Read configuration and output contracts
+
 All YAML blocks on the family pages are **list fragments**, to paste under a selected recipe, unless
 explicitly marked as standalone Core configuration. Each card names the file to edit. Pre-split
 admission is narrower than ordinary preprocessing; training-only steps and diagnostics are marked
@@ -280,7 +329,7 @@ its card.
 
 ## Registry index and scope
 
-This index covers 67 registered IDs and 63 distinct Calculator/Applier owners.
+This index covers 73 registered IDs and 69 distinct Calculator/Applier owners.
 Four additional names are aliases, not new algorithms. Follow each link for
 parameters and phase restrictions; presence here does not grant pre-split/Spark/REST
 admission.
@@ -310,8 +359,14 @@ admission.
 | <span id="generaltransformation"></span>GeneralTransformation | [GeneralTransformation](preprocessing_recipes_scaling.md#generaltransformation) |
 | <span id="geodistance"></span>GeoDistance | [GeoDistance](preprocessing_recipes_time_geo.md#geodistance) |
 | <span id="groupimputer"></span>GroupImputer | [GroupImputer](preprocessing_recipes_cleaning.md#groupimputer) |
+| FrequencyEncoder | [FrequencyEncoder](preprocessing_recipes_encoding.md#frequencyencoder) |
+| RareCategoryGrouping | [RareCategoryGrouping](preprocessing_recipes_encoding.md#rarecategorygrouping) |
+| QuantileTransformer | [QuantileTransformer](preprocessing_recipes_scaling.md#quantiletransformer) |
+| Normalizer | [Normalizer](preprocessing_recipes_scaling.md#normalizer) |
 | <span id="h3index"></span>H3Index | [H3Index](preprocessing_recipes_time_geo.md#h3index) |
 | <span id="hashencoder"></span>HashEncoder | [HashEncoder](preprocessing_recipes_encoding.md#hashencoder) |
+| <span id="isolationforest"></span>IsolationForest | [IsolationForest](preprocessing_recipes_outliers.md#isolationforest) |
+| <span id="localoutlierfactor"></span>LocalOutlierFactor | [LocalOutlierFactor](preprocessing_recipes_outliers.md#localoutlierfactor) |
 | <span id="iqr"></span>IQR | [IQR: training filter](preprocessing_recipes_outliers.md#iqr) |
 | <span id="invalidvaluereplacement"></span>InvalidValueReplacement | [InvalidValueReplacement](preprocessing_recipes_cleaning.md#invalidvaluereplacement) |
 | <span id="iterativeimputer"></span>IterativeImputer | [IterativeImputer](preprocessing_recipes_cleaning.md#iterativeimputer) |

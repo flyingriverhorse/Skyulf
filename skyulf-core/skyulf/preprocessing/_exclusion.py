@@ -7,6 +7,8 @@ import numpy as np
 from ..registry import NodeRegistry
 from .outliers.elliptic import EllipticEnvelopeApplier
 from .outliers.iqr import IQRApplier
+from .outliers.isolation_forest import IsolationForestApplier
+from .outliers.local_outlier_factor import LocalOutlierFactorApplier
 from .outliers.manual_bounds import ManualBoundsApplier
 from .outliers.zscore import ZScoreApplier
 from .transformations.power import PowerTransformerApplier
@@ -15,6 +17,8 @@ EXCLUSION_APPLIERS = {
     "IQR": IQRApplier,
     "ZScore": ZScoreApplier,
     "EllipticEnvelope": EllipticEnvelopeApplier,
+    "IsolationForest": IsolationForestApplier,
+    "LocalOutlierFactor": LocalOutlierFactorApplier,
     "ManualBounds": ManualBoundsApplier,
     "PowerTransformer": PowerTransformerApplier,
 }

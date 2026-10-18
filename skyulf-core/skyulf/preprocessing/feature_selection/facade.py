@@ -1,6 +1,5 @@
 """Unified feature-selection facade node."""
 
-import logging
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -12,8 +11,6 @@ from .correlation import CorrelationThresholdApplier, CorrelationThresholdCalcul
 from .model_based import ModelBasedSelectionApplier, ModelBasedSelectionCalculator
 from .univariate import UnivariateSelectionApplier, UnivariateSelectionCalculator
 from .variance import VarianceThresholdApplier, VarianceThresholdCalculator
-
-logger = logging.getLogger(__name__)
 
 _FS_APPLIERS = {
     "variance_threshold": VarianceThresholdApplier,
@@ -57,9 +54,8 @@ class FeatureSelectionApplier(BaseApplier):
     ) -> Any:
         """Apply whichever concrete selection applier the artifact's ``type`` names.
 
-        An unrecognized ``type`` — including the empty artifact an unknown method
-        produces at fit time — is an identity passthrough, so this facade can
-        never drop data on its own.
+        An unrecognized saved ``type`` remains an identity passthrough for legacy
+        artifacts. New fits reject unsupported methods before creating state.
         """
         # The params returned by the specific calculator carry a "type" tag
         # that selects the right concrete applier.
@@ -93,6 +89,8 @@ _FS_CALCULATORS: dict[str, Callable[[], BaseCalculator]] = {
     "select_fwe": UnivariateSelectionCalculator,
     "select_from_model": ModelBasedSelectionCalculator,
     "rfe": ModelBasedSelectionCalculator,
+    "rfecv": ModelBasedSelectionCalculator,
+    "sequential_feature_selection": ModelBasedSelectionCalculator,
 }
 
 
@@ -101,8 +99,9 @@ _FS_CALCULATORS: dict[str, Callable[[], BaseCalculator]] = {
     id="feature_selection",
     name="Feature Selection (Wrapper)",
     category="Feature Selection",
-    description="General wrapper for feature selection strategies.",
+    description="Feature selection including RFE, RFECV and sequential selection.",
     params={"method": "variance", "threshold": 0.0},
+    tags=["rfe", "rfecv", "sequential_feature_selection"],
     learns_from_data=True,
 )
 class FeatureSelectionCalculator(BaseCalculator):
@@ -115,15 +114,16 @@ class FeatureSelectionCalculator(BaseCalculator):
     ) -> Mapping[str, Any]:
         """Fit the concrete calculator the method alias maps to and return its artifact.
 
-        ``_FS_CALCULATORS`` collapses eleven aliases — node ids such as
+        ``_FS_CALCULATORS`` collapses method aliases — node ids such as
         ``variance`` alongside sklearn-style names such as ``select_k_best`` and
         ``rfe`` — onto four calculators, so several spellings reach the same fit.
-        An unknown method logs a warning and returns an empty artifact rather
-        than raising, which degrades the node to a passthrough.
+        An unknown method raises ``ValueError`` listing the supported choices.
         """
         method = config.get("method", "select_k_best")
         ctor = _FS_CALCULATORS.get(method)
         if ctor is None:
-            logger.warning(f"Unknown feature selection method: {method}")
-            return {}
+            raise ValueError(
+                f"Unknown feature selection method {method!r}; "
+                f"choose from {', '.join(_FS_CALCULATORS)}."
+            )
         return ctor().fit(df, config)

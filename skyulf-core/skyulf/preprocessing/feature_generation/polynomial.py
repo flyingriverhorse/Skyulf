@@ -11,7 +11,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns
+from ...utils import detect_numeric_columns, resolve_columns
 from .._artifacts import PolynomialFeaturesArtifact
 from .._fitted_validation import local_boolean, local_state_fields
 from .._helpers import select_then_to_numpy
@@ -186,16 +186,15 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         """Record the expansion settings and the feature names they produce.
 
         ``columns`` falls back to auto-detected numeric columns when
-        ``auto_detect`` is set. ``PolynomialFeatures`` is fitted here purely to
+        ``auto_detect`` is set, excluding the configured target column.
+        ``PolynomialFeatures`` is fitted here purely to
         derive ``feature_names`` — the expansion itself is recomputed at apply
         time. Returns an empty artifact, a no-op passthrough, when no column
         resolves. Ambiguous generated names raise ``ValueError`` before replay.
         """
         cols = list(config.get("columns", []))
         if not cols and config.get("auto_detect", False):
-            # detect_numeric_columns dispatches natively on Polars frames too,
-            # so this doesn't require converting the full frame first.
-            cols = detect_numeric_columns(X)
+            cols = resolve_columns(X, config, detect_numeric_columns)
         X_np, cols = select_then_to_numpy(X, cols)
         if not cols:
             return cast(PolynomialFeaturesArtifact, {})
