@@ -120,6 +120,7 @@ nav:
         - Search Strategies: user_guide/databricks_tuning.md
         - Voting and Stacking Ensembles: user_guide/databricks_ensembles.md
         - Preprocessing YAML Catalog:
+          - Build Preprocessing with YAML: user_guide/preprocessing_yaml_walkthrough.md
           - Overview: user_guide/preprocessing_recipes.md
           - Missing Values, Cleaning and Types: user_guide/preprocessing_recipes_cleaning.md
           - Scaling and Numeric Transforms: user_guide/preprocessing_recipes_scaling.md

@@ -6,6 +6,11 @@ registered Core operation. A custom factory builds one step from project Python.
 These are separate choices: registering an operation does not enable it in every
 phase or runtime.
 
+For complete recipe files using built-in operations without editing Python, start
+with [Build preprocessing with YAML](preprocessing_yaml_walkthrough.md). This
+reference supplies the full parameter tables for the steps used there and every
+other registered operation.
+
 For complete custom Python factories and their exact YAML selectors, see
 [custom steps](databricks_custom_steps.md) and
 [custom pre-split filters](databricks_custom_pre_split.md). For

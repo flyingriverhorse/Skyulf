@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 
 yaml = pytest.importorskip("yaml")
-pytest.importorskip("polars")
+pl = pytest.importorskip("polars")
 
 from skyulf import SkyulfPipeline
 from skyulf.data.dataset import SplitDataset
@@ -25,7 +25,13 @@ from skyulf.inference.pipeline_scoring import score_pipeline
 from skyulf.inference.project_scoring import run_project_scoring
 from skyulf.integrations.databricks.projects.project import load_project_workflow
 from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
-from skyulf.integrations.databricks.training.fitting.candidate import apply_pre_split_step
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
+    apply_pre_split_step,
+    candidate_config,
+    split_labeled_snapshot,
+)
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 from skyulf.registry import NodeRegistry
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -132,6 +138,7 @@ def test_databricks_topic_links_resolve_after_splitting_guides():
         *GUIDES.glob("databricks_*.md"),
         *GUIDES.glob("preprocessing_recipes*.md"),
         GUIDES / "preprocessing_context.md",
+        GUIDES / "preprocessing_yaml_walkthrough.md",
     ]
     checked = []
     for source in sources:
@@ -305,6 +312,154 @@ def _example(page, name, language):
     )
     assert len(matches) == 1, f"{page.name}: missing or duplicate {name} example"
     return matches[0]
+
+
+def test_yaml_walkthrough_inventory_reaches_every_registered_step():
+    """The entry guide must keep new operations reachable without duplicating parameter cards."""
+    page = GUIDES / "preprocessing_yaml_walkthrough.md"
+    inventory = page.read_text(encoding="utf-8").split("<!-- yaml-catalog:start -->")[1]
+    inventory = inventory.split("<!-- yaml-catalog:end -->")[0]
+    names = re.findall(r"`([^`]+)`", inventory)
+    assert len(names) == len(set(names))
+    assert set(names) == set(NodeRegistry.list_transformers())
+    assert set(re.findall(r"\]\(([^)]+)\)", inventory)) == {path.name for path in CATALOG_PAGES}
+
+
+def _yaml_walkthrough_project(tmp_path, engine, recipe):
+    """Load the literal complete files with unmodified generated feature modules."""
+    page = GUIDES / "preprocessing_yaml_walkthrough.md"
+    pre_split = yaml.safe_load(_example(page, "yaml-customer-pre-split", "yaml"))
+    preprocessing = yaml.safe_load(_example(page, "yaml-customer-preprocessing", "yaml"))
+    training = yaml.safe_load(_example(page, "yaml-customer-training", "yaml"))
+    features = _project(tmp_path, pre_split, preprocessing)
+    defaults = training["defaults"]
+    defaults["preprocessing_recipe"] = recipe
+    (tmp_path / "config/training.yml").write_text(yaml.safe_dump(training), encoding="utf-8")
+    workflow = load_project_workflow(
+        {
+            "engine": engine,
+            "target_column": defaults["target_column"],
+            "input_columns": defaults["input_columns"],
+            "pipeline": {
+                "engine": engine,
+                "preprocessing": [],
+                "modeling": {},
+            },
+        },
+        features,
+    )
+    assert workflow["pipeline"]["project_scoring"]["pre_split"]["skipped_target_steps"] == []
+    return workflow, features
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("recipe", ["customer", "fixed_categories", "isolation", "local_density"])
+def test_yaml_walkthrough_recipes_fit_save_reload_and_preserve_scoring_rows(
+    tmp_path, engine, recipe
+):
+    """Copied YAML must train and retain raw-query exclusions after the project is edited."""
+    page = GUIDES / "preprocessing_yaml_walkthrough.md"
+    workflow, features = _yaml_walkthrough_project(tmp_path, engine, recipe)
+    data = pd.read_csv(io.StringIO(_example(page, "yaml-customer-data", "csv")))
+    spec = TrainingSpec(
+        table="workspace.example.customers",
+        version=0,
+        record_key_columns=("customer_id",),
+        input_columns=("age", "income", "tenure", "segment"),
+        target_column="churn",
+        max_rows=100,
+        max_bytes=100_000,
+        pre_split_steps=tuple(workflow["pre_split_steps"]),
+        stratify=True,
+    )
+    train, test, unavailable = split_labeled_snapshot(data, spec, engine=engine)
+    assert unavailable == 0
+    assert test.attrs["survivor_rows"] == 31
+    assert test.attrs["pre_split_filter_counts"][-1]["excluded_rows"] == 1
+    # Match actual candidate training: keep raw surviving features and save fixed normalization.
+    config = candidate_config(
+        spec,
+        workflow["pipeline"],
+        engine=engine,
+        cv=CVSpec(),
+        metric="heldout_accuracy",
+        min_improvement=0.0,
+        champion_version=None,
+        quality_threshold=None,
+        risk_category=None,
+    )
+    dataset = SplitDataset(
+        train=pl.from_pandas(train) if engine == "polars" else train,
+        test=pl.from_pandas(test) if engine == "polars" else test,
+    )
+    artifact = fit_workflow(
+        config,
+        dataset,
+        target_column="churn",
+        artifact_path=tmp_path / "artifact",
+        max_rows=100,
+        max_bytes=100_000,
+    )
+    query = pd.read_csv(io.StringIO(_example(page, "yaml-customer-query", "csv")))
+    query = query.drop(columns="customer_id")
+    original = query.copy(deep=True)
+    expected = score_pipeline(query, artifact)
+    missing = query.iloc[[4]].copy()
+    missing["income"] = np.nan
+    pd.testing.assert_frame_equal(
+        score_pipeline(query.iloc[[4]], artifact), score_pipeline(missing, artifact)
+    )
+    pd.testing.assert_frame_equal(query, original)
+    if engine == "polars":
+        pd.testing.assert_frame_equal(score_pipeline(pl.from_pandas(query), artifact), expected)
+    assert len(expected) == len(query)
+    assert expected.scoring_status.iloc[2] == "excluded"
+    assert expected.exclusion_reason.iloc[2] == "pre_split:age_range"
+    assert pd.isna(expected.prediction.iloc[2])
+    if recipe in ("customer", "fixed_categories"):
+        assert expected.scoring_status.tolist() == [
+            "predicted",
+            "predicted",
+            "excluded",
+            "predicted",
+            "predicted",
+        ]
+    else:
+        assert expected.scoring_status.iloc[3] == "excluded"
+        assert expected.exclusion_reason.iloc[3] == "outlier:unusual_measurements"
+        assert pd.isna(expected.prediction.iloc[3])
+    _assert_yaml_recipe_transformed_values(artifact, query, train, engine, recipe)
+    for module in features.rglob("*.py"):
+        assert (
+            module.read_bytes()
+            == (TEMPLATE / "src/features" / module.relative_to(features)).read_bytes()
+        )
+    restored = load_pipeline(tmp_path / "artifact")
+    pd.testing.assert_frame_equal(score_pipeline(query, restored), expected)
+    _replay_after_project_edit(tmp_path, features, query, expected)
+    assert artifact.manifest.project_source_sha256 == restored.manifest.project_source_sha256
+
+
+def _assert_yaml_recipe_transformed_values(artifact, query, train, engine, recipe):
+    """Pin real output effects rather than accepting an unchanged or empty pipeline."""
+    if recipe not in ("customer", "fixed_categories"):
+        return
+    # These rows survive the fixed age check and exercise the saved numeric/category state.
+    probe = query.iloc[:2]
+    native = pl.from_pandas(probe) if engine == "polars" else probe
+    transformed = artifact.pipeline.feature_engineer.transform(native)
+    frame = transformed.to_pandas() if isinstance(transformed, pl.DataFrame) else transformed
+    if recipe == "fixed_categories":
+        names = ["segment_a", "segment_b", "segment_c"]
+        assert frame.columns.tolist() == ["age", "income", "tenure", *names]
+        np.testing.assert_array_equal(frame[names], [[1, 0, 0], [0, 0, 0]])
+    else:
+        np.testing.assert_allclose(np.linalg.norm(frame[["age", "income", "tenure"]], axis=1), 1)
+        counts = train.segment.value_counts()
+        np.testing.assert_allclose(
+            frame.segment, [counts["A"] / len(train), counts[counts < 3].sum() / len(train)]
+        )
+    assert np.isfinite(frame.to_numpy()).all()
 
 
 def _custom_workflow(features, defaults):
