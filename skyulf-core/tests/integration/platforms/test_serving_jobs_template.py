@@ -149,6 +149,8 @@ def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(job):
         text = text.replace(
             "{{`{{job.parameters.publication_action}}`}}", "{{job.parameters.publication_action}}"
         )
+    if job == "daily_rollout":
+        text = text.replace('{{"{{job.run_id}}"}}', "{{job.run_id}}")
     resource = yaml.safe_load(text)["resources"]["jobs"][job]
     assert resource["max_concurrent_runs"] == 1
     assert resource["schedule"]["pause_status"] == "PAUSED"
@@ -165,7 +167,12 @@ def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(job):
     if job == "online_publication":
         parameters["publication_action"] = "{{job.parameters.publication_action}}"
     if job == "daily_rollout":  # rollout evidence names the target that ran it
-        parameters["bundle_target"] = "${bundle.target}"
+        parameters.update(
+            bundle_target="${bundle.target}",
+            job_run_id="{{job.run_id}}",
+            task_key="daily_rollout",
+            workspace_host="${workspace.host}",
+        )
     assert task["notebook_task"]["base_parameters"] == parameters
     assert resource["environments"][0]["spec"]["dependencies"] == [
         "-r ${workspace.file_path}/deployment/serving-requirements.txt",

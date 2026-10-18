@@ -13,7 +13,10 @@ from ...observability.monitoring.monitoring_store import (
     ensure_monitoring_store,
     load_enrolled_models,
 )
-from ...observability.monitoring.serving.serving_registration import enroll_serving_configs
+from ...observability.monitoring.serving.serving_registration import (
+    enroll_serving_configs,
+    parse_serving_enrollments,
+)
 from ...observability.monitoring.spark.spark_monitoring_reference import (
     prepare_spark_monitoring_reference,
 )
@@ -131,6 +134,9 @@ def run_project_monitoring_notebook(spark: Any, dbutils: Any) -> dict:
     if namespace is None or values.get("monitoring_enabled", "true") != "true":
         return {"status": "disabled"}
     if action == "enroll_serving":
+        parse_serving_enrollments(
+            values.get("monitoring_serving_enrollments", "[]"), namespace, values
+        )
         with reference_mutation_scope(spark, namespace, **notebook_reference_holder(values)):
             return enroll_serving_configs(spark, namespace, values)
     if action == "prepare_references":
