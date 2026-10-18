@@ -1,0 +1,102 @@
+# Shared environments are independent of your CI/CD provider.
+# Personal development targets deliberately have no shared run_as or job ACL overrides.
+# Every target lets the deployer and pipeline_owner manage its resources;
+# shared targets can add a read-only group chosen in setup.
+# Personal names retain the train/score/monitoring role after the user prefix.
+targets:
+  test:
+    mode: production
+    default: false
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+    workspace:
+      host: https://replace-test.example.invalid
+      root_path: ${var.test_root_path}
+    variables:
+      catalog: ${var.test_catalog}
+      input_schema: ${var.test_input_schema}
+      output_schema: ${var.test_output_schema}
+      metadata_schema: ${var.test_metadata_schema}
+      # load_nyctaxi.sql supplies outcomes; training.yml supplies trip_id and fare_amount.
+      monitoring_label_table: ${var.catalog}.${var.input_schema}.trips_labels
+      monitoring_result_available_at_column: result_available_at
+      # Initial version for a fresh model; set the concrete observed version before enrollment.
+      # An older Spark reference cache without WAPE is unavailable. This never requests training.
+      monitoring_performance_policies: >-
+        {"${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}":{
+          "mode":"report","metric":"wape","direction":"lower",
+          "baseline":{"kind":"training_holdout","model_version":"1"},
+          "tolerance":0.2,"tolerance_mode":"relative",
+          "window_hours":24,"label_delay_hours":6,
+          "minimum_labeled_rows":20,"minimum_label_coverage":0.8,
+          "consecutive_windows":2}}
+      resource_suffix: ""
+
+
+
+  syst:
+    mode: production
+    default: false
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+    workspace:
+      host: https://replace-syst.example.invalid
+      root_path: ${var.syst_root_path}
+    variables:
+      catalog: ${var.syst_catalog}
+      input_schema: ${var.syst_input_schema}
+      output_schema: ${var.syst_output_schema}
+      metadata_schema: ${var.syst_metadata_schema}
+      monitoring_label_table: ${var.catalog}.${var.input_schema}.trips_labels
+      monitoring_result_available_at_column: result_available_at
+      # Initial version for a fresh model; set the concrete observed version before enrollment.
+      # An older Spark reference cache without WAPE is unavailable. This never requests training.
+      monitoring_performance_policies: >-
+        {"${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}":{
+          "mode":"report","metric":"wape","direction":"lower",
+          "baseline":{"kind":"training_holdout","model_version":"1"},
+          "tolerance":0.2,"tolerance_mode":"relative",
+          "window_hours":24,"label_delay_hours":6,
+          "minimum_labeled_rows":20,"minimum_label_coverage":0.8,
+          "consecutive_windows":2}}
+      resource_suffix: ""
+
+
+
+  prod:
+    mode: production
+    default: false
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+    workspace:
+      host: https://replace-prod.example.invalid
+      root_path: ${var.prod_root_path}
+    variables:
+      catalog: ${var.prod_catalog}
+      input_schema: ${var.prod_input_schema}
+      output_schema: ${var.prod_output_schema}
+      metadata_schema: ${var.prod_metadata_schema}
+      monitoring_label_table: ${var.catalog}.${var.input_schema}.trips_labels
+      monitoring_result_available_at_column: result_available_at
+      # Initial version for a fresh model; set the concrete observed version before enrollment.
+      # An older Spark reference cache without WAPE is unavailable. This never requests training.
+      monitoring_performance_policies: >-
+        {"${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}":{
+          "mode":"report","metric":"wape","direction":"lower",
+          "baseline":{"kind":"training_holdout","model_version":"1"},
+          "tolerance":0.2,"tolerance_mode":"relative",
+          "window_hours":24,"label_delay_hours":6,
+          "minimum_labeled_rows":20,"minimum_label_coverage":0.8,
+          "consecutive_windows":2}}
+      resource_suffix: ""
+
+

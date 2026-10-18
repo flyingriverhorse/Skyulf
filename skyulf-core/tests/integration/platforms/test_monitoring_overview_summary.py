@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from monitoring_sql_helpers import install_shared_views
 
 DASHBOARD = (
     Path(__file__).resolve().parents[3]
@@ -42,6 +43,7 @@ def _epoch(value):
 def database():
     """Model real input columns and only shim Spark scalar functions for SQLite."""
     connection = sqlite3.connect(":memory:")
+    install_shared_views(connection)
     connection.row_factory = sqlite3.Row
     connection.create_function("get_json_object", 2, _json_field)
     connection.create_function("unix_timestamp", 1, _epoch)

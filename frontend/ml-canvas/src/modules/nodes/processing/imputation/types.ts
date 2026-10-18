@@ -7,7 +7,8 @@ export interface ImputationConfig {
   fill_value?: string | number | undefined;
 
   // Group Imputer: fill each row from the statistic of its own group.
-  group_by?: string | undefined;
+  group_by?: string | string[] | undefined;
+  fallback?: 'global' | 'hierarchical' | undefined;
 
   // KNN Imputer
   n_neighbors?: number | undefined;

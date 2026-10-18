@@ -3,29 +3,140 @@
     "order": 904,
     "type": "string",
     "default": "false",
-    "enum": ["false", "true"],
+    "enum": [
+      "false",
+      "true"
+    ],
     "description": "Online serving | Add a paused daily traffic rollout job? Uses an explicitly initialized rollout, verified monitoring, 10 percentage-point stages lasting at least 24 hours, and guarded champion promotion after the final stage passes. Configure config/serving.yml before enabling."
   },
   "include_online_serving": {
     "order": 906,
     "type": "string",
     "default": "false",
-    "enum": ["false", "true"],
-    "description": "Online features | Add explicit online endpoint setup and saved freshness policy configuration? Independent of publication and rollout. Requires pandas, non-temporal lookup and single-model or competition training. Configure training.yml and serving.yml before running."
+    "enum": [
+      "false",
+      "true"
+    ],
+    "description": "Online features | Add explicit online endpoint setup and saved freshness policy configuration? Independent of publication and rollout. Requires pandas, non-temporal lookup and single-model or competition training. Configure training.yml and serving.yml before running.",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "engine": {
+              "const": "polars"
+            }
+          }
+        }
+      ]
+    }
   },
   "include_online_publication": {
     "order": 905,
     "type": "string",
     "default": "false",
-    "enum": ["false", "true"],
+    "enum": [
+      "false",
+      "true"
+    ],
     "description": "Online features | Add explicit native publication controls? Publishes one selected latest-value Delta feature table into an existing online store. Independent of online serving and rollout. Configure config/serving.yml before enabling."
   },
   "online_publication_mode": {
     "order": 907,
     "type": "string",
     "default": "TRIGGERED",
-    "enum": ["TRIGGERED", "CONTINUOUS"],
+    "enum": [
+      "TRIGGERED",
+      "CONTINUOUS"
+    ],
     "description": "Online features | Publication mode? TRIGGERED adds a paused hourly sync; CONTINUOUS adds explicit start/status/stop/restart controls with no periodic schedule.",
-    "skip_prompt_if": {"properties": {"include_online_publication": {"const": "false"}}}
+    "skip_prompt_if": {
+      "properties": {
+        "include_online_publication": {
+          "const": "false"
+        }
+      }
+    }
+  },
+  "serving_logging_mode": {
+    "order": 908,
+    "type": "string",
+    "default": "telemetry",
+    "enum": [
+      "telemetry",
+      "ai_gateway",
+      "disabled"
+    ],
+    "description": "Online features | Endpoint inference table: telemetry = log every REST and ai_query request (needed for rollout and serving monitoring); ai_gateway = the same where your workspace supports AI Gateway tables; disabled = no inference table, callers store predictions themselves",
+    "skip_prompt_if": {
+      "properties": {
+        "include_online_serving": {
+          "const": "false"
+        }
+      }
+    }
+  },
+  "serving_workload_type": {
+    "order": 910,
+    "type": "string",
+    "default": "CPU",
+    "enum": ["CPU", "CPU_MEDIUM", "CPU_LARGE"],
+    "description": "Online serving | CPU workload type for newly created endpoints; GPU packages are not supported by this setup.",
+    "skip_prompt_if": {}
+  },
+  "serving_workload_size": {
+    "order": 911,
+    "type": "string",
+    "default": "Small",
+    "enum": ["Small", "Medium", "Large"],
+    "description": "Online serving | Workload size for newly created endpoints.",
+    "skip_prompt_if": {}
+  },
+  "serving_scale_to_zero_enabled": {
+    "order": 912,
+    "type": "string",
+    "default": "true",
+    "enum": ["true", "false"],
+    "description": "Online serving | Allow newly created endpoints to scale to zero when idle.",
+    "skip_prompt_if": {}
+  },
+  "serving_ready_timeout_s": {
+    "order": 913,
+    "type": "string",
+    "default": "3600",
+    "pattern": "^[1-9][0-9]*$",
+    "description": "Online serving | Positive setup wait in seconds for READY and NOT_UPDATING; timeout leaves the endpoint intact for inspection.",
+    "skip_prompt_if": {}
+  },
+  "serving_logging_table_prefix": {
+    "order": 909,
+    "type": "string",
+    "default": "",
+    "description": "Online features | Inference table name prefix in the project catalog and schema; Databricks writes <prefix>_payload. Blank uses <project_name>_endpoint",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "include_online_serving": {
+              "const": "false"
+            }
+          }
+        },
+        {
+          "properties": {
+            "serving_logging_mode": {
+              "const": "disabled"
+            }
+          }
+        }
+      ]
+    }
   }
 }

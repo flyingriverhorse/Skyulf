@@ -26,6 +26,8 @@ _APPROVAL_FIELDS = (
     "min_improvement",
     "quality_threshold",
     "quality_gates",
+    "min_scored_fraction",
+    "max_coverage_drop",
     "max_rows",
     "max_input_mb",
     "tracking_uri",

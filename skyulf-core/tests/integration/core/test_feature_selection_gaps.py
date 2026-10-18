@@ -642,11 +642,16 @@ def test_model_based_selection_rfe_honours_requested_feature_count(count_key: st
 
 
 @pytest.mark.parametrize(*_model_based_empty_cases)
-def test_model_based_selection_returns_empty(df_kind: str, config: dict[str, Any]) -> None:
-    """Various bad configs/candidate sets must yield an empty artifact."""
+def test_model_based_selection_rejects_invalid_fit_or_keeps_empty_candidates(
+    df_kind: str, config: dict[str, Any]
+) -> None:
+    """Only an empty candidate set may no-op; invalid supervised configuration must fail."""
     df = _FEATURE_SELECTION_DF_BUILDERS[df_kind]()
-    art = ModelBasedSelectionCalculator().fit(df, config)
-    assert art == {}
+    if df_kind == "target_only":
+        assert ModelBasedSelectionCalculator().fit(df, config) == {}
+    else:
+        with pytest.raises(ValueError):
+            ModelBasedSelectionCalculator().fit(df, config)
 
 
 def test_model_based_selection_linear_regression_estimator_for_classification() -> None:

@@ -7,9 +7,11 @@ receipt survives an uncertain mutation, which requires operator reconciliation.
 
 import hashlib
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass, replace
+from contextvars import ContextVar
+from dataclasses import asdict, dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 from uuid import uuid4
@@ -29,6 +31,7 @@ from ..registration.registry import (
     resolve_model,
     translate_error,
 )
+from .alias_intent import read_alias_intent, write_alias_intent
 from .validation import (
     ModelComparisonReport,
     compare_registered_pipeline_models,
@@ -45,6 +48,24 @@ _HISTORY_TAG = "previous_challenger_current_event"
 _ACTIVE_TAG = "champion_current_event"
 _CHALLENGER_TAG = "challenger_current_event"
 _PENDING_TAG = "pending_alias_event"
+_BEFORE_ALIAS_WRITE: ContextVar[Callable[[], None] | None] = ContextVar(
+    "skyulf_before_alias_write", default=None
+)
+
+
+@contextmanager
+def guard_alias_mutations(before_write: Callable[[], None]) -> Iterator[None]:
+    """Scope an optional platform check to actual alias writes, preserving nested callers.
+
+    The callback runs after transaction validation and immediately before each
+    alias network request. A refusal prevents that request. Callers own their
+    external admission and recovery; ordinary SDK calls need no callback.
+    """
+    token = _BEFORE_ALIAS_WRITE.set(before_write)
+    try:
+        yield
+    finally:
+        _BEFORE_ALIAS_WRITE.reset(token)
 
 
 class AliasConflictError(RegistryError):
@@ -326,8 +347,8 @@ def _event_payload(receipt: AliasChangeReceipt, status: str) -> dict[str, str | 
     }
 
 
-def _write_event(client: Any, receipt: AliasChangeReceipt, status: str) -> None:
-    """Persist a prepared, committed or safely aborted transition on its destination."""
+def _event_value(receipt: AliasChangeReceipt, status: str) -> str:
+    """Serialize and budget an event before any recovery evidence can be overwritten."""
     labels = {
         "k": "action",
         "p": "from_version",
@@ -337,18 +358,35 @@ def _write_event(client: Any, receipt: AliasChangeReceipt, status: str) -> None:
         "o": "previous",
     }
     payload = {labels[key]: value for key, value in _event_payload(receipt, status).items()}
+    payload["at"] = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     value = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    if len(value.encode("utf-8")) > 256:
+    # Reserve the longest state before preparation can authorize any alias writes.
+    remaining_state_bytes = max(0, len("committed") - len(status))
+    if len(value.encode("utf-8")) + remaining_state_bytes > 256:
         raise ValueError("UC model-version receipt exceeds the 256-byte tag value limit.")
+    return value
+
+
+def _write_event(client: Any, receipt: AliasChangeReceipt, status: str) -> None:
+    """Persist a prepared, committed or safely aborted transition on its destination."""
     client.set_model_version_tag(
-        receipt.model_name, receipt.new_version, event_tag(receipt.event_id), value
+        receipt.model_name,
+        receipt.new_version,
+        event_tag(receipt.event_id),
+        _event_value(receipt, status),
     )
 
 
 def read_event(raw: str | None) -> Any:
-    """Decode readable receipts while retaining compatibility with compact receipts."""
+    """Decode control fields; validate optional audit time without changing receipt identity.
+
+    The raw readable tag retains ``at`` as the UTC write time of its stored state.
+    Historical readable and compact tags without timestamps remain valid.
+    """
     payload = json.loads(raw) if raw is not None else None
     if isinstance(payload, dict) and "action" in payload:
+        if "at" in payload:
+            _validate_event_time(payload.pop("at"))
         labels = {
             "action": "k",
             "from": "p",
@@ -364,6 +402,15 @@ def read_event(raw: str | None) -> Any:
             raise ValueError("Ambiguous prior-version fields in lifecycle receipt.")
         return {labels[key]: value for key, value in payload.items()}
     return payload
+
+
+def _validate_event_time(value: Any) -> None:
+    """Require a canonical basic ISO-8601 UTC second before ignoring audit metadata."""
+    if not isinstance(value, str):
+        raise ValueError("Lifecycle receipt time must be a UTC timestamp.")
+    parsed = datetime.strptime(value, "%Y%m%dT%H%M%SZ")
+    if parsed.strftime("%Y%m%dT%H%M%SZ") != value:
+        raise ValueError("Lifecycle receipt time must use YYYYMMDDTHHMMSSZ.")
 
 
 def verify_original_receipt(client: Any, receipt: AliasChangeReceipt) -> bool:
@@ -400,12 +447,293 @@ def commit_change(
     failures are reported as unknown and require reconciliation before retry.
     """
     assert_no_pending(client, receipt.model_name)
+    try:
+        _event_value(receipt, "prepared")
+    except ValueError as exc:
+        raise translate_error(exc, name=receipt.model_name, version=receipt.new_version) from exc
     history = _plan_challenger_history(client, receipt, updates)
     if history is not None:
         updates = [*updates, (_HISTORY, history[1], history[0])]
+    _persist_alias_intent(client, receipt, updates, version_tags)
     _prepare_alias_change(client, receipt, history)
     _apply_alias_updates(client, receipt, updates)
     _finish_alias_change(client, receipt, history, version_tags)
+
+
+def _persist_alias_intent(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    updates: list[tuple[str, str | None, str | None]],
+    version_tags: dict[str, str] | None,
+) -> None:
+    """Preserve typed registry failures before publishing a pending transaction."""
+    try:
+        intent = _alias_intent(client, receipt, updates, version_tags)
+        final_keys = set(intent["version_tags"]) | {event_tag(receipt.event_id)}
+        before, after = intent["aliases"][_HISTORY]
+        if before != after:
+            final_keys.add(f"challenger_history_{receipt.event_id}")
+        write_alias_intent(client, receipt.model_name, receipt.new_version, intent, final_keys)
+    except RegistryError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - registry preparation has no alias side effects
+        raise translate_error(exc, name=receipt.model_name, version=receipt.new_version) from exc
+
+
+def _alias_intent(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    updates: list[tuple[str, str | None, str | None]],
+    version_tags: dict[str, str] | None,
+) -> dict[str, Any]:
+    """Snapshot changed and guarded roles plus the exact metadata needed for completion."""
+    name = receipt.model_name
+    aliases = _alias_role_pairs(client, name, updates)
+    model_tags = client.get_registered_model(name).tags or {}
+    markers = _alias_marker_pairs(model_tags, receipt, aliases[_HISTORY])
+    stored = client.get_model_version(name, receipt.new_version).tags or {}
+    tags = dict(version_tags or {})
+    if receipt.kind in {"initial", "promotion"}:
+        tags["promotion_status"] = "promoted"
+    if any(len(value.encode("utf-8")) > 256 for value in tags.values()):
+        raise ValueError("Alias status exceeds the 256-byte tag value limit.")
+    return {
+        "format": 1,
+        "receipt": asdict(receipt),
+        "aliases": aliases,
+        "model_tags": markers,
+        "version_tags": {key: [stored.get(key), value] for key, value in tags.items()},
+    }
+
+
+def _alias_role_pairs(
+    client: Any,
+    name: str,
+    updates: list[tuple[str, str | None, str | None]],
+) -> dict[str, list[str | None]]:
+    """Freeze all controlled roles, checking the supplied prior values before preparation."""
+    roles = (_ALIAS, _CHALLENGER, _PREVIOUS, _HISTORY)
+    before = {role: read_optional_alias(client, name, role) for role in roles}
+    after = dict(before)
+    for role, new, old in updates:
+        if role not in before or before[role] != old:
+            raise AliasConflictError("Alias transaction differs from its expected prior roles.")
+        after[role] = new
+    return {role: [before[role], after[role]] for role in roles}
+
+
+def _alias_marker_pairs(
+    model_tags: dict[str, str],
+    receipt: AliasChangeReceipt,
+    history: list[str | None],
+) -> dict[str, list[str | None]]:
+    """Save exact control-marker targets and reserve pending capacity before writes."""
+    markers = {
+        key: [model_tags.get(key), model_tags.get(key)]
+        for key in (
+            _ACTIVE_TAG,
+            _CHALLENGER_TAG,
+            _HISTORY_TAG,
+        )
+    }
+    marker = json.dumps({"event_id": receipt.event_id, "version": receipt.new_version})
+    target = _ACTIVE_TAG if receipt.alias == _ALIAS else _CHALLENGER_TAG
+    markers[target][1] = marker
+    if receipt.kind in {"initial", "promotion"}:
+        markers[_CHALLENGER_TAG][1] = None
+    if history[0] != history[1]:
+        markers[_HISTORY_TAG][1] = marker
+    final_keys = {key for key, pair in markers.items() if pair[1] is not None}
+    if len(set(model_tags) | final_keys | {_PENDING_TAG}) > 50:
+        raise ValueError("Alias transaction would exceed the 50-tag registered-model limit.")
+    return markers
+
+
+def reconcile_alias_change(
+    model_name: str,
+    *,
+    version: str,
+    event_id: str,
+    admission: AliasAdmission,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
+) -> str:
+    """Complete or abort an interrupted transaction without changing any aliases.
+
+    Use the original destination version and pending event ID. All writers must
+    share the supplied admission. Fully applied roles complete compatible
+    metadata; unchanged roles abort only if metadata is also unchanged. Partial,
+    contradictory, legacy or superseded intent raises ``AliasConflictError``.
+    Returns ``committed`` or ``aborted``; a verified retry makes no writes.
+    """
+    validate_admission(admission, registry_uri)
+    client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
+    with admission.hold(alias_resource_id(model_name)):
+        try:
+            return _reconcile_alias_change(client, model_name, version, event_id)
+        except RegistryError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - translate backend read failures at the API
+            raise translate_error(exc, name=model_name, version=version) from exc
+
+
+def _recovery_evidence(
+    client: Any,
+    name: str,
+    version: str,
+    event_id: str,
+) -> tuple[AliasChangeReceipt, dict[str, Any], str]:
+    """Bind the saved snapshot to the requested registry address and durable event."""
+    tags = client.get_model_version(name, version).tags or {}
+    try:
+        intent = read_alias_intent(tags)
+        receipt = AliasChangeReceipt(**intent["receipt"])
+        if (receipt.model_name, receipt.new_version, receipt.event_id) != (name, version, event_id):
+            raise ValueError("Alias intent belongs to another event.")
+        event = read_event(tags.get(event_tag(event_id)))
+        status = event["s"]
+        if status not in {"prepared", "committed", "aborted"} or event != _event_payload(
+            receipt, status
+        ):
+            raise ValueError("Alias event disagrees with its saved intent.")
+        _validate_recovery_pairs(intent)
+        _validate_recovery_history(client, receipt, intent, tags, status)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AliasConflictError(
+            "Missing or invalid alias recovery intent; inspect manually."
+        ) from exc
+    return receipt, intent, status
+
+
+def _validate_recovery_pairs(intent: dict[str, Any]) -> None:
+    """Reject incomplete guard sets and malformed pairs before any recovery mutation."""
+    fields = ("aliases", "model_tags", "version_tags")
+    if any(not isinstance(intent[field], dict) for field in fields):
+        raise ValueError("Alias recovery fields must be mappings.")
+    if set(intent["aliases"]) != {_ALIAS, _CHALLENGER, _PREVIOUS, _HISTORY}:
+        raise ValueError("Alias recovery guards are incomplete.")
+    if set(intent["model_tags"]) != {_ACTIVE_TAG, _CHALLENGER_TAG, _HISTORY_TAG}:
+        raise ValueError("Alias recovery markers are incomplete.")
+    for field in fields:
+        for pair in intent[field].values():
+            _validate_recovery_pair(pair)
+
+
+def _validate_recovery_pair(pair: Any) -> None:
+    """Require two optional string values for one snapshotted role or metadata key."""
+    if not isinstance(pair, list) or len(pair) != 2:
+        raise ValueError("Alias recovery state pair is invalid.")
+    if any(value is not None and not isinstance(value, str) for value in pair):
+        raise ValueError("Alias recovery state value is invalid.")
+
+
+def _validate_recovery_history(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    intent: dict[str, Any],
+    tags: dict[str, str],
+    status: str,
+) -> None:
+    """Validate history evidence before abort or completion can touch any metadata."""
+    before, after = intent["aliases"][_HISTORY]
+    if before == after:
+        _read_challenger_history(client, receipt.model_name)
+        return
+    raw = tags.get(f"challenger_history_{receipt.event_id}")
+    if raw is None:
+        return  # Preparation may have failed before the first history tag write.
+    history = json.loads(raw)
+    states = ("prepared", "committed") if status == "committed" else ("prepared",)
+    expected = [{"from_version": before, "to_version": after, "state": state} for state in states]
+    if history not in expected:
+        raise ValueError("Challenger history disagrees with the saved alias intent.")
+
+
+def _reconcile_alias_change(client: Any, name: str, version: str, event_id: str) -> str:
+    """Classify observable state under admission and refuse every ambiguous outcome."""
+    model_tags = client.get_registered_model(name).tags or {}
+    pending = model_tags.get(_PENDING_TAG)
+    if pending not in {None, event_id}:
+        raise AliasConflictError("Pending alias event belongs to another operation.")
+    receipt, intent, status = _recovery_evidence(client, name, version, event_id)
+    observed = {role: read_optional_alias(client, name, role) for role in intent["aliases"]}
+    version_tags = client.get_model_version(name, version).tags or {}
+    metadata = _recovery_metadata(intent, model_tags, version_tags)
+    before = all(observed[role] == pair[0] for role, pair in intent["aliases"].items())
+    after = all(observed[role] == pair[1] for role, pair in intent["aliases"].items())
+    outcome = _recovery_outcome(before, after, metadata, status, pending is not None)
+    if outcome is None:
+        raise AliasConflictError(
+            f"Alias recovery requires manual inspection: observed={observed}; "
+            f"expected before/after={intent['aliases']}; event_state={status}."
+        )
+    if outcome == "aborted":
+        _read_challenger_history(client, name)
+    if pending is None:
+        assert_no_pending(client, name)
+        return outcome
+    _complete_recovery(client, receipt, intent, outcome)
+    return outcome
+
+
+def _recovery_metadata(
+    intent: dict[str, Any],
+    model_tags: dict[str, str],
+    version_tags: dict[str, str],
+) -> list[tuple[str | None, list[str | None]]]:
+    """Read only metadata fields that the saved operation owns or guards."""
+    pairs = [(model_tags.get(key), pair) for key, pair in intent["model_tags"].items()]
+    pairs += [(version_tags.get(key), pair) for key, pair in intent["version_tags"].items()]
+    return pairs
+
+
+def _recovery_outcome(
+    before: bool,
+    after: bool,
+    metadata: list[tuple[str | None, list[str | None]]],
+    status: str,
+    pending: bool,
+) -> str | None:
+    """Distinguish terminal retries and no-op transactions without vacuous success."""
+    metadata_before = all(current == pair[0] for current, pair in metadata)
+    metadata_after = all(current == pair[1] for current, pair in metadata)
+    if pending:
+        compatible = all(current in pair for current, pair in metadata)
+        return _pending_recovery_outcome(before, after, metadata_before, compatible, status)
+    terminal = {"committed": after and metadata_after, "aborted": before and metadata_before}
+    return status if terminal.get(status, False) else None
+
+
+def _pending_recovery_outcome(
+    before: bool,
+    after: bool,
+    metadata_before: bool,
+    compatible: bool,
+    status: str,
+) -> str | None:
+    """Treat overlapping before/after roles as ambiguous until metadata proves a state."""
+    if status != "aborted" and after and compatible and (not before or status == "committed"):
+        return "committed"
+    if status != "committed" and before and metadata_before:
+        return "aborted"
+    return None
+
+
+def _complete_recovery(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    intent: dict[str, Any],
+    outcome: str,
+) -> None:
+    """Reuse the normal verified metadata completion and abort paths, never alias calls."""
+    aliases = intent["aliases"]
+    if outcome == "aborted":
+        updates = [(role, pair[1], pair[0]) for role, pair in aliases.items()]
+        _abort_refused_change(client, receipt, updates)
+        return
+    history = tuple(aliases[_HISTORY]) if aliases[_HISTORY][0] != aliases[_HISTORY][1] else None
+    tags = {key: pair[1] for key, pair in intent["version_tags"].items()}
+    _finish_alias_change(client, receipt, history, tags)
 
 
 def _prepare_alias_change(
@@ -445,6 +773,9 @@ def _apply_alias_updates(
     changed = False
     for update in updates:
         alias, new_version = update[:2]
+        before_write = _BEFORE_ALIAS_WRITE.get()
+        if before_write is not None:
+            before_write()
         try:
             if new_version is None:
                 client.delete_registered_model_alias(receipt.model_name, alias)
@@ -496,6 +827,9 @@ def _abort_refused_change(
             receipt, "aborted"
         ):
             raise AliasOutcomeUnknownError("Aborted alias receipt was not verified.")
+        pending = (client.get_registered_model(receipt.model_name).tags or {}).get(_PENDING_TAG)
+        if pending != receipt.event_id:
+            raise AliasOutcomeUnknownError("Pending alias event ownership changed.")
         client.delete_registered_model_tag(receipt.model_name, _PENDING_TAG)
         assert_no_pending(client, receipt.model_name)
     except Exception as exc:  # noqa: BLE001 - failed cleanup cannot authorize a retry
@@ -529,7 +863,12 @@ def _finish_alias_change(
     """Commit the receipt and clear pending state only after all pointers are verified."""
     try:
         _write_version_status(client, receipt, version_tags)
-        _write_event(client, receipt, "committed")
+        stored = client.get_model_version(receipt.model_name, receipt.new_version).tags or {}
+        if read_event(stored.get(event_tag(receipt.event_id))) != _event_payload(
+            receipt, "committed"
+        ):
+            _write_event(client, receipt, "committed")
+        verify_original_receipt(client, receipt)
         if history is not None:
             _write_challenger_history(client, receipt, history, "committed")
             client.set_registered_model_tag(
@@ -549,6 +888,9 @@ def _finish_alias_change(
             != receipt.event_id
         ):
             raise AliasOutcomeUnknownError("Active receipt verification failed.")
+        pending = (client.get_registered_model(receipt.model_name).tags or {}).get(_PENDING_TAG)
+        if pending != receipt.event_id:
+            raise AliasOutcomeUnknownError("Pending alias event ownership changed.")
         client.delete_registered_model_tag(receipt.model_name, _PENDING_TAG)
         assert_no_pending(client, receipt.model_name)
     except Exception as exc:  # noqa: BLE001 - never imply rollback after a possible alias write
@@ -568,11 +910,14 @@ def _validated_report(
     tracking_uri: str | None,
     registry_uri: str | None,
     require_eligible: bool = True,
+    allow_unloadable_champion: bool = False,
 ) -> str:
     """Re-evaluate the pinned candidate and return its comparison digest."""
     if not isinstance(report, ModelComparisonReport):
         raise TypeError("report must be a ModelComparisonReport.")
-    _validate_report_approval(report, expected_champion_version, require_eligible)
+    _validate_report_approval(
+        report, expected_champion_version, require_eligible, allow_unloadable_champion
+    )
     candidate = resolve_model(
         report.model_name,
         version=report.candidate_version,
@@ -599,6 +944,8 @@ def _validated_report(
         min_improvement=report.min_improvement,
         quality_threshold=report.quality_threshold,
         quality_gates=report.quality_gates,
+        min_scored_fraction=report.min_scored_fraction,
+        max_coverage_drop=report.max_coverage_drop,
         max_rows=max_rows,
         max_bytes=max_bytes,
         tracking_uri=tracking_uri,
@@ -606,7 +953,7 @@ def _validated_report(
     )
     if report.holdout_reference is not None:
         fresh = replace(fresh, holdout_reference=report.holdout_reference)
-    if fresh != report or (require_eligible and not fresh.eligible):
+    if fresh != report:
         raise ValueError("Pinned comparison no longer matches the supplied report.")
     return comparison_digest(fresh)
 
@@ -645,6 +992,8 @@ def initialize_champion(
         min_improvement=report.min_improvement,
         quality_threshold=report.quality_threshold,
         quality_gates=report.quality_gates,
+        min_scored_fraction=report.min_scored_fraction,
+        max_coverage_drop=report.max_coverage_drop,
         max_rows=max_rows,
         max_bytes=max_bytes,
         tracking_uri=tracking_uri,
@@ -810,8 +1159,14 @@ def promote_candidate(
     max_bytes: int,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> AliasChangeReceipt:
-    """Re-evaluate a pinned report and explicitly promote only a better candidate."""
+    """Re-evaluate a pinned report and explicitly promote only a better candidate.
+
+    ``allow_unloadable_champion`` admits a candidate whose champion this Core release
+    cannot load; its absolute quality gates must pass and the comparison digest
+    records that the champion was not measured.
+    """
     validate_admission(admission, registry_uri)
     digest = _validated_report(
         report,
@@ -822,6 +1177,7 @@ def promote_candidate(
         max_bytes=max_bytes,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
+        allow_unloadable_champion=allow_unloadable_champion,
     )
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
@@ -884,13 +1240,14 @@ def rollback_promotion(
         if active_marker(client, receipt.model_name, current) != receipt.event_id:
             raise AliasConflictError("A newer promotion superseded this rollback receipt.")
         _verify_rollback_roles(client, receipt, current, legacy)
-        # The previous version must still exist before changing the alias.
+        # Validate existing destinations before preparing any writes.
         resolve_model(
             receipt.model_name,
             version=receipt.prior_version,
             tracking_uri=tracking_uri,
             registry_uri=registry_uri,
         )
+        previous = _rollback_previous_version(client, receipt, tracking_uri, registry_uri)
         reversal = AliasChangeReceipt(
             event_id=uuid4().hex,
             kind="rollback",
@@ -900,15 +1257,37 @@ def rollback_promotion(
             new_version=receipt.prior_version,
             comparison_sha256=receipt.comparison_sha256,
             parent_event_id=receipt.event_id,
-            previous_champion_version=receipt.previous_champion_version,
+            previous_champion_version=previous,
         )
         updates: list[tuple[str, str | None, str | None]] = [
             (_ALIAS, receipt.prior_version, current)
         ]
         if not legacy:
-            updates.append((_PREVIOUS, receipt.previous_champion_version, receipt.prior_version))
+            updates.append((_PREVIOUS, previous, receipt.prior_version))
         commit_change(client, reversal, updates)
         return reversal
+
+
+def _rollback_previous_version(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    tracking_uri: str | None,
+    registry_uri: str | None,
+) -> str | None:
+    """Clear a deleted older pointer without treating unreadable artifacts as deleted versions."""
+    previous = receipt.previous_champion_version
+    if previous is None:
+        return None
+    try:
+        client.get_model_version(receipt.model_name, previous)
+    except Exception as exc:  # noqa: BLE001 - distinguish registry absence from artifact errors
+        if error_code(exc) in {"RESOURCE_DOES_NOT_EXIST", "NOT_FOUND"}:
+            return None
+        raise translate_error(exc, name=receipt.model_name, version=previous) from exc
+    resolve_model(
+        receipt.model_name, version=previous, tracking_uri=tracking_uri, registry_uri=registry_uri
+    )
+    return previous
 
 
 def _parse_history_marker(raw: str) -> dict[str, Any]:
@@ -976,7 +1355,10 @@ def _verify_champion_receipt(client: Any, model_name: str, current: str) -> None
 
 
 def _validate_report_approval(
-    report: ModelComparisonReport, expected_champion_version: str | None, require_eligible: bool
+    report: ModelComparisonReport,
+    expected_champion_version: str | None,
+    require_eligible: bool,
+    allow_unloadable_champion: bool = False,
 ) -> None:
     """Check comparison identity and requested promotion approval before re-evaluation."""
     if expected_champion_version != report.champion_version or (
@@ -988,8 +1370,38 @@ def _validate_report_approval(
         )
     ):
         raise ValueError("Expected champion version must match the comparison report.")
-    if require_eligible and (not report.eligible or report.reason != "candidate_improved"):
+    _validate_promotion_decision(report, require_eligible, allow_unloadable_champion)
+
+
+def _validate_promotion_decision(
+    report: ModelComparisonReport, require_eligible: bool, allow_unloadable_champion: bool
+) -> None:
+    """Allow an improved candidate, or an unmeasured champion only by explicit override."""
+    if allow_unloadable_champion:
+        _validate_unloadable_approval(report)
+        return
+    if not require_eligible:
+        return
+    if report.reason == "champion_runtime_unavailable":
+        raise ValueError(
+            "The champion cannot be loaded by this Core release, so it was not compared. "
+            "Approve explicitly with allow_unloadable_champion=true after reviewing the candidate."
+        )
+    if not report.eligible or report.reason != "candidate_improved":
         raise ValueError("Comparison does not approve candidate promotion.")
+
+
+def _validate_unloadable_approval(report: ModelComparisonReport) -> None:
+    """Admit an unmeasured champion only with an absolute bound the candidate passes."""
+    if report.reason != "champion_runtime_unavailable":
+        raise ValueError(
+            "allow_unloadable_champion applies only when the champion cannot be loaded."
+        )
+    if report.quality_threshold is None or not quality_gates_pass(report):
+        raise ValueError(
+            "allow_unloadable_champion requires a configured quality_threshold "
+            "and passing quality gates."
+        )
 
 
 def _initial_alias_updates(
@@ -1040,13 +1452,13 @@ def _replayed_rollback(
         new_version=prior_version,
         comparison_sha256=receipt.comparison_sha256,
         parent_event_id=receipt.event_id,
-        previous_champion_version=receipt.previous_champion_version,
+        previous_champion_version=_replayed_previous_version(client, receipt, current, event_id),
     )
     verify_original_receipt(client, reversal)
     if (
         not legacy
         and read_optional_alias(client, receipt.model_name, _PREVIOUS)
-        != receipt.previous_champion_version
+        != reversal.previous_champion_version
     ):
         raise AliasConflictError("Previous champion changed after rollback.")
     challenger = read_optional_alias(client, receipt.model_name, _CHALLENGER)
@@ -1055,6 +1467,22 @@ def _replayed_rollback(
         if challenger == current:
             raise AliasConflictError("Challenger conflicts with the restored champion.")
     return reversal
+
+
+def _replayed_previous_version(
+    client: Any, receipt: AliasChangeReceipt, current: str, event_id: str
+) -> str | None:
+    """Read an explicitly cleared rollback pointer before verifying the complete saved receipt."""
+    if receipt.previous_champion_version is None:
+        return None
+    try:
+        tags = client.get_model_version(receipt.model_name, current).tags or {}
+    except Exception as exc:  # noqa: BLE001 - registry transport boundary
+        raise translate_error(exc, name=receipt.model_name, version=current) from exc
+    event = read_event(tags.get(event_tag(event_id)))
+    if isinstance(event, dict) and "o" in event and event["o"] is None:
+        return None
+    return receipt.previous_champion_version
 
 
 def _verify_rollback_roles(

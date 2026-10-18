@@ -100,7 +100,7 @@ def test_benign_predictions_replay_saved_detectors_exactly(node, engine, monkeyp
     _poison_fit(monkeypatch, node)
     detail, output = _probe(record, sample, engine)
     assert detail["context"] == "row" and detail["row_effect"] == "filter", detail
-    assert detail["action"] == "apply" and detail["status"] == "passed", detail
+    assert detail["action"] == "exclude_outliers" and detail["status"] == "passed", detail
     assert detail["state_validation"] == "node_owned"
     assert output.equals(sample)
     assert artifact_digest(record) == before
@@ -108,10 +108,8 @@ def test_benign_predictions_replay_saved_detectors_exactly(node, engine, monkeyp
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("node", NODES)
-def test_outlier_predictions_fail_row_guard_while_native_filter_aligns_targets(
-    node, engine, monkeypatch
-):
-    """Saved native filters align X/y, but unkeyed prediction may not silently lose rows."""
+def test_outlier_probe_matches_native_filter_and_aligns_targets(node, engine, monkeypatch):
+    """Exclusion probes preserve native survivor order and target alignment without refitting."""
     record = _record(node, engine)
     before = artifact_digest(record)
     sample = _frame(engine, [0, 100, None, 0.5])
@@ -122,10 +120,10 @@ def test_outlier_predictions_fail_row_guard_while_native_filter_aligns_targets(
     assert len(filtered) == 3
     detail, output = _probe(record, sample, engine)
     assert detail["context"] == "row" and detail["row_effect"] == "filter", detail
-    assert detail["action"] == "apply" and detail["status"] == "failed", detail
-    assert detail["checks"][0]["reason"] == "apply_error"
-    assert detail["checks"][0]["error_type"] == "ValueError"
-    assert output is sample
+    assert detail["action"] == "exclude_outliers" and detail["status"] == "passed", detail
+    assert all(check["status"] == "passed" for check in detail["checks"]), detail
+    assert output.equals(filtered)
+    np.testing.assert_allclose(output["x"].to_numpy(), [0, np.nan, 0.5], equal_nan=True)
     assert artifact_digest(record) == before
 
 

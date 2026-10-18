@@ -7,6 +7,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
+import pandas as pd
+
+from .....inference.pipeline_scoring import scoring_output_schema
 from ....mlflow.registration.registry import load_run_pipeline
 from .evaluation_chart_data import load_chart_sample
 from .evaluation_charts import chart_figure, diagnostic_charts, model_charts
@@ -61,16 +64,14 @@ def report_model(
     )
     manifest = artifact.manifest
     target, limits = metadata["target_column"], metadata["settings"]
-    expected = ["observed", "prediction"]
-    if manifest.task == "classification" and manifest.classification_probabilities:
-        expected += [f"probability_{index}" for index in range(len(manifest.classes))]
-    if list(sample.columns) != expected:
-        raise ValueError("Chart predictions differ from the fitted output contract.")
+    sample = _scored_chart_sample(sample, artifact, report)
     figures, skipped = diagnostic_charts(
         manifest.task, sample["observed"], sample, manifest.classes, limits["max_classes"]
     )
     extras, notes = _estimator_figures(artifact, limits)
-    caption = f"{prefix} | saved holdout: {len(sample)}/{metadata['holdout_rows']} rows | uniform sample, seed 42"
+    caption = f"{prefix} | saved holdout: {metadata['sample_rows']}/{metadata['holdout_rows']} rows | uniform sample, seed 42"
+    if "sample_excluded_rows" in report:
+        caption += f" | scored {len(sample)}; {report['sample_excluded_rows']} excluded in sample"
     report["image_keys"] = publish_figures(
         client, destination, {**figures, **extras}, prefix=prefix, caption=caption
     )
@@ -83,6 +84,27 @@ def report_model(
     )
     report.update(task=manifest.task, target=target, skipped=skipped + notes)
     return report
+
+
+def _scored_chart_sample(sample: pd.DataFrame, artifact: Any, report: dict) -> pd.DataFrame:
+    """Validate the saved output schema and disclose exclusions within the original sample."""
+    expected = ["observed", *(column.name for column in scoring_output_schema(artifact))]
+    if list(sample.columns) != expected:
+        raise ValueError("Chart predictions differ from the fitted output contract.")
+    if "scoring_status" not in sample:
+        return sample
+    if not sample.scoring_status.isin(["predicted", "excluded"]).all():
+        raise ValueError("Chart scoring status must be predicted or excluded.")
+    scored = sample.scoring_status.eq("predicted")
+    reasons = sample.loc[~scored, "exclusion_reason"]
+    report.update(
+        sample_scored_rows=int(scored.sum()),
+        sample_excluded_rows=len(reasons),
+        sample_excluded_by_reason={
+            str(reason): int(count) for reason, count in reasons.value_counts().items()
+        },
+    )
+    return sample.loc[scored]
 
 
 def _validate_sample_identity(metadata: dict, identity: dict) -> None:
@@ -165,19 +187,28 @@ def _metric_summary(saved: dict, cv: dict, task: str) -> dict:
     return {"metric_summary": figure}
 
 
-def _cv_charts(evidence: dict, task: str) -> dict:
-    """Keep different metric units on separate axes and disclose post-selection CV."""
+def _cv_series(evidence: dict, task: str) -> tuple[tuple[str, ...], list[dict]]:
+    """Read ordinary fold metrics or the named nested outer-fold selection score."""
     names = (
         ("rmse", "mae", "r2")
         if task == "regression"
         else ("accuracy", "f1_weighted", "roc_auc", "log_loss")
     )
+    folds = evidence.get("folds", [])
+    if evidence.get("method") == "nested_cv":
+        metric = evidence["scoring_metric"]
+        names = (metric,)
+        folds = [{"fold": fold["fold"], "metrics": {metric: fold["outer_score"]}} for fold in folds]
+    return names, folds
+
+
+def _cv_charts(evidence: dict, task: str) -> dict:
+    """Keep different metric units on separate axes and disclose post-selection CV."""
+    names, folds = _cv_series(evidence, task)
     figures = {}
     for name in names:
         points = [
-            (fold["fold"], fold["metrics"][name])
-            for fold in evidence.get("folds", [])
-            if name in fold["metrics"]
+            (fold["fold"], fold["metrics"][name]) for fold in folds if name in fold["metrics"]
         ]
         if not points or not all(math.isfinite(value) for _, value in points):
             continue

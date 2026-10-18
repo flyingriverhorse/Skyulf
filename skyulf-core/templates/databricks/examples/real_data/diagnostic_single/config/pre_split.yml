@@ -1,0 +1,10 @@
+version: 1
+recipes:
+  default: []
+  valid_measurements:
+    - custom: pre_split.positive_measurements
+      params: {columns: [mean_radius, mean_perimeter, mean_area]}
+    # Target-only filter is explicitly skipped when the saved recipe scores raw inputs.
+    - name: known_target
+      transformer: DropMissingRows
+      params: {subset: [malignant]}

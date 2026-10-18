@@ -1,0 +1,104 @@
+# Scoring policy: which rows get a prediction and which extra columns are added.
+# It is saved with the NEXT trained model (or model set); editing this file does
+# not change versions that are already trained. Guide: SCORING.md.
+#
+# Three sections, three moments:
+#
+#   section      runs                          does                              example
+#   eligibility  BEFORE the model              may this row get a prediction?    hour is missing -> no prediction
+#   outputs      AFTER the model               extra columns from a prediction   probability 0.85 -> risk_band: high
+#   combined     AFTER all models of a set     one result from several models    revenue - cost -> profit
+#
+# A rejected row is NOT deleted. It stays in the result with
+# scoring_status: excluded, its exclusion_reason and an empty prediction.
+# outputs run only on predicted rows and keep the raw prediction unchanged.
+# A combined result stays empty when one of its required models excluded the row;
+# a missing prediction is never counted as zero.
+#
+# Two settings with similar names do different things:
+#   mode: combined   pre-split filters, then the eligibility rules, then outputs
+#   combined: [...]  cross-model rules; only model sets use them
+#
+# Leaving this file unchanged scores every row that config/pre_split.yml accepts.
+# Worked example using all three sections (bike demand):
+# https://www.skyulf.com/manual/user_guide/databricks_scoring.html#the-three-scoring-sections
+version: 1
+
+# mode: where the eligibility checks come from.
+#   pre_split  (default) reuse the training filters in config/pre_split.yml.
+#              Choose it when a row you can train on is also a row you can score.
+#              eligibility and outputs must stay empty in this mode.
+#   custom     use only the eligibility and outputs rules below; ignore pre_split.yml.
+#   combined   pre_split.yml first, then the eligibility rules below.
+mode: pre_split
+
+# Scoring rows have no target value yet. With pre_split or combined, set this to
+# true to skip the pre-split filters that read the target. Keep false in custom mode.
+skip_target_pre_split_steps: false
+
+# eligibility: YOUR rules for rows that must not get a prediction.
+#   Use it when a prediction would be meaningless or unsafe, for example:
+#   a required input is empty, a value is implausible (founded in 2090), or a
+#   business rule says "do not score closed companies".
+#   - Scoring only: training still uses every row that config/pre_split.yml keeps.
+#   - Needs mode: custom (only these rules) or combined (pre_split.yml + these).
+#   - Saved at training time: write the rule before training the version you score.
+#   - The model does not run for a rejected row, but the row stays in the result:
+#       id | prediction | scoring_status | exclusion_reason
+#        1 | 0.42       | predicted      |
+#        2 |            | excluded       | missing:employee_count
+#   Rules run in order; the first one that rejects a row gives its reason.
+# Built-in checks (no Python needed):
+#   required_values  the listed columns must not be empty     reason: missing:<columns>
+#   value_range      a number within inclusive limits         reason: outside_range:<column>
+#                    (minimum, maximum, or only one of them)
+#                    (missing or non-numeric values are rejected too)
+# Anything else: custom: scoring.<function>, returning a reason or null per row.
+# Example (remove the leading # to use it, and set mode: combined):
+# eligibility:
+#   - name: known_employees
+#     check: required_values
+#     params: {columns: [employee_count]}
+#   - name: plausible_year
+#     check: value_range
+#     params: {column: established_year, minimum: 1800, maximum: 2026}
+eligibility: []
+
+# outputs (custom/combined): extra columns after the model. Declare each column
+# and its dtype. Built-in: prediction_band puts a number into labelled bands
+# (a value equal to a threshold goes to the higher band).
+# column defaults to prediction, output defaults to band.
+# Example: probability_1 below 0.3 -> low, below 0.7 -> medium, else high.
+# outputs:
+#   - name: risk_band
+#     rule: prediction_band
+#     params:
+#       column: probability_1
+#       thresholds: [0.3, 0.7]
+#       labels: [low, medium, high]
+#       output: risk_band
+#     columns: [{name: risk_band, dtype: string}]
+outputs: []
+
+# combined (model sets only): read predictions of several models, named
+# <model>__prediction, and list those models in required_components.
+# Built-in operations: weighted_sum, weighted_mean. They use operation: instead of
+# custom:, params with exactly inputs and weights (same length, weighted_mean needs
+# nonnegative weights) and one float64 column:
+# combined:
+#   - name: blended
+#     operation: weighted_mean
+#     required_components: [revenue, cost]
+#     params: {inputs: [revenue__prediction, cost__prediction], weights: [0.7, 0.3]}
+#     columns: [{name: blended, dtype: float64}]
+# Example: profit = revenue - cost, with profit() in src/features/scoring.py.
+# combined:
+#   - name: profit
+#     custom: scoring.profit
+#     required_components: [revenue, cost]
+#     columns: [{name: profit, dtype: float64}]
+combined: []
+
+# Any rule can use custom: scoring.<function> (a function in src/features/scoring.py)
+# instead of a built-in. params and version are optional; version defaults to "1".
+# Callback signatures and Spark/endpoint admission: src/features/README.md.

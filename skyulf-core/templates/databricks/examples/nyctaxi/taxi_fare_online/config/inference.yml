@@ -1,0 +1,12 @@
+# Scoring controls and output destinations. No model is trained by this file.
+version: 1
+inference_mode: local
+# from_now checkpoints without predictions on the first run; rebuilds keep that boundary.
+initial_scoring: full_snapshot
+score_source_table: "{catalog}.{input_schema}.trips_score"
+prediction_table: "{catalog}.{output_schema}.trips_predictions{resource_suffix}"
+score_model_selection: champion
+model_change_mode: incremental_append
+auto_rebuild_on_cdf_expiry: false
+score_handoff: disabled
+

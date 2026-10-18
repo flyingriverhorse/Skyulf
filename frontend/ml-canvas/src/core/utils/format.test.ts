@@ -4,6 +4,11 @@ import { formatMetricName, formatBytes, getEnsembleSubTask, getEnsembleStrategy,
 const accuracyDescription = 'Fraction of correctly classified samples. Can be misleading when classes are imbalanced.';
 
 describe('getMetricDescription', () => {
+  it('explains WAPE as a ratio and retains the undefined denominator boundary', () => {
+    expect(formatMetricName('wape')).toBe('WAPE');
+    expect(getMetricDescription('wape')).toContain('0.1 means 10%');
+    expect(getMetricDescription('wape')).toContain('all actual values are zero');
+  });
   it.each([
     ['accuracy', accuracyDescription],
     ['train_accuracy', `Train set — ${accuracyDescription}`],

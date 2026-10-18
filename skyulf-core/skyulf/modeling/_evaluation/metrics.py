@@ -487,6 +487,11 @@ def calculate_regression_metrics(
     ``X``/``y`` to numpy and/or already called ``model.predict()`` (e.g.
     ``evaluate_regression_model``) pass those results straight through,
     avoiding a redundant conversion/inference pass on the same data.
+
+    WAPE is MAE divided by mean absolute truth. Like the other evaluation
+    metrics, it is unweighted; training weights are never inferred.
+    WAPE is omitted when that denominator is zero or
+    the result is nonfinite, preserving finite metric payloads.
     """
     # Convert to Numpy for compatibility (skip if the caller already has it)
     if X_np is None or y_np is None:
@@ -497,7 +502,6 @@ def calculate_regression_metrics(
         predictions = model.predict(X_np)
 
     y_arr = y_np
-
     mse_value = mean_squared_error(y_arr, predictions)
     metrics: dict[str, float] = {
         "mae": float(mean_absolute_error(y_arr, predictions)),
@@ -507,7 +511,11 @@ def calculate_regression_metrics(
         "mape": float(mean_absolute_percentage_error(y_arr, predictions)),
         "explained_variance": float(explained_variance_score(y_arr, predictions)),
     }
-
+    denominator = float(mean_absolute_error(y_arr, np.zeros_like(y_arr)))
+    if denominator > 0 and math.isfinite(denominator):
+        wape = metrics["mae"] / denominator
+        if math.isfinite(wape):
+            metrics["wape"] = wape
     return metrics
 
 

@@ -351,11 +351,86 @@ def test_live_exact_stage_metrics_and_physical_evidence(live):
         ({"latency_max_ms": 101.0}, "FAIL"),
         ({"latency_max_ms": None}, "HOLD"),
         ({"error_count": True}, "HOLD"),
+        ({"logging_error_count": 1}, "HOLD"),
+        ({"logging_error_count": 0}, "PASS"),
     ],
 )
 def test_live_health_thresholds(live, change, expected):
     """Confirmed operational regression fails; absent or insufficient measurement holds."""
     live[-1]["summary"].update(change)
+    assert _observe(live).evidence.verdict == expected
+
+
+@pytest.mark.parametrize("maximum,expected", [(20.0, "PASS"), (101.0, "FAIL"), (None, "HOLD")])
+def test_live_latency_prefers_p99_over_legacy_maximum(live, maximum, expected):
+    """A single slow outlier must not override the recorded tail percentile."""
+    summary = live[-1]["summary"]
+    summary["latency_max_ms"] = maximum
+    before = _observe(live)
+    summary.update(
+        {
+            "status_4xx_count": 0,
+            "status_5xx_count": 0,
+            "status_other_count": 0,
+            "latency_sample_count": 100,
+            "latency_p50_ms": 10.0,
+            "latency_p95_ms": 15.0,
+            "latency_p99_ms": 19.0,
+            "latency_bucket_edges_ms": [5, 10, 25, 50, 100, 250, 500, 1000],
+            "latency_bucket_counts": [0, 0, 100, 0, 0, 0, 0, 0, 0],
+        }
+    )
+    after = _observe(live)
+    assert before.evidence.verdict == expected
+    assert after.evidence.verdict == "PASS"
+    assert before.details_digest != after.details_digest
+
+
+@pytest.mark.parametrize(
+    "p99,maximum,expected",
+    [
+        (0.0, 101.0, "PASS"),
+        (100.0, 101.0, "PASS"),
+        (101.0, 200.0, "FAIL"),
+        (None, 20.0, "PASS"),
+        (None, 101.0, "FAIL"),
+        (None, None, "HOLD"),
+        (-1.0, 20.0, "HOLD"),
+        (True, 20.0, "HOLD"),
+        ("20", 20.0, "HOLD"),
+        (float("nan"), 20.0, "HOLD"),
+        (float("inf"), 20.0, "HOLD"),
+    ],
+)
+def test_live_p99_bounds_and_unavailable_evidence(live, p99, maximum, expected):
+    """Only absent percentiles fall back; invalid values cannot admit more traffic."""
+    from skyulf.integrations.databricks.serving.rollout_policy import (
+        DailyRolloutPolicy,
+        decide_rollout,
+    )
+
+    live[-1]["summary"].update(latency_p99_ms=p99, latency_max_ms=maximum)
+    result = _observe(live)
+    assert result.evidence.verdict == expected
+    decision = decide_rollout(DailyRolloutPolicy(), _state(), result.evidence, now=NOW)
+    assert (decision.action, decision.target_percentage) == {
+        "PASS": ("ADVANCE", 20),
+        "FAIL": ("ROLLBACK", 0),
+        "HOLD": ("HOLD", 10),
+    }[expected]
+
+
+@pytest.mark.parametrize(
+    "change,expected",
+    [
+        ({"request_count": 5, "success_count": 5}, "HOLD"),
+        ({"error_count": 11, "success_count": 89}, "FAIL"),
+        ({"logging_error_count": 1}, "HOLD"),
+    ],
+)
+def test_passing_p99_preserves_other_operational_guards(live, change, expected):
+    """An acceptable percentile cannot bypass request, error-rate or capture checks."""
+    live[-1]["summary"].update(latency_p99_ms=20.0, latency_max_ms=101.0, **change)
     assert _observe(live).evidence.verdict == expected
 
 

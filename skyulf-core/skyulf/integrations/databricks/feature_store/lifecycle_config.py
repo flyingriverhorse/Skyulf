@@ -240,10 +240,21 @@ def bind_lookup_tables(value: Any, bindings: dict[str, str]) -> dict[str, Any]:
     config = deepcopy(_mapping(value, {"lookups"}, "feature_lookup"))
     if type(config.get("lookups")) is not list:
         raise ValueError("feature_lookup.lookups must be a list.")
-    for lookup in config["lookups"]:
+    for index, lookup in enumerate(config["lookups"]):
         if type(lookup) is not dict or not isinstance(lookup.get("table_name"), str):
             raise ValueError("feature_lookup table_name must be a string.")
+        if not lookup["table_name"].strip() and not (
+            lookup.get("lookup_key") or lookup.get("feature_names")
+        ):  # The include_online_serving stub is generated blank for the operator to fill.
+            raise ValueError(
+                f"feature_lookup.lookups[{index}] is not filled in: complete feature_lookup and "
+                "online_features in config/training.yml, or regenerate with "
+                "include_online_serving=false."
+            )
         for key, replacement in bindings.items():
             lookup["table_name"] = lookup["table_name"].replace("{" + key + "}", replacement)
-        validate_uc_name(lookup["table_name"])
+        try:
+            validate_uc_name(lookup["table_name"])
+        except ValueError as exc:  # Name the indexed YAML entry the operator must repair.
+            raise ValueError(f"feature_lookup.lookups[{index}].table_name: {exc}") from exc
     return config

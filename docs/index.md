@@ -90,6 +90,12 @@ cd frontend/ml-canvas && npm run dev
 4. [Step-by-Step (No Config)](user_guide/step_by_step_no_config.md) — Low-level building blocks.
 5. [Reference → Preprocessing Nodes](reference/preprocessing_nodes.md) / [Modeling Nodes](reference/modeling_nodes.md) — Full node catalog.
 
+### Using Databricks, MLflow and Spark
+
+Open the [integrations documentation index](user_guide/integrations.md) for every
+integration guide with a short description. It includes a suggested reading
+order, preprocessing recipes, training, scoring, serving and monitoring.
+
 ### Going Deeper
 
 - [Automated EDA & Profiling](user_guide/eda_profiling.md) — Statistical analysis powered by Polars.

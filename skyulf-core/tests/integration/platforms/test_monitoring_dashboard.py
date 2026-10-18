@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 
 import yaml
+from monitoring_sql_helpers import install_shared_views
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
@@ -34,7 +35,6 @@ def test_identity_controls_are_shared_across_model_pages() -> None:
             "serving_windows",
             "serving_status",
         } <= bound
-        assert not any(name.startswith("execution_") for name in bound)
     for page in dashboard["pages"]:
         if page is global_page:
             continue
@@ -76,6 +76,23 @@ def _widgets(page: dict) -> list[dict]:
     return [item["widget"] for item in page["layout"]]
 
 
+def test_quality_table_displays_total_and_invalid_exclusions_as_percentages():
+    """Generic quality evidence must not disappear behind the dashboard's fixed pivot."""
+    dashboard = _dashboard()
+    dataset = next(d for d in dashboard["datasets"] if d["name"] == "quality_history")
+    sql = "".join(dataset["queryLines"])
+    table = next(
+        w for p in dashboard["pages"] for w in _widgets(p) if w["name"] == "quality_metrics"
+    )
+    fields = {f["name"] for f in table["queries"][0]["query"]["fields"]}
+    columns = {c["fieldName"]: c for c in table["spec"]["encodings"]["columns"]}
+    for name in ("exclusion_rate", "invalid_exclusion_rate"):
+        assert f"MAX(CASE WHEN metric_name = '{name}' THEN value END) AS {name}" in sql
+        assert name in fields
+        assert columns[name]["format"]["type"] == "number-percent"
+        assert columns[name]["displayName"].endswith("(%)")
+
+
 def test_shared_defaults_never_filter_visual_rows_by_an_all_sentinel() -> None:
     """Inherited scalar defaults must not become equality filters on portfolio rows."""
     dashboard = _dashboard()
@@ -104,32 +121,6 @@ def test_shared_defaults_never_filter_visual_rows_by_an_all_sentinel() -> None:
         assert len(defaults) == 1 and "" not in defaults
 
 
-def test_execution_ids_are_enterable_without_project_named_job_options() -> None:
-    """Valid one-off jobs remain inspectable when no Bundle-named jobs exist."""
-    dashboard = _dashboard()
-    page = next(p for p in dashboard["pages"] if p["name"] == "execution")
-    controls = [w for w in _widgets(page) if w["name"].startswith("filter_execution_")]
-    for control in controls:
-        assert all("fields" not in query["query"] for query in control["queries"])
-    choices = next(d for d in dashboard["datasets"] if d["name"] == "execution_choices")
-    sql = "".join(choices["queryLines"])
-    sql = (
-        sql.replace("system.lakeflow.jobs", "jobs")
-        .replace("system.lakeflow.job_run_timeline", "runs")
-        .replace("current_timestamp() - INTERVAL 30 DAYS", "'2026-09-11'")
-        .replace(" AS STRING", " AS TEXT")
-    )
-    with sqlite3.connect(":memory:") as connection:
-        connection.executescript(
-            "CREATE TABLE jobs(workspace_id TEXT, job_id TEXT, name TEXT, change_time TEXT);"
-            "CREATE TABLE runs(workspace_id TEXT, job_id TEXT, period_start_time TEXT, "
-            "period_end_time TEXT);"
-            "INSERT INTO runs VALUES ('workspace-a','one-off','2026-10-11','2026-10-11');"
-        )
-        rows = connection.execute(sql).fetchall()
-    assert len(rows) == 1 and rows[0][:2] == ("workspace-a", "one-off")
-
-
 def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
     """A history date choice must never erase unobserved inventory rows."""
     dashboard = _dashboard()
@@ -139,7 +130,6 @@ def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
         "overview",
         "drift_quality",
         "performance",
-        "execution",
         "serving",
         "training_lineage",
         "investigation_filters",
@@ -168,7 +158,7 @@ def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
 
 
 def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
-    """Every widget field and filter query must bind to its selected dataset."""
+    """Every dataset must be used and each widget/filter must retain a valid binding."""
     dashboard = _dashboard()
     names = {item["name"] for item in dashboard["datasets"]}
     filters = {
@@ -177,11 +167,13 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
         "monitor_context",
     }
     seen_filters: set[str] = set()
+    used_datasets: set[str] = set()
     for page in dashboard["pages"]:
         for widget in _widgets(page):
             queries = {item["name"]: item["query"] for item in widget.get("queries", [])}
             for query in queries.values():
                 assert query["datasetName"] in names
+                used_datasets.add(query["datasetName"])
             spec = widget.get("spec", {})
             widget_type = spec.get("widgetType")
             if widget_type and widget_type.startswith("filter-"):
@@ -214,6 +206,7 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
                         if isinstance(value, dict) and "fieldName" in value
                     ]
                     refs += encodings.get("extra", [])
+                    refs += encodings.get("y", {}).get("fields", [])
                 if "facet" in spec:
                     refs = [*refs, spec["facet"]]
                 assert all(ref["fieldName"] in selected for ref in refs)
@@ -221,10 +214,11 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
                     1
                     if widget_type == "custom-vega-viz"
                     else 3
-                    if widget_type in {"line", "bar", "scatter", "pivot"}
+                    if widget_type in {"line", "bar", "scatter", "pivot", "heatmap"}
                     else 2
                 )
     assert filters <= seen_filters
+    assert used_datasets == names
     assert not {"environment", "project"} & seen_filters
     assert all(
         field["name"] not in {"environment", "project"}
@@ -277,7 +271,7 @@ def test_history_keeps_metric_identity_and_units_separate() -> None:
     performance_charts = {
         w["name"]: w["spec"]
         for w in _widgets(performance_page)
-        if w.get("spec", {}).get("widgetType") == "scatter"
+        if w["name"] in {"performance_trend", "performance_policy_trend"}
     }
     assert set(performance_charts) == {
         "performance_trend",
@@ -309,11 +303,11 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
             assert control["spec"]["widgetType"] == "filter-single-select"
             assert any(q["query"]["datasetName"] == dataset for q in control["queries"])
     psi = datasets["drift_psi_chart"]
-    assert "metric_name = 'psi'" in psi
+    assert "metric_name IN ('psi', 'psi_categorical')" in psi
     assert "threshold AS plot_value" in psi
     assert "report_rank = 1" in psi and "feature_rank <= 10" in psi
     assert "PARTITION BY monitor_id, model_name, model_version" in psi
-    assert "FROM monitoring_results" in psi
+    assert "FROM complete_observations" in psi
     assert "window_end DESC" in psi
     assert "metric_name <> 'ks_test_p_value'" in datasets["drift_trend"]
     chart = widgets["drift_trend"]["spec"]
@@ -329,7 +323,7 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
     latest = datasets["performance_latest"]
     assert "ORDER BY window_end DESC, measured_at DESC, report_id DESC" in latest
     assert "value IS NOT NULL" not in latest
-    assert "FROM monitoring_results" in latest
+    assert "FROM complete_observations" in latest
     assert "history.report_id = latest_reports.report_id" in latest
     for field in ("model_name", "model_version", "metric_name"):
         control = widgets[
@@ -479,8 +473,7 @@ def test_context_selection_keeps_every_matching_observed_or_unobserved_identity(
     """All matching enrollments must survive selection, including shared model versions."""
     dashboard = _dashboard()
     datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
-    assert "FROM current_health" in datasets["context_choices"]
-    assert "FROM monitoring_results" in datasets["context_choices"]
+    assert "FROM monitoring_identities" in datasets["context_choices"]
     for name in ("metric_history", "quality_history", "performance_measurements"):
         assert "chosen_context" in datasets[name]
         assert "LIMIT 1" not in datasets[name]
@@ -506,8 +499,6 @@ def test_context_selection_keeps_every_matching_observed_or_unobserved_identity(
         "trend_version",
         "trend_monitor",
         "performance_metric",
-        "execution_workspace",
-        "execution_job",
     }
 
 
@@ -543,29 +534,13 @@ def test_latest_observations_do_not_rank_policy_only_windows_as_feature_reports(
         "confusion_cells",
     ):
         sql = datasets[name]
-        assert "status = 'no_data'" in sql
-        assert "get_json_object(report_json, '$.performance') IS NOT NULL" in sql
-        assert "get_json_object(report_json, '$.current_rows') IS NULL" in sql
+        assert "FROM monitoring_identities" in sql
+        if name != "context_choices":
+            assert "FROM complete_observations" in sql
     assert "FROM performance_history" in datasets["performance_policy"]
     for name in ("drift_psi_chart", "performance_latest"):
         rank_source = datasets[name].split("AS report_rank", 1)[1]
-        assert rank_source.startswith("\n FROM monitoring_results WHERE NOT (status = 'no_data'")
-
-
-def test_execution_cost_requires_exact_scope_and_preserves_unpriced_usage() -> None:
-    """Empty portable settings must never expose arbitrary workspace spend or fake exact cost."""
-    dashboard = _dashboard()
-    datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
-    for name in ("execution_runs", "execution_cost"):
-        assert ":execution_workspace" in datasets[name]
-        assert ":execution_job" in datasets[name]
-    cost = datasets["execution_cost"]
-    assert "system.billing.usage" in cost
-    assert "system.billing.list_prices" in cost
-    assert "unpriced_records" in cost
-    assert "currency_code = 'USD'" in cost
-    assert "COALESCE(lp.pricing" not in cost
-    assert "Select a workspace and job" in datasets["execution_status"]
+        assert rank_source.startswith("\n FROM complete_observations")
 
 
 def test_nullable_context_parameters_keep_all_and_explicit_selections() -> None:
@@ -578,6 +553,7 @@ def test_nullable_context_parameters_keep_all_and_explicit_selections() -> None:
     }
     checked: set[str] = set()
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.execute(
             "CREATE TABLE available_contexts (monitor_id TEXT, model_name TEXT, "
             "model_version TEXT, monitor_context TEXT, latest_measurement INTEGER)"
@@ -670,6 +646,7 @@ def test_performance_snapshot_uses_latest_full_observation_without_inventing_cou
         "UNION ALL SELECT 'unmeasured', 'model-c', '1', 'prod-new'), ranked_reports AS (" + tail
     )
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
 
         def json_value(raw: str, path: str) -> str | None:
@@ -741,6 +718,7 @@ def test_policy_summary_keeps_latest_unavailable_window_and_its_own_metric() -> 
         "'1' AS model_version, 'prod-main' AS monitor_context), policy_ranked AS (" + tail
     )
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
         connection.execute(
             "CREATE TABLE performance_history (monitor_id TEXT, model_name TEXT, model_version TEXT, "
@@ -755,12 +733,15 @@ def test_policy_summary_keeps_latest_unavailable_window_and_its_own_metric() -> 
             ],
         )
         connection.execute("ALTER TABLE performance_history ADD COLUMN direction TEXT")
+        connection.execute("ALTER TABLE performance_history ADD COLUMN tolerance REAL")
+        connection.execute("ALTER TABLE performance_history ADD COLUMN tolerance_mode TEXT")
         row = connection.execute(query).fetchone()
         assert row["report_id"] == "latest" and row["current_value"] is None
         assert row["policy_status"] == "Insufficient evidence"
         connection.execute(
-            "INSERT INTO performance_history VALUES "
-            "('m','model','1','disabled',3,3,NULL,'disabled','policy_off','none',NULL,NULL,NULL,NULL)"
+            "INSERT INTO performance_history (monitor_id,model_name,model_version,report_id,"
+            "window_end,measured_at,status,reason,action) VALUES "
+            "('m','model','1','disabled',3,3,'disabled','policy_off','none')"
         )
         assert connection.execute(query).fetchone()["policy_status"] == "Policy disabled"
     for name in ("performance_policy_snapshot", "performance_policy_series"):
@@ -779,8 +760,9 @@ def test_performance_checks_explain_results_without_claiming_training_started() 
     dashboard = _dashboard()
     dataset = next(d for d in dashboard["datasets"] if d["name"] == "performance_policy")
     sql = "".join(dataset["queryLines"])
-    labels = sql.split("source.*,", 1)[1].split("FROM (SELECT", 1)[0]
+    labels = sql[sql.index("CASE WHEN source.status IN ('disabled'") :].split("FROM (SELECT", 1)[0]
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         cases = [
             ("healthy", "none", "Within tolerance", "No training requested"),
             ("degraded", "report", "Performance loss", "Report only"),

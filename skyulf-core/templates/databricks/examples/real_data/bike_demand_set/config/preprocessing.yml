@@ -1,0 +1,7 @@
+version: 1
+recipes:
+  default: []
+  weather_and_clock:
+    - custom: preprocessing.clock_cycle
+    - custom: preprocessing.weather_imputation
+      params: {columns: [temp, atemp, hum, windspeed]}

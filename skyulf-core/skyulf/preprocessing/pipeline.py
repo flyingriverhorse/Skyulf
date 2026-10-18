@@ -20,12 +20,14 @@ from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
 from ..types import PreprocessingStepConfig
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
+from ._exclusion import apply_exclusion_filter, exclusion_reason, is_exclusion_step
 from ._feature_state import export_feature_state, restore_feature_state
 from ._helpers import select_rows_by_position
 from ._spark import fit_spark, transform_spark, use_spark
 from ._target_labels import record_target_labels
 from ._weight_policy import prepare_pipeline_weights
 from .base import StatefulTransformer
+from .column_selection import resolve_column_selection, uses_column_selection
 from .dispatcher import _check_xy_engine_parity
 from .time_series.lag import LagFeaturesApplier
 from .time_series.rolling import RollingAggregateApplier
@@ -253,6 +255,27 @@ class FeatureEngineer:
             skipped.update(self._ROW_DROPPING_TYPES)
         return [step for step in self.fitted_steps if step["type"] not in skipped]
 
+    def transform_with_exclusions(self, data: Any) -> tuple[Any, np.ndarray, pd.Series]:
+        """Apply fitted filters while retaining the first reason for each original row.
+
+        Training and ordinary transform remove invalid/outlier rows. Saved scoring uses
+        the returned positions to publish a null outcome for each removed row.
+        Other filters and permutations keep the ordinary prediction guard.
+        """
+        positions = np.arange(len(data))
+        reasons = pd.Series(pd.NA, index=pd.RangeIndex(len(data)), dtype="string")
+        for step in self._transform_steps(preserve_rows=True):
+            if not len(data):
+                break
+            if is_exclusion_step(step):
+                data, kept = apply_exclusion_filter(data, step)
+                excluded = ~np.isin(np.arange(len(positions)), kept)
+                reasons.iloc[positions[excluded]] = exclusion_reason(step)
+                positions = positions[kept]
+            else:
+                data = _apply_prediction_step(data, step)
+        return data, positions, reasons
+
     def transform_tracking_order(self, data: Any) -> tuple[Any, np.ndarray]:
         """Transform local features and report each output row's original input position.
 
@@ -326,6 +349,7 @@ class FeatureEngineer:
                 # A raw-frame target must not become an auto-selected feature.
                 # Keep the caller's config untouched and use pipeline context.
                 params["target_column"] = target_column
+            params = resolve_column_selection(current_data, params, transformer_type)
             step_metrics: dict[str, Any] = {}
             step_key = f"{i}:{name}"
 
@@ -350,6 +374,7 @@ class FeatureEngineer:
                 params=params,
                 sample_weight=raw_weights,
             )
+            self._record_column_selection(step, transformer_inst)
 
             raw_weights = _step_weights(current_data, transformer_inst, raw_weights)
             record_target_labels(
@@ -407,6 +432,11 @@ class FeatureEngineer:
         self.evaluation_coverage_ = deepcopy(getattr(current_data, "evaluation_coverage", {}))
         return current_data, metrics
 
+    def _record_column_selection(self, step: Any, transformer: Any) -> None:
+        """Bind fitted column choices to their original recipe without mutating caller rules."""
+        if uses_column_selection(step.get("params", {})) and transformer is not None:
+            self.fitted_steps[-1]["column_selection_config"] = deepcopy(dict(step))
+
     def _fit_transform_spark(
         self,
         data: Any,
@@ -415,6 +445,11 @@ class FeatureEngineer:
         on_split: Callable[[SplitDataset], None] | None,
     ) -> tuple[Any, dict[str, Any]]:
         """Fit one Spark frame and publish learned records after native execution succeeds."""
+        if any(uses_column_selection(step.get("params", {})) for step in self.steps_config):
+            raise ValueError(
+                "Column selection rules require pandas or Polars training; "
+                "use explicit columns for native Spark training."
+            )
         assert spec is not None
         if target_column is not None and target_column != spec.target:
             raise ValueError("target_column conflicts with frame_spec.target.")
@@ -562,8 +597,17 @@ class FeatureEngineer:
         "MinMaxScaler",
         "RobustScaler",
         "MaxAbsScaler",
+        "QuantileTransformer",
+        "Normalizer",
     }
-    _OUTLIER_TYPES: ClassVar[set[str]] = {"IQR", "Winsorize", "ZScore", "EllipticEnvelope"}
+    _OUTLIER_TYPES: ClassVar[set[str]] = {
+        "IQR",
+        "Winsorize",
+        "ZScore",
+        "EllipticEnvelope",
+        "IsolationForest",
+        "LocalOutlierFactor",
+    }
     _BUCKETING_TYPES: ClassVar[set[str]] = {
         "GeneralBinning",
         "EqualWidthBinning",
@@ -578,6 +622,8 @@ class FeatureEngineer:
         "IQR",
         "ZScore",
         "EllipticEnvelope",
+        "IsolationForest",
+        "LocalOutlierFactor",
         "Winsorize",
     }
     _ENCODER_TYPES: ClassVar[set[str]] = {
@@ -587,6 +633,8 @@ class FeatureEngineer:
         "TargetEncoder",
         "HashEncoder",
         "DummyEncoder",
+        "FrequencyEncoder",
+        "RareCategoryGrouping",
     }
 
     def _collect_step_metrics(

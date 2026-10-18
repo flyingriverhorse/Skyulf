@@ -166,7 +166,7 @@ def test_scalers_passthrough_schema(cls) -> None:
             "SimpleImputer",
             SimpleImputerCalculator,
             pd.DataFrame({"x": [1.0, None, 3.0], "y": [1.0, 2.0, 3.0], "text": ["a", "b", "c"]}),
-            {"strategy": "mean"},
+            {"strategy": "mean", "columns": ["x", "y"]},
         ),
         (
             "KNNImputer",
@@ -211,7 +211,7 @@ def test_scalers_passthrough_schema(cls) -> None:
         (
             "LagFeatures",
             LagFeaturesCalculator,
-            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [4, 5, 6]}),
             {"columns": ["x"], "lags": [1]},
         ),
     ],
@@ -316,8 +316,6 @@ PASSTHROUGH_CALCULATORS = [
     DatasetProfileCalculator,
     DataSnapshotCalculator,
     LabelEncoderCalculator,
-    OrdinalEncoderCalculator,
-    HashEncoderCalculator,
     SplitCalculator,
 ]
 
@@ -328,17 +326,14 @@ def test_phase_a_passthrough(calc_cls: type) -> None:
     assert calc_cls().infer_output_schema(s, {}) == s
 
 
-def test_target_encoder_binary_continuous_is_passthrough() -> None:
-    """Explicit binary/continuous ``target_type`` encodes in place, so its schema is predictable.
-
-    Breaks if the encoder ever starts fanning out columns for these two target
-    types, or if the in-place prediction is lost for the regression case —
-    ``"continuous"`` is sklearn's spelling, not ``"regression"``.
-    """
+def test_target_encoder_binary_continuous_rewrites_selected_dtypes() -> None:
+    """Explicit binary/continuous targets keep column names but replace selected values with floats."""
     s = SkyulfSchema.from_columns(["a", "b", "c"], {"a": "float64"})
     for target_type in ("binary", "continuous"):
-        out = TargetEncoderCalculator().infer_output_schema(s, {"target_type": target_type})
-        assert out == s
+        out = TargetEncoderCalculator().infer_output_schema(
+            s, {"target_type": target_type, "columns": ["b"]}
+        )
+        assert out == s.with_dtype("b", "float64")
 
 
 def test_target_encoder_regression_spelling_is_rejected_and_opaque() -> None:
@@ -450,7 +445,8 @@ DATA_DEPENDENT_CALCULATORS = [
     # Encoders whose output column count depends on cardinality.
     OneHotEncoderCalculator,
     DummyEncoderCalculator,
-    HashEncoderCalculator,  # passthrough actually — kept here pending review
+    HashEncoderCalculator,
+    OrdinalEncoderCalculator,
     TargetEncoderCalculator,  # returns None for the default "auto"/multiclass
     # target_type (data-dependent column fan-out); binary/continuous stays
     # passthrough, covered separately in test_encoding_target.py.

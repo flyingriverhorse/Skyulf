@@ -16,7 +16,6 @@ from .._fitted_validation import _scalar, fitted_columns, portable_config
 from .._helpers import (
     auto_detect_numeric_columns,
     decimal_columns_to_float,
-    promote_configured_columns_to_float64,
 )
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -27,6 +26,7 @@ from ._common import (
     _polars_missing_counts,
     _resolve_simple_columns,
 )
+from ._constant import constant_text_values
 from ._spark_simple import apply_spark_imputer, fit_spark_imputer
 
 
@@ -47,6 +47,15 @@ def _fill_pandas_series(series: pd.Series, value: Any, strategy: str | None) -> 
     ):
         series = series.cat.add_categories([value])
     return series.fillna(value)
+
+
+def _constant_text_fit_data(frame: pd.DataFrame, strategy: str) -> Any:
+    """Normalize nullable text for sklearn while preserving numeric default-fill inference."""
+    if strategy != "constant":
+        return frame
+    if any(dtype == object or isinstance(dtype, pd.StringDtype) for dtype in frame.dtypes):
+        return frame.to_numpy(dtype=object, na_value=float("nan"))
+    return frame
 
 
 class SimpleImputerApplier(BaseApplier):
@@ -191,20 +200,10 @@ class SimpleImputerApplier(BaseApplier):
             execution_kind,
             "preserve",
             "row",
-            config_match=(("strategy", "most_frequent"),),
+            config_match=(("strategy", strategy),),
         )
         for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
-    )
-    + tuple(
-        ExecutionCapability(
-            engine,
-            "apply",
-            "local",
-            "preserve",
-            "row",
-            config_match=(("strategy", "median"),),
-        )
-        for engine in ("pandas", "polars")
+        for strategy in ("most_frequent", "median")
     ),
 )
 @node_meta(
@@ -229,14 +228,25 @@ class SimpleImputerCalculator(BaseCalculator):
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
-    ) -> SkyulfSchema:
-        """Return ``input_schema`` and promote float-only imputation targets to ``float64``."""
+    ) -> SkyulfSchema | None:
+        """Preserve known double targets and abstain when output needs values or engine identity."""
         strategy = config.get("strategy", "mean")
-        if strategy == "mode":
-            strategy = "most_frequent"
-        if strategy not in {"mean", "median"}:
+        columns = config.get("columns")
+        if not isinstance(columns, list):
+            return None
+        selected = [column for column in columns if column in input_schema]
+        if not selected:
             return input_schema
-        return promote_configured_columns_to_float64(input_schema, config)
+        if any(input_schema.dtypes.get(column, "").lower() != "float64" for column in selected):
+            return None
+        if strategy == "constant" and type(config.get("fill_value")) not in (
+            type(None),
+            int,
+            float,
+            str,
+        ):
+            return None
+        return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SimpleImputerArtifact:  # pylint: disable=arguments-differ
@@ -308,7 +318,11 @@ class SimpleImputerCalculator(BaseCalculator):
         strategy: str = params["_resolved_strategy"]
         fill_value = params["_resolved_fill_value"]
 
-        fill_values = _compute_polars_fill_values(X, cols, strategy, fill_value)
+        fill_values = (
+            constant_text_values(X, cols, fill_value)
+            if strategy == "constant" and isinstance(fill_value, str)
+            else _compute_polars_fill_values(X, cols, strategy, fill_value)
+        )
         missing_counts, total_missing = _polars_missing_counts(X, cols)
 
         return {
@@ -335,27 +349,7 @@ class SimpleImputerCalculator(BaseCalculator):
             if not cols:
                 return {}
 
-        imputer = SimpleImputer(
-            strategy=strategy,
-            fill_value=fill_value,
-            keep_empty_features=strategy == "constant",
-        )
-        fit_data = (
-            decimal_columns_to_float(X[cols], cols) if strategy in {"mean", "median"} else X[cols]
-        )
-        if strategy == "most_frequent":
-            # Preserve nullable integers/booleans as scalar values and normalize
-            # pd.NA, which sklearn's object-array missing mask cannot compare.
-            fit_data = X[cols].to_numpy(dtype=object, na_value=float("nan"))
-        imputer.fit(fit_data)
-
-        if strategy == "constant" and fill_value is not None:
-            # Validation still runs, but heldout missingness must not choose a constant.
-            fill_values = dict.fromkeys(cols, fill_value)
-        else:
-            # Keeping empty constant columns preserves sklearn's dtype-based defaults.
-            statistics = imputer.statistics_.tolist()
-            fill_values = dict(zip(cols, statistics, strict=True))
+        fill_values = _pandas_fill_values(X, cols, strategy, fill_value)
         missing_counts = X[cols].isnull().sum().to_dict()
         total_missing = int(sum(missing_counts.values()))
 
@@ -367,6 +361,29 @@ class SimpleImputerCalculator(BaseCalculator):
             "missing_counts": missing_counts,
             "total_missing": total_missing,
         }
+
+
+def _pandas_fill_values(X: Any, columns: list[str], strategy: str, fill_value: Any) -> dict:
+    """Fit statistics normally and resolve explicit text constants per column without dtype merging."""
+    if strategy == "constant" and isinstance(fill_value, str):
+        return constant_text_values(X, columns, fill_value)
+    imputer = SimpleImputer(
+        strategy=strategy, fill_value=fill_value, keep_empty_features=strategy == "constant"
+    )
+    fit_data = (
+        decimal_columns_to_float(X[columns], columns)
+        if strategy in {"mean", "median"}
+        else X[columns]
+    )
+    if strategy == "most_frequent":
+        # Keep exact integer/Boolean modes and normalize pd.NA for sklearn's mask.
+        fit_data = X[columns].to_numpy(dtype=object, na_value=float("nan"), copy=True)
+    else:
+        fit_data = _constant_text_fit_data(fit_data, strategy)
+    imputer.fit(fit_data)
+    if strategy == "constant" and fill_value is not None:
+        return dict.fromkeys(columns, fill_value)
+    return dict(zip(columns, imputer.statistics_.tolist(), strict=True))
 
 
 def _local_statistic_state(raw: dict) -> dict:

@@ -2,6 +2,7 @@
 
 import json
 import runpy
+import sys
 from dataclasses import asdict
 from datetime import UTC, datetime
 from importlib import import_module
@@ -312,14 +313,30 @@ def test_real_disabled_notebook_exits_with_one_json_object(tmp_path, job_name):
     assert json.loads(dbutils.notebook.exit.call_args.args[0]) == {"status": "DISABLED"}
 
 
-def test_online_setup_uses_external_publication_and_actual_request_schema(api, monkeypatch):
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {},
+        {
+            "workload_type": "CPU_MEDIUM",
+            "workload_size": "Medium",
+            "scale_to_zero_enabled": False,
+            "ready_timeout_s": 120,
+        },
+    ],
+)
+def test_online_setup_uses_external_publication_and_actual_request_schema(
+    api, monkeypatch, overrides
+):
     """Setup must inspect a concrete model and publications before submitting one create."""
     from skyulf.integrations.databricks.serving.contracts import (
         PinnedEndpointPlan,
         PinnedEndpointSpec,
     )
 
-    spec = PinnedEndpointSpec("online", "main.models.online", "3", "main", "logs", "online")
+    spec = PinnedEndpointSpec(
+        "online", "main.models.online", "3", "main", "logs", "online", **overrides
+    )
     plan = PinnedEndpointPlan(spec, {}, ("id", "segment"), (("id", "int64"), ("segment", "string")))
     events = []
     prepare = Mock(side_effect=lambda *args, **kwargs: events.append("prepare") or plan)
@@ -345,12 +362,48 @@ def test_online_setup_uses_external_publication_and_actual_request_schema(api, m
         spark, settings, client=workspace, feature_client=features
     )
     assert events == ["prepare", "create"]
-    assert output["status"] == "SUBMITTED"
+    assert prepare.call_args.args[0] == spec
+    assert output["status"] == "READY"
     assert output["request_example"] == {"dataframe_records": [{"id": 0, "segment": "example"}]}
     assert prepare.call_args.kwargs["publications"][0].source_table_id == "delta-id"
     assert prepare.call_args.kwargs["client"] is workspace
     assert prepare.call_args.kwargs["spark"] is spark
     features.publish_table.assert_not_called()
+
+
+def test_online_setup_does_not_report_ready_after_timeout(api, monkeypatch):
+    """A failed setup wait must propagate so its job cannot report a successful deployment."""
+    spec = {
+        "endpoint_name": "online",
+        "model_name": "main.models.online",
+        "model_version": "3",
+        "logging_catalog": "main",
+        "logging_schema": "logs",
+        "logging_table_prefix": "online",
+    }
+    settings = {
+        "enabled": True,
+        "exclusive_writer": True,
+        "endpoint": spec,
+        "publications": [
+            {
+                "source_table": "main.f.latest",
+                "source_table_id": "delta-id",
+                "online_table": "main.f.online",
+                "online_store": "store",
+            }
+        ],
+        "tracking_uri": "databricks",
+        "registry_uri": "databricks-uc",
+    }
+    monkeypatch.setattr(
+        api, "prepare_online_endpoint", Mock(return_value=SimpleNamespace(input_schema=()))
+    )
+    create = Mock(side_effect=TimeoutError("online not ready"))
+    monkeypatch.setattr(api, "create_pinned_endpoint", create)
+    with pytest.raises(TimeoutError, match="online not ready"):
+        api.run_online_serving_setup(Mock(), settings, client=Mock())
+    create.assert_called_once()
 
 
 def test_online_setup_refuses_incomplete_config_before_endpoint_mutation(api):
@@ -361,3 +414,28 @@ def test_online_setup_refuses_incomplete_config_before_endpoint_mutation(api):
             None, {"enabled": True, "exclusive_writer": True}, client=workspace
         )
     assert workspace.mock_calls == []
+
+
+def test_daily_rollout_labels_evidence_with_the_deployed_target(api, tmp_path, monkeypatch):
+    """Rollout evidence must name the Bundle target that ran it, not a fixed template value."""
+    path = tmp_path / "serving.yml"
+    path.write_text(
+        "rollout:\n  enabled: true\n  exclusive_writer: true\n  monitoring:\n    environment: syst\n"
+    )
+    seen = {}
+    monkeypatch.setattr(
+        api, "run_daily_rollout", lambda spark, settings, **_: seen.setdefault("s", settings)
+    )
+    monkeypatch.setitem(sys.modules, "databricks.sdk", SimpleNamespace(WorkspaceClient=Mock))
+    monkeypatch.setitem(
+        sys.modules, "mlflow.tracking", SimpleNamespace(MlflowClient=lambda **_: Mock())
+    )
+    dbutils = Mock()
+    dbutils.widgets.get.return_value = str(path)
+    dbutils.widgets.getAll.return_value = {"bundle_target": "prod"}
+    api.run_daily_rollout_notebook(None, dbutils)
+    assert seen["s"]["monitoring"]["environment"] == "prod"
+    dbutils.widgets.getAll.return_value = {}
+    seen.clear()
+    api.run_daily_rollout_notebook(None, dbutils)
+    assert seen["s"]["monitoring"]["environment"] == "syst"

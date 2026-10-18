@@ -190,7 +190,7 @@ class CorrelationThresholdApplier(BaseApplier):
     name="Correlation Threshold",
     category="Feature Selection",
     description="Remove features highly correlated with others.",
-    params={"threshold": 0.95, "method": "pearson"},
+    params={"threshold": 0.95, "correlation_method": "pearson"},
     learns_from_data=True,
 )
 class CorrelationThresholdCalculator(BaseCalculator):

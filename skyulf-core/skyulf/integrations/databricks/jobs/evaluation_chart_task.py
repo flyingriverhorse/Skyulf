@@ -144,7 +144,18 @@ def render_chart_report(payload: dict, *, workspace_host: str = "") -> str:
                 f"{payload['experiment_id']}/runs/{run_id}/model-metrics"
             )
         sections.append("\n".join([location, *(f"- {key}" for key in keys)]))
+    sections.extend(_chart_population_notes(payload["reports"]))
     return "\n\n".join(sections) or "No evaluation charts were generated."
+
+
+def _chart_population_notes(reports: dict) -> list[str]:
+    """Distinguish plotted survivors from the original saved holdout sample."""
+    return [
+        f"{name}: {report['sample_scored_rows']} of {report['sample_rows']} sampled holdout rows "
+        f"accepted for diagnostics; {report['sample_excluded_rows']} excluded rows are not plotted."
+        for name, report in reports.items()
+        if "sample_excluded_rows" in report
+    ]
 
 
 def run_evaluation_charts_notebook(dbutils: Any) -> str:

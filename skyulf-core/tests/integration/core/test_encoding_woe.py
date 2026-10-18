@@ -120,16 +120,16 @@ def test_fit_polars_resolves_target_column_from_within_x() -> None:
     assert set(params["mappings"]["city"].keys()) == {"a", "b"}
 
 
-class TestBinaryTargetInvariantReturnsEmptyParams:
+class TestBinaryTargetInvariantRejectsInvalidTargets:
     """Scenarios (non-binary target, single-row, empty frame) that all fail the
-    binary-target check and cause ``fit()`` to short-circuit to ``{}``. Loaded
+    binary-target check and cause ``fit()`` to reject the training data. Loaded
     from ``tests/test_cases/preprocessing/encoding_woe.json`` (group ``empty_params``).
     """
 
     @pytest.mark.parametrize(
         _empty_params_cases[0], _empty_params_cases[1], ids=_empty_params_cases[2]
     )
-    def test_returns_empty_params(
+    def test_rejects_invalid_target(
         self,
         city: list[str],
         y: list[int],
@@ -137,10 +137,11 @@ class TestBinaryTargetInvariantReturnsEmptyParams:
         y_dtype: str | None,
         columns: list[str],
     ) -> None:
+        """Invalid target class counts must not produce an apparently fitted no-op encoder."""
         X = pd.DataFrame({"city": pd.Series(city, dtype=city_dtype)})
         y_series = pd.Series(y, dtype=y_dtype, name="target")
-        params = WOEEncoderCalculator().fit((X, y_series), {"columns": columns})
-        assert params == {}
+        with pytest.raises(ValueError, match="binary target.*exactly 2 classes"):
+            WOEEncoderCalculator().fit((X, y_series), {"columns": columns})
 
 
 def test_missing_target_returns_empty_params() -> None:

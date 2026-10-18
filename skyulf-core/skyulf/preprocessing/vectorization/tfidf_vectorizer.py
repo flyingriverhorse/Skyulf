@@ -6,7 +6,7 @@ Output is **always dense**.
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -28,6 +28,14 @@ from ._common import (
     apply_text_dual_engine,
     resolve_fit_text_columns,
     validate_text_output_names,
+)
+from ._per_column import (
+    apply_per_column_pandas,
+    apply_per_column_polars,
+    build_per_column_artifact,
+    column_mode,
+    per_column_uses_callbacks,
+    validate_per_column_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,9 +74,9 @@ def _validate_saved_idf(raw: dict, vectorizer: TfidfVectorizer) -> None:
 class TfidfVectorizerApplier(BaseApplier):
     """Attach one TF-IDF-weighted column per vocabulary term to the frame.
 
-    The configured text columns are joined into a single corpus string before
-    transforming, the dense result is concatenated on, and the source columns
-    survive unless ``drop_original`` is set. This node uses the text-specific
+    The default joins text columns into one corpus string; ``per_column`` uses
+    each source's saved vocabulary and IDF. Dense blocks are attached together;
+    sources survive unless ``drop_original`` is set. This node uses the text-specific
     dispatcher: the polars path runs natively, so only the text payload crosses
     into sklearn, and it falls back to a full pandas round-trip when a text
     column is not String dtype.
@@ -77,6 +85,10 @@ class TfidfVectorizerApplier(BaseApplier):
     @staticmethod
     def validate_inference_state(raw: dict) -> dict:
         """Inspect learned vocabulary and IDF weights without recomputing corpus statistics."""
+        if validate_per_column_state(
+            raw, "tfidf_vectorizer", TfidfVectorizerApplier.validate_inference_state
+        ):
+            return raw
         vectorizer = _validate_local_vectorizer(
             raw, "tfidf_vectorizer", TfidfVectorizer, {"vocabulary", "max_features", "idf"}
         )
@@ -91,6 +103,12 @@ class TfidfVectorizerApplier(BaseApplier):
         if engine not in ("pandas", "polars"):
             return None
         TfidfVectorizerApplier.validate_inference_state(state)
+        if state.get("column_mode") == "per_column":
+            return (
+                None
+                if per_column_uses_callbacks(state)
+                else ExecutionCapability(engine, "apply", "local", "preserve", "row")
+            )
         if state and _vectorizer_uses_callbacks(state["vectorizer_object"]):
             return None
         return ExecutionCapability(engine, "apply", "local", "preserve", "row")
@@ -98,6 +116,11 @@ class TfidfVectorizerApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Dispatch through the text-specific dual-engine path; ``y`` passes through."""
+        if "column_mode" in params:
+            self.validate_inference_state(params)
+            return apply_text_dual_engine(
+                X, params, apply_per_column_pandas, apply_per_column_polars
+            )
         return apply_text_dual_engine(
             X, params, _tfidf_apply_pandas, _sklearn_vectorizer_apply_polars
         )
@@ -181,12 +204,13 @@ def _build_tfidf_artifact(
         "lowercase": True,
         "stop_words": None,
         "drop_original": False,
+        "column_mode": "joined",
     },
     tags=["text", "nlp", "tfidf", "vectorizer"],
     learns_from_data=True,
 )
 class TfidfVectorizerCalculator(BaseCalculator):
-    """Fit a ``TfidfVectorizer`` vocabulary and IDF weights on the joined text.
+    """Fit shared or per-column ``TfidfVectorizer`` vocabularies and IDF weights.
 
     Both the vocabulary and the per-term IDF weights are learned from the
     training corpus and carried in the artifact, so the weights stay inspectable
@@ -199,17 +223,26 @@ class TfidfVectorizerCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TfidfVectorizerArtifact:  # pylint: disable=arguments-differ
-        """Narrow to the configured text columns and fit the vocabulary on their joined text.
+        """Fit the selected text with shared or per-column vocabulary and IDF.
 
         An empty or wholly-absent column selection yields an empty artifact so
-        the applier no-ops. An empty vocabulary also yields an empty artifact
-        with a warning; source columns are retained even with ``drop_original``.
+        the applier no-ops. In joined mode an empty vocabulary returns an empty
+        artifact with a warning, retaining sources even with ``drop_original``.
+        In per-column mode any empty vocabulary raises with its source name.
         """
+        mode = column_mode(config)
         resolved = resolve_fit_text_columns(X, config, _y)
         if resolved is None:
             return {}
         text_frame, valid_cols = resolved
 
-        artifact = _build_tfidf_artifact(config, text_frame, valid_cols)
+        artifact = (
+            cast(
+                TfidfVectorizerArtifact,
+                build_per_column_artifact(config, text_frame, valid_cols, _build_tfidf_artifact),
+            )
+            if mode == "per_column"
+            else _build_tfidf_artifact(config, text_frame, valid_cols)
+        )
         validate_text_output_names(X, artifact, valid_cols)
         return artifact

@@ -2,6 +2,6 @@
   "params": "config_n_features, expected_n_features",
   "test_cases": {
     "explicit_n_features": {"config_n_features": 4, "expected_n_features": 4},
-    "default_n_features_is_ten": {"config_n_features": null, "expected_n_features": 10}
+    "default_n_features_is_eight": {"config_n_features": null, "expected_n_features": 8}
   }
 }

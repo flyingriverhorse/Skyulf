@@ -23,12 +23,14 @@ def test_ensemble_questions_are_independent_per_candidate():
     )
     assert "competition_ensemble_1_classification_base_3" in shown
     assert "competition_ensemble_2_classification_base_3" not in shown
-    assert "competition_ensemble_1_voting" in shown
-    assert "competition_ensemble_2_voting" not in shown
     assert "competition_ensemble_2_classification_final" in shown
     assert "competition_ensemble_1_classification_final" not in shown
-    assert "competition_ensemble_1_classification_weight_3" in shown
-    assert "competition_ensemble_2_classification_weight_1" not in shown
+    # Settings of a chosen ensemble come from training.yml defaults or an answer file.
+    assert not any(
+        name.startswith("competition_ensemble_")
+        and name.endswith(("_voting", "_cv", "_passthrough", "_calibrate", "_weight_1"))
+        for name in shown
+    )
     assert not any(name.startswith("competition_ensemble_3_") for name in shown)
     assert "logistic_regression" in props["competition_ensemble_1_classification_base_1"]["enum"]
 
@@ -37,7 +39,7 @@ def _visible(**overrides):
     """Evaluate real initializer predicates with all defaults filled as the CLI does."""
     props = json.loads((ROOT / "databricks_template_schema.json").read_text())["properties"]
     values = {name: prop["default"] for name, prop in props.items()}
-    values.update({"training_layout": "model_competition", **overrides})
+    values.update({"setup_mode": "detailed", "training_layout": "model_competition", **overrides})
     shown = {
         name
         for name, prop in props.items()
@@ -61,7 +63,9 @@ def test_candidate_questions_follow_count_and_task(task, count):
     for position in range(1, 9):
         name = f"competition_{task}_model_{position}"
         assert (name in shown) == (position <= int(count))
-        assert props[name]["enum"] == props[f"{task}_model"]["enum"]
+        # Same choices; each list starts with its own default, which Enter selects.
+        assert sorted(props[name]["enum"]) == sorted(props[f"{task}_model"]["enum"])
+        assert props[name]["enum"][0] == props[name]["default"]
     other = "classification" if task == "regression" else "regression"
     assert not any(name.startswith(f"competition_{other}_model_") for name in shown)
     assert not {"regression_search_metric", "classification_search_metric"} & shown
@@ -78,11 +82,9 @@ def test_inactive_ensemble_slots_do_not_open_questions():
     )
     assert {
         "competition_ensemble_2_classification_base_count",
-        "competition_ensemble_2_cv",
         "competition_ensemble_2_classification_final",
-        "competition_ensemble_2_calibrate",
     } <= shown
-    assert "competition_ensemble_2_voting" not in shown
+    assert not {"competition_ensemble_2_cv", "competition_ensemble_2_calibrate"} & shown
 
 
 @pytest.mark.parametrize("layout", ["single_model", "multi_target"])

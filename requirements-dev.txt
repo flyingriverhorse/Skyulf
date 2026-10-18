@@ -1,12 +1,13 @@
 # Development requirements (linters, formatters, test runners)
 -r requirements-mlflow.txt          # Tracking integration tests and type checking
-ruff>=0.8,<1.0                        # Lint + format + import sort (replaces black/flake8/isort)
+ruff==0.15.16                        # Match pre-commit and CI Python/Markdown formatting.
 pytest>=7.4.0,<10.0.0
 pytest-asyncio>=0.21.0,<2.0.0
 pytest-cov>=4.1.0,<8.0.0
 hypothesis>=6.100,<7.0.0           # Property-based tests (engine parity, ingestion fuzz)
 syrupy>=4.0.0                       # Snapshot assertions — pipeline JSON regression tests
 pytest-benchmark>=5.0.0,<6.0.0     # Opt-in performance benchmarks (--benchmark-only)
+pytest-xdist>=3.6.0,<4.0.0         # Local parallel runs (scripts/test_targets.py); CI shards instead
 jsonschema>=4.0.0,<5.0.0          # Databricks template prompt visibility tests
 lizard>=1.23.0                      # Cyclomatic-complexity gate (CCN 10) — mirrors CI
 factory-boy>=3.3.0,<4.0.0

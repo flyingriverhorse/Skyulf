@@ -47,6 +47,7 @@ from ..shared._nullable_transport import (  # noqa: F401 - public compatibility 
 )
 from ..spark._spark_environment import pyfunc_environment
 from ..spark._spark_output import (
+    nullable_outputs,
     prepare_spark_output,
     require_spark_output,
     score_prediction_batches,
@@ -145,7 +146,12 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
             params,
             spark_output,
         )
-        return prepare_spark_output(result, scoring_output_schema(self._artifact), spark_output)
+        return prepare_spark_output(
+            result,
+            scoring_output_schema(self._artifact),
+            spark_output,
+            nullable=nullable_outputs(self._artifact),
+        )
 
 
 def log_pipeline_model(

@@ -9,6 +9,17 @@ from ..admission import BatchConflictError, PublishAdmission, validate_admission
 
 __all__ = ["BatchConflictError", "DeltaPublishError", "publish_replace_period"]
 
+MAINTENANCE_OPERATIONS = frozenset(
+    {
+        "OPTIMIZE",
+        "VACUUM START",
+        "VACUUM END",
+        "SET TBLPROPERTIES",
+        "UNSET TBLPROPERTIES",
+        "COMPUTE STATS",
+    }
+)
+
 
 class DeltaPublishError(RuntimeError):
     """Publication failed or its committed receipt could not be verified."""
@@ -22,9 +33,39 @@ def table_identity(spark: Any, table: str) -> str:
     return str(detail["id"])
 
 
-def history(spark: Any, table: str) -> Any:
-    """Expose distributed commit history without collecting it on the driver."""
-    return spark.sql(f"DESCRIBE HISTORY {table_name(table)}")
+def history(spark: Any, table: str, *, limit: int | None = None) -> Any:
+    """Read retained history, optionally limiting Delta's own latest-version lookup."""
+    if limit is not None and (type(limit) is not int or limit <= 0):
+        raise ValueError("Delta history limit must be a positive integer.")
+    suffix = "" if limit is None else f" LIMIT {limit}"
+    return spark.sql(f"DESCRIBE HISTORY {table_name(table)}{suffix}")
+
+
+def prediction_commit(spark: Any, table: str, latest: Any) -> Any:
+    """Find the last non-maintenance commit within the captured physical snapshot.
+
+    Unknown operations and unreceipted writes remain barriers. Retained history
+    is searched only after maintenance; a fixed lookback could lose a valid
+    watermark. The caller must retain ``latest`` for optimistic write checks.
+    """
+    values = latest if isinstance(latest, dict) else latest.asDict()
+    if values.get("operation") not in MAINTENANCE_OPERATIONS:
+        return latest
+    functions = importlib.import_module("pyspark.sql.functions")
+    operation = functions.col("operation")
+    row = (
+        history(spark, table)
+        .where(
+            (functions.col("version") <= int(latest["version"]))
+            & (operation.isNull() | ~operation.isin(sorted(MAINTENANCE_OPERATIONS)))
+        )
+        .orderBy(functions.desc("version"))
+        .select("version", "userMetadata", "operation")
+        .first()
+    )
+    if row is None:
+        raise BatchConflictError("Prediction receipt history is no longer available.")
+    return row
 
 
 def _receipt(spark: Any, spec: BatchSpec, manifest: dict[str, Any]) -> tuple[int, dict] | None:

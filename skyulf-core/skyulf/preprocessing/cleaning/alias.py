@@ -207,7 +207,7 @@ class AliasReplacementApplier(BaseApplier):
     name="Standardize Values",
     category="Cleaning",
     description="Standardize common variations in text values (e.g. Yes/No, Country names).",
-    params={"columns": [], "domain": "boolean"},
+    params={"columns": [], "alias_type": "boolean"},
     learns_from_data=False,
 )
 class AliasReplacementCalculator(BaseCalculator):

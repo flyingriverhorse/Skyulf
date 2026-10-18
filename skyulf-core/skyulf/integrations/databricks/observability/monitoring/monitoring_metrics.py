@@ -1,6 +1,7 @@
 """Build finite monitoring evidence from bounded saved feature and prediction rows."""
 
 import math
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -15,10 +16,17 @@ from skyulf.modeling._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
 )
+from skyulf.profiling._drift_settings import merge_drift_settings
 from skyulf.profiling.drift import DriftCalculator
 
-_DRIFT_THRESHOLDS = {"psi", "ks_statistic", "wasserstein", "kl_divergence"}
-REGRESSION_METRICS = ("mae", "mse", "rmse", "r2", "mape", "explained_variance")
+from .missing_markers import (
+    Marker,
+    require_marked_features,
+    split_missing_markers,
+    typed_markers,
+)
+
+REGRESSION_METRICS = ("mae", "mse", "rmse", "r2", "mape", "explained_variance", "wape")
 CLASSIFICATION_METRICS = (
     "accuracy",
     "balanced_accuracy",
@@ -37,6 +45,32 @@ def _frame(value: pd.DataFrame | pl.DataFrame, name: str) -> pl.DataFrame:
     if isinstance(value, pd.DataFrame):
         return pl.from_pandas(value, nan_to_null=False)
     raise TypeError(f"{name} must be a pandas or Polars DataFrame.")
+
+
+def _without_markers(frame: pl.DataFrame, markers: dict[str, tuple[Marker, ...]]) -> pl.DataFrame:
+    """Replace marked values with nulls of the same dtype in an in-memory population.
+
+    Args:
+        frame: A reference or current population.
+        markers: Validated markers per feature column.
+
+    Returns:
+        The frame with marked values as nulls; absent columns are left to schema checks.
+
+    Raises:
+        ValueError: If a marked column is not integer or floating point, or a marker has no
+            exact value in its dtype.
+    """
+    replacements = []
+    for column, values in markers.items():
+        if column not in frame.columns:
+            continue
+        dtype = frame.schema[column]
+        kind = str(dtype) if dtype.is_float() or dtype.is_integer() else None
+        exact = pl.Series(typed_markers(column, values, kind), dtype=dtype)
+        marked = pl.col(column).is_in(exact.implode())
+        replacements.append(pl.when(marked).then(None).otherwise(pl.col(column)).alias(column))
+    return frame.with_columns(replacements) if replacements else frame
 
 
 def monitoring_metric(
@@ -77,14 +111,8 @@ def validate_monitoring_inputs(
 
 
 def _validate_thresholds(thresholds: dict | None) -> None:
-    """Accept only finite positive overrides supported by Core drift."""
-    if thresholds is None:
-        return
-    if type(thresholds) is not dict or set(thresholds) - _DRIFT_THRESHOLDS:
-        raise ValueError("Unknown monitoring drift thresholds.")
-    for value in thresholds.values():
-        if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
-            raise ValueError("Drift thresholds must be finite and positive.")
+    """Accept only finite positive overrides supported by Core drift, plus valid markers."""
+    merge_drift_settings(split_missing_markers(thresholds)[0])
 
 
 def _keyed_rows(frame: pl.DataFrame, columns: tuple[str, ...], name: str) -> dict[tuple, dict]:
@@ -149,7 +177,7 @@ def _probability_columns(
     predictions: pl.DataFrame, classes: tuple, task: str, scored: dict[tuple, dict]
 ) -> tuple[str, ...]:
     """Validate the complete saved class-ordered probability contract."""
-    columns = tuple(name for name in predictions.columns if name.startswith("probability_"))
+    columns = tuple(name for name in predictions.columns if re.fullmatch(r"probability_\d+", name))
     if not columns:
         return ()
     expected = tuple(f"probability_{index}" for index in range(len(classes)))
@@ -332,14 +360,15 @@ def column_drift_evidence(column: str, result: Any) -> list[dict[str, Any]]:
     """Retain Core's per-statistic verdict or an explicit unavailable row."""
     if result is None:
         return [monitoring_metric("drift", column, "unavailable")]
+    diagnostics = {"ks_test_p_value", "new_category_rate"}
     metrics = [
         monitoring_metric(
             "drift",
             column,
             item.metric,
             item.value,
-            None if item.metric == "ks_test_p_value" else item.threshold,
-            result.drift_detected and item.has_drift and item.metric != "ks_test_p_value",
+            None if item.metric in diagnostics else item.threshold,
+            result.drift_detected and item.has_drift and item.metric not in diagnostics,
         )
         for item in result.metrics
     ]
@@ -433,9 +462,14 @@ def _performance_evidence(
         monitoring_metric("performance", target, name, float(value))
         for name, value in values.items()
     ]
+    if task == "regression" and "wape" not in values:
+        evidence.append(monitoring_metric("performance", target, "wape"))
+        notes.append(
+            "WAPE unavailable: absolute actual-value denominator is zero or the ratio is nonfinite."
+        )
     unavailable = any(item["status"] == "unavailable" for item in evidence)
     if unavailable:
-        notes.append("A calculated performance metric was nonfinite.")
+        notes.append("A calculated performance metric was undefined or nonfinite.")
     return evidence, len(pairs), notes, unavailable
 
 
@@ -492,6 +526,40 @@ def _validate_saved_predictions(scored: dict[tuple, dict], task: str, classes: t
         valid = _finite_pair(value, value) if task == "regression" else value in classes
         if not valid:
             raise ValueError("Saved prediction does not match the model output contract.")
+
+
+def exclusion_metrics(total: int, excluded: int, invalid: int | None) -> list[dict]:
+    """Report ratios (0..1) over all saved outcomes, independent of available labels.
+
+    Invalid exclusions are a data-quality issue; ordinary eligibility exclusions
+    remain measured without implying bad input. Legacy missing reasons and empty
+    populations cannot establish an invalid-exclusion rate.
+    """
+    return [
+        monitoring_metric(
+            "quality", "prediction", "exclusion_rate", excluded / total if total else None
+        ),
+        monitoring_metric(
+            "quality",
+            "prediction",
+            "invalid_exclusion_rate",
+            invalid / total if total and invalid is not None else None,
+            threshold=0.0,
+            issue=bool(invalid),
+        ),
+    ]
+
+
+def _invalid_exclusions(prediction_rows: dict[tuple, dict]) -> int | None:
+    """Avoid reporting zero invalid inputs when historical excluded rows lack reasons."""
+    reasons = [
+        row.get("exclusion_reason")
+        for row in prediction_rows.values()
+        if row.get("scoring_status") == "excluded"
+    ]
+    if any(not isinstance(reason, str) for reason in reasons):
+        return None
+    return sum(isinstance(reason, str) and reason.startswith("invalid:") for reason in reasons)
 
 
 def _feature_report(
@@ -560,8 +628,10 @@ def build_monitoring_report(
     still counts NaN, whose quality verdict comes from the missingness check.
     """
     validate_monitoring_inputs(as_of, task, classes, thresholds)
-    reference = _frame(reference, "reference")
-    current = _frame(current, "current")
+    thresholds, markers = split_missing_markers(thresholds)
+    require_marked_features(markers, feature_columns)
+    reference = _without_markers(_frame(reference, "reference"), markers)
+    current = _without_markers(_frame(current, "current"), markers)
     predictions = _frame(predictions, "predictions")
     labels = None if labels is None else _frame(labels, "labels")
     current_rows = _keyed_rows(current, record_key_columns, "current")
@@ -588,6 +658,9 @@ def build_monitoring_report(
         task, classes, target_column, scored, eligible, probabilities
     )
     metrics.extend(performance)
+    metrics.extend(
+        exclusion_metrics(len(prediction_rows), excluded, _invalid_exclusions(prediction_rows))
+    )
     notes.extend(performance_notes)
     if labels is None:
         notes.append("No labels were provided; performance is unavailable.")
@@ -600,6 +673,7 @@ def build_monitoring_report(
         "reference_rows": len(reference),
         "current_rows": len(current),
         "scored_rows": len(scored),
+        "excluded_rows": excluded,
         "labeled_rows": labeled,
         "label_coverage": labeled / len(scored) if scored else None,
         "drifted_columns": drifted,

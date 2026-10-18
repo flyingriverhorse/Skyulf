@@ -12,11 +12,16 @@ SCHEMA = (
 SHARED_FIELDS = {
     "training_layout",
     "project_name",
+    "setup_mode",
     "engine",
     "inference_mode",
     "catalog",
     "schema",
     "source_table_name",
+    "source_layout",
+    "include_source_sql",
+    "initial_scoring",
+    "score_source_table_name",
     "record_key_columns",
     "training_version",
     "max_rows",
@@ -24,9 +29,19 @@ SHARED_FIELDS = {
     "compute_mode",
     "deployment_identity",
     "manage_job_permissions",
+    "pipeline_owner",
+    "test_view_group",
+    "syst_view_group",
+    "prod_view_group",
     "personal_development_targets",
+    "monitoring_catalog",
+    "monitoring_schema",
     "auto_rebuild_on_cdf_expiry",
     "evaluation_charts_enabled",
+    "preprocessing_probe",
+    "label_table_name",
+    "label_available_at_column",
+    "performance_policy_mode",
     "cluster_policy_name",
     "spark_version",
     "node_type_id",
@@ -81,6 +96,7 @@ def test_multi_target_prompts_for_shared_setup_and_independent_branches(settings
     """Model-set setup must collect per-branch settings without unrelated root-model prompts."""
     properties = json.loads(SCHEMA.read_text())["properties"]
     values = {name: field["default"] for name, field in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(settings, training_layout="multi_target")
     visible = {
         name
@@ -107,6 +123,7 @@ def test_multi_target_keeps_scheduled_training_and_policy_compute_questions():
     """Selecting branch training must retain the shared deployment controls it needs."""
     properties = json.loads(SCHEMA.read_text())["properties"]
     values = {name: field["default"] for name, field in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(
         training_layout="multi_target", retraining_mode="scheduled", compute_mode="policy_cluster"
     )
@@ -181,6 +198,7 @@ def test_multi_target_exposes_independent_model_and_source_change_choices():
     """Choosing how new models replace results must remain separate from source corrections."""
     properties = json.loads(SCHEMA.read_text())["properties"]
     values = {name: field["default"] for name, field in properties.items()}
+    values["setup_mode"] = "detailed"
     values["training_layout"] = "multi_target"
     for name in ("model_change_mode", "source_change_policy"):
         assert not Draft7Validator(properties[name].get("skip_prompt_if", False)).is_valid(values)

@@ -1,0 +1,55 @@
+# Shared training settings; model entries override whole values from defaults.
+# Custom transformations stay in src/features. Scoring uses the saved fitted model.
+# preprocessing_recipe selects a list in config/preprocessing.yml.
+# pre_split_recipe selects a list in config/pre_split.yml.
+# Keep custom functions in src/features/preprocessing.py and pre_split.py.
+# See PREPROCESSING.md; do not add pipeline.preprocessing here.
+version: 1
+defaults:
+  config_version: 1
+  training_layout: single_model
+  engine: pandas
+
+  preprocessing_probe: true # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
+  # Spark and online-feature projects check admission automatically, even when false below.
+  # Set true for endpoint-only projects to seal the same lint + probe evidence during training.
+  # Details: https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html
+  admit_probed_custom_steps: false
+  training_table: "{catalog}.{input_schema}.trips_train"
+  record_key_columns: ["trip_id"]
+  model_name: "{catalog}.{metadata_schema}.taxi_fare_robust_model{resource_suffix}"
+  promotion_policy: automatic
+  evaluation_charts: {enabled: true}
+  explainability: {method: shap, max_samples: 100, max_features: 30, max_display_samples: 3}
+  task: regression
+  input_columns: ["pickup_hour", "pickup_dow", "trip_distance", "duration_min", "pickup_zip"]
+  target_column: "fare_amount"
+  split_strategy: random
+  training_window_mode: full_snapshot
+  test_size: 0.2
+  random_state: 42
+  stratify: false
+  cv_enabled: false
+  training_sample_rows: 4096
+  training_sample_seed: 42
+  filter_unavailable_results: false
+  max_rows: 25000
+  max_input_mb: 64
+  metric: heldout_rmse
+  min_improvement: 0
+  # Candidate coverage and allowed loss versus champion; null disables either gate.
+  min_scored_fraction: 0.80
+  max_coverage_drop: 0.05 # 0.05 = five percentage points.
+  quality_threshold: 6.0
+models:
+
+  main:
+    model:
+      type: random_forest_regressor
+    tuning:
+      strategy: random
+      metric: rmse
+      n_trials: 10
+      random_state: 42
+      search_space: {"bootstrap": [true, false], "criterion": ["squared_error", "friedman_mse", "absolute_error"], "max_depth": [null, 5, 10, 20, 30, 50], "min_samples_leaf": [1, 2, 4, 8], "min_samples_split": [2, 5, 10, 20], "n_estimators": [50, 100, 200, 500]}
+

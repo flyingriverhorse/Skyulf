@@ -67,13 +67,22 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
 
 /** The group column must exist, stay unfilled, and use a learned statistic. */
 function validateGroup(config: ImputationConfig) {
-  if (!config.group_by) return { isValid: false, field: 'group_by', message: 'Select the column that defines the groups' };
-  if (config.columns.includes(config.group_by)) {
+  const keys = Array.isArray(config.group_by) ? config.group_by : [config.group_by];
+  if (!keys.length || keys.some(key => !key)) return { isValid: false, field: 'group_by', message: 'Select the column that defines the groups' };
+  if (new Set(keys).size !== keys.length) return { isValid: false, field: 'group_by', message: 'Group columns must be unique' };
+  if (keys.some(key => config.columns.includes(key!))) {
     return { isValid: false, field: 'group_by', message: 'The group column cannot also be filled' };
   }
   if (config.strategy === 'constant') {
     return { isValid: false, field: 'strategy', message: 'Group imputation supports mean, median or most frequent' };
   }
+  return validateGroupFallback(config);
+}
+
+/** Hierarchical fallbacks require an explicit ordered list of grouping columns. */
+function validateGroupFallback(config: ImputationConfig) {
+  if (config.fallback && !['global', 'hierarchical'].includes(config.fallback)) return { isValid: false, field: 'fallback', message: 'Choose global or hierarchical fallback' };
+  if (config.fallback === 'hierarchical' && !Array.isArray(config.group_by)) return { isValid: false, field: 'fallback', message: 'Enable multiple group columns for hierarchical fallback' };
   return { isValid: true };
 }
 

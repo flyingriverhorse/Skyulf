@@ -30,4 +30,4 @@ export const DATE_METHOD_META: Record<string, { type: string; desc: string }> = 
   time_of_day:{ type: 'string', desc: 'Hour bucket — "Morning" (5-11), "Afternoon" (12-16), "Evening" (17-20), "Night" (21-4)' },
 };
 export const SIMILARITY_METHODS = ['ratio', 'token_sort_ratio', 'token_set_ratio'];
-export const GROUP_AGG_METHODS = ['mean', 'sum', 'count', 'min', 'max', 'std', 'median'];
+export const GROUP_AGG_METHODS = ['mean', 'sum', 'count', 'min', 'max', 'std', 'median', 'deviation'];

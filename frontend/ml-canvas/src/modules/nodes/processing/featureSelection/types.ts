@@ -9,7 +9,9 @@ export interface FeatureSelectionConfig {
   | 'select_fwe'
   | 'generic_univariate_select'
   | 'select_from_model'
-  | 'rfe';
+  | 'rfe'
+  | 'rfecv'
+  | 'sequential_feature_selection';
 
   // Common
   target_column?: string | undefined;
@@ -28,6 +30,11 @@ export interface FeatureSelectionConfig {
   estimator?: 'RandomForest' | 'LogisticRegression' | 'LinearRegression' | 'auto' | undefined; // Model based
   max_features?: number | undefined; // SelectFromModel
   step?: number | undefined; // RFE
+  cv?: number;
+  scoring?: string;
+  min_features_to_select?: number;
+  n_features_to_select?: number | 'auto';
+  direction?: 'forward' | 'backward';
   drop_columns?: boolean | undefined;
 }
 

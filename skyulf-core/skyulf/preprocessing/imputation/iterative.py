@@ -30,12 +30,42 @@ from ..dispatcher import apply_dual_engine
 from ._common import (
     _build_iterative_estimator,
     _sklearn_transform_subset,
+    _transform_imputer,
     _validate_imputer_array,
     _validate_local_imputer,
     drop_all_missing_columns,
 )
 
 _LOCAL_ESTIMATORS = (BayesianRidge, DecisionTreeRegressor, ExtraTreesRegressor, KNeighborsRegressor)
+
+
+def _deterministic_row_estimators(imputer: IterativeImputer) -> bool:
+    """Keep posterior sampling and unknown fitted predictors outside row-local admission."""
+    return not imputer.sample_posterior and all(
+        _row_estimator(step.estimator) for step in imputer.imputation_sequence_
+    )
+
+
+def _row_estimator(estimator: Any) -> bool:
+    """Exact regressor identities must also retain their built-in inference methods/options."""
+    return type(estimator) in _LOCAL_ESTIMATORS and not any(
+        callable(value) for value in vars(estimator).values()
+    )
+
+
+def _transform_iterative(imputer: IterativeImputer, values: np.ndarray) -> Any:
+    """Use one discarded complete row to avoid sklearn's all-missing-request shortcut."""
+    if (
+        not len(values)
+        or type(imputer) is not IterativeImputer
+        or not imputer.n_iter_
+        or not _deterministic_row_estimators(imputer)
+    ):
+        return _transform_imputer(imputer, values)
+    # The fitted regressors predict each row independently. A complete sentinel
+    # is never imputed and prevents np.all(mask) from skipping saved rounds.
+    sentinel = np.full((1, values.shape[1]), int(imputer.missing_values == 0), dtype=values.dtype)
+    return imputer.transform(np.concatenate([values, sentinel], axis=0))[:-1]
 
 
 def _validate_iterative_initial(imputer: IterativeImputer, width: int) -> None:
@@ -97,21 +127,15 @@ class IterativeImputerApplier(BaseApplier):
 
     @staticmethod
     def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
-        """Retain the all-missing request shortcut and abstain from stochastic replay."""
+        """Admit deterministic saved rounds while abstaining from stochastic replay."""
         if engine not in {"pandas", "polars"}:
             return None
         IterativeImputerApplier.validate_inference_state(state)
-        context = "row"
         if state:
             imputer = state["imputer_object"]
-            if imputer.sample_posterior or any(
-                type(step.estimator) not in _LOCAL_ESTIMATORS
-                for step in imputer.imputation_sequence_
-            ):
+            if not _deterministic_row_estimators(imputer):
                 return None
-            if imputer.n_iter_:
-                context = "global"
-        return ExecutionCapability(engine, "apply", "local", "preserve", context)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -126,7 +150,9 @@ class IterativeImputerApplier(BaseApplier):
         imputer = params.get("imputer_object")
         if not resolve_valid_columns(X, cols) or not imputer:
             return X, _y
-        return _sklearn_transform_subset(X, cols, imputer, is_polars=True), _y
+        return _sklearn_transform_subset(
+            X, cols, imputer, is_polars=True, transform=_transform_iterative
+        ), _y
 
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -134,7 +160,9 @@ class IterativeImputerApplier(BaseApplier):
         imputer = params.get("imputer_object")
         if not resolve_valid_columns(X, cols) or not imputer:
             return X, _y
-        return _sklearn_transform_subset(X, cols, imputer, is_polars=False), _y
+        return _sklearn_transform_subset(
+            X, cols, imputer, is_polars=False, transform=_transform_iterative
+        ), _y
 
 
 @NodeRegistry.register("IterativeImputer", IterativeImputerApplier)
@@ -158,11 +186,12 @@ class IterativeImputerCalculator(BaseCalculator):
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> IterativeImputerArtifact:  # pylint: disable=arguments-differ
         """Fit chained-equations imputation, dropping all-missing columns sklearn cannot impute."""
+        estimator_name = config.get("estimator", "BayesianRidge")
+        estimator = _build_iterative_estimator(estimator_name)
         if user_picked_no_columns(config):
             return {}
 
         max_iter = config.get("max_iter", 10)
-        estimator_name = config.get("estimator", "BayesianRidge")
         random_state = config.get("random_state", 0)
 
         # KNN/Iterative imputers always fit through numpy — engine choice
@@ -177,7 +206,6 @@ class IterativeImputerCalculator(BaseCalculator):
         if not cols:
             return {}
 
-        estimator = _build_iterative_estimator(estimator_name)
         imputer = IterativeImputer(
             estimator=estimator, max_iter=max_iter, random_state=random_state
         )

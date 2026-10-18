@@ -208,10 +208,15 @@ def _polars_replace_mapping(col: str, dtype: Any, mapping: dict) -> Any:
     return pl.col(col).replace_strict(dict(rules), default=pl.col(col)).alias(col)
 
 
-def _pandas_integer_rules(
+def _pandas_replacement_rules(
     series: pd.Series, pairs: list[tuple[Any, Any]]
 ) -> tuple[pd.Series, list[tuple[Any, Any]]]:
-    """Use a nullable integer container whenever configured numeric rules can introduce nulls."""
+    """Keep numeric missing replacements in the column's native numeric storage."""
+    if pd.api.types.is_float_dtype(series.dtype):
+        return series, [
+            (key, float("nan") if value is None or value is pd.NA else value)
+            for key, value in pairs
+        ]
     rules, integer_output = _integer_replacement_rules(series.dtype, pairs)
     if not integer_output:
         return series, rules
@@ -223,7 +228,7 @@ def _pandas_integer_rules(
 
 def _pandas_replace_mapping(series: pd.Series, mapping: dict) -> pd.Series:
     """Retain native dictionary replacement after validating integer-only numeric rules."""
-    series, pairs = _pandas_integer_rules(series, list(mapping.items()))
+    series, pairs = _pandas_replacement_rules(series, list(mapping.items()))
     return series.replace(dict(pairs))
 
 
@@ -249,7 +254,7 @@ def _pandas_replace_pairs(
     series: pd.Series, pairs: list[tuple[Any, Any]], scalar: bool
 ) -> pd.Series:
     """Keep native scalar null handling and ordered list replacement semantics."""
-    series, pairs = _pandas_integer_rules(series, pairs)
+    series, pairs = _pandas_replacement_rules(series, pairs)
     if scalar and pairs:
         key, value = pairs[0]
         return series.replace(key, value)
@@ -368,8 +373,24 @@ def _replacement_output_dtype(
         if isinstance(configured, dict)
         else _coerce_replacement_pairs(configured, kind)
     )
+    return _numeric_replacement_output_dtype(label, dtype, rules)
+
+
+def _is_float_null(value: Any) -> bool:
+    """Recognize the null replacements that retain native floating storage."""
+    if value is None or value is pd.NA:
+        return True
+    return pd.api.types.is_float(value) and bool(pd.isna(value))
+
+
+def _numeric_replacement_output_dtype(
+    label: str, dtype: Any, rules: list[tuple[Any, Any]]
+) -> str | None:
+    """Infer only native storage guaranteed by numeric/null replacement rules."""
     rules, integer_output = _integer_replacement_rules(dtype, rules)
     if not rules or label == "object":
+        return label
+    if pd.api.types.is_float_dtype(dtype) and all(_is_float_null(value) for _, value in rules):
         return label
     if not integer_output:
         return None
@@ -392,6 +413,8 @@ class ValueReplacementApplier(BaseApplier):
     fractional, infinite and out-of-range replacements require an explicit
     Casting step. Missing replacements use native nullable integers. These
     checks use configured rules before matching rows, including empty requests.
+    Null replacements in floating columns retain the floating dtype, so a later
+    numeric imputer can consume them. Existing nullable floating storage is kept.
     Nonnumeric replacements retain their native engine behavior.
     """
 

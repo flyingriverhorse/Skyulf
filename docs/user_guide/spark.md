@@ -1,4 +1,4 @@
-# Spark: execution and environment setup
+# Spark: choose an execution path
 
 Use Spark when the input should stay distributed. Native SimpleImputer
 `mean`/`constant` and StandardScaler support fit and apply; their portable state
@@ -6,7 +6,7 @@ can be restored across pandas, Polars and Spark. A
 [portable inference bundle](inference_bundles.md) combines supported preprocessing
 with a fitted Python regression or classification model on workers.
 
-The separate [certified MLflow pyfunc route](databricks_bundle.md#distributed-inference-settings)
+The separate [certified MLflow pyfunc route](databricks_spark_scoring.md)
 uses inspected pandas fitted-pipeline packages and supports its own admitted
 recipes, estimators and model sets. Training those models still uses bounded
 pandas/Polars frames. Installing the Spark extra does not convert arbitrary
@@ -15,71 +15,54 @@ Python preprocessing into distributed operations.
 [How inference works](inference_flow.md) explains how the saved FE and
 model are reused, with diagrams for local, native Spark and worker FE paths.
 
-## Why a separate environment?
+## Choose the path before configuring compute
 
-`.venv-spark` isolates PySpark and its dependencies from the web application's
-existing `.venv`. It is a local development convention, not a runtime requirement
-or a directory shipped with Skyulf. Both environments are excluded from Git.
-Use your own environment name if preferred.
+| Goal | Entry point and artifact | Where the work runs | Current boundary |
+| --- | --- | --- | --- |
+| Fit/apply supported feature engineering on a distributed frame | `FeatureEngineer` with `ExecutionOptions("spark")` and `FrameSpec` | Native Spark expressions and aggregates | SimpleImputer mean/constant and StandardScaler; no model training |
+| Score a portable model with native preprocessing | `predict_spark(..., mode="native_features")`, `InferenceBundle` | Native FE, then Python estimator in workers | Raw input and the portable FE subset |
+| Score portable preprocessing and model together in workers | `predict_spark(..., mode="python_pipeline")`, `InferenceBundle` | Python FE/model per independent worker batch | Same portable FE subset; arbitrary Python nodes are not admitted |
+| Score an inspected fitted pandas pipeline from MLflow | Certified fitted pyfunc / generated Bundle `inference_mode: spark` | Saved Python preprocessing and model in workers | Exact fitted recipe, estimator, source and runtime must pass certification |
 
-The initial test target is Python 3.12, PySpark 4.0.3 and Java 17. Java must be
-installed separately. `JAVA_HOME` should point to the JDK directory. Consult
-the [Spark installation documentation](https://spark.apache.org/docs/4.0.3/api/python/getting_started/install.html)
-for runtime requirements. Databricks Runtime and Connect require their own
-validated dependency profiles; do not replace a managed runtime's PySpark
-installation with this development environment.
+Choose the certified route when the required fitted recipe is outside the
+portable FE subset and that exact recipe passes its admission checks. Its
+catalog differs from the native Spark catalog; local fit/save/apply success for
+a built-in transformation does not prove worker eligibility. See the
+[MLflow packaging guide](mlflow_models.md) and
+[preprocessing recipe catalog](preprocessing_recipes.md).
 
-## Install from the repository
+Model fitting for these Python estimators happens in one Python process with a
+bounded training frame. Distributed prediction does not turn that training step
+into Spark ML training. Native FE can fit its supported statistics on Spark,
+while Python model training still needs an explicitly prepared bounded dataset.
 
-Run these commands from the repository root. Create the environment only once.
+## Prerequisites for the runtime examples
 
-```powershell
-uv venv .venv-spark --python 3.12
-uv pip install --python .venv-spark/Scripts/python.exe -r requirements-spark.txt
-$env:JAVA_HOME = 'C:\path\to\jdk-17'
-$env:SKYULF_REQUIRE_SPARK = '1'
-.venv-spark/Scripts/python.exe -m pytest skyulf-core/tests/spark -q -o addopts=
-```
+Use an **existing caller-owned `spark` session** on compatible classic Spark or
+Databricks compute. Every runtime block below assumes that variable already
+exists; Skyulf neither creates nor stops your session. Input examples declare
+flat schemas, unique non-null row keys and floating-point model features.
 
-On Linux/macOS:
+For a separate local environment, the package installation is:
 
 ```bash
-uv venv .venv-spark --python 3.12
-uv pip install --python .venv-spark/bin/python -r requirements-spark.txt
-export JAVA_HOME=/path/to/jdk-17
-SKYULF_REQUIRE_SPARK=1 .venv-spark/bin/python -m pytest skyulf-core/tests/spark -q -o addopts=
+uv venv --python 3.12
+# Activate your environment using your shell.
+uv pip install "skyulf-core[spark]"
 ```
 
-The tests execute a distributed aggregate and an Arrow/Python worker transform.
-The mandatory lane fails when PySpark is missing. In the ordinary core suite,
-the optional runtime tests skip if PySpark is not installed. A skip does not
-prove Spark compatibility.
+Java must be installed separately for classic local Spark. On Databricks, keep
+the managed PySpark/Connect environment and use the project's matching dependency
+profile; installing another PySpark into a managed runtime can break it. Install
+the artifact's recorded dependencies on every process that loads it, including
+workers. The local development setup and focused checks appear in the
+[Spark capacity guide](spark_benchmark.md#local-development-environment-and-runtime-check).
 
-## Minimal runtime example
-
-This is a plain PySpark example, not a Skyulf feature-engineering pipeline.
-Run it using the Spark environment's Python interpreter.
-
-```python
-import os
-import sys
-
-from pyspark.sql import SparkSession, functions as F
-
-os.environ["PYSPARK_PYTHON"] = sys.executable
-spark = SparkSession.builder.master("local[2]").appName("spark-check").getOrCreate()
-try:
-    frame = spark.range(100).repartition(2)
-    total = frame.agg(F.sum("id").alias("total")).first()["total"]
-    assert total == 4950
-finally:
-    spark.stop()
-```
-
-Only one aggregate row is returned to Python. Supported native FE operations
-keep the dataset in Spark and transfer bounded learned state when supported.
-Python model inference on Spark workers is a separate capability from native
-Spark model training.
+Start with the native imputation example below to learn a mean of 2.0 and reuse
+it for a missing value in a new batch. Continue to the portable inference example
+for keyed model predictions of 40.0 and 20.0. Any `collect`/`first` calls in the
+examples materialize only their tiny demonstration data or aggregate result;
+production callers select their own action or distributed output sink.
 
 ## Spark engine adapter
 
@@ -89,6 +72,7 @@ engine without its optional dependency raises an explicit installation error.
 
 After creating your own `spark` session, you can run:
 
+<!-- skyulf-example: spark_runtime engine-adapter -->
 ```python
 from skyulf.engines import EngineRegistry, SparkEngine, get_engine
 
@@ -108,16 +92,15 @@ The separate `DistributedDataFrame` protocol exposes `columns`, `schema`,
 backticks; an empty projection keeps the rows. Schema access can require query
 analysis, but these adapter operations do not collect rows or count them.
 
-The local `SkyulfDataFrame` protocol remains for pandas/Polars. Spark wrappers
-reject `len`, `shape`, `to_pandas`, `to_numpy` and `to_arrow` with
-`DistributedMaterializationError`. `SparkEngine.to_numpy` and `SklearnBridge`
-also reject distributed features or targets. Worker inference uses the separate `predict_spark` or certified MLflow entry
-point; wrapping a DataFrame does not enable model execution.
+The local `SkyulfDataFrame` protocol remains for pandas/Polars. Spark wrappers reject `len`,
+`shape`, `to_pandas`, `to_numpy` and `to_arrow` with `DistributedMaterializationError`.
+`SparkEngine.to_numpy` and `SklearnBridge` also reject distributed features or targets. Worker
+inference uses the separate `predict_spark` or certified MLflow entry point; wrapping a DataFrame
+does not enable model execution.
 
-Skyulf neither creates nor retains a Spark session. Use your own
-`spark.createDataFrame(...)` to create input; `SparkEngine.from_pandas` and
-`create_dataframe` reject calls with this guidance. `to_native()` returns the
-original distributed frame: native actions you call explicitly remain your
+Skyulf neither creates nor retains a Spark session. Use your own `spark.createDataFrame(...)` to
+create input; `SparkEngine.from_pandas` and `create_dataframe` reject calls with this guidance.
+`to_native()` returns the original distributed frame: native actions you call explicitly remain your
 responsibility. In particular, Spark's
 [`toPandas`](https://spark.apache.org/docs/4.0.3/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toPandas.html)
 collects data into driver memory.
@@ -135,6 +118,7 @@ checks; unrelated connection and permission failures still propagate.
 The execution API can validate an execution request without starting
 Spark or changing the current pandas/Polars engine:
 
+<!-- skyulf-example: native spark-contracts -->
 ```python
 from skyulf.core.execution import ExecutionOptions, FrameSpec
 
@@ -163,6 +147,7 @@ must be unambiguous under the session's case-sensitivity setting.
 This working example exercises the input boundary with an empty pipeline;
 it does not perform feature transformations:
 
+<!-- skyulf-example: spark_runtime keyed-engineer -->
 ```python
 from skyulf.core.execution import ExecutionOptions, FrameSpec
 from skyulf.preprocessing.pipeline import FeatureEngineer
@@ -193,18 +178,16 @@ Automatic feature selection excludes keys and target. Explicit `columns` cannot
 select either. Names are exact and literal, including dots/backticks. Raw inputs
 produce raw Spark outputs; wrapped inputs retain their wrapper convention.
 
-Every step must declare both fit and apply support before fitting starts. Apply
-also checks all fitted steps before execution. This path accepts native,
-row-preserving operations with row-local apply behavior. This native FeatureEngineer path does not run worker Python, window,
-filtering or expansion operations. SimpleImputer
-mean/constant and StandardScaler are available; unsupported nodes or strategies fail before any
-validation action or fit. The runner normalizes registered node defaults before
-checking capabilities, so an omitted SimpleImputer strategy means `mean`, and
-StandardScaler defaults to `with_mean=True, with_std=True`.
-Custom native nodes use the existing engine-keyed dispatcher mapping with a
-`"spark"` implementation. It receives the full native frame, `y=None` and the
-resolved feature names in `config["columns"]`; the returned frame retains keys
-and any target. Fitted parameters must contain what its applier needs.
+Every step must declare both fit and apply support before fitting starts. Apply also checks all
+fitted steps before execution. This path accepts native, row-preserving operations with row-local
+apply behavior. This native FeatureEngineer path does not run worker Python, window, filtering or
+expansion operations. SimpleImputer mean/constant and StandardScaler are available; unsupported
+nodes or strategies fail before any validation action or fit. The runner normalizes registered node
+defaults before checking capabilities, so an omitted SimpleImputer strategy means `mean`, and
+StandardScaler defaults to `with_mean=True, with_std=True`. Custom native nodes use the existing
+engine-keyed dispatcher mapping with a `"spark"` implementation. It receives the full native frame,
+`y=None` and the resolved feature names in `config["columns"]`; the returned frame retains keys and
+any target. Fitted parameters must contain what its applier needs.
 
 ### Validation actions and metrics
 
@@ -233,6 +216,7 @@ available. The portable learned-state codec is described below.
 The following pipeline learns the mean on training data and applies that same
 value to an unlabeled batch. Use a caller-owned Spark session as above:
 
+<!-- skyulf-example: spark_runtime native-imputer -->
 ```python
 from skyulf.core.execution import ExecutionOptions, FrameSpec
 from skyulf.preprocessing.pipeline import FeatureEngineer
@@ -287,6 +271,7 @@ Selection and dtype rules:
 Learned state can also cross engines explicitly. This example fits on pandas and
 applies to Spark; swapping the fit/apply engines follows the same codec contract:
 
+<!-- skyulf-example: spark_runtime cross-engine-state -->
 ```python
 import pandas as pd
 from skyulf.core.portable_state import encode_state, decode_state
@@ -312,13 +297,14 @@ input feature columns to be present. Output rows must still be matched by keys.
 
 ## Native StandardScaler: center and scale
 
-StandardScaler learns per-column statistics on Spark and applies them with native
-expressions. Its population variance matches the local node's `ddof=0` convention,
-as documented by [scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html).
+StandardScaler learns per-column statistics on Spark and applies them with native expressions. Its
+population variance matches the local node's `ddof=0` convention, as documented by
+[scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html).
 It uses Spark's native
 [`var_pop`](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.var_pop.html)
 on shifted values to reduce numerical error.
 
+<!-- skyulf-example: spark_runtime native-scaler -->
 ```python
 from skyulf.core.execution import ExecutionOptions, FrameSpec
 from skyulf.preprocessing.pipeline import FeatureEngineer
@@ -333,6 +319,7 @@ scaler = FeatureEngineer(
     execution_options=ExecutionOptions(engine="spark", state_max_bytes=8192),
 )
 scaled_train, _ = scaler.fit_transform(train)
+# Materialize only the two-row demonstration. Production output stays distributed.
 assert [r.amount for r in scaled_train.orderBy("id").collect()] == [-1.0, 1.0]
 batch = spark.createDataFrame([(10, 5.0)], "id long, amount double")
 assert scaler.transform(batch).first().amount == 3.0
@@ -393,6 +380,7 @@ versioned UTF-8 JSON bytes. It currently supports `StandardScaler` and
 `SimpleImputer` with `mean` or `constant` strategies, including empty no-op
 artifacts. This example works in the base environment without Spark:
 
+<!-- skyulf-example: native spark-contracts -->
 ```python
 import pandas as pd
 
@@ -411,7 +399,9 @@ budget = ExecutionOptions(engine="spark").state_max_bytes
 payload = encode_state("SimpleImputer", params, max_bytes=budget)
 node_type, restored = decode_state(payload, max_bytes=budget)
 assert node_type == "SimpleImputer"
-result = SimpleImputerApplier().apply(pd.DataFrame({"amount": [None]}), restored)
+result = SimpleImputerApplier().apply(
+    pd.DataFrame({"amount": [None]}, dtype="float64"), restored,
+)
 assert result["amount"].tolist() == [3.0]
 ```
 
@@ -457,6 +447,7 @@ chain. `FeatureEngineer.from_state(...)` validates those bytes and restores the
 learned transformations without fitting. Both methods work without Spark installed
 when the destination is local. With a caller-owned `spark` session:
 
+<!-- skyulf-example: spark_runtime restored-engineer -->
 ```python
 import math
 import pandas as pd
@@ -523,15 +514,6 @@ checksum. Unknown versions, malformed fields, configuration/state disagreement a
 checksum mismatches are rejected. The checksum covers step order and configuration;
 it detects corruption but does not authenticate a producer.
 
-The runnable repository example also exercises Spark fit and application-owned
-file persistence. From the repository root, with Java configured as above:
-
-```powershell
-.venv-spark/Scripts/python.exe skyulf-core/examples/spark_feature_engineering.py --state-path features.json
-```
-
-`skyulf-core/examples/spark_feature_engineering.py` owns and closes its local Spark
-session. Its `run_example(spark, state_path)` function accepts an existing session.
 Use representative nulls, dtypes and partitions when checking your own recipe;
 verify prediction output by record key rather than relying on Spark row order.
 
@@ -557,56 +539,15 @@ Polars. [MLflow packaging](mlflow_models.md), [registry loading](mlflow_registry
 and [Delta publication](databricks_batch.md) have separate contracts. Check them
 on the selected compute with the fitted recipe and producer dependencies.
 
-## Measuring inference capacity
+## Benchmark and local runtime check
 
-The reproducible notebook `skyulf-core/benchmarks/bench_spark_inference.py`
-compares `native_features`, `python_pipeline` and certified MLflow pyfunc UDF
-on the same fitted SimpleImputer/StandardScaler/LinearRegression pipeline.
-It uses Spark-generated data, including nulls, and verifies every prediction
-against an independent expression. Only aggregate diagnostics reach the driver.
+<span id="measuring-inference-capacity"></span>
+<span id="local-development-environment-and-runtime-check"></span>
 
-Notebook parameters:
-
-| Parameter | Purpose |
-| --- | --- |
-| `schema` | Dedicated `catalog.schema` for benchmark models and report volume |
-| `experiment` | MLflow experiment path for benchmark artifacts |
-| `compute` | `classic` or `serverless`; must match the actual job compute |
-| `env_manager` | `virtualenv` for validated classic environments; `local` for the declared serverless worker environment |
-| `suite` | `full` for the scale matrix; `smoke` for a small runner verification |
-
-The full matrix covers 1 and 5 million rows, 2 and 64 input features, 8 and 32
-requested partitions, and 1,000/10,000-row model calls. It reports observed
-source partitions and both first/repeat action timings. Timings include source
-generation, inference and a correctness aggregate, not Delta publication.
-Preparation and model registration are outside action throughput. Fixed route
-order and managed serverless allocation mean these are workload observations,
-not a universal ranking or latency guarantee.
-
-Full reports are saved under `/Volumes/<catalog>/<schema>/benchmark/<id>.json`
-and returned from the notebook. Action checkpoints survive later scoring errors;
-the job still fails. Separate worker probes measure package restore time and
-Python-process RSS. Their process lifetime high-water mark is not an incremental
-allocation measurement or a complete executor-memory measurement.
-
-On classic compute, enable `spark.executor.processTreeMetrics.enabled=true`
-and `spark.executor.metrics.pollingInterval=1000` before starting the cluster.
-Executor peaks are cumulative across the application. Disabled or unobserved
-process counters are unknown, not zero. Serverless does not expose the executor
-status store or caller-controlled Arrow allocation; those metrics remain
-unavailable. Model-call batch size alone cannot bound worker memory.
-
-### Interpreting measurements
-
-Compare preparation, first action and repeated action separately. Changing
-partition count or model-call size can increase overhead as well as improve
-throughput; measure the actual feature width, model size and input distribution.
-Include publication when estimating end-to-end score-job latency.
-
-Keep benchmark outputs in your own schema or volume and record the runtime,
-package versions and parameters alongside the results. Worker process RSS includes
-libraries and the Python environment; its lifetime peak is not a per-call memory
-ceiling. A passing benchmark does not expand fitted-recipe admission.
+[Measure Spark inference capacity](spark_benchmark.md) covers the reproducible
+notebook that compares `native_features`, `python_pipeline` and certified MLflow
+pyfunc UDF on the same fitted pipeline, how to interpret its timings, and the
+separate `.venv-spark` local development environment with its runtime check.
 
 ## Capability declarations
 
@@ -614,6 +555,7 @@ ceiling. A passing benchmark does not expand fitted-recipe admission.
 
 A capability check distinguishes fit and apply and never falls back to pandas:
 
+<!-- skyulf-example: native spark-contracts -->
 ```python
 from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
 
@@ -628,9 +570,8 @@ except UnsupportedExecutionError as error:
 ```
 
 Mean and StandardScaler succeed; median reports unsupported. The query requires explicit defaults.
-Existing local pipelines continue to work; this new preflight is not yet wired
-into their execution. A local node without an explicit declaration also fails
-this new query, even though its existing local pipeline path remains available.
+Local pipeline execution does not call this query. A node without an explicit
+declaration fails the query, but its local pipeline path still runs.
 
 ### Declaring custom operation support
 
@@ -662,10 +603,19 @@ Spark code, certify compatibility or make a window transform batch-independent.
   child-process cleanup. A passing calculation does not prove clean shutdown;
   use an environment that permits the owned JVM processes to terminate.
 - **Spark dependency unavailable:** install the optional `skyulf-core[spark]`
-  dependency in a suitable environment, or use the repository requirements above.
+  dependency in a suitable environment, or use the
+  [repository requirements](spark_benchmark.md#install-from-the-repository).
 - **Unsupported node:** SimpleImputer mean/constant and StandardScaler are available. Other built-in
   native FE nodes are still being implemented; installing Spark does not enable them.
 
 [MLflow packaging](mlflow_models.md), [registry resolution](mlflow_registry.md),
 and [Databricks Bundles](databricks_bundle.md) have separate integration contracts.
 Use their guides to configure deployment, publication and worker dependencies.
+
+## Next steps
+
+Use [inference bundles](inference_bundles.md) to build/save/load the portable
+artifact, [inference flow](inference_flow.md) to compare where saved state runs,
+and [preprocessing context](preprocessing_context.md) before batching temporal
+or group-dependent transformations. [Databricks batch scoring](databricks_batch.md)
+covers durable table publication, which is separate from returning a Spark frame.

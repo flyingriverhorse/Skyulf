@@ -37,6 +37,7 @@ class MinMaxScalerArtifact(TypedDict, total=False):
     data_max: list[float]
     feature_range: list[float]
     columns: list[str]
+    clip: bool
 
 
 class RobustScalerArtifact(TypedDict, total=False):
@@ -49,6 +50,23 @@ class RobustScalerArtifact(TypedDict, total=False):
     with_centering: bool
     with_scaling: bool
     columns: list[str]
+    unit_variance: bool
+
+
+class QuantileTransformerArtifact(TypedDict, total=False):
+    """Learned empirical quantiles and their ordered input columns."""
+
+    type: str
+    columns: list[str]
+    transformer_object: Any
+
+
+class NormalizerArtifact(TypedDict, total=False):
+    """Saved row normalization settings and their ordered input columns."""
+
+    type: str
+    columns: list[str]
+    transformer_object: Any
 
 
 class MaxAbsScalerArtifact(TypedDict, total=False):
@@ -78,7 +96,10 @@ class GroupImputerArtifact(TypedDict, total=False):
     """Group-imputation parameters ([group, value] pairs per column and global fallbacks)."""
 
     type: str
-    group_by: str
+    group_by: str | list[str]
+    group_key_version: int
+    fallback: str
+    levels: list[dict[str, Any]]
     strategy: str
     columns: list[str]
     group_values: dict[str, list[list[Any]]]
@@ -133,6 +154,25 @@ class WinsorizeArtifact(TypedDict, total=False):
     bounds: dict[str, dict[str, float]]
     lower_percentile: float
     upper_percentile: float
+    warnings: list[str]
+    percentiles_by_column: dict[str, dict[str, float]]
+
+
+class IsolationForestArtifact(TypedDict, total=False):
+    """A fitted multivariate isolation detector and the selected feature order."""
+
+    type: str
+    columns: list[str]
+    detector_object: Any
+    warnings: list[str]
+
+
+class LocalOutlierFactorArtifact(TypedDict, total=False):
+    """A fitted novelty detector for applying fixed training neighborhoods to new rows."""
+
+    type: str
+    columns: list[str]
+    detector_object: Any
     warnings: list[str]
 
 
@@ -317,6 +357,7 @@ class FeatureGenerationArtifact(TypedDict, total=False):
     """Feature-generation parameters (operations, epsilon and allow-overwrite flag)."""
 
     type: str
+    operation_contract_version: int
     operations: list[dict[str, Any]]
     epsilon: float
     allow_overwrite: bool
@@ -452,6 +493,8 @@ class CountVectorizerArtifact(TypedDict, total=False):
     """Count-vectorizer parameters (vocabulary, output columns and fitted sklearn vectorizer)."""
 
     type: str
+    column_mode: str
+    column_artifacts: dict[str, Any]
     columns: list[str]  # source text column(s) fed to the vectorizer
     output_columns: list[str]  # one name per vocabulary term
     vocabulary: dict[str, int]  # token → column-index mapping
@@ -467,6 +510,8 @@ class TfidfVectorizerArtifact(TypedDict, total=False):
     """TF-IDF vectorizer params: vocabulary, per-term IDF weights and the fitted vectorizer."""
 
     type: str
+    column_mode: str
+    column_artifacts: dict[str, Any]
     columns: list[str]
     output_columns: list[str]
     vocabulary: dict[str, int]
@@ -565,6 +610,8 @@ class OneHotArtifact(TypedDict, total=False):
     drop_original: bool
     include_missing: bool
     missing_encoding_version: int
+    fixed_categories: bool
+    column_names: str
 
 
 class OrdinalArtifact(TypedDict, total=False):
@@ -597,6 +644,7 @@ class TargetEncoderArtifact(TypedDict, total=False):
     columns: list[str]
     # sklearn TargetEncoder — not JSON-serialisable
     encoder_object: Any
+    category_key_version: int
 
 
 class HashEncoderArtifact(TypedDict, total=False):

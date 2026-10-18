@@ -276,6 +276,15 @@ class StatefulTransformer:
                 self.calculator, self.applier, data, config, weights
             )
             return transformed, weights
+        lof = import_module("skyulf.preprocessing.outliers.local_outlier_factor")
+        if (
+            type(self.calculator) is lof.LocalOutlierFactorCalculator
+            and type(self.applier) is lof.LocalOutlierFactorApplier
+        ):
+            self.params, transformed, weights = lof.fit_transform_train_weighted(
+                self.calculator, data, config, weights
+            )
+            return transformed, weights
         if has_builtin_row_mapping(self.applier):
             self.params = cast(dict[str, Any], self.calculator.fit(data, config))
             return apply_weighted(

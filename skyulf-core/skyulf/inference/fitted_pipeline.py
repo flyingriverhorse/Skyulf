@@ -20,15 +20,17 @@ from sklearn.base import is_classifier
 from ..core.portable_state import _bad_constant, _unique_object
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
+from ..preprocessing._exclusion import is_exclusion_step
 from ..preprocessing._target_labels import original_labels
-from ._manifest import checksum, runtime_requirements
+from ._manifest import checksum, label_dtype, runtime_requirements
+from ._model_requirements import native_model_requirements
 from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
 from .project_dependencies import (
     parse_project_requirements,
     source_project_requirements,
     verify_project_requirements,
 )
-from .project_scoring import validate_scoring_config
+from .project_scoring import _typed_column, validate_scoring_config
 
 _MAX_MANIFEST_BYTES = 64 * 1024
 _MAX_PIPELINE_BYTES = 256 * 1024 * 1024
@@ -132,12 +134,16 @@ def _validate_tuned_thresholds(
         raise ValueError("Tuned thresholds require fitted classification thresholds.")
 
 
+class ArtifactRuntimeMismatchError(ValueError):
+    """A saved artifact was produced by different pinned runtime versions."""
+
+
 def _check_runtime(manifest: FittedPipelineManifest) -> None:
     """Reject incompatible Python or dependency versions before loading pickle."""
     verify_project_requirements(manifest.project_requirements)
     current = dict(runtime_requirements())
     required = dict(manifest.requirements)
-    if set(required) != set(current):
+    if tuple(name for name, _ in manifest.requirements) != tuple(current):
         raise ValueError("Local artifact runtime requirements are incomplete.")
     for name in ("python", "skyulf-core", "scikit-learn", "numpy", "scipy", "pandas", "polars"):
         actual, expected = current[name], required[name]
@@ -147,7 +153,7 @@ def _check_runtime(manifest: FittedPipelineManifest) -> None:
             else actual == expected
         )
         if not matches:
-            raise ValueError(
+            raise ArtifactRuntimeMismatchError(
                 f"Local artifact runtime mismatch for {name}: requires {expected}, found {actual}."
             )
 
@@ -227,6 +233,8 @@ def load_pipeline(path: str | Path) -> FittedPipelineArtifact:
             manifest.use_tuned_thresholds,
             format_version=manifest.format_version,
         )
+        # _check_runtime already validated these pins, allowing Python patch differences.
+        .model_copy(update={"requirements": manifest.requirements})
         != manifest
     ):
         raise ValueError("Local artifact manifest disagrees with its fitted pipeline.")
@@ -284,12 +292,16 @@ def require_pipeline_scope(
 def predict_pipeline(
     frame: pd.DataFrame | pl.DataFrame, artifact: FittedPipelineArtifact
 ) -> pd.DataFrame:
-    """Apply the fitted preprocessing and model with the recorded fit engine."""
+    """Apply saved preprocessing and publish null outcomes for fitted row exclusions."""
     if not isinstance(artifact, FittedPipelineArtifact):
         raise TypeError("Expected a FittedPipelineArtifact.")
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Local prediction requires a pandas or Polars DataFrame.")
     native = validate_pipeline_input(frame, artifact)
+    if has_exclusion_steps(artifact):
+        return _predict_with_exclusions(frame, native, artifact)
+    if not len(native):
+        return _empty_prediction(frame, artifact.manifest)
     prediction = np.asarray(
         artifact.pipeline.predict(
             native, use_tuned_thresholds=artifact.manifest.use_tuned_thresholds
@@ -299,16 +311,79 @@ def predict_pipeline(
         raise ValueError("Local pipeline prediction shape disagrees with input rows.")
     index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(len(frame))
     result = pd.DataFrame({"prediction": pd.Series(prediction, index=index)})
+    _add_probabilities(result, native, artifact)
+    return result
+
+
+def _add_probabilities(
+    result: pd.DataFrame,
+    native: pd.DataFrame | pl.DataFrame,
+    artifact: FittedPipelineArtifact,
+) -> None:
+    """Append recorded classifier probabilities while preserving the ordinary prediction path."""
     if (
         artifact.manifest.task == "classification"
         and artifact.manifest.classification_probabilities
     ):
         transformed = artifact.pipeline.feature_engineer.transform(native, preserve_rows=True)
         probabilities = np.asarray(artifact.pipeline._predict_proba_transformed(transformed))
-        if probabilities.shape != (len(frame), len(artifact.manifest.classes)):
+        if probabilities.shape != (len(result), len(artifact.manifest.classes)):
             raise ValueError("Local pipeline probability shape disagrees with recorded classes.")
         for position in range(len(artifact.manifest.classes)):
             result[f"probability_{position}"] = probabilities[:, position]
+
+
+def has_exclusion_steps(artifact: FittedPipelineArtifact) -> bool:
+    """Identify saved filters whose prediction outputs require explicit coverage columns."""
+    return any(is_exclusion_step(step) for step in artifact.pipeline.feature_engineer.fitted_steps)
+
+
+def _predict_with_exclusions(
+    frame: pd.DataFrame | pl.DataFrame,
+    native: pd.DataFrame | pl.DataFrame,
+    artifact: FittedPipelineArtifact,
+) -> pd.DataFrame:
+    """Scatter eligible predictions into typed, full-length nullable output columns."""
+    pipeline, manifest = artifact.pipeline, artifact.manifest
+    transformed, positions, reasons = pipeline.feature_engineer.transform_with_exclusions(native)
+    index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(len(frame))
+    empty = _empty_prediction(frame.head(0), manifest)
+    result = pd.DataFrame(index=pd.RangeIndex(len(frame)))
+    label = "float64" if manifest.task == "regression" else label_dtype(manifest.classes)
+    for column in empty:
+        dtype = label if column == "prediction" else "float64"
+        result[column] = _typed_column(pd.Series(pd.NA, index=result.index), dtype)
+    if len(positions):
+        result.loc[positions, "prediction"] = np.asarray(
+            pipeline._predict_transformed(
+                transformed, use_tuned_thresholds=manifest.use_tuned_thresholds
+            )
+        )
+        if manifest.task == "classification" and manifest.classification_probabilities:
+            probabilities = np.asarray(pipeline._predict_proba_transformed(transformed))
+            if probabilities.shape != (len(positions), len(manifest.classes)):
+                raise ValueError(
+                    "Local pipeline probability shape disagrees with recorded classes."
+                )
+            result.loc[positions, list(empty.columns[1:])] = probabilities
+    result["scoring_status"] = pd.Series(
+        np.where(reasons.isna(), "predicted", "excluded"), index=result.index, dtype="string"
+    )
+    result["exclusion_reason"] = reasons
+    result.index = index
+    return result
+
+
+def _empty_prediction(
+    frame: pd.DataFrame | pl.DataFrame, manifest: FittedPipelineManifest
+) -> pd.DataFrame:
+    """Return the declared empty output without invoking preprocessing or estimators."""
+    index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(0)
+    dtype = "float64" if manifest.task == "regression" else label_dtype(manifest.classes)
+    result = pd.DataFrame({"prediction": pd.Series(index=index, dtype=dtype)}, index=index)
+    if manifest.task == "classification" and manifest.classification_probabilities:
+        for position in range(len(manifest.classes)):
+            result[f"probability_{position}"] = pd.Series(index=index, dtype="float64")
     return result
 
 
@@ -330,6 +405,12 @@ def _project_contract(pipeline: SkyulfPipeline) -> tuple[str, ...]:
             raise ValueError("Project scoring requires saved project Python source.")
         validate_scoring_config(config, source)
     pins = set(source_project_requirements(source) if source else ())
+    pins.update(
+        native_model_requirements(
+            getattr(pipeline, "model_estimator", None),
+            [record["artifact"] for record in pipeline.feature_engineer.fitted_steps],
+        )
+    )
     for record in pipeline.feature_engineer.fitted_steps:
         if record["type"] == "sentence_embedder":
             pins.update(_embedding_requirements(record["artifact"]))

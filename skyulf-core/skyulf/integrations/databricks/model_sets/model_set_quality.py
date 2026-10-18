@@ -120,6 +120,8 @@ def _evaluate_component(
         min_improvement=report.min_improvement,
         quality_threshold=report.quality_threshold,
         quality_gates=report.quality_gates,
+        min_scored_fraction=report.min_scored_fraction,
+        max_coverage_drop=report.max_coverage_drop,
         max_rows=min(max_rows, spec.max_rows),
         max_bytes=min(max_bytes, spec.max_bytes),
         **endpoints,

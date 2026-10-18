@@ -7,9 +7,12 @@ stable across library and pickle-protocol versions while still changing
 whenever the learned model changes.
 """
 
+import ctypes
 import dataclasses
 import hashlib
+import importlib
 import inspect
+from _ctypes import CFuncPtr
 from collections.abc import Iterator
 from datetime import date, time, timedelta
 from types import ModuleType
@@ -41,6 +44,14 @@ _BIT_GENERATOR_TYPES = frozenset(
     (np.random.PCG64, np.random.PCG64DXSM, np.random.MT19937, np.random.Philox, np.random.SFC64)
 )
 _NUMERIC_DTYPE_TYPES = frozenset(type(np.dtype(code)) for code in "?bhilqBHILQefdgFDG")
+_CTYPES_TYPES = (
+    ctypes._SimpleCData,
+    ctypes._Pointer,
+    CFuncPtr,
+    ctypes.Array,
+    ctypes.Structure,
+    ctypes.Union,
+)
 
 
 def artifact_digest(obj: Any) -> bytes:
@@ -57,6 +68,9 @@ def artifact_digest(obj: Any) -> bytes:
     contain process-dependent pointers. Nesting beyond Python's recursion
     capacity also raises ``TypeError``, with an excessive-depth explanation.
     Temporal scalars are unsupported; NumPy temporal arrays retain their encoding.
+    Exact XGBoost and LightGBM boosters use their native model serializers;
+    unknown ctypes values and booster subclasses are unsupported. Native format
+    bytes can change between library versions, so those upgrades may change seals.
 
     The length-framed encoding replaces the original ambiguous encoding;
     previously stored artifact digests and fitted fingerprints must be
@@ -226,6 +240,8 @@ def _tree_children(h: Any, obj: Any) -> Iterator[Any]:
 
 def _object_children(h: Any, obj: Any) -> Iterator[Any]:
     """Yield supported object state and reject values with no canonical representation."""
+    if _feed_native_state(h, obj):
+        return
     if isinstance(obj, type):
         h.update(b"type:")
         yield obj.__module__
@@ -256,6 +272,39 @@ def _object_children(h: Any, obj: Any) -> Iterator[Any]:
         yield _object_state(obj)
         return
     raise TypeError(f"Cannot digest object of type {type(obj)!r}: no canonical representation")
+
+
+def _feed_native_state(h: Any, obj: Any) -> bool:
+    """Hash exact booster serializers, rejecting unrecognized native memory wrappers."""
+    if isinstance(obj, _CTYPES_TYPES):
+        raise TypeError(f"Cannot digest ctypes object of type {type(obj)!r}")
+    booster_type = _native_booster_type(type(obj))
+    if booster_type is None:
+        return False
+    if type(obj) is not booster_type or any(callable(value) for value in vars(obj).values()):
+        raise TypeError(f"Cannot digest unreviewed native booster of type {type(obj)!r}")
+    # Call the library class method, never an instance-provided serializer. Global
+    # monkeypatches of trusted libraries remain outside the artifact trust boundary.
+    if booster_type.__module__ == "xgboost.core":
+        _feed_bytes(h, b"xgboost-ubj", bytes(booster_type.save_raw(obj, raw_format="ubj")))
+    else:
+        _feed_bytes(
+            h, b"lightgbm-model", booster_type.model_to_string(obj, num_iteration=-1).encode()
+        )
+        # All trees are bound above; this Python value chooses the default serving subset.
+        if type(obj.best_iteration) is not int:
+            raise TypeError("Cannot digest native booster with invalid best_iteration")
+        # Fitted models use 0 and native reloads use -1 for the same all-tree behavior.
+        _feed_scalar(h, max(0, obj.best_iteration))
+    return True
+
+
+def _native_booster_type(cls: type) -> Any:
+    """Resolve optional libraries only for booster ancestry, then require their exact class."""
+    for base in cls.__mro__:
+        if base.__name__ == "Booster" and base.__module__ in ("xgboost.core", "lightgbm.basic"):
+            return importlib.import_module(base.__module__).Booster
+    return None
 
 
 def _compiled_loss_state(obj: Any) -> Any:

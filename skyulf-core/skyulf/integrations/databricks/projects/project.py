@@ -243,11 +243,12 @@ def resolve_project_workflow(
 
 def _load_scoring_hook(result: dict[str, Any], module: Any, source: str) -> None:
     """Resolve optional scoring rules once and bind their parameters to the model."""
-    factory = getattr(module, "build_scoring", None)
-    if factory is None:
+    hook = "build_model_rules" if hasattr(module, "build_model_rules") else "build_scoring"
+    factory = getattr(module, hook, None)
+    if factory is None and hook == "build_scoring":
         return
     if not callable(factory):
-        raise ValueError("build_scoring must be a function returning a scoring policy.")
+        raise ValueError(f"{hook} must be a function returning a scoring policy.")
     config = factory()
     if isinstance(config, dict) and "reuse_pre_split" in config:
         from ..scoring.shared.scoring_pre_split import resolve_pre_split_scoring  # noqa: PLC0415

@@ -2,6 +2,7 @@
 
 import importlib
 import math
+from decimal import Decimal
 from typing import Any
 
 import numpy as np
@@ -13,7 +14,8 @@ from skyulf.profiling._drift_evidence import (
     correct_evidence,
     numeric_evidence,
 )
-from skyulf.profiling.drift import ColumnDrift, DriftMetric
+from skyulf.profiling._drift_settings import merge_drift_settings
+from skyulf.profiling.drift import ColumnDrift, DriftCalculator, DriftMetric
 
 from ..monitoring_metrics import column_drift_evidence, monitoring_metric
 from .spark_monitoring_metrics import (
@@ -103,28 +105,60 @@ def _cdf_statistics(reference: Any, current: Any, n: int, m: int) -> tuple[float
     return float(row["ks"]) / (n * m), float(row["transport"] or 0) / (n * m)
 
 
-def _histogram(frame: Any, edges: list[float], size: int) -> np.ndarray:
-    """Reduce clipped reference-quantile bins to at most ten counts."""
+def _histogram(frame: Any, boundaries: list[float | Decimal], size: int) -> np.ndarray:
+    """Reduce midpoint or quantile bins to at most ten counts, including tails."""
     f = spark_functions()
     value = spark_column("value")
+    floating = frame.schema["value"].dataType.typeName() in {"float", "double"}
     bucket = f.lit(0)
-    for edge in edges[1:-1]:
+    for edge in boundaries:
+        if floating and isinstance(edge, Decimal):
+            # Spark compares float/Decimal as double. Round the exact midpoint
+            # upward so a representable value below it stays in the lower bin.
+            rounded = float(edge)
+            edge = math.nextafter(rounded, math.inf) if Decimal(rounded) < edge else rounded
         bucket = bucket + (value >= f.lit(edge)).cast("int")
     rows = frame.select(bucket.alias("bucket")).groupBy("bucket").count().limit(11).collect()
-    counts = np.zeros(len(edges) - 1)
+    counts = np.zeros(len(boundaries) + 1)
     for row in rows:
         counts[row["bucket"]] = row["count"] / size
     return np.where(counts == 0, 0.0001, counts)
 
 
+def _histogram_boundaries(reference: Any) -> list[float | Decimal]:
+    """Match Core's discrete midpoints before falling back to continuous quantiles."""
+    levels = sorted(
+        row["value"] for row in reference.select("value").distinct().limit(11).collect()
+    )
+    if len(levels) > 10:
+        f = spark_functions()
+        percentiles = f.percentile("value", [index / 10 for index in range(11)])
+        return sorted(set(reference.agg(percentiles.alias("edges")).first()["edges"]))[1:-1]
+    dtype = reference.schema["value"].dataType.typeName()
+    if dtype in {"long", "integer", "short", "byte"}:
+        # Parsing (left + right) * 5 at scale 1 gives the exact midpoint without
+        # integer overflow or rounding by the caller's Decimal precision.
+        return [
+            Decimal(f"{(left + right) * 5}e-1")
+            for left, right in zip(levels, levels[1:], strict=False)
+        ]
+    values = np.asarray(levels, dtype=np.float32 if dtype == "float" else np.float64)
+    return np.maximum(values[:-1] / 2 + values[1:] / 2, np.nextafter(values[:-1], np.inf)).tolist()
+
+
 def _histogram_metrics(reference: Any, current: Any, n: int, m: int) -> tuple[float, float]:
-    """Use exact continuous quantiles, matching NumPy percentile interpolation."""
-    f = spark_functions()
-    percentiles = f.percentile("value", [index / 10 for index in range(11)])
-    edges = sorted(set(reference.agg(percentiles.alias("edges")).first()["edges"]))
-    if len(edges) < 2:
+    """Preserve Core's numeric binning and smoothing for both PSI and KL."""
+    # Core converts Decimal columns to float64 before numeric drift calculations.
+    reference, current = (
+        frame.select(spark_column("value").cast("double").alias("value"))
+        if frame.schema["value"].dataType.typeName() == "decimal"
+        else frame
+        for frame in (reference, current)
+    )
+    boundaries = _histogram_boundaries(reference)
+    if not boundaries:
         return 0.0, 0.0
-    expected, actual = _histogram(reference, edges, n), _histogram(current, edges, m)
+    expected, actual = _histogram(reference, boundaries, n), _histogram(current, boundaries, m)
     return float(np.sum((actual - expected) * np.log(actual / expected))), float(
         entropy(actual, expected)
     )
@@ -148,25 +182,11 @@ def _ks_p_value_metric(evidence: DriftEvidence, statistic: float, threshold: flo
 
 
 def _numeric_result(
-    reference: Any, current: Any, column: str, thresholds: dict
+    reference: Any, current: Any, column: str, thresholds: dict, n: int, m: int, std: float
 ) -> ColumnDrift | None:
     """Calculate numeric effect statistics and a separately identified inference gate."""
-    f = spark_functions()
-    if has_spark_rows(
-        reference.where(f.abs(spark_column(column).cast("double")) == float("inf"))
-    ) or has_spark_rows(current.where(f.abs(spark_column(column).cast("double")) == float("inf"))):
-        return None
     ref, cur = _numeric_frame(reference, column), _numeric_frame(current, column)
-    n, m = ref.count(), cur.count()
-    if not n or not m:
-        return None
     statistic, distance = _cdf_statistics(ref, cur, n, m)
-    # Center native integer coordinates before converting to double for stable scaling.
-    origin = ref.agg(f.min("value").alias("origin")).first()["origin"]
-    centered = f.col("value") - f.lit(origin)
-    if ref.schema["value"].dataType.typeName() in {"long", "integer", "short", "byte"}:
-        centered = f.col("value").cast("decimal(38,0)") - f.lit(origin)
-    std = float(ref.agg(f.stddev_pop(centered.cast("double")).alias("std")).first()["std"] or 0)
     psi, kl = _histogram_metrics(ref, cur, n, m)
     evidence = _ks_evidence(statistic, n, m)
     metrics = [
@@ -190,17 +210,19 @@ def _numeric_result(
     )
 
 
-def _category_counts(frame: Any, column: str) -> dict[str, int] | None:
+def _category_counts(
+    frame: Any, column: str, limit: int = MAX_CATEGORY_SUMMARIES
+) -> dict[str, int] | None:
     """Bound category summaries explicitly without ever collecting input observations."""
     rows = (
         frame.where(spark_column(column).isNotNull())
         .select(spark_column(column).cast("string").alias("value"))
         .groupBy("value")
         .count()
-        .limit(MAX_CATEGORY_SUMMARIES + 1)
+        .limit(limit + 1)
         .collect()
     )
-    if len(rows) > MAX_CATEGORY_SUMMARIES:
+    if len(rows) > limit:
         return None
     return {row["value"]: row["count"] for row in rows}
 
@@ -209,9 +231,20 @@ def _categorical_result(
     reference: Any, current: Any, column: str, thresholds: dict
 ) -> ColumnDrift | None:
     """Reuse Core exact categorical tests on bounded unsmoothed count tables."""
-    ref, cur = _category_counts(reference, column), _category_counts(current, column)
-    if not ref or not cur or len(ref) > 50:
+    cap = int(thresholds.get("max_category_summaries", DriftCalculator._MAX_CATEGORY_SUMMARIES))
+    ref = _category_counts(reference, column, cap)
+    if not ref:
         return None
+    grouped = len(ref) > thresholds.get(
+        "categorical_top_k", DriftCalculator._MAX_CATEGORICAL_CARDINALITY
+    )
+    configured = "max_category_summaries" in thresholds or "categorical_top_k" in thresholds
+    limit = cap if grouped or configured else MAX_CATEGORY_SUMMARIES
+    cur = _category_counts(current, column, limit)
+    if not cur:
+        return None
+    if grouped:
+        return DriftCalculator._grouped_categorical_drift(column, ref, cur, thresholds)
     categories = sorted(ref.keys() | cur.keys())
     table = np.array(
         [[ref.get(label, 0) for label in categories], [cur.get(label, 0) for label in categories]],
@@ -233,29 +266,80 @@ def _categorical_result(
     )
 
 
-def _both_populated(reference: Any, current: Any, column: str) -> bool:
-    """Retain the local no-data precedence even when inferred nullable types differ."""
-    return has_spark_rows(reference.where(spark_column(column).isNotNull())) and has_spark_rows(
-        current.where(spark_column(column).isNotNull())
-    )
+def _population_summaries(
+    frame: Any, columns: tuple[str, ...], numeric: tuple[str, ...], *, origins: bool
+) -> dict[str, dict]:
+    """Collect only scalar preflight summaries in one scan, retaining native minima."""
+    if not columns:
+        return {}
+    f = spark_functions()
+    aggregates = []
+    for column in columns:
+        original = spark_column(column)
+        fields = [f.count(original).alias("populated")]
+        if column in numeric:
+            value = original if is_numeric_column(frame, column) else original.try_cast("double")
+            finite = f.when(finite_spark_value(value), value)
+            fields.extend(
+                [
+                    f.count(finite).alias("count"),
+                    f.max(f.abs(value.cast("double")) == float("inf")).alias("infinite"),
+                    f.count(f.when(original.isNotNull() & value.isNull(), 1)).alias("invalid"),
+                ]
+            )
+            if origins:
+                fields.append(f.min(finite).alias("origin"))
+        aggregates.append(f.struct(*fields).alias(column))
+    return frame.agg(*aggregates).first().asDict(recursive=True)
+
+
+def _has_numeric_data(summary: dict) -> bool:
+    """Require finite observations and reject infinity or failed numeric conversion."""
+    return bool(summary.get("count")) and not summary["infinite"] and not summary["invalid"]
+
+
+def _reference_deviations(reference: Any, ref: dict, cur: dict) -> dict[str, float]:
+    """Batch standard deviations after centering in each column's native coordinates."""
+    f = spark_functions()
+    aggregates = []
+    for column, summary in ref.items():
+        if not _has_numeric_data(summary) or not _has_numeric_data(cur[column]):
+            continue
+        value = spark_column(column)
+        finite = f.when(finite_spark_value(value), value)
+        if reference.schema[column].dataType.typeName() in {"long", "integer", "short", "byte"}:
+            finite = finite.cast("decimal(38,0)")
+        centered = finite - f.lit(summary["origin"])
+        aggregates.append(f.stddev_pop(centered.cast("double")).alias(column))
+    if not aggregates:
+        return {}
+    row = reference.agg(*aggregates).first().asDict()
+    return {column: float(value or 0) for column, value in row.items()}
 
 
 def _column_result(
-    reference: Any, current: Any, column: str, thresholds: dict
+    reference: Any,
+    current: Any,
+    column: str,
+    thresholds: dict,
+    ref_summary: dict,
+    cur_summary: dict,
+    std: float | None,
 ) -> ColumnDrift | None:
     """Classify schema compatibility before selecting a distributed numeric or category kernel."""
     types = importlib.import_module("pyspark.sql.types")
     ref_type, cur_type = reference.schema[column].dataType, current.schema[column].dataType
     categorical = (types.StringType, types.BooleanType)
-    if not _both_populated(reference, current, column):
+    if not ref_summary["populated"] or not cur_summary["populated"]:
         return None
-    if isinstance(ref_type, types.NumericType) and isinstance(cur_type, types.StringType):
-        converted = spark_column(column).try_cast("double")
-        if not has_spark_rows(current.where(spark_column(column).isNotNull() & converted.isNull())):
-            current = current.withColumn(column, converted)
-            cur_type = current.schema[column].dataType
-    if isinstance(ref_type, types.NumericType) and isinstance(cur_type, types.NumericType):
-        return _numeric_result(reference, current, column, thresholds)
+    if "count" in ref_summary and not cur_summary["invalid"]:
+        if std is None:
+            return None
+        if isinstance(cur_type, types.StringType):
+            current = current.withColumn(column, spark_column(column).try_cast("double"))
+        return _numeric_result(
+            reference, current, column, thresholds, ref_summary["count"], cur_summary["count"], std
+        )
     if isinstance(ref_type, categorical) and isinstance(cur_type, categorical):
         return _compatible_categories(reference, current, column, thresholds)
     if ref_type != cur_type:
@@ -263,6 +347,28 @@ def _column_result(
             column=column, metrics=[_metric_result("type_drift", 1.0, 0.0)], drift_detected=True
         )
     return None
+
+
+def _column_results(reference: Any, current: Any, columns: tuple, thresholds: dict) -> dict:
+    """Share numeric preflight work while preserving column order and per-feature kernels."""
+    numeric = tuple(
+        column
+        for column in columns
+        if is_numeric_column(reference, column)
+        and (
+            is_numeric_column(current, column)
+            or current.schema[column].dataType.typeName() == "string"
+        )
+    )
+    ref = _population_summaries(reference, columns, numeric, origins=True)
+    cur = _population_summaries(current, columns, numeric, origins=False)
+    deviations = _reference_deviations(reference, ref, cur)
+    return {
+        column: _column_result(
+            reference, current, column, thresholds, ref[column], cur[column], deviations.get(column)
+        )
+        for column in columns
+    }
 
 
 def _compatible_categories(
@@ -331,19 +437,14 @@ def drift_evidence(
     reference: Any, current: Any, columns: tuple[str, ...], thresholds: dict | None
 ) -> tuple[list[dict], int, list[str], bool]:
     """Return feature-only evidence with honest unavailable outcomes for unsupported types."""
-    limits = {"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1} | (
-        thresholds or {}
-    )
+    limits = merge_drift_settings(thresholds)
     missing = [
         column
         for column in columns
         if column not in reference.columns or column not in current.columns
     ]
-    results = {
-        column: _column_result(reference, current, column, limits)
-        for column in columns
-        if column not in missing
-    }
+    present = tuple(dict.fromkeys(column for column in columns if column not in missing))
+    results = _column_results(reference, current, present, limits)
     _correct_results(results)
     metrics = [
         monitoring_metric("drift", column, "schema_missing", 1.0, 0.0, True) for column in missing

@@ -183,7 +183,7 @@ def test_independent_model_set_certificate_checks_every_component(artifact, tmp_
 
 
 def test_custom_composition_rejected_even_when_callable_is_row_local(artifact, tmp_path):
-    """An arbitrary callback is not admitted from its name or a claimed safe flag."""
+    """A row-local callback is still rejected without sealed training probe evidence."""
     from skyulf.inference._manifest import ColumnSpec
     from skyulf.inference._model_set_manifest import ComponentReference
     from skyulf.inference.model_set import save_model_set
@@ -209,7 +209,7 @@ def test_custom_composition_rejected_even_when_callable_is_row_local(artifact, t
             ]
         },
     )
-    with pytest.raises(ValueError, match="independent_components_v1"):
+    with pytest.raises(ValueError, match="Combined rule 'business': No training probe evidence"):
         spark_model.partition_safety_certificate(model_set)
     assert spark_model.optional_partition_certificate(model_set) is None
 
@@ -313,7 +313,7 @@ def test_feature_package_routes_missing_features_to_native_lookup(artifact, monk
         spark_model, "feature_source_columns", lambda *args: ("entity",), raising=False
     )
     monkeypatch.setattr(spark_model, "validate_feature_source", lambda *args: None, raising=False)
-    outer, raw = object(), object()
+    outer, raw = object(), SimpleNamespace(signature=SimpleNamespace(params=None))
     monkeypatch.setattr(spark_model, "_download_package", lambda *args: ("package", outer))
     package = Mock(return_value=raw)
     monkeypatch.setattr(spark_model, "_scoring_package", package, raising=False)
@@ -453,7 +453,7 @@ def test_certified_set_spark_output_preserves_nulls_and_local_dtypes(
     model.load_context(SimpleNamespace(artifacts={"model_set": str(tmp_path / "set")}))
     query = pd.DataFrame({"id": [2**53 + 1, 2**53 + 2], "x": [5.0, 6.0]})
     local = model.predict(None, query)
-    distributed = model.predict(None, query, params={"skyulf_spark_output": True})
+    distributed = model.predict(None, query, params={"spark_output": True})
     assert str(local["first__exclusion_reason"].dtype) == "string"
     assert str(distributed["first__exclusion_reason"].dtype) == "object"
     converted = mlflow_struct_converter(
@@ -472,9 +472,7 @@ def test_certified_set_spark_output_preserves_nulls_and_local_dtypes(
     )
     loaded = mlflow.pyfunc.load_model(str(package))
     pd.testing.assert_frame_equal(loaded.predict(query), local)
-    loaded_output = loaded.predict(
-        query, params={"skyulf_spark_output": True, "skyulf_spark_batch_rows": 1}
-    )
+    loaded_output = loaded.predict(query, params={"spark_output": True, "spark_batch_rows": 1})
     pd.testing.assert_frame_equal(loaded_output, distributed)
 
 
@@ -487,7 +485,7 @@ def test_uncertified_pyfunc_cannot_enable_spark_output(artifact, tmp_path, monke
     score = Mock()
     monkeypatch.setattr(pipeline_model, "score_pipeline", score)
     with pytest.raises(ValueError, match="certif"):
-        model.predict(None, pd.DataFrame({"x": [5.0]}), params={"skyulf_spark_output": True})
+        model.predict(None, pd.DataFrame({"x": [5.0]}), params={"spark_output": True})
     score.assert_not_called()
 
 
@@ -511,23 +509,44 @@ def test_spark_package_requires_exact_output_transport_param_schema(artifact, ce
     if certified:
         spark_model._validate_package(package, certificate, inputs, outputs)
         assert package.signature.params.to_dict() == [
-            {"name": "skyulf_spark_output", "type": "boolean", "default": False, "shape": None},
-            {"name": "skyulf_spark_batch_rows", "type": "long", "default": 10000, "shape": None},
+            {"name": "spark_output", "type": "boolean", "default": False, "shape": None},
+            {"name": "spark_batch_rows", "type": "long", "default": 10000, "shape": None},
         ]
     else:
         with pytest.raises(ValueError, match="output transport contract"):
             spark_model._validate_package(package, certificate, inputs, outputs)
 
 
-def test_spark_output_rejects_unreviewed_mixed_null_string_semantics():
-    """Future exclusions cannot silently stringify missing values inside mixed batches."""
+def test_spark_output_marks_mixed_null_strings_for_the_driver():
+    """Exclusions cannot silently stringify missing values: a reserved marker carries them."""
     from skyulf.inference._manifest import ColumnSpec
-    from skyulf.integrations.mlflow.spark._spark_output import prepare_spark_output
+    from skyulf.integrations.mlflow.spark._spark_output import (
+        SPARK_NULL_TEXT,
+        prepare_spark_output,
+    )
 
     frame = pd.DataFrame({"reason": pd.Series([pd.NA, "excluded"], dtype="string")})
-    with pytest.raises(ValueError, match="mixed-null"):
-        prepare_spark_output(frame, (ColumnSpec(name="reason", dtype="string"),), True)
+    worker = prepare_spark_output(frame, (ColumnSpec(name="reason", dtype="string"),), True)
+    assert worker.reason.tolist() == [SPARK_NULL_TEXT, "excluded"]
     assert str(frame.reason.dtype) == "string" and pd.isna(frame.reason.iloc[0])
+
+
+def test_spark_output_rejects_the_reserved_marker_and_inexact_integers():
+    """A real marker value would read back as null; large integers would round in float64."""
+    from skyulf.inference._manifest import ColumnSpec
+    from skyulf.integrations.mlflow.spark._spark_output import (
+        SPARK_NULL_TEXT,
+        prepare_spark_output,
+    )
+
+    text = pd.DataFrame({"reason": pd.Series([SPARK_NULL_TEXT, pd.NA], dtype="string")})
+    with pytest.raises(ValueError, match="reserved null marker"):
+        prepare_spark_output(text, (ColumnSpec(name="reason", dtype="string"),), True)
+    numbers = pd.DataFrame({"count": pd.array([2**53 + 1, None], dtype="Int64")})
+    with pytest.raises(ValueError, match="beyond 2\\*\\*53"):
+        prepare_spark_output(
+            numbers, (ColumnSpec(name="count", dtype="int64"),), True, nullable=True
+        )
 
 
 def test_spark_worker_bounds_model_calls_and_preserves_duplicate_indices(
@@ -554,12 +573,10 @@ def test_spark_worker_bounds_model_calls_and_preserves_duplicate_indices(
         return original(frame, artifact)
 
     monkeypatch.setattr(pipeline_model, "score_pipeline", observe)
-    expected = model.predict(None, query, params={"skyulf_spark_batch_rows": 3})
+    expected = model.predict(None, query, params={"spark_batch_rows": 3})
     assert calls == [7]
     calls.clear()
-    result = model.predict(
-        None, query, params={"skyulf_spark_output": True, "skyulf_spark_batch_rows": 3}
-    )
+    result = model.predict(None, query, params={"spark_output": True, "spark_batch_rows": 3})
     assert calls == [3, 3, 1]
     pd.testing.assert_frame_equal(result, expected)
 
@@ -621,9 +638,7 @@ def test_set_spark_worker_bounds_calls_preserving_keys_nulls_and_indices(
     expected = model.predict(None, query)
     assert calls == [7]
     calls.clear()
-    result = model.predict(
-        None, query, params={"skyulf_spark_output": True, "skyulf_spark_batch_rows": 3}
-    )
+    result = model.predict(None, query, params={"spark_output": True, "spark_batch_rows": 3})
     assert calls == [3, 3, 1]
     assert result.index.equals(query.index) and result.id.tolist() == query.id.tolist()
     for name in expected:
@@ -641,7 +656,7 @@ def test_empty_prediction_chunk_preserves_existing_scorer_behavior():
     query = pd.DataFrame({"x": pd.Series(dtype=float)}, index=pd.Index([], name="source_index"))
     expected = pd.DataFrame({"prediction": pd.Series(dtype=float)}, index=query.index)
     score = Mock(return_value=expected)
-    result = score_prediction_batches(query, score, {"skyulf_spark_batch_rows": 3}, True)
+    result = score_prediction_batches(query, score, {"spark_batch_rows": 3}, True)
     score.assert_called_once_with(query)
     assert result is expected
 

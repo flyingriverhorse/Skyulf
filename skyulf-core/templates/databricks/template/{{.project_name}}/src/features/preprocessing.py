@@ -32,8 +32,17 @@ Rules:
   - params={...} is passed to your functions as their last argument.
   - replace=True overwrites an existing column; otherwise output must be new.
 
-custom/advanced_class_step.py shows rare_categories written as a class pair
-(Calculator/Applier), so you can compare both ways.
+Spark and online-feature projects lint and probe these steps during training.
+column_step callbacks and fitted_step apply() must depend only on their own row:
+no aggregates across rows, ranks, groupby or batch-size-dependent values.
+learn() may aggregate training rows and save the results for apply(). Row-wise
+calculations across columns are allowed. Calculator/Applier pairs registered by
+custom_step remain local-only; declaring a row context does not admit them.
+See https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html#when-the-probe-fails.
+
+Add your own factories here, or in another module under src/features selected as
+<file>.<factory>. The public custom-steps guide shows rare_categories written as
+a Calculator/Applier class pair for steps that need one.
 """
 
 import numpy as np
@@ -104,7 +113,7 @@ def frequency_encoding(columns):
 
 # ---------------------------------------------------------------------------
 # Example 3 - fitted_step that cleans a text column: group rare categories.
-# The same step is written as a class pair in custom/advanced_class_step.py.
+# The custom-steps guide shows the same step written as a class pair.
 #   rare_categories("city", min_share=0.05)
 #   training city: 60% London, 38% Paris, 2% Oslo  ->  learns ["London", "Paris"]
 #   scoring  city: London, Oslo, Tokyo, null        ->  London, Other, Other, null

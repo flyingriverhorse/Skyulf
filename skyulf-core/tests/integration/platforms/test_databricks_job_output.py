@@ -237,7 +237,9 @@ def test_generated_notebook_keeps_report_and_exit_in_separate_cells(entrypoint):
     assert ".notebook.exit(output)" in cells[1]
 
 
-@pytest.mark.parametrize("entrypoint", ["score.py", "score_models.py"])
+@pytest.mark.parametrize(
+    "entrypoint", ["score.py", "score_models.py", "training_report.py", "models_report.py"]
+)
 def test_generated_score_notebook_enables_visible_summary(entrypoint):
     """The notebook must pass Databricks' renderer to show HTML instead of only JSON."""
     from pathlib import Path

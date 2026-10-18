@@ -185,7 +185,7 @@ def test_native_call_passes_pinned_uri_named_schema_and_worker_params(monkeypatc
         model_uri="models:/catalog.schema.model/3",
         result_type=schema,
         env_manager="virtualenv",
-        prediction_batch_rows=7,
+        params={"spark_output": True, "spark_batch_rows": 7},
         tracking_uri="databricks",
         registry_uri="databricks-uc",
     )
@@ -194,7 +194,7 @@ def test_native_call_passes_pinned_uri_named_schema_and_worker_params(monkeypatc
         df=frame,
         result_type=schema,
         env_manager="virtualenv",
-        params={"skyulf_spark_output": True, "skyulf_spark_batch_rows": 7},
+        params={"spark_output": True, "spark_batch_rows": 7},
     )
     assert result is client.score_batch.return_value
 

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
-from ..models.model_set import load_registered_model_set
+from ..models.model_set import read_registered_model_set_manifest
 from ..registration.registry import ResolvedModel
 from .challenger import ChallengerLifecycle
 from .promotion import (
@@ -24,9 +24,12 @@ from .rejection import replayed_rejection
 
 
 def _saved_baseline(resolved: ResolvedModel, expected: str | None, endpoints: dict) -> None:
-    """Require a genuine set and preserve the baseline frozen during its training."""
-    artifact = load_registered_model_set(resolved, **endpoints)
-    evidence = artifact.manifest.quality_evidence
+    """Require a genuine set and preserve the baseline frozen during its training.
+
+    Only verified metadata is read, so a later Core release can still reject a set
+    whose component pipelines it cannot load.
+    """
+    evidence = read_registered_model_set_manifest(resolved, **endpoints).quality_evidence
     if evidence is not None and evidence["expected_champion_version"] != expected:
         raise AliasConflictError("Model set baseline differs from expected champion.")
 

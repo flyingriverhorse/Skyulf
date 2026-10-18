@@ -53,7 +53,7 @@ pytest-benchmark>=5.0.0,<6.0.0
 jsonschema>=4.0.0,<5.0.0             # Databricks template prompt visibility tests
 ipython>=8.18.1                       # Imported by full executable notebook exports
 jinja2>=3.1.6                         # Required by pandas Styler in compact notebook exports
-ruff>=0.15,<1.0                     # >=0.15 for PLC0415 (F-11 deferred-import enforcement)
+ruff==0.15.16                      # Match pre-commit and local Python/Markdown formatting.
 lizard>=1.23.0
 ty>=0.0.55,<0.0.76
 pandas-stubs>=3.0.3.260530

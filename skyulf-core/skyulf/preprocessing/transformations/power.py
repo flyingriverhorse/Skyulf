@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import polars as pl
-from sklearn.preprocessing import PowerTransformer
+from sklearn.preprocessing import PowerTransformer, StandardScaler
 
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
@@ -18,6 +18,7 @@ from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
     resolve_columns_then_to_pandas,
+    select_rows_by_position,
 )
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -25,37 +26,111 @@ from ..dispatcher import apply_dual_engine
 from ._power_common import build_pretrained_power_transformer, validate_power_parameters
 
 logger = logging.getLogger(__name__)
+_MAX_INVALID_TRAINING_PERCENT = 10
 
 
 def _power_transform_array(
     X_vals: np.ndarray, params: dict[str, Any], cols: list[str], valid_cols: list[str]
 ) -> np.ndarray:
-    """Run the rebuilt PowerTransformer over a numpy array; return transformed array."""
+    """Transform independently, marking invalid values for the row filter."""
+    values = np.array(X_vals, dtype=np.float64, copy=True)
+    invalid = np.isinf(values)
+    if params.get("method", "yeo-johnson") == "box-cox":
+        invalid |= values <= 0
+    values[invalid] = np.nan
+    if np.isfinite(values).any():
+        values = _transform_valid_power(values, params, cols, valid_cols)
+    invalid |= ~np.isfinite(values)
+    values[invalid] = np.nan
+    return values
+
+
+def _transform_valid_power(
+    values: np.ndarray, params: dict[str, Any], cols: list[str], valid_cols: list[str]
+) -> np.ndarray:
+    """Apply saved lambdas then scaler arithmetic without batch-wide finite-output checks."""
     col_indices = [cols.index(c) for c in valid_cols]
     lambdas_arr = np.array(params["lambdas"])[col_indices]
     pt = build_pretrained_power_transformer(
         method=params.get("method", "yeo-johnson"),
-        standardize=params.get("standardize", True),
+        standardize=False,
         lambdas_arr=lambdas_arr,
-        scaler_params=params.get("scaler_params", {}) or {},
-        col_indices=col_indices,
-        n_total_cols=len(cols),
+        scaler_params=None,
     )
-    X_trans = pt.transform(X_vals)
-    # sklearn may be configured with transform_output="pandas".
-    return X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        transformed = np.asarray(pt.transform(values))
+        if params.get("standardize", True):
+            scaler = params["scaler_params"]
+            transformed = (transformed - np.asarray(scaler["mean"])[col_indices]) / np.asarray(
+                scaler["scale"]
+            )[col_indices]
+    return transformed
 
 
-def _filter_power_columns(X_pd: pd.DataFrame, cols: list[str], method: str) -> list[str]:
-    """Box-Cox requires strictly positive data — drop columns that violate it."""
-    if not cols:
-        return []
+def _valid_training_values(X_pd: pd.DataFrame, cols: list[str], method: str) -> np.ndarray:
+    """Exclude invalid rows before learning lambdas or standardization statistics."""
+    values = decimal_columns_to_float(X_pd[cols], cols).to_numpy(dtype=np.float64, na_value=np.nan)
+    valid = ~np.isinf(values).any(axis=1)
     if method == "box-cox":
-        invalid = [c for c in cols if (X_pd[c] <= 0).any()]
-        if invalid:
-            logger.warning("Box-Cox excludes columns containing non-positive values: %s", invalid)
-        return [c for c in cols if c not in invalid]
-    return cols
+        valid &= ~(values <= 0).any(axis=1)
+    count = int(np.count_nonzero(~valid))
+    if count:
+        logger.warning("PowerTransformer fit excluded %d invalid row(s)", count)
+    _check_training_exclusion(len(values), int(np.count_nonzero(valid)))
+    if not valid.any():
+        raise ValueError("PowerTransformer has no valid training rows for the selected columns.")
+    values = values[valid]
+    _require_power_observations(values, cols)
+    return values
+
+
+def _check_training_exclusion(input_rows: int, output_rows: int) -> None:
+    """Stop training above the fixed invalid-row limit using the original row denominator."""
+    invalid_rows = input_rows - output_rows
+    if invalid_rows * 100 > input_rows * _MAX_INVALID_TRAINING_PERCENT:
+        raise ValueError(
+            f"PowerTransformer step would exclude {invalid_rows}/{input_rows} "
+            f"({invalid_rows / input_rows:.2%}) invalid training rows, exceeding the fixed "
+            f"{_MAX_INVALID_TRAINING_PERCENT}% limit. Use Yeo-Johnson for nonpositive "
+            "Box-Cox inputs, or remove/repair invalid rows before this step. "
+            "Missing NaN/null values do not count as invalid."
+        )
+
+
+def _require_power_observations(values: np.ndarray, cols: list[str]) -> None:
+    """Require observed values per selected feature without deleting partially missing rows."""
+    missing = [
+        col
+        for col, observed in zip(cols, np.isfinite(values).any(axis=0), strict=True)
+        if not observed
+    ]
+    if missing:
+        raise ValueError(
+            f"PowerTransformer has no observed training values for columns: {missing}."
+        )
+
+
+def _valid_power_positions(values: np.ndarray, original: np.ndarray) -> np.ndarray:
+    """Preserve missing inputs while excluding domain errors, infinities and new nonfinite values."""
+    invalid = np.isinf(original) | (np.isfinite(original) & ~np.isfinite(values))
+    valid = ~invalid.any(axis=1)
+    count = int(np.count_nonzero(~valid))
+    if count:
+        logger.warning("PowerTransformer excluded %d invalid row(s)", count)
+    return np.flatnonzero(valid)
+
+
+def _validate_finite_power_state(state: dict, size: int) -> None:
+    """Reject unusable learned parameters rather than treating every row as invalid."""
+    validate_power_parameters(state, size)
+    if not np.isfinite(state["lambdas"]).all():
+        raise ValueError("Fitted PowerTransformer lambdas must be finite.")
+    if state.get("standardize", True):
+        scaler = state["scaler_params"]
+        if not np.isfinite(scaler["mean"]).all() or not np.isfinite(scaler["scale"]).all():
+            raise ValueError("Fitted PowerTransformer scaler statistics must be finite.")
+        if not (np.asarray(scaler["scale"]) > 0).all():
+            raise ValueError("Fitted PowerTransformer scale must be positive.")
 
 
 def _fitted_columns_present(X: Any, cols: list[str]) -> list[str]:
@@ -78,17 +153,36 @@ def _fitted_columns_present(X: Any, cols: list[str]) -> list[str]:
     return present
 
 
-def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> dict[str, Any]:
-    """Pull mean/scale arrays out of a fitted PowerTransformer's internal scaler."""
-    if not standardize:
-        return {}
-    scaler = getattr(transformer, "_scaler", None)
-    if scaler is None:
-        return {}
-    return {
-        "mean": scaler.mean_.tolist() if scaler.mean_ is not None else None,
-        "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
+def _fit_power_state(
+    values: np.ndarray, cols: list[str], method: str, standardize: bool, input_rows: int
+) -> PowerTransformerArtifact:
+    """Fit lambdas first so overflowing transformed rows cannot contaminate the scaler."""
+    transformer = PowerTransformer(method=method, standardize=False).fit(values)
+    state: PowerTransformerArtifact = {
+        "type": "power_transformer",
+        "lambdas": transformer.lambdas_.tolist(),
+        "method": method,
+        "standardize": False,
+        "columns": cols,
+        "scaler_params": {},
     }
+    transformed = _power_transform_array(values, dict(state), cols, cols)
+    positions = _valid_power_positions(transformed, values)
+    _check_training_exclusion(input_rows, len(positions))
+    if not len(positions):
+        raise ValueError("PowerTransformer has no valid training rows after transformation.")
+    _require_power_observations(transformed[positions], cols)
+    if standardize:
+        scaler = StandardScaler().fit(transformed[positions])
+        state["scaler_params"] = {"mean": scaler.mean_.tolist(), "scale": scaler.scale_.tolist()}
+    state["standardize"] = standardize
+    _validate_finite_power_state(dict(state), len(cols))
+    if standardize:
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            standardized = (transformed - scaler.mean_) / scaler.scale_
+        positions = _valid_power_positions(standardized, values)
+        _check_training_exclusion(input_rows, len(positions))
+    return state
 
 
 class PowerTransformerApplier(BaseApplier):
@@ -106,31 +200,34 @@ class PowerTransformerApplier(BaseApplier):
             columns = raw["columns"]
             if type(columns) is not list or any(not isinstance(col, str) for col in columns):
                 raise ValueError("Fitted power columns must be a list of strings.")
-            validate_power_parameters(raw, len(columns))
+            _validate_finite_power_state(raw, len(columns))
         return raw
 
     @staticmethod
     def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
-        """Expose whole-request fallback when any value prevents a power transform."""
+        """Declare row-local filtering of invalid selected values and transformed outputs."""
         if engine not in ("pandas", "polars"):
             return None
         PowerTransformerApplier.validate_inference_state(state)
-        context = "global" if state.get("columns") else "row"
-        return ExecutionCapability(engine, "apply", "local", "preserve", context)
+        return ExecutionCapability(
+            engine, "apply", "local", "filter" if state else "preserve", "row"
+        )
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        """Rebuild the transformer from stored lambdas and transform ``X``; ``y`` untouched.
+        """Transform valid rows with stored lambdas and align ``y`` by position.
 
-        Fails open, like every applier in ``preprocessing/transformations/``: a
-        failed transform is logged at ERROR with its traceback and leaves the data
-        unchanged, so a degraded frame beats a hard failure at inference time.
-        Every path that leaves data untransformed logs — including the one that
-        used not to, a frame missing columns the transformer was fitted on, which
-        is train/serve skew rather than a no-op and is warned about by name.
+        Invalid numeric rows are excluded and counted in a warning. Missing
+        values remain missing for later imputers. Valid
+        neighbours keep their fitted transform. Missing fitted columns are
+        warned about; malformed state and unexpected implementation errors raise.
         """
+        if params.get("lambdas") is not None:
+            _validate_finite_power_state(params, len(params["columns"]))
         return apply_dual_engine(
-            X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
+            (X, _y) if _y is not None else X,
+            params,
+            {"polars": self._apply_polars, "pandas": self._apply_pandas},
         )
 
     @staticmethod
@@ -142,14 +239,11 @@ class PowerTransformerApplier(BaseApplier):
         if not valid_cols:
             return X, _y
 
-        try:
-            X_vals = X.select(valid_cols).to_numpy()
-            X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
-            series = [pl.Series(name, X_trans[:, i]) for i, name in enumerate(valid_cols)]
-            return X.with_columns(series), _y
-        except Exception:  # noqa: BLE001 - transform failure is logged; frame left unchanged
-            logger.exception("PowerTransformer (Polars) application failed")
-            return X, _y
+        X_vals = np.asarray(X.select(valid_cols).to_numpy(), dtype=np.float64)
+        X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
+        series = [pl.Series(name, X_trans[:, i]) for i, name in enumerate(valid_cols)]
+        positions = _valid_power_positions(X_trans, X_vals)
+        return X.with_columns(series)[positions], select_rows_by_position(_y, positions)
 
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -160,21 +254,15 @@ class PowerTransformerApplier(BaseApplier):
         if not valid_cols:
             return X, _y
 
-        try:
-            # Computed before the copy so a failure hands back the caller's frame
-            # rather than one whose columns were already cast to float64, matching
-            # what the polars path returns.
-            subset = decimal_columns_to_float(X[valid_cols], valid_cols)
-            X_vals = subset.to_numpy(dtype=np.float64, na_value=np.nan)
-            X_trans = np.asarray(_power_transform_array(X_vals, params, cols, valid_cols))
-            df_out = X.copy()
-            # Replace selected columns so nullable integers and Decimal objects
-            # can receive float results without incompatible-dtype assignment.
-            df_out[valid_cols] = X_trans
-        except Exception:  # noqa: BLE001 - transform failure is logged; frame left unchanged
-            logger.exception("PowerTransformer (Pandas) application failed")
-            return X, _y
-        return df_out, _y
+        subset = decimal_columns_to_float(X[valid_cols], valid_cols)
+        X_vals = subset.to_numpy(dtype=np.float64, na_value=np.nan)
+        X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
+        df_out = X.copy()
+        # Replace selected columns so nullable integers and Decimal objects
+        # can receive float results without incompatible-dtype assignment.
+        df_out[valid_cols] = X_trans
+        positions = _valid_power_positions(X_trans, X_vals)
+        return df_out.iloc[positions], select_rows_by_position(_y, positions)
 
 
 @NodeRegistry.register("PowerTransformer", PowerTransformerApplier)
@@ -197,31 +285,14 @@ class PowerTransformerCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PowerTransformerArtifact:  # pylint: disable=arguments-differ
-        """Fit per-column lambdas, dropping columns Box-Cox cannot accept."""
+        """Fit selected columns on valid rows, excluding invalid rows from learned statistics."""
         if user_picked_no_columns(config):
             return {}
 
         method = config.get("method", "yeo-johnson")
         standardize = config.get("standardize", True)
-        # TODO(pandas-removal): PowerTransformer.fit accepts numpy directly,
-        # but _filter_power_columns() uses Pandas column-wise boolean
-        # indexing (`X_pd[c] <= 0`) to drop non-positive columns for box-cox.
-        # That check is easy to port to numpy (X_np[:, i] <= 0), but do it
-        # together with a matching rewrite of _filter_power_columns to take
-        # an ndarray, so both stay in sync.
         X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
-        valid_cols = _filter_power_columns(X_pd, cols, method)
-        if not valid_cols:
+        if not cols:
             return {}
-
-        transformer = PowerTransformer(method=method, standardize=standardize)
-        transformer.fit(X_pd[valid_cols])
-
-        return {
-            "type": "power_transformer",
-            "lambdas": transformer.lambdas_.tolist(),
-            "method": method,
-            "standardize": standardize,
-            "columns": valid_cols,
-            "scaler_params": _extract_scaler_params(transformer, standardize),
-        }
+        values = _valid_training_values(X_pd, cols, method)
+        return _fit_power_state(values, cols, method, standardize, len(X_pd))

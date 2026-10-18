@@ -19,8 +19,6 @@ from tests.utils.test_case_loader import TestCaseLoader
 from skyulf.preprocessing.transformations.power import (
     PowerTransformerApplier,
     PowerTransformerCalculator,
-    _extract_scaler_params,
-    _filter_power_columns,
 )
 from skyulf.preprocessing.transformations.simple import (
     SimpleTransformationApplier,
@@ -50,13 +48,14 @@ def test_power_transformer_yeo_johnson_matches_sklearn_reference() -> None:
     np.testing.assert_allclose(out["a"].to_numpy(), expected[:, 0], rtol=1e-6, atol=1e-6)
 
 
-def test_power_transformer_box_cox_excludes_non_positive_columns() -> None:
-    """Box-Cox drops columns containing zero/negative values from ``columns``."""
-    df = pd.DataFrame({"pos": [1.0, 2.0, 3.0], "has_zero": [0.0, 1.0, 2.0]})
+def test_power_transformer_box_cox_excludes_non_positive_rows() -> None:
+    """Box-Cox retains selected columns and excludes rows containing invalid values."""
+    df = pd.DataFrame({"pos": np.arange(1.0, 11.0), "has_zero": np.arange(10.0)})
     art = PowerTransformerCalculator().fit(
         df, {"method": "box-cox", "columns": ["pos", "has_zero"]}
     )
-    assert art["columns"] == ["pos"]
+    assert art["columns"] == ["pos", "has_zero"]
+    assert len(PowerTransformerApplier().apply(df, art)) == 9
 
 
 @pytest.mark.parametrize(*_empty_artifact_cases)
@@ -69,8 +68,12 @@ def test_power_transformer_returns_empty_artifact(
     (group ``empty_artifact``).
     """
     df = pd.DataFrame(df_data)
-    art = PowerTransformerCalculator().fit(df, fit_config)
-    assert art == {}
+    if fit_config.get("method") == "box-cox":
+        with pytest.raises(ValueError, match="invalid training rows.*10%"):
+            PowerTransformerCalculator().fit(df, fit_config)
+    else:
+        art = PowerTransformerCalculator().fit(df, fit_config)
+        assert art == {}
 
 
 def test_power_transformer_apply_missing_lambdas_is_noop() -> None:
@@ -142,17 +145,11 @@ def test_power_transformer_infer_output_schema_is_identity() -> None:
     assert out is schema
 
 
-def test_filter_power_columns_empty_input_returns_empty() -> None:
-    """_filter_power_columns must short-circuit on an empty `cols` list directly."""
-    df = pd.DataFrame({"a": [1.0, 2.0]})
-    assert _filter_power_columns(df, [], "yeo-johnson") == []
-
-
-def test_extract_scaler_params_returns_empty_when_no_scaler_present() -> None:
-    """_extract_scaler_params must return {} when the transformer lacks a `_scaler` (line 84)."""
-    transformer = SkPowerTransformer(method="yeo-johnson", standardize=True)
-    # Freshly constructed (unfitted) transformer has no `_scaler` attribute yet.
-    assert _extract_scaler_params(transformer, standardize=True) == {}
+def test_power_explicit_empty_columns_is_noop() -> None:
+    """An intentional empty selection does not reject rows with missing values."""
+    df = pd.DataFrame({"a": [np.nan, -1.0]})
+    state = PowerTransformerCalculator().fit(df, {"columns": []})
+    pd.testing.assert_frame_equal(PowerTransformerApplier().apply(df, state), df)
 
 
 def test_power_transformer_apply_polars_missing_lambdas_is_noop() -> None:
@@ -223,60 +220,46 @@ def test_power_transformer_apply_transforms_present_columns_and_names_missing_on
     assert "['b']" in caplog.text
 
 
-def test_power_transformer_apply_polars_swallows_exception(
+def test_power_transformer_apply_polars_raises_unexpected_exception(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform failure on the polars path must be logged, not raised (lines 112-114).
-
-    Fail-open is only defensible while it stays observable, so the ERROR record
-    and its traceback are pinned alongside the unchanged frame.
-    """
+    """Unexpected implementation failures must not silently return untransformed neighbours."""
     import skyulf.preprocessing.transformations.power as power_mod
 
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
     art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
 
     def _boom(*args, **kwargs):
+        """Represent an implementation failure rather than one invalid numeric value."""
         raise RuntimeError("simulated transform failure")
 
     monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
     pl_df = pl.from_pandas(df)
-    with caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.transformations.power"):
-        out = PowerTransformerApplier().apply(pl_df, art)
-    # Exception swallowed; original frame returned unchanged.
-    assert out.equals(pl_df)
-    assert "PowerTransformer (Polars) application failed" in caplog.text
-    assert "RuntimeError: simulated transform failure" in caplog.text
+    with pytest.raises(RuntimeError, match="simulated transform failure"):
+        PowerTransformerApplier().apply(pl_df, art)
+    assert pl_df.equals(pl.from_pandas(df))
 
 
-def test_power_transformer_apply_pandas_swallows_exception(
+def test_power_transformer_apply_pandas_raises_unexpected_exception(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform failure on the pandas path must be logged, not raised (lines 130-131).
-
-    The caller's own frame must come back, not a copy whose columns were already
-    cast to float64 — the polars path returns the untouched original, and a
-    failed transform should not change dtypes on either engine.
-    """
+    """An unexpected transform error must surface without changing the caller's frame."""
     import skyulf.preprocessing.transformations.power as power_mod
 
     df = pd.DataFrame({"a": [1, 2, 3]})
     art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
 
     def _boom(*args, **kwargs):
+        """Represent an implementation failure rather than one invalid numeric value."""
         raise RuntimeError("simulated transform failure")
 
     monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
-    with caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.transformations.power"):
-        out = PowerTransformerApplier().apply(df, art)
-    # Exception swallowed; original values returned unchanged.
-    pd.testing.assert_frame_equal(out, df)
-    assert out is df
-    assert str(out["a"].dtype) == "int64"
-    assert "PowerTransformer (Pandas) application failed" in caplog.text
-    assert "RuntimeError: simulated transform failure" in caplog.text
+    before = df.copy()
+    with pytest.raises(RuntimeError, match="simulated transform failure"):
+        PowerTransformerApplier().apply(df, art)
+    pd.testing.assert_frame_equal(df, before)
 
 
 # ---------------------------------------------------------------------------
@@ -286,15 +269,19 @@ def test_power_transformer_apply_pandas_swallows_exception(
 
 @pytest.mark.parametrize(*_simple_method_cases)
 def test_simple_transformation_method(
-    values: list[float], method: str, extra_params: dict, expected: list[float | None]
+    values: list[float], method: str, extra_params: dict, expected: list[float | None] | None
 ) -> None:
-    """Verifies per-method transform math and edge-case handling (NaN masking, clipping, unknown methods).
+    """Valid methods retain their math; unknown methods cannot be fitted silently.
 
     Loaded from ``tests/test_cases/preprocessing/transformations_power_simple.json``
     (group ``simple_methods``).
     """
     df = pd.DataFrame({"a": values})
     config = {"column": "a", "method": method, **extra_params}
+    if expected is None:
+        with pytest.raises(ValueError, match="Supported methods"):
+            SimpleTransformationCalculator().fit(df, {"transformations": [config]})
+        return
     art = SimpleTransformationCalculator().fit(df, {"transformations": [config]})
     out = SimpleTransformationApplier().apply(df, art)
     result = out["a"].tolist()
@@ -344,13 +331,14 @@ def test_simple_transformation_polars_missing_column_skipped() -> None:
     assert list(out.columns) == ["a"]
 
 
-def test_simple_transformation_polars_unknown_method_skipped() -> None:
-    """An unrecognised method must be skipped on the polars apply path (line 36)."""
+def test_simple_transformation_polars_legacy_unknown_method_skipped() -> None:
+    """Already saved no-op rules must retain their replay despite stricter new fitting."""
     df = pd.DataFrame({"a": [1.0, 2.0]})
     pl_df = pl.from_pandas(df)
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "bogus_method"}]}
-    )
+    art = {
+        "type": "simple_transformation",
+        "transformations": [{"column": "a", "method": "bogus_method"}],
+    }
     out = SimpleTransformationApplier().apply(pl_df, art)
     assert out["a"].to_list() == [1.0, 2.0]
 

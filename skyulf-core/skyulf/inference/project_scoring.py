@@ -50,7 +50,7 @@ def _json_copy(value: Any) -> Any:
     return result
 
 
-def _identifier(value: Any) -> bool:
+def is_scoring_identifier(value: Any) -> bool:
     """Recognize simple public names outside Skyulf's internal namespace."""
     return (
         isinstance(value, str)
@@ -61,7 +61,9 @@ def _identifier(value: Any) -> bool:
 
 def _resolve(module: ModuleType, path: str) -> Callable[..., Any]:
     """Resolve a relative dotted function solely within saved project code."""
-    if not isinstance(path, str) or not all(_identifier(part) for part in path.split(".")):
+    if not isinstance(path, str) or not all(
+        is_scoring_identifier(part) for part in path.split(".")
+    ):
         raise ValueError("Scoring function must be a relative dotted project name.")
     parent, separator, name = path.rpartition(".")
     try:
@@ -86,7 +88,7 @@ def _validate_rule(rule: Any, *, output: bool, module: ModuleType) -> None:
         raise ValueError(
             "Scoring rule fields must match name, version, function, params and output columns."
         )
-    if not _identifier(rule["name"]):
+    if not is_scoring_identifier(rule["name"]):
         raise ValueError("Scoring rule name must be a simple identifier.")
     if not isinstance(rule["version"], str) or not rule["version"].strip():
         raise ValueError("Scoring rule requires a nonempty immutable version string.")
@@ -94,7 +96,7 @@ def _validate_rule(rule: Any, *, output: bool, module: ModuleType) -> None:
         raise ValueError("Scoring rule params must be a JSON object.")
     _resolve(module, rule["function"])
     if output:
-        _validate_columns(rule["columns"])
+        validate_scoring_columns(rule["columns"])
 
 
 def _reserved(name: str) -> bool:
@@ -105,14 +107,14 @@ def _reserved(name: str) -> bool:
     )
 
 
-def _validate_columns(columns: Any) -> None:
+def validate_scoring_columns(columns: Any) -> None:
     """Require explicit supported scalar output types and unreserved names."""
     if type(columns) is not list or not columns:
         raise ValueError("Output rules need a nonempty columns list.")
     for column in columns:
         if type(column) is not dict or set(column) != {"name", "dtype"}:
             raise ValueError("Output column requires exactly name and dtype.")
-        if not _identifier(column["name"]) or _reserved(column["name"]):
+        if not is_scoring_identifier(column["name"]) or _reserved(column["name"]):
             raise ValueError("Output column name is invalid or reserved.")
         if column["dtype"] not in _DTYPES:
             raise ValueError("Output column dtype must be float64, int64, string or bool.")
@@ -168,11 +170,22 @@ def _is_null(value: Any) -> bool:
     return value is None or value is pd.NA or (isinstance(value, Real) and bool(np.isnan(value)))
 
 
+def _call_rule(module: ModuleType, rule: dict[str, Any], frame: pd.DataFrame, *args: Any) -> Any:
+    """Explain a callback that reads a column this model never receives."""
+    try:
+        return _resolve(module, rule["function"])(*args)
+    except KeyError as exc:
+        raise ValueError(
+            f"Scoring rule {rule['name']!r} raised KeyError {exc}: a missing params key, or a "
+            f"column this model does not receive. Its input columns are {list(frame.columns)}."
+        ) from exc
+
+
 def _eligibility(frame: pd.DataFrame, config: dict[str, Any], module: ModuleType) -> pd.Series:
     """Collect the first exclusion reason without changing callback inputs."""
     reasons = pd.Series(pd.NA, index=frame.index, dtype="string")
     for rule in config["eligibility"]:
-        values = _resolve(module, rule["function"])(frame.copy(deep=True), deepcopy(rule["params"]))
+        values = _call_rule(module, rule, frame, frame.copy(deep=True), deepcopy(rule["params"]))
         _check_rows(values, frame, pd.Series)
         if any(
             not _is_null(value) and (not isinstance(value, str) or not value.strip())
@@ -232,8 +245,13 @@ def _outputs(
     """Run ordered rules, allowing later rules to read earlier declared outputs."""
     result = predictions.copy(deep=True)
     for rule in config["outputs"]:
-        values = _resolve(module, rule["function"])(
-            frame.copy(deep=True), result.copy(deep=True), deepcopy(rule["params"])
+        values = _call_rule(
+            module,
+            rule,
+            frame,
+            frame.copy(deep=True),
+            result.copy(deep=True),
+            deepcopy(rule["params"]),
         )
         _check_rows(values, frame, pd.DataFrame)
         expected = [column["name"] for column in rule["columns"]]
@@ -294,14 +312,52 @@ def _predict_eligible(
     )
     predictions = predict(model_frame)
     _check_rows(predictions, selected, pd.DataFrame)
-    if list(predictions.columns) != list(prediction_dtypes):
+    reasons = _prediction_reasons(predictions, prediction_dtypes)
+    predicted = reasons.isna()
+    result = pd.DataFrame(index=selected.index)
+    schema = {**prediction_dtypes, **dict(scoring_output_columns(config))}
+    for name, dtype in schema.items():
+        result[name] = _typed_column(pd.Series(pd.NA, index=selected.index), dtype)
+    if predicted.any():
+        estimates = predictions.loc[predicted, list(prediction_dtypes)].copy(deep=True)
+        for name, dtype in prediction_dtypes.items():
+            estimates[name] = _typed_column(estimates[name], dtype)
+        outputs = _outputs(
+            selected.loc[predicted].reset_index(drop=True),
+            estimates.reset_index(drop=True),
+            config,
+            module,
+        )
+        outputs.index = selected.index[predicted]
+        result.loc[predicted, list(schema)] = outputs
+    result["exclusion_reason"] = reasons
+    return result
+
+
+def _prediction_reasons(predictions: pd.DataFrame, prediction_dtypes: dict[str, str]) -> pd.Series:
+    """Validate native outlier outcomes before merging them with project policy decisions."""
+    columns = list(prediction_dtypes)
+    reasons = pd.Series(pd.NA, index=predictions.index, dtype="string")
+    if "scoring_status" in predictions:
+        columns.extend(["scoring_status", "exclusion_reason"])
+    if list(predictions.columns) != columns:
         raise ValueError("Prediction columns must exactly match their recorded schema.")
-    if predictions.isna().any().any():
+    if "scoring_status" in predictions:
+        status = predictions["scoring_status"]
+        if not status.isin(["predicted", "excluded"]).all():
+            raise ValueError("Prediction scoring_status must describe every requested row.")
+        reasons = predictions["exclusion_reason"].astype("string")
+        excluded = status.eq("excluded")
+        if (
+            not np.array_equal(reasons.notna(), excluded)
+            or reasons.loc[excluded].str.strip().eq("").any()
+        ):
+            raise ValueError("Prediction exclusion reasons must match excluded rows.")
+        if predictions.loc[excluded, list(prediction_dtypes)].notna().any().any():
+            raise ValueError("Excluded predictions must contain only missing estimates.")
+    if predictions.loc[reasons.isna(), list(prediction_dtypes)].isna().any().any():
         raise ValueError("Estimator outputs must not contain missing values.")
-    predictions = predictions.copy(deep=True)
-    for name, dtype in prediction_dtypes.items():
-        predictions[name] = _typed_column(predictions[name], dtype)
-    return _outputs(selected, predictions, config, module)
+    return reasons
 
 
 def run_project_scoring(
@@ -336,7 +392,9 @@ def run_project_scoring(
     if eligible.any():
         scored = _predict_eligible(raw, eligible, frame, predict, config, module, prediction_dtypes)
         scored.index = raw.index[eligible]
-        result.loc[eligible, list(schema)] = scored
+        result.loc[eligible, list(schema)] = scored[list(schema)]
+        reasons.loc[eligible] = scored["exclusion_reason"]
+    eligible = reasons.isna()
     result["scoring_status"] = pd.Series(
         np.where(eligible, "predicted", "excluded"), index=raw.index, dtype="string"
     )

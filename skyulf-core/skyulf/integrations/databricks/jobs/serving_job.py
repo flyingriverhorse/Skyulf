@@ -37,6 +37,7 @@ from ..serving.rollout_promotion import approval_config_digest, promote_complete
 from ..serving.rollout_store import MLflowRolloutStore
 from ..shared.json_contracts import finite_json_digest
 from ..training.shared.training_evidence import load_candidate_evidence
+from .shared.reference_mutations import notebook_reference_holder, reference_mutation_scope
 
 
 def _enabled(settings: dict[str, Any]) -> bool:
@@ -141,13 +142,18 @@ def _output(
     approval: dict[str, Any],
     store: MLflowRolloutStore,
     result: RolloutResult,
+    settings: dict[str, Any],
 ) -> dict[str, Any]:
     """Automatically request guarded promotion only after durable final completion."""
     output = asdict(result)
     if result.promotion_pending:
-        receipt = promote_completed_rollout(
-            client, spark, approval, store=store, admission=SingleWriterAdmission()
-        )
+        namespace = settings.get("monitoring", {}).get("reference_namespace") or None
+        with reference_mutation_scope(
+            spark, namespace, deferred=True, **settings.get("reference_holder", {})
+        ):
+            receipt = promote_completed_rollout(
+                client, spark, approval, store=store, admission=SingleWriterAdmission()
+            )
         output["promotion"] = asdict(receipt)
     return output
 
@@ -172,13 +178,13 @@ def run_daily_rollout(
     if before["status"] == "PREPARED" or result.status != "COMMITTED":
         return asdict(result)
     if result.state.phase != "ACTIVE":
-        return _output(client, spark, approval, store, result)
+        return _output(client, spark, approval, store, result, settings)
     observation = _observe(spark, client, registry_client, settings, record, result, approval)
     persist_rollout_observation(store, observation)
     changed = advance_rollout(
         client, store=store, admission=SingleWriterAdmission(), evidence=observation.evidence
     )
-    output = _output(client, spark, approval, store, changed)
+    output = _output(client, spark, approval, store, changed, settings)
     output["observation_sha256"] = observation.details_digest
     return output
 
@@ -196,13 +202,7 @@ def run_online_publication(
         return {"status": "DISABLED"}
     if action not in {"start", "status", "stop", "restart"}:
         raise ValueError("Publication action must be start, status, stop or restart.")
-    spec = OnlinePublicationSpec(
-        **{
-            name: settings[name]
-            for name in ("source_table", "online_table", "online_store", "source_table_id")
-        },
-        publish_mode=settings.get("publish_mode", "TRIGGERED"),
-    )
+    spec = _publication_spec(settings)
     admission = SingleWriterAdmission()
     if action == "start":
         receipt = publish_online_features(
@@ -224,8 +224,8 @@ def run_online_serving_setup(
 ) -> dict[str, Any]:
     """Inspect the saved policy and external publication, then create one new endpoint.
 
-    No publisher or batch scoring task is required. SUBMITTED is not readiness;
-    inspect the endpoint and query its returned schema after native startup.
+    No publisher or batch scoring task is required. Wait for the exact saved
+    configuration to become READY and NOT_UPDATING before returning READY.
     An existing endpoint is never overwritten and creation is never retried.
     """
     if not _enabled(settings):
@@ -250,7 +250,7 @@ def run_online_serving_setup(
     }
     create_pinned_endpoint(client, plan)
     return {
-        "status": "SUBMITTED",
+        "status": "READY",
         "endpoint_name": spec.endpoint_name,
         "model_uri": spec.model_uri,
         "input_schema": [list(column) for column in plan.input_schema],
@@ -282,6 +282,41 @@ def _online_setup_contract(
         ) from exc
 
 
+def _publication_spec(settings: dict[str, Any]) -> OnlinePublicationSpec:
+    """Build the publication job's typed contract from its YAML section."""
+    return OnlinePublicationSpec(
+        **{
+            name: settings[name]
+            for name in ("source_table", "online_table", "online_store", "source_table_id")
+        },
+        publish_mode=settings.get("publish_mode", "TRIGGERED"),
+    )
+
+
+def validate_serving_section(section: str, settings: Any) -> None:
+    """Apply a serving job's own pre-remote checks to one ``config/serving.yml`` section.
+
+    Every section needs the explicit ``enabled`` switch. Enabled online serving
+    and online publication sections must also build the contracts their jobs
+    build before any workspace call. Nothing here reads Spark, MLflow or the
+    network, so a passing check does not prove the pinned resources exist.
+
+    Args:
+        section: ``online_serving``, ``rollout`` or ``online_publication``.
+        settings: The section's parsed YAML value.
+
+    Raises:
+        ValueError: The section is malformed or incomplete.
+        KeyError: An enabled publication section lacks a required field.
+    """
+    if not _enabled(settings):
+        return
+    if section == "online_serving":
+        _online_setup_contract(settings)
+    elif section == "online_publication":
+        _publication_spec(settings)
+
+
 def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:
     """Read the explicit deployed YAML file and reject malformed selected settings."""
     import yaml  # noqa: PLC0415 - optional integration dependency
@@ -309,7 +344,18 @@ def run_daily_rollout_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         tracking_uri=settings.get("tracking_uri", "databricks"),
         registry_uri=settings.get("registry_uri", "databricks-uc"),
     )
+    values = dbutils.widgets.getAll()
+    settings = _bind_rollout_target(settings, values.get("bundle_target", ""))
+    settings = {**settings, "reference_holder": notebook_reference_holder(values)}
     return run_daily_rollout(spark, settings, client=WorkspaceClient(), registry_client=registry)
+
+
+def _bind_rollout_target(settings: dict[str, Any], target: str) -> dict[str, Any]:
+    """Label rollout evidence with the deployed Bundle target; older jobs keep the YAML value."""
+    monitoring = settings.get("monitoring")
+    if not target or not isinstance(monitoring, dict):
+        return settings
+    return {**settings, "monitoring": {**monitoring, "environment": target}}
 
 
 def run_online_publication_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:

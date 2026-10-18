@@ -15,6 +15,111 @@ from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_exclusion_rates_use_all_predictions_without_polluting_performance(engine):
+    """Invalid and outlier rows remain quality evidence even when their labels are wrong."""
+    current = [{"id": str(i), "value": i, "kind": "a"} for i in range(4)]
+    predictions = [
+        {
+            "id": str(i),
+            "prediction": "no" if i < 2 else None,
+            "scoring_status": "predicted" if i < 2 else "excluded",
+            "exclusion_reason": [None, None, "invalid:power", "outlier:bounds"][i],
+        }
+        for i in range(4)
+    ]
+    result = report(
+        engine,
+        current=current,
+        reference=current,
+        predictions=predictions,
+        labels=[
+            {"id": str(i), "outcome": "no" if i < 2 else "yes", "available_at": AS_OF}
+            for i in range(4)
+        ],
+    )
+    metrics = {item["metric_name"]: item for item in result["metrics"]}
+    assert metrics["accuracy"]["value"] == 1.0
+    assert result["labeled_rows"] == result["scored_rows"] == result["excluded_rows"] == 2
+    assert metrics["exclusion_rate"]["value"] == 0.5
+    assert metrics["invalid_exclusion_rate"]["value"] == 0.25
+    assert metrics["invalid_exclusion_rate"]["category"] == "quality"
+    assert metrics["invalid_exclusion_rate"]["has_issue"]
+
+
+def test_monitoring_source_keeps_exclusion_reasons():
+    """Table projection must retain the cause needed to distinguish invalid inputs."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_sources import (
+        prediction_columns,
+    )
+
+    predictions = pd.DataFrame(
+        columns=[
+            "id",
+            "run_id",
+            "prediction",
+            "scoring_status",
+            "exclusion_reason",
+            "business_output",
+        ]
+    )
+    assert prediction_columns(predictions, ("id",), 0) == (
+        "id",
+        "run_id",
+        "prediction",
+        "scoring_status",
+        "exclusion_reason",
+    )
+
+
+@pytest.mark.parametrize(
+    "total,excluded,invalid,expected",
+    [
+        (0, 0, 0, (None, None)),
+        (3, 0, 0, (0.0, 0.0)),
+        (3, 2, None, (2 / 3, None)),
+        (3, 3, 3, (1.0, 1.0)),
+    ],
+)
+def test_exclusion_rate_empty_and_legacy_evidence(total, excluded, invalid, expected):
+    """Missing historical reasons or empty populations must never imply valid inputs."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
+        exclusion_metrics,
+    )
+
+    metrics = exclusion_metrics(total, excluded, invalid)
+    assert tuple(item["value"] for item in metrics) == expected
+    assert tuple(item["status"] for item in metrics) == tuple(
+        "unavailable" if value is None else "measured" for value in expected
+    )
+
+
+@pytest.mark.parametrize("distributed", [False, True])
+@pytest.mark.parametrize("extra", ["probability_band", "probability_score"])
+def test_custom_probability_named_output_is_not_a_class_probability(
+    monkeypatch, distributed, extra
+):
+    """Extra scoring outputs must not invalidate the saved class probability contract."""
+    from types import SimpleNamespace
+
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_metrics as native
+    from skyulf.integrations.databricks.observability.monitoring.spark import (
+        spark_monitoring_metrics as spark_metrics,
+    )
+
+    columns = ["prediction", "probability_0", "probability_1", extra]
+    if distributed:
+        monkeypatch.setattr(spark_metrics, "has_spark_rows", lambda frame: False)
+        actual = spark_metrics._probability_names(
+            SimpleNamespace(columns=columns), (0, 1), "classification"
+        )
+    else:
+        actual = native._probability_columns(
+            pl.DataFrame(schema=dict.fromkeys(columns, pl.String)), (0, 1), "classification", {}
+        )
+    assert actual == ("probability_0", "probability_1")
+
+
 def frame(engine: str, rows: list[dict]) -> pd.DataFrame | pl.DataFrame:
     """Keep the same input records for both supported frame engines."""
     return (
@@ -85,6 +190,7 @@ def test_identical_features_are_healthy_without_labels(engine):
     result = report(engine, reference=reference, current=current, predictions=predictions)
     assert result["status"] == "healthy"
     assert (result["reference_rows"], result["current_rows"], result["scored_rows"]) == (40, 40, 40)
+    assert result["excluded_rows"] == 0
     assert result["labeled_rows"] == 0 and result["label_coverage"] == 0
     assert metric(result, "performance", "accuracy")["status"] == "unavailable"
     json.dumps(result, allow_nan=False)
@@ -211,8 +317,18 @@ def test_excluded_predictions_do_not_enter_performance(engine):
     ]
     result = report(engine, predictions=predictions, labels=labels)
     assert result["scored_rows"] == 1 and result["labeled_rows"] == 1
+    assert json.loads(json.dumps(result, allow_nan=False))["excluded_rows"] == 1
     assert metric(result, "performance", "accuracy")["status"] == "unavailable"
     assert any("excluded" in note for note in result["notes"])
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_missing_predictions_are_not_counted_as_excluded(engine):
+    """Missing saved outputs must remain distinct from explicit scoring exclusions."""
+    result = report(engine, predictions=[{"id": "one", "prediction": "no"}])
+    assert result["current_rows"] == 2
+    assert result["scored_rows"] == 1
+    assert result["excluded_rows"] == 0
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -329,6 +445,7 @@ def test_no_predicted_outputs_cannot_be_healthy(engine, empty):
     )
     result = report(engine, predictions=predictions)
     assert result["scored_rows"] == 0
+    assert result["excluded_rows"] == (0 if empty else 2)
     assert result["status"] == "degraded"
 
 

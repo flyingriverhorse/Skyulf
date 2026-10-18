@@ -17,6 +17,7 @@ interface BaseVectorizerConfig {
 }
 
 interface CountVectorizerConfig extends BaseVectorizerConfig {
+  column_mode?: 'joined' | 'per_column' | undefined;
   max_features: number | null;
   min_df: number;
   max_df: number;
@@ -146,6 +147,24 @@ function HashingParameters({ hashCfg, patch }: {
   );
 }
 
+function VocabularyColumnMode({ config, patch }: {
+  config: CountVectorizerConfig;
+  patch: VectorizerPatch;
+}) {
+  return (
+    <ValidationField field="column_mode">
+      <label className="block text-xs font-medium">Vocabulary columns
+        <select aria-label="Vocabulary columns" className="mt-1 w-full text-xs rounded border p-1.5 bg-background"
+          value={config.column_mode ?? 'joined'} onChange={(e) => patch({ column_mode: e.target.value as CountVectorizerConfig['column_mode'] })}>
+          <option value="joined">Join columns into one document</option>
+          <option value="per_column">Separate vocabulary per column</option>
+        </select>
+      </label>
+      <p className="text-[11px] text-gray-500 mt-0.5">Separate vocabularies keep source-specific tokens and IDF. Feature limits apply to each column.</p>
+    </ValidationField>
+  );
+}
+
 function VocabularyParameters({ config, variant, patch }: {
   config: CountVectorizerConfig | TfidfVectorizerConfig;
   variant: 'count' | 'tfidf';
@@ -155,6 +174,7 @@ function VocabularyParameters({ config, variant, patch }: {
   const tfidfCfg = config as TfidfVectorizerConfig;
   return (
     <>
+      <VocabularyColumnMode config={config} patch={patch} />
       <NumberField
         label="Max features"
         value={countCfg.max_features ?? null}
@@ -288,7 +308,7 @@ const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { va
               />
             </ValidationField>
             <p className="text-xs text-gray-500 mt-1">
-              Only text/categorical columns are shown. Multiple columns are joined with a space.
+              Only text/categorical columns are shown. Vocabulary vectorizers can process them independently; Hashing always joins them with a space.
             </p>
           </div>
 
@@ -361,6 +381,15 @@ const baseValidate = (config: { columns: string[] }) =>
     ? { isValid: false, field: 'columns', message: 'Select at least one text column.' }
     : { isValid: true };
 
+const vocabularyValidate = (config: CountVectorizerConfig) => {
+  const base = baseValidate(config);
+  if (!base.isValid) return base;
+  const mode = config.column_mode === undefined ? 'joined' : config.column_mode;
+  if (!['joined', 'per_column'].includes(mode))
+    return { isValid: false, field: 'column_mode', message: 'Choose joined columns or a separate vocabulary per column.' };
+  return { isValid: true };
+};
+
 // ── Node definitions ──────────────────────────────────────────────────────────
 
 export const CountVectorizerNode: NodeDefinition<CountVectorizerConfig> = {
@@ -375,9 +404,10 @@ export const CountVectorizerNode: NodeDefinition<CountVectorizerConfig> = {
     <VectorizerSettings {...(props as NodeSettingsProps<AnyVectorizerConfig>)} variant="count" />
   ),
   bodyPreview: bagPreview,
-  validate: baseValidate,
+  validate: vocabularyValidate,
   getDefaultConfig: () => ({
     columns: [],
+    column_mode: 'joined',
     max_features: null,
     min_df: 1,
     max_df: 1.0,
@@ -401,9 +431,10 @@ export const TfidfVectorizerNode: NodeDefinition<TfidfVectorizerConfig> = {
     <VectorizerSettings {...(props as NodeSettingsProps<AnyVectorizerConfig>)} variant="tfidf" />
   ),
   bodyPreview: bagPreview,
-  validate: baseValidate,
+  validate: vocabularyValidate,
   getDefaultConfig: () => ({
     columns: [],
+    column_mode: 'joined',
     max_features: null,
     min_df: 1,
     max_df: 1.0,

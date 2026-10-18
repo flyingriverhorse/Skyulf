@@ -121,6 +121,8 @@ def test_training_probe_logs_real_saved_apply_and_report(
         if enabled:
             report = training_report_document(run.client, run.run_id, "preprocessing_probe.json")
             assert report["status"] == "passed", report
+            assert report["report_version"] == 2
+            assert report["float_tolerance"] == {"rtol": 1e-9, "atol": 1e-12}
             assert report["sample_rows"] == 256
             assert report["admission"] == "diagnostic_only"
             assert report["fitted_engine"] == engine

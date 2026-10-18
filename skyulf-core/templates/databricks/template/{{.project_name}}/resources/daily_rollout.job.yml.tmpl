@@ -23,6 +23,10 @@ resources:
             notebook_path: ../src/jobs/daily_rollout.py
             base_parameters:
               serving_config_path: ${workspace.file_path}/config/serving.yml
+              bundle_target: ${bundle.target}
+              job_run_id: '{{"{{job.run_id}}"}}'
+              task_key: daily_rollout
+              workspace_host: ${workspace.host}
       environments:
         - environment_key: serving
           spec:

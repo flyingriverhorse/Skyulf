@@ -1,0 +1,35 @@
+-- EDIT BEFORE EXECUTION: replace {catalog}, {input_schema}, and TYPE_FOR_*.
+-- Types must match your real data. Skyulf never guesses them from column names.
+-- Use CREATE TABLE without IF NOT EXISTS so an incompatible existing table fails.
+-- Review existing tables instead of overwriting them; see SOURCES.md.
+-- Add any extra lookup, weight or custom pre-split inputs configured after initialization.
+{{- $source := .source_table_name -}}{{- if not $source -}}{{- $source = printf "%s_source" .project_name -}}{{- end -}}
+{{- $features := .record_key_columns -}}{{- $targets := "" -}}{{- $events := "" -}}
+{{- if eq .training_layout "multi_target" -}}
+{{- range $slot := (regexp "[1-8]").FindAllString "12345678" -1 -}}{{- if le $slot $.branch_count -}}
+{{- $features = printf "%s,%s" $features (index $ (printf "branch_%s_input_columns" $slot)) -}}
+{{- $targets = printf "%s,%s" $targets (index $ (printf "branch_%s_target_column" $slot)) -}}
+{{- $events = printf "%s,%s" $events (index $ (printf "branch_%s_event_column" $slot)) -}}
+{{- if ne $.source_layout "separate_outcomes" -}}{{- $events = printf "%s,%s" $events (index $ (printf "branch_%s_result_available_at_column" $slot)) -}}{{- end -}}
+{{- $events = printf "%s,%s" $events (index $ (printf "branch_%s_cv_group_column" $slot)) -}}
+{{- end -}}{{- end -}}
+{{- else -}}{{- $features = printf "%s,%s" $features .input_columns -}}{{- $targets = .target_column -}}{{- $events = .event_column -}}
+{{- if ne .source_layout "separate_outcomes" -}}{{- $events = printf "%s,%s" $events .result_available_at_column -}}{{- end -}}
+{{- $events = printf "%s,%s" $events .cv_group_column -}}{{- end -}}
+{{- $training := printf "%s,%s" $features $events -}}{{- if ne .source_layout "separate_outcomes" -}}{{- $training = printf "%s,%s" $training $targets -}}{{- end -}}
+{{- $score := .score_source_table_name -}}{{- if not $score -}}{{- $score = $source -}}{{- end -}}
+{{- $sourceLabels := (regexp (printf "(?i)^(%s|%s\\.%s\\.%s)$" $source .catalog .schema $source)).MatchString .label_table_name -}}
+{{- $scoreLabels := (regexp (printf "(?i)^(%s|%s\\.%s\\.%s)$" $score .catalog .schema $score)).MatchString .label_table_name -}}
+{{- if $sourceLabels -}}{{- $training = printf "%s,%s,%s" $training $targets .label_available_at_column -}}{{- end -}}
+{{- if $scoreLabels -}}{{- $features = printf "%s,%s,%s" $features $targets .label_available_at_column -}}{{- end}}
+
+CREATE TABLE {catalog}.{input_schema}.{{$source}} (
+{{template "source_columns" (map (pair "columns" $training) (pair "timestamp" .label_available_at_column))}}
+) USING DELTA TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true');
+{{if and .score_source_table_name (ne .score_source_table_name $source)}}CREATE TABLE {catalog}.{input_schema}.{{.score_source_table_name}} (
+{{template "source_columns" (map (pair "columns" $features) (pair "timestamp" .label_available_at_column))}}
+) USING DELTA TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true');
+{{end}}{{if and .label_table_name (not $sourceLabels) (not $scoreLabels)}}CREATE TABLE {{if not ((regexp "\\.").MatchString .label_table_name)}}{catalog}.{input_schema}.{{end}}{{.label_table_name}} (
+{{template "source_columns" (map (pair "columns" (printf "%s,%s,%s" .record_key_columns $targets .label_available_at_column)) (pair "timestamp" .label_available_at_column))}}
+) USING DELTA TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true');
+{{end -}}

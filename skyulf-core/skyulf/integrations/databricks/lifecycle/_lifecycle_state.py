@@ -119,9 +119,10 @@ class PhaseStore:
             raise ValueError("Lifecycle predecessor receipt digest differs from its reference.")
 
     def _validate_bound_request(self) -> None:
-        """Verify the loaded request identity and saved integrity tag."""
+        """Verify saved config, identity and integrity before replaying a frozen request."""
         if (
             self.request.get("version") != 1
+            or not isinstance(self.request.get("config"), dict)
             or self.request.get("context") != self.context.identity()
             or self.request.get("run_id") != self.run_id
             or evidence_digest(self.request) != self.request_digest

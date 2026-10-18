@@ -728,7 +728,7 @@
   "branch_SLOT_split_strategy": {
     "type": "string",
     "default": "random",
-    "description": "Branch SLOT | How to reserve test rows? random = random rows; temporal = newer rows for testing and older rows for training. Default source: full snapshot for random, rolling calendar for temporal. Override training_window_mode in an init file.",
+    "description": "Branch SLOT | How to reserve test rows? random = random rows; temporal = newer rows for testing and older rows for training. Default source: full snapshot for random, rolling calendar for temporal. Not asked after a full_snapshot window (always random).",
     "enum": [
       "random",
       "temporal"
@@ -745,6 +745,13 @@
               "branch_count": {
                 "pattern": "^[SLOT-8]$"
               }
+            }
+          }
+        },
+        {
+          "properties": {
+            "branch_SLOT_training_window_mode": {
+              "const": "full_snapshot"
             }
           }
         },
@@ -869,7 +876,7 @@
       "rolling_calendar",
       "rolling_days"
     ],
-    "order": 21,
+    "order": 16.5,
     "skip_prompt_if": {
       "not": {
         "properties": {
@@ -2463,8 +2470,7 @@
               }
             }
           }
-        },
-        {}
+        }
       ]
     }
   },
@@ -3076,9 +3082,9 @@
   "branch_SLOT_search_max_resources": {
     "order": 65,
     "type": "string",
-    "default": "null",
-    "description": "Branch SLOT | Maximum estimator resource count for n_estimators halving; enter a positive integer compatible with the selected model",
-    "pattern": "^(?:null|[1-9][0-9]*)$",
+    "default": "100",
+    "description": "Branch SLOT | Maximum estimator count for n_estimators halving (integer 2 or more; at least the starting budget)",
+    "pattern": "^(?:[2-9]|[1-9][0-9]+)$",
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -3427,6 +3433,22 @@
         {}
       ]
     }
+  },
+  "branch_SLOT_min_scored_fraction": {
+    "order": 75,
+    "type": "string",
+    "default": "0.90",
+    "description": "Branch SLOT | Minimum fraction of holdout rows this candidate must score (0 to 1); null disables this coverage gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+    "skip_prompt_if": {}
+  },
+  "branch_SLOT_max_coverage_drop": {
+    "order": 76,
+    "type": "string",
+    "default": "0.05",
+    "description": "Branch SLOT | Maximum scored-fraction loss versus champion (0 to 1); 0.05 means five percentage points; null disables this gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+    "skip_prompt_if": {}
   },
   "branch_SLOT_quality_threshold": {
     "order": 73,

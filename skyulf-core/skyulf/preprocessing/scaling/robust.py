@@ -12,7 +12,7 @@ from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import RobustScalerArtifact
-from .._fitted_validation import _columns, local_state_fields
+from .._fitted_validation import _columns, local_boolean, local_state_fields
 from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
@@ -40,21 +40,25 @@ class RobustScalerApplier(BaseApplier):
     @staticmethod
     def validate_inference_state(raw: dict) -> dict:
         """Inspect saved local flags and statistics without recalculating quantiles."""
+        fields = {
+            "type",
+            "columns",
+            "center",
+            "scale",
+            "quantile_range",
+            "with_centering",
+            "with_scaling",
+        }
+        if isinstance(raw, dict) and "unit_variance" in raw:
+            fields.add("unit_variance")
         if not local_state_fields(
             raw,
             "robust_scaler",
-            {
-                "type",
-                "columns",
-                "center",
-                "scale",
-                "quantile_range",
-                "with_centering",
-                "with_scaling",
-            },
+            fields,
             allow_empty=True,
         ):
             return raw
+        local_boolean(raw.get("unit_variance", False), "unit_variance")
         columns = _columns(raw["columns"])
         if type(raw["quantile_range"]) not in (list, tuple):
             raise ValueError("Fitted robust scaler quantiles must be a pair of bounds.")
@@ -151,6 +155,7 @@ def _validate_robust_statistic(state: dict, flag: str, field: str, size: int) ->
         "quantile_range": [25.0, 75.0],
         "with_centering": True,
         "with_scaling": True,
+        "unit_variance": False,
         "columns": [],
     },
     learns_from_data=True,
@@ -202,10 +207,11 @@ def _fit_robust(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[
         quantile_range=quantile_range,
         with_centering=with_centering,
         with_scaling=with_scaling,
+        unit_variance=config.get("unit_variance", False),
     )
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     scaler.fit(X_np)
-    return {
+    state = {
         "type": "robust_scaler",
         "center": scaler.center_.tolist() if scaler.center_ is not None else None,
         "scale": scaler.scale_.tolist() if scaler.scale_ is not None else None,
@@ -214,3 +220,6 @@ def _fit_robust(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[
         "with_scaling": with_scaling,
         "columns": cols,
     }
+    if "unit_variance" in config:
+        state["unit_variance"] = bool(scaler.unit_variance)
+    return state

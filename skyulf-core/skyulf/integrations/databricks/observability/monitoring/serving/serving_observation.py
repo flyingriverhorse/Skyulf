@@ -11,6 +11,25 @@ from .serving_payloads import REQUEST_KEY, ROW_KEY, parse_serving_payloads
 from .serving_sources import read_serving_payload_snapshot, verify_serving_payload_snapshot
 
 
+def add_serving_report_details(report: dict, serving: dict) -> None:
+    """Keep captured counts visible and prevent partial populations appearing healthy."""
+    report["serving"] = serving
+    notes = report.setdefault("notes", [])
+    notes.append(
+        "Serving observations describe captured requests; platform logging is asynchronous "
+        "and may omit HTTP error responses. Counts are not total endpoint traffic."
+    )
+    count = serving.get("logging_error_count", 0)
+    if count:
+        if report["status"] == "healthy":
+            report["status"] = "degraded"
+        notes.append(
+            f"Excluded payloads from {count} captured request(s) with logging errors. "
+            "These requests remain in HTTP counts. Drift and performance describe only "
+            "usable payloads; the missing population may differ."
+        )
+
+
 def observation_keys(config: MonitorConfig, spec: Any) -> tuple[str, ...]:
     """Keep repeat requests separate while preserving the original training key contract."""
     return (REQUEST_KEY, ROW_KEY) if config.serving_endpoint else spec.record_key_columns
@@ -51,7 +70,10 @@ def spark_dtype(dtype: str) -> str:
 
 def _payload_contract(artifact: Any, config: MonitorConfig) -> tuple[tuple, tuple, str]:
     """Project component inputs and standard outputs without mixing sibling targets."""
-    from skyulf.inference.pipeline_scoring import prediction_output_schema  # noqa: PLC0415
+    from skyulf.inference.pipeline_scoring import (  # noqa: PLC0415
+        prediction_output_schema,
+        scoring_output_schema,
+    )
 
     manifest = artifact.manifest
     inputs = tuple(
@@ -62,8 +84,10 @@ def _payload_contract(artifact: Any, config: MonitorConfig) -> tuple[tuple, tupl
     outputs = tuple(
         (prefix + c.name, spark_dtype(c.dtype)) for c in prediction_output_schema(artifact)
     )
-    if config.model_set_branch or artifact.pipeline.config.get("project_scoring") is not None:
-        outputs += ((prefix + "scoring_status", "string"),)
+    if config.model_set_branch or any(
+        column.name == "scoring_status" for column in scoring_output_schema(artifact)
+    ):
+        outputs += ((prefix + "scoring_status", "string"), (prefix + "exclusion_reason", "string"))
     return inputs, outputs, prefix
 
 

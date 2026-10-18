@@ -222,6 +222,7 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "max_rows",
         "max_bytes",
         "preprocessing_probe",
+        "admit_probed_custom_steps",
         "survivor_key_sha256",
         "training_evidence_sha256",
         "group_column",
@@ -233,6 +234,9 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "feature_lookup_json",
         "feature_binding_json",
         "online_policy_json",
+        "training_label_table",
+        "training_label_version",
+        "training_label_table_id",
     ):
         old.pop(key)
     for key in ("start", "holdout_start", "cutoff", "result_cutoff"):
@@ -242,6 +246,9 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
     saved.pop("pre_split_steps")
     saved.pop("group_column")
     saved.pop("drop_missing_labels")
+    saved.pop("training_label_table")
+    saved.pop("training_label_version")
+    saved.pop("training_label_table_id")
     for key in (
         "weight_column",
         "reserved_weight_columns",
@@ -430,6 +437,8 @@ def test_offline_preview_names_filter_phase_and_project_recipe(workflow_config):
     assert "config/pre_split.yml" in preview
     assert "config/preprocessing.yml" in preview
     assert "fold-local preprocessing/model" in preview
+    assert "saved pre-split eligibility when reuse_pre_split is enabled" in preview
+    assert "training row exclusions are not repeated during scoring" not in preview
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -1142,7 +1151,9 @@ def test_champion_target_contract_mismatch_stops_before_metrics(monkeypatch):
         validation, "_checked_artifact", lambda ref, **kwargs: artifacts[ref.version]
     )
     monkeypatch.setattr(
-        validation, "evaluate_holdout", lambda *args, **kwargs: pytest.fail("metric called")
+        validation,
+        "evaluate_holdout_comparison",
+        lambda *args, **kwargs: pytest.fail("metric called"),
     )
     with pytest.raises(ValueError, match="target normalization contracts differ"):
         validation.compare_registered_pipeline_models(

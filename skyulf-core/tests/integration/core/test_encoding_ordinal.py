@@ -80,14 +80,12 @@ def test_custom_unknown_value_is_respected() -> None:
     assert result["category"].iloc[0] == -99.0
 
 
-def test_invalid_handle_unknown_falls_back_to_use_encoded_value() -> None:
-    """An unsupported handle_unknown value silently falls back to a safe default."""
+def test_invalid_handle_unknown_is_rejected_at_fit() -> None:
+    """An unsupported policy must not silently change unseen-category behavior."""
     train = pd.DataFrame({"category": ["a", "b"]})
     calc = OrdinalEncoderCalculator()
-    params = calc.fit(train, {"columns": ["category"], "handle_unknown": "bogus"})
-
-    encoder = params["encoder_object"]
-    assert encoder.handle_unknown == "use_encoded_value"
+    with pytest.raises(ValueError, match="handle_unknown.*error.*use_encoded_value"):
+        calc.fit(train, {"columns": ["category"], "handle_unknown": "bogus"})
 
 
 def test_empty_dataframe_raises_on_fit() -> None:

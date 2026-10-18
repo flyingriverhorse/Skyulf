@@ -8,12 +8,14 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from .....inference.fitted_pipeline import FittedPipelineArtifact
+from .....inference.fitted_pipeline import FittedPipelineArtifact, has_exclusion_steps
 from .....modeling._explainability.shap_explanation import compute_shap_explanation
+from .....preprocessing.inference_context import get_inference_capability
 from .explanation_report import render_explanation_report
 
 _DEFAULTS = {"max_samples": 100, "max_features": 30, "max_display_samples": 10}
-_LIMITS = {"max_samples": (1, 200), "max_features": (1, 50), "max_display_samples": (0, 50)}
+_LIMITS = {"max_samples": (1, 200), "max_features": (1, 100), "max_display_samples": (0, 50)}
+_MIN_EXPLAINED_ROWS_AFTER_EXCLUSIONS = 2
 
 
 def validate_explanation_config(pipeline: dict[str, Any]) -> None:
@@ -66,6 +68,33 @@ def _input_unavailable_reason(
     return None
 
 
+def _sample_positions(count: int, limit: int) -> np.ndarray:
+    """Keep chronological order while selecting reproducible positional samples."""
+    if count <= limit:
+        return np.arange(count)
+    return np.sort(np.random.default_rng(42).choice(count, limit, replace=False))
+
+
+def _take_rows(frame: pd.DataFrame | pl.DataFrame, positions: np.ndarray) -> Any:
+    """Use positions consistently even with duplicate or nonnumeric pandas indexes."""
+    return frame[positions.tolist()] if isinstance(frame, pl.DataFrame) else frame.iloc[positions]
+
+
+def _requires_context(artifact: FittedPipelineArtifact) -> bool:
+    """Sample early only when every saved step declares row-independent inference."""
+    for step in artifact.pipeline.feature_engineer.fitted_steps:
+        capability = get_inference_capability(
+            step["type"],
+            step.get("params", {}),
+            step["artifact"],
+            engine=artifact.manifest.fitted_engine,
+            applier=step["applier"],
+        )
+        if capability is None or capability.context != "row":
+            return True
+    return False
+
+
 def _sample_training_inputs(
     artifact: FittedPipelineArtifact,
     training_frame: pd.DataFrame | pl.DataFrame,
@@ -73,18 +102,13 @@ def _sample_training_inputs(
 ) -> pd.DataFrame | pl.DataFrame:
     """Select reproducible input-only rows and match the fitted preprocessing engine."""
     manifest = artifact.manifest
-    count = min(len(training_frame), max_samples)
-    positions = np.sort(np.random.default_rng(42).choice(len(training_frame), count, replace=False))
+    positions = _sample_positions(len(training_frame), max_samples)
     projected = (
         training_frame.select(manifest.input_columns)
         if isinstance(training_frame, pl.DataFrame)
         else training_frame.loc[:, list(manifest.input_columns)]
     )
-    sampled = (
-        projected[positions.tolist()]
-        if isinstance(projected, pl.DataFrame)
-        else projected.iloc[positions]
-    )
+    sampled = _take_rows(projected, positions)
     if manifest.fitted_engine == "pandas" and isinstance(sampled, pl.DataFrame):
         return sampled.to_pandas()
     if manifest.fitted_engine == "polars" and isinstance(sampled, pd.DataFrame):
@@ -121,6 +145,36 @@ def _explanation_result(explanation: Any, evidence: dict[str, Any]) -> dict[str,
     return {**evidence, "status": "completed", "shap": explanation}
 
 
+def _explanation_features(
+    artifact: FittedPipelineArtifact,
+    sampled: pd.DataFrame | pl.DataFrame,
+    evidence: dict[str, Any],
+) -> pd.DataFrame | pl.DataFrame:
+    """Compute history before selecting rows, with exclusion counts for that same sample."""
+    engineer = artifact.pipeline.feature_engineer
+    positions = _sample_positions(len(sampled), evidence["limits"]["max_samples"])
+    if not has_exclusion_steps(artifact):
+        transformed = engineer.transform(sampled, preserve_rows=True)
+        if len(transformed) != len(sampled):
+            return transformed
+        evidence["sample_count"] = len(positions)
+        return _take_rows(transformed, positions)
+    transformed, _, reasons = engineer.transform_with_exclusions(sampled)
+    selected = np.isin(np.flatnonzero(reasons.isna().to_numpy()), positions)
+    transformed = _take_rows(transformed, np.flatnonzero(selected))
+    reasons = reasons.iloc[positions]
+    evidence.update(
+        sampled_rows=len(positions),
+        explained_rows=len(transformed),
+        excluded_rows=int(reasons.notna().sum()),
+        excluded_by_reason={
+            str(reason): int(count) for reason, count in reasons.value_counts().items()
+        },
+        sample_count=len(transformed),
+    )
+    return transformed
+
+
 def _explain_sample(
     artifact: FittedPipelineArtifact,
     sampled: pd.DataFrame | pl.DataFrame,
@@ -128,11 +182,13 @@ def _explain_sample(
 ) -> dict[str, Any]:
     """Reuse fitted preprocessing and explain the fitted estimator without refitting."""
     try:
-        transformed = artifact.pipeline.feature_engineer.transform(sampled, preserve_rows=True)
+        transformed = _explanation_features(artifact, sampled, evidence)
     except ValueError as exc:
         return {**evidence, "reason": "inference_transform_unavailable", "detail": str(exc)}
     limits = evidence["limits"]
     count = evidence["sample_count"]
+    if "excluded_rows" in evidence and count < _MIN_EXPLAINED_ROWS_AFTER_EXCLUSIONS:
+        return {**evidence, "reason": "too_few_rows_after_exclusions"}
     reason = _transformed_unavailable_reason(artifact, transformed, count, limits["max_features"])
     if reason:
         return {**evidence, "reason": reason}
@@ -172,7 +228,12 @@ def explain_training_artifact(
     reason = _input_unavailable_reason(artifact, training_frame, limits)
     if reason:
         return {**evidence, "reason": reason}
-    sampled = _sample_training_inputs(artifact, training_frame, limits["max_samples"])
+    # The caller already bounds the training population. Context-dependent or
+    # undeclared steps need that complete population; only SHAP rows are sampled.
+    input_limit = len(training_frame) if _requires_context(artifact) else limits["max_samples"]
+    sampled = _sample_training_inputs(artifact, training_frame, input_limit)
+    if len(sampled) > limits["max_samples"]:
+        evidence["preprocessing_rows"] = len(sampled)
     evidence["sample_count"] = len(sampled)
     return _explain_sample(artifact, sampled, evidence)
 

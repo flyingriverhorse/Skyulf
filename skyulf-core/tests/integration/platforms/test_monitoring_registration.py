@@ -7,6 +7,89 @@ import pytest
 from test_monitoring_config import performance_policy
 
 
+@pytest.mark.parametrize(
+    ("count", "scoring_noop", "expected_noop", "saved_batch"),
+    [
+        (0, False, True, False),
+        (0, True, True, False),
+        (3, False, False, True),
+        (3, True, True, True),
+        (None, True, True, True),
+    ],
+)
+def test_monitoring_handoff_distinguishes_empty_checkpoints(
+    count, scoring_noop, expected_noop, saved_batch
+):
+    """Receipt-only progress must skip batch observation while retaining old nonempty retries."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        publish_monitoring_request,
+    )
+
+    manifest = {"skyulf_mode": "incremental_append", "run_id": "saved"}
+    if count is not None:
+        manifest["output_count"] = count
+    dbutils = Mock()
+    publish_monitoring_request(
+        dbutils,
+        {
+            "monitoring": {"config": {}, "inventory_table": "workspace.shared.model_inventory"},
+            "result": {
+                "commit_version": 4,
+                "noop": scoring_noop,
+                "manifest": manifest,
+                "output_count": 0 if scoring_noop else count,
+            },
+        },
+    )
+    request = dbutils.jobs.taskValues.set.call_args.kwargs["value"]
+    assert request["noop"] is expected_noop
+    assert request["has_saved_batch"] is saved_batch
+    assert request["commit_version"] == 4
+
+
+@pytest.mark.parametrize("performance", [False, True])
+def test_empty_checkpoint_handoff_preserves_delayed_label_observation(performance):
+    """An empty increment skips new-batch monitoring but must not stop mature-label checks."""
+    from skyulf.integrations.databricks.jobs.monitoring.monitoring_tasks import (
+        _empty_scoring_request,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        publish_monitoring_request,
+    )
+
+    config = MonitorConfig(
+        environment="test",
+        project="empty",
+        model_name="workspace.test.amount",
+        model_version="2",
+        source_table="workspace.test.source",
+        prediction_table="workspace.test.predictions",
+        label_table="workspace.test.labels",
+        result_available_at_column="available_at",
+        performance_policy=performance_policy() if performance else None,
+    )
+    dbutils = Mock()
+    publish_monitoring_request(
+        dbutils,
+        {
+            "monitoring": {
+                "config": config.payload(),
+                "inventory_table": "workspace.test.model_inventory",
+            },
+            "result": {
+                "noop": False,
+                "commit_version": 3,
+                "manifest": {"skyulf_mode": "incremental_append", "output_count": 0},
+            },
+        },
+    )
+    request = dbutils.jobs.taskValues.set.call_args.kwargs["value"]
+    assert _empty_scoring_request(request, [config]) is (not performance)
+
+
 @pytest.fixture(autouse=True)
 def existing_monitoring_store(monkeypatch):
     """Isolate configuration assertions from the separately tested shared-store bootstrap."""
@@ -106,6 +189,31 @@ def test_invalid_thresholds_block_scoring_before_inference(monkeypatch, raw):
     with pytest.raises(ValueError, match="threshold"):
         job_runtime.run_score_notebook(Mock(), dbutils, exit_notebook=False)
     run.assert_not_called()
+
+
+@pytest.mark.parametrize("engine", ["local", "spark"])
+def test_json_limits_reach_enrollment_without_changing_spark_budgets(engine):
+    """The existing Bundle JSON variable must carry overrides into the registered configuration."""
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
+
+    overrides = {
+        "categorical_top_k": 20,
+        "id_like_uniqueness": 0.75,
+        "monitor_max_rows": 200_000,
+        "monitor_max_bytes": 256 * 1024**2,
+    }
+    config = registration.build_monitor_enrollment_config(
+        workflow(),
+        settings(
+            monitoring_execution_engine=engine, monitoring_drift_thresholds=json.dumps(overrides)
+        ),
+        "1",
+    )
+    assert config.thresholds == overrides
+    assert config.max_rows == (200_000 if engine == "local" else 10000)
+    assert config.max_bytes == (256 * 1024**2 if engine == "local" else 64 * 1024**2)
 
 
 def settings(**changes):

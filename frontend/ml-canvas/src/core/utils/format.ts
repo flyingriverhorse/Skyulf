@@ -25,6 +25,7 @@ const METRIC_BASE_DESCRIPTIONS: Record<string, string> = {
   pr_auc: 'Area under Precision-Recall curve. More informative than ROC AUC when the positive class is rare.',
   pr_auc_weighted: 'PR AUC averaged across classes by support.',
   mape: 'Mean absolute percentage error. Expresses average error as a % of the true value. Avoid when targets are near zero.',
+  wape: 'Weighted absolute percentage error: total absolute error divided by total absolute actual values. Lower is better; 0.1 means 10%. Unavailable when all actual values are zero.',
   explained_variance: 'Fraction of target variance explained by the model. Like R² but does not penalise systematic bias.',
   best_score: 'Best cross-validation score found across all tuning trials. This value drove hyperparameter selection.',
 };
@@ -144,7 +145,7 @@ export const formatMetricName = (metric?: string | null): string => {
   if (!metric) return '';
   const map: Record<string, string> = {
     accuracy: 'Accuracy', f1: 'F1', precision: 'Precision', recall: 'Recall',
-    roc_auc: 'ROC AUC', r2: 'R²', mse: 'MSE', mae: 'MAE', rmse: 'RMSE', mape: 'MAPE',
+    roc_auc: 'ROC AUC', r2: 'R²', mse: 'MSE', mae: 'MAE', rmse: 'RMSE', mape: 'MAPE', wape: 'WAPE',
     f1_weighted: 'F1 Weighted', precision_weighted: 'Precision Weighted',
     recall_weighted: 'Recall Weighted', roc_auc_weighted: 'ROC AUC Weighted',
     f1_macro: 'F1 Macro', f1_micro: 'F1 Micro',

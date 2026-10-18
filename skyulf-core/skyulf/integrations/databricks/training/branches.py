@@ -18,6 +18,7 @@ from typing import Any, Literal
 from ....inference.project_code import load_project_module
 from ...mlflow.lifecycle.promotion import controlled_champion_version
 from ...mlflow.runs.tracking import TrackingConfig, TrackingRun, track_run
+from ..data.training.training_labels import LABEL_FIELDS, pin_training_labels
 from ..lifecycle.workflow import resolve_training_spec, training_settings, training_spec
 from ..projects.workflow_config import validate_workflow_config
 from ..scoring.shared.prediction_output import TABLE_NAME_PATTERN
@@ -48,6 +49,8 @@ class TrainingBranch:
     champion_version: str | None = None
     quality_threshold: float | None = None
     quality_gates: dict[str, float] | None = None
+    min_scored_fraction: float | None = 0.90
+    max_coverage_drop: float | None = 0.05
     risk_category: str | None = None
     cv: CVSpec = CVSpec()
     tracking_uri: str | None = None
@@ -141,6 +144,8 @@ def _validate_branch(branch: TrainingBranch) -> None:
         champion_version=branch.champion_version,
         quality_threshold=branch.quality_threshold,
         quality_gates=branch.quality_gates,
+        min_scored_fraction=branch.min_scored_fraction,
+        max_coverage_drop=branch.max_coverage_drop,
         risk_category=branch.risk_category,
     )
     validate_cv_holdout_policy(branch.spec, branch.cv)
@@ -178,6 +183,8 @@ def _from_config(name: str, config: dict[str, Any], now: datetime) -> TrainingBr
         champion_version=config.get("champion_version"),
         quality_threshold=config.get("quality_threshold"),
         quality_gates=config.get("quality_gates"),
+        min_scored_fraction=config.get("min_scored_fraction", 0.90),
+        max_coverage_drop=config.get("max_coverage_drop", 0.05),
         risk_category=config.get("risk_category"),
         cv=CVSpec.from_workflow(config),
         tracking_uri=config["tracking_uri"],
@@ -273,12 +280,28 @@ def prepare_training_branches(
     )
     branch_training_payload(branches)
     resolved = resolve_training_spec(spark, checked[branches[0].name], instant)
-    pinned = tuple(
-        replace(branch, spec=replace(branch.spec, version=resolved.version)) for branch in branches
-    )
+    pinned = _pin_branch_sources(spark, branches, resolved)
     if champion_versions is not None:
         return _set_champion_pins(pinned, champion_versions)
     return tuple(_resolve_champion(branch, checked[branch.name]) for branch in pinned)
+
+
+def _pin_branch_sources(
+    spark: Any, branches: tuple[TrainingBranch, ...], resolved: TrainingSpec
+) -> tuple[TrainingBranch, ...]:
+    """Share the feature snapshot and resolve each requested outcome snapshot only once."""
+    first = branches[0].spec
+    labels = {(first.training_label_table, first.training_label_version): resolved}
+    pinned = []
+    for branch in branches:
+        spec = replace(branch.spec, version=resolved.version)
+        if spec.training_label_table is not None:
+            key = (spec.training_label_table, spec.training_label_version)
+            if key not in labels:
+                labels[key] = pin_training_labels(spark, spec)
+            spec = replace(spec, **{name: getattr(labels[key], name) for name in LABEL_FIELDS})
+        pinned.append(replace(branch, spec=spec))
+    return tuple(pinned)
 
 
 def _set_champion_pins(
@@ -327,7 +350,7 @@ def _restore_branch(payload: Any) -> TrainingBranch:
     """Restore saved project registrations before validating its pinned spec."""
     _exact_fields(payload, {field.name for field in fields(TrainingBranch)}, "training branch")
     values = deepcopy(payload)
-    _exact_fields(values["spec"], {field.name for field in fields(TrainingSpec)}, "branch spec")
+    values["spec"] = _restore_spec_fields(values["spec"])
     _exact_fields(values["cv"], {field.name for field in fields(CVSpec)}, "branch cv")
     if not isinstance(values["pipeline"], dict):
         raise ValueError("Branch pipeline must be an object.")
@@ -341,6 +364,18 @@ def _restore_branch(payload: Any) -> TrainingBranch:
     values["spec"] = TrainingSpec.from_payload(values["spec"])
     values["cv"] = CVSpec(**values["cv"])
     return TrainingBranch(**values)
+
+
+def _restore_spec_fields(value: Any) -> dict[str, Any]:
+    """Accept absent optional label metadata in older plans, but require concrete label pins."""
+    if isinstance(value, dict):
+        value = dict.fromkeys(LABEL_FIELDS) | value
+    _exact_fields(value, {field.name for field in fields(TrainingSpec)}, "branch spec")
+    if value["training_label_table"] is not None and any(
+        value[name] is None for name in LABEL_FIELDS[1:]
+    ):
+        raise ValueError("Saved branch specs require pinned outcome version and identity.")
+    return value
 
 
 def restore_training_branches(payload: dict[str, Any]) -> tuple[TrainingBranch, ...]:
@@ -432,6 +467,8 @@ def train_branch(
         champion_version=branch.champion_version,
         quality_threshold=branch.quality_threshold,
         quality_gates=branch.quality_gates,
+        min_scored_fraction=branch.min_scored_fraction,
+        max_coverage_drop=branch.max_coverage_drop,
         risk_category=branch.risk_category,
         cv=branch.cv,
         evaluation_charts=evaluation_charts,

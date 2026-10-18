@@ -110,9 +110,15 @@ class StandardScalerApplier(BaseApplier):
                     output_dtype = X.lazy().select(divided).collect_schema()[col_name]
                     if output_dtype in (pl.Float32, pl.Float64):
                         # Use Polars' native promotion with batch-independent NumPy division.
+                        # Polars 2 centers unsigned minus signed as Int128, which NumPy cannot
+                        # view; casting first is the same promotion NumPy applies itself.
                         divided = cast(
                             pl.Expr,
-                            np.divide(e, scale_arr[idx : idx + 1], dtype=str(output_dtype).lower()),
+                            np.divide(
+                                e.cast(output_dtype),
+                                scale_arr[idx : idx + 1],
+                                dtype=str(output_dtype).lower(),
+                            ),
                         )
                 e = divided
             return e.alias(col_name)

@@ -201,7 +201,7 @@ function UnivariateParameters({ config, onChange }: SelectionConfigProps) {
 }
 
 function ModelParameters({ config, onChange }: SelectionConfigProps) {
-  const isModelBased = ['select_from_model', 'rfe'].includes(config.method);
+  const isModelBased = ['select_from_model', 'rfe', 'rfecv', 'sequential_feature_selection'].includes(config.method);
   return <>
     {/* Model Based Common */}
     {isModelBased && (
@@ -248,7 +248,7 @@ function ModelParameters({ config, onChange }: SelectionConfigProps) {
     )}
 
     {/* RFE Specific */}
-    {config.method === 'rfe' && (
+    {(config.method === 'rfe' || config.method === 'rfecv') && (
       <div className="space-y-2">
         <span className="text-sm font-medium">Step</span>
         <ValidationField field="step"><input
@@ -267,6 +267,45 @@ function ModelParameters({ config, onChange }: SelectionConfigProps) {
   </>;
 }
 
+function CrossValidatedParameters({ config, onChange }: SelectionConfigProps) {
+  if (config.method !== 'rfecv' && config.method !== 'sequential_feature_selection') return null;
+  return <div className="space-y-2">
+    <label className="block text-xs">CV folds
+      <ValidationField field="cv"><input aria-label="CV folds" type="number" min="2" step="1" className="w-full p-2 border rounded" value={numericInputValue(config.cv, 5)}
+        onChange={event => onChange({ ...config, cv: numericDraft(event.target.value) })} /></ValidationField>
+    </label>
+    <label className="block text-xs">Scorer name (optional)
+      <input aria-label="Scorer name" type="text" className="w-full p-2 border rounded" placeholder="Estimator default" value={config.scoring ?? ''}
+        onChange={event => {
+          const next = { ...config };
+          if (event.target.value) next.scoring = event.target.value;
+          else delete next.scoring;
+          onChange(next);
+        }} />
+    </label>
+    {config.method === 'rfecv' ? <label className="block text-xs">Minimum features
+      <ValidationField field="min_features_to_select"><input aria-label="Minimum features" type="number" min="1" step="1" className="w-full p-2 border rounded" value={numericInputValue(config.min_features_to_select, 1)}
+        onChange={event => onChange({ ...config, min_features_to_select: numericDraft(event.target.value) })} /></ValidationField>
+    </label> : <SequentialParameters config={config} onChange={onChange} />}
+    <p className="text-xs text-muted-foreground">Cross-validation repeats estimator fitting and can be costly. Folds are not shuffled or automatically reduced for small data.</p>
+  </div>;
+}
+
+function SequentialParameters({ config, onChange }: SelectionConfigProps) {
+  return <>
+    <label className="block text-xs">Direction
+      <select aria-label="Direction" className="w-full p-2 border rounded" value={config.direction ?? 'forward'} onChange={event => onChange({ ...config, direction: event.target.value as 'forward' | 'backward' })}>
+        <option value="forward">Forward</option><option value="backward">Backward</option>
+      </select>
+    </label>
+    <label className="block text-xs">Features to select
+      <ValidationField field="n_features_to_select"><input aria-label="Features to select" type="text" className="w-full p-2 border rounded" value={config.n_features_to_select ?? 'auto'}
+        onChange={event => onChange({ ...config, n_features_to_select: event.target.value === 'auto' ? 'auto' : numericDraft(event.target.value) })} /></ValidationField>
+    </label>
+    <p className="text-xs text-muted-foreground">Auto selects half the features. Enter an integer count or a fraction between zero and one.</p>
+  </>;
+}
+
 export function SelectionParameters({ id, ...props }: SelectionConfigProps & { id: string }) {
   const { config, onChange } = props;
   return <>
@@ -275,6 +314,7 @@ export function SelectionParameters({ id, ...props }: SelectionConfigProps & { i
     <FeatureCount {...props} />
     <UnivariateParameters {...props} />
     <ModelParameters {...props} />
+    <CrossValidatedParameters {...props} />
     {/* Drop Columns Checkbox */}
     <div className="flex items-center space-x-2 pt-2 border-t">
       <input

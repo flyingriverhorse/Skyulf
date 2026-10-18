@@ -10,11 +10,17 @@ from typing import Any
 from ....config_validation import validate_pipeline_config
 from ....modeling.base import BaseModelCalculator
 from ....registry import NodeRegistry
-from ...mlflow.lifecycle.validation import validate_quality_policy
+from ...mlflow.lifecycle.validation import validate_coverage_policy, validate_quality_policy
 from ..data.training.training_dates import training_date_spec
-from ..lifecycle.workflow import training_settings, training_spec, training_window_mode
+from ..lifecycle.workflow import (
+    probed_admission,
+    training_settings,
+    training_spec,
+    training_window_mode,
+)
 from ..observability.charts.evaluation_chart_data import chart_settings
 from ..observability.reports.explanations import validate_explanation_config
+from ..scoring.incremental.initial_scoring import validate_initial_scoring
 from ..scoring.shared.prediction_output import IDENTIFIER_PATTERN, TABLE_NAME_PATTERN
 from ..scoring.workflow import ModelSelection
 from ..shared._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
@@ -25,7 +31,9 @@ from ..training.weights.weight_config import WEIGHT_FIELDS, validate_weight_role
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
+    "initial_scoring",
     "preprocessing_probe",
+    "admit_probed_custom_steps",
     "feature_lookup",
     "online_features",
     *WEIGHT_FIELDS,
@@ -47,6 +55,8 @@ WORKFLOW_FIELDS = {
     "spark_udf_env_manager",
     "spark_udf_prediction_batch_rows",
     "training_table",
+    "training_label_table",
+    "training_label_version",
     "score_source_table",
     "prediction_table",
     "model_name",
@@ -86,6 +96,8 @@ WORKFLOW_FIELDS = {
     "min_improvement",
     "quality_threshold",
     "quality_gates",
+    "min_scored_fraction",
+    "max_coverage_drop",
     "pipeline",
     "tracking_uri",
     "registry_uri",
@@ -260,6 +272,9 @@ def _validate_workflow_quality(config: dict[str, Any], task: str, policy: str) -
         config.get("quality_gates"),
         task=task,
     )
+    validate_coverage_policy(
+        config.get("min_scored_fraction", 0.90), config.get("max_coverage_drop", 0.05)
+    )
     if _finite(config.get("min_improvement"), "min_improvement") < 0:
         raise ValueError("min_improvement must be nonnegative.")
     if config.get("quality_threshold") is None and policy == "automatic":
@@ -297,6 +312,11 @@ def _validate_pipeline_model(
         raise ValueError("Configured model does not match the declared task.")
 
 
+def _saved_model_action(action: str, layout: str) -> bool:
+    """Saved-model actions read only YAML; score and operators reuse the saved winner."""
+    return action != "train" and layout in {"single_model", "model_competition"}
+
+
 def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str, Any]:
     """Validate a resolved project without starting Spark, fitting or accessing MLflow.
 
@@ -314,14 +334,15 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     policy = _choice(config, "promotion_policy", {"automatic", "manual_approval"})
     _choice(config, "score_handoff", {"disabled", "after_alias_change"})
     _choice(config, "model_change_mode", {"incremental_append", "full_rebuild"})
+    validate_initial_scoring(config.get("initial_scoring", "full_snapshot"))
     _validate_workflow_sources(config)
     _validate_workflow_model_selection(config, selection)
     _validate_workflow_quality(config, task, policy)
     validate_workflow_pipeline(
         config,
         task,
-        allow_empty_model=(
-            action != "train" and config.get("training_layout", "single_model") == "single_model"
+        allow_empty_model=_saved_model_action(
+            action, config.get("training_layout", "single_model")
         ),
     )
     _training_contract(config, action)
@@ -485,6 +506,8 @@ def _preview_model_and_scoring(checked: dict[str, Any], cv: CVSpec) -> list[str]
         f"Promotion: {checked['promotion_policy']} | Metric: {checked['metric']} | "
         f"Threshold: {checked.get('quality_threshold')} | "
         f"Minimum improvement (absolute): {checked['min_improvement']}",
+        f"Minimum scored fraction: {checked.get('min_scored_fraction', 0.90)}",
+        f"Maximum coverage drop (fraction): {checked.get('max_coverage_drop', 0.05)}",
         f"Additional quality gates: {json.dumps(checked.get('quality_gates') or {}, sort_keys=True)}",
         f"Scoring source: {checked['score_source_table']}",
         f"Score model: {checked['model_name']} | {checked['score_model_selection']} | "
@@ -595,7 +618,8 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
     )
     lines.append(
         "Fixed feature cleanup is saved as a pipeline prefix and applied once to raw model inputs; "
-        "training row exclusions are not repeated during scoring."
+        "project scoring reuses saved pre-split eligibility when reuse_pre_split is enabled; "
+        "target-reading filters require explicit skip_target_steps."
     )
     lines.append(
         "Fold-local preprocessing (after final split; "
@@ -605,7 +629,34 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         _preview_steps(checked["pipeline"].get("preprocessing", []), "  No preprocessing steps.")
     )
     lines.extend(_preview_model_and_scoring(checked, cv))
+    if checked.get("initial_scoring", "full_snapshot") == "from_now":
+        lines.append(
+            "Initial scoring: from_now. First run commits a zero-row checkpoint; "
+            "later runs score only new inserts. Rebuilds retain the original boundary "
+            "using saved keys and recent CDF. CDF-expiry recovery needs the original snapshot."
+        )
+    elif checked["score_source_table"].casefold() == checked["training_table"].casefold():
+        lines.append(
+            "Warning: training and scoring use the same source; initial scoring includes training history. "
+            "Its performance is not an independent production measurement."
+        )
+    if action == "train" and probed_admission(checked) is True:
+        lines.extend(_preview_admission(checked["pipeline"]))
     return "\n".join(lines)
+
+
+def _preview_admission(pipeline: dict[str, Any]) -> list[str]:
+    """Run training's Spark admission lint offline; the probe itself needs a fitted model."""
+    from ....inference.probed_rules import preview_admission_lint  # noqa: PLC0415
+
+    found = preview_admission_lint(pipeline)
+    if not found:
+        return []
+    return [
+        "Spark/endpoint admission lint (training also probes these on holdout rows; "
+        "run smoke.py --probe <sample> to probe locally):",
+        *(f"  {line}" for line in found),
+    ]
 
 
 def migrate_workflow_config(

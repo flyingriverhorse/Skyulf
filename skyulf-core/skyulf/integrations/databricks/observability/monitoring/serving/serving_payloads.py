@@ -5,10 +5,12 @@ import json
 import math
 import re
 from datetime import UTC, datetime
+from itertools import pairwise
 from typing import Any
 
 REQUEST_KEY = "databricks_request_id"
 ROW_KEY = "request_row_index"
+_LATENCY_BUCKET_EDGES_MS = (5, 10, 25, 50, 100, 250, 500, 1000)
 _PAYLOAD_COLUMNS = (
     REQUEST_KEY,
     "request_time",
@@ -45,32 +47,43 @@ def _exists(frame: Any) -> bool:
     return bool(frame.limit(1).count())
 
 
+def _check_invalid(frame: Any, checks: list[tuple[Any, str]]) -> None:
+    """Collect bounded violation flags once and raise the first configured error."""
+    if not checks:
+        return
+    fn = _spark_functions()
+    flags = frame.agg(*(fn.max(condition.cast("int")) for condition, _ in checks)).first()
+    for flag, (_, message) in zip(flags, checks, strict=True):
+        if flag:
+            raise ValueError(message)
+
+
 def _identity(payloads: Any, entities: Any, endpoint: str, model: str, version: str) -> Any:
     """Join actual served entities while rejecting ambiguous dimension history."""
     fn = _spark_functions()
     ids = payloads.select("served_entity_id").distinct()
-    if _exists(ids.filter(fn.col("served_entity_id").isNull())):
-        raise ValueError("served entity identity is missing")
     relevant = entities.select(*_ENTITY_COLUMNS).join(ids, "served_entity_id", "inner")
-    if _exists(
-        relevant.filter(
-            fn.col("endpoint_name").isNull()
-            | fn.col("entity_name").isNull()
-            | fn.col("entity_version").isNull()
-        )
-    ):
-        raise ValueError("served entity mapping is incomplete")
-    if _exists(
-        ids.join(relevant.select("served_entity_id").distinct(), "served_entity_id", "left_anti")
-    ):
-        raise ValueError("served entity mapping is missing")
-    conflicts = relevant.groupBy("served_entity_id").agg(
+    mapping = relevant.groupBy("served_entity_id").agg(
+        fn.max(
+            (
+                fn.col("endpoint_name").isNull()
+                | fn.col("entity_name").isNull()
+                | fn.col("entity_version").isNull()
+            ).cast("int")
+        ).alias("incomplete"),
         fn.countDistinct(fn.struct("endpoint_name", "entity_name", "entity_version")).alias(
             "variants"
-        )
+        ),
     )
-    if _exists(conflicts.filter(fn.col("variants") > 1)):
-        raise ValueError("conflicting served entity mapping")
+    _check_invalid(
+        ids.join(mapping, "served_entity_id", "left"),
+        [
+            (fn.col("served_entity_id").isNull(), "served entity identity is missing"),
+            (fn.col("incomplete") > 0, "served entity mapping is incomplete"),
+            (fn.col("variants").isNull(), "served entity mapping is missing"),
+            (fn.col("variants") > 1, "conflicting served entity mapping"),
+        ],
+    )
     selected = (
         relevant.filter(
             (fn.col("endpoint_name") == endpoint)
@@ -97,24 +110,23 @@ def _deduplicate(payloads: Any) -> Any:
 
 
 def _check_capture(payloads: Any) -> None:
-    """Reject missing IDs, partial capture, and telemetry sampling."""
+    """Reject missing request metadata and telemetry sampling."""
     fn = _spark_functions()
-    if _exists(payloads.filter(fn.col(REQUEST_KEY).isNull() | fn.col("served_entity_id").isNull())):
-        raise ValueError("request or served entity identity is missing")
-    if _exists(
-        payloads.filter(fn.col("sampling_fraction").isNull() | (fn.col("sampling_fraction") != 1.0))
-    ):
-        raise ValueError("sampling prevents complete serving observation")
-    if _exists(
-        payloads.filter(
-            fn.col("logging_error_codes").isNotNull() & (fn.size("logging_error_codes") > 0)
-        )
-    ):
-        raise ValueError("logging errors prevent complete serving observation")
-    if _exists(payloads.filter(fn.col("request_time").isNull())):
-        raise ValueError("serving request time is missing")
-    if _exists(payloads.filter(fn.col("status_code").isNull())):
-        raise ValueError("serving request metadata is incomplete")
+    _check_invalid(
+        payloads,
+        [
+            (
+                fn.col(REQUEST_KEY).isNull() | fn.col("served_entity_id").isNull(),
+                "request or served entity identity is missing",
+            ),
+            (
+                fn.col("sampling_fraction").isNull() | (fn.col("sampling_fraction") != 1.0),
+                "sampling prevents complete serving observation",
+            ),
+            (fn.col("request_time").isNull(), "serving request time is missing"),
+            (fn.col("status_code").isNull(), "serving request metadata is incomplete"),
+        ],
+    )
 
 
 def _scalar_record(record: Any) -> bool:
@@ -140,15 +152,6 @@ def _scalar_envelope(raw: str | None, field: str) -> bool:
     return isinstance(records, list) and all(_scalar_record(record) for record in records)
 
 
-def _check_scalar_envelopes(successes: Any) -> None:
-    """Keep strict shape checks distributed; only the existence probe reaches the driver."""
-    fn = _spark_functions()
-    scalar = fn.udf(_scalar_envelope, "boolean")
-    for source, field in (("request", "dataframe_records"), ("response", "predictions")):
-        if _exists(successes.filter(~scalar(fn.col(source), fn.lit(field)))):
-            raise ValueError(f"{source} {field} must contain finite scalar records")
-
-
 def _parse_envelopes(successes: Any) -> Any:
     """Accept only named dataframe records and record-shaped predictions."""
     fn = _spark_functions()
@@ -160,19 +163,32 @@ def _parse_envelopes(successes: Any) -> Any:
     parsed = parsed.withColumn(
         "_outputs", fn.from_json("response", response_schema).getField("predictions")
     )
-    if _exists(parsed.filter(fn.col("_inputs").isNull() | (fn.size("_inputs") == 0))):
-        raise ValueError("request must contain nonempty dataframe_records")
-    if _exists(parsed.filter(fn.col("_outputs").isNull())):
-        raise ValueError("response predictions must be record-oriented")
-    if _exists(parsed.filter(fn.size("_inputs") != fn.size("_outputs"))):
-        raise ValueError("request and prediction row count mismatch")
-    if _exists(
-        parsed.filter(
-            fn.expr("exists(_inputs, x -> x is null) or exists(_outputs, x -> x is null)")
-        )
-    ):
-        raise ValueError("request and predictions must contain records")
-    _check_scalar_envelopes(successes)
+    scalar = fn.udf(_scalar_envelope, "boolean")
+    _check_invalid(
+        parsed,
+        [
+            (
+                fn.col("_inputs").isNull() | (fn.size("_inputs") == 0),
+                "request must contain nonempty dataframe_records",
+            ),
+            (fn.col("_outputs").isNull(), "response predictions must be record-oriented"),
+            (
+                fn.size("_inputs") != fn.size("_outputs"),
+                "request and prediction row count mismatch",
+            ),
+            (
+                fn.expr("exists(_inputs, x -> x is null) or exists(_outputs, x -> x is null)"),
+                "request and predictions must contain records",
+            ),
+            *(
+                (
+                    ~scalar(fn.col(source), fn.lit(field)),
+                    f"{source} {field} must contain finite scalar records",
+                )
+                for source, field in (("request", "dataframe_records"), ("response", "predictions"))
+            ),
+        ],
+    )
     return parsed
 
 
@@ -182,41 +198,90 @@ def _expand(parsed: Any, field: str) -> Any:
     return parsed.select(REQUEST_KEY, fn.posexplode(fn.col(field)).alias(ROW_KEY, "_record"))
 
 
+def _output_name(name: str, dtype: str, prefix: str) -> str:
+    """Validate a scalar column contract in its original configured order."""
+    if not name.startswith(prefix):
+        raise ValueError(f"output column {name!r} lacks prefix {prefix!r}")
+    output = name.removeprefix(prefix)
+    if not output or output in (REQUEST_KEY, ROW_KEY):
+        raise ValueError(f"invalid output column {name!r}")
+    if not _SCALAR_TYPE.fullmatch(dtype):
+        raise ValueError(f"unsupported scalar Spark type {dtype!r}")
+    return output
+
+
 def _typed_records(frame: Any, columns: tuple[tuple[str, str], ...], prefix: str = "") -> Any:
     """Cast scalar transport values and detect missing or invalid values."""
     fn = _spark_functions()
     selected = frame
+    checks = []
     for name, dtype in columns:
-        if not name.startswith(prefix):
-            raise ValueError(f"output column {name!r} lacks prefix {prefix!r}")
-        output = name.removeprefix(prefix)
-        if not output or output in (REQUEST_KEY, ROW_KEY):
-            raise ValueError(f"invalid output column {name!r}")
-        if not _SCALAR_TYPE.fullmatch(dtype):
-            raise ValueError(f"unsupported scalar Spark type {dtype!r}")
+        try:
+            output = _output_name(name, dtype, prefix)
+        except ValueError:
+            _check_invalid(frame, checks)
+            raise
         source = fn.col("_record").getItem(name)
         cast = source.try_cast(dtype)
         if dtype.lower() in ("boolean", "bool"):
             cast = fn.when(fn.lower(source).isin("true", "false"), cast)
         selected = selected.withColumn(output, cast)
         invalid = (~fn.array_contains(fn.map_keys("_record"), name)) | (
-            source.isNotNull() & fn.col(output).isNull()
+            source.isNotNull() & cast.isNull()
         )
-        if _exists(selected.filter(invalid)):
-            raise ValueError(f"invalid or missing payload column {name!r}")
+        checks.append((invalid, f"invalid or missing payload column {name!r}"))
+    _check_invalid(frame, checks)
     return selected.select(
         REQUEST_KEY, ROW_KEY, *(name.removeprefix(prefix) for name, _ in columns)
     )
 
 
+def _latency_summary(total: Any) -> dict[str, int | float | list[int] | None]:
+    """Describe the same non-null duration population with quantiles and fixed bins."""
+    samples = int(total.latency_sample_count)
+    cumulative = [0, *(int(total[f"below_{edge}"] or 0) for edge in _LATENCY_BUCKET_EDGES_MS)]
+    cumulative.append(samples)
+    quantiles = total.latency_quantiles or [None, None, None]
+    return {
+        "latency_mean_ms": float(total.latency_mean_ms)
+        if total.latency_mean_ms is not None
+        else None,
+        "latency_max_ms": int(total.latency_max_ms) if total.latency_max_ms is not None else None,
+        "latency_sample_count": samples,
+        "latency_bucket_edges_ms": list(_LATENCY_BUCKET_EDGES_MS),
+        "latency_bucket_counts": [right - left for left, right in pairwise(cumulative)],
+        **{
+            f"latency_{name}_ms": float(value) if value is not None else None
+            for name, value in zip(("p50", "p95", "p99"), quantiles, strict=True)
+        },
+    }
+
+
 def _summary(
     payloads: Any, predictions: Any
-) -> tuple[dict[str, int | float | None], datetime | None]:
+) -> tuple[dict[str, int | float | list[int] | None], datetime | None]:
     """Collect only bounded request aggregates and the latest event time."""
     fn = _spark_functions()
     total = payloads.agg(
         fn.count("*").alias("requests"),
+        fn.sum(fn.when(fn.size("logging_error_codes") > 0, 1).otherwise(0)).alias("logging_errors"),
         fn.sum(fn.when(fn.col("status_code").between(200, 299), 1).otherwise(0)).alias("successes"),
+        fn.sum(fn.when(fn.col("status_code").between(400, 499), 1).otherwise(0)).alias(
+            "status_4xx"
+        ),
+        fn.sum(fn.when(fn.col("status_code").between(500, 599), 1).otherwise(0)).alias(
+            "status_5xx"
+        ),
+        fn.count("execution_duration_ms").alias("latency_sample_count"),
+        fn.percentile_approx("execution_duration_ms", [0.5, 0.95, 0.99], 10000).alias(
+            "latency_quantiles"
+        ),
+        *(
+            fn.sum(fn.when(fn.col("execution_duration_ms") < edge, 1).otherwise(0)).alias(
+                f"below_{edge}"
+            )
+            for edge in _LATENCY_BUCKET_EDGES_MS
+        ),
         fn.avg("execution_duration_ms").alias("latency_mean_ms"),
         fn.max("execution_duration_ms").alias("latency_max_ms"),
         fn.max("request_time").alias("observed_at"),
@@ -230,12 +295,16 @@ def _summary(
     request_count = int(total.requests)
     return {
         "request_count": request_count,
+        "logging_error_count": int(total.logging_errors or 0),
         "success_count": success_count,
         "error_count": request_count - success_count,
-        "latency_mean_ms": float(total.latency_mean_ms)
-        if total.latency_mean_ms is not None
-        else None,
-        "latency_max_ms": int(total.latency_max_ms) if total.latency_max_ms is not None else None,
+        "status_4xx_count": int(total.status_4xx or 0),
+        "status_5xx_count": int(total.status_5xx or 0),
+        "status_other_count": request_count
+        - success_count
+        - int(total.status_4xx or 0)
+        - int(total.status_5xx or 0),
+        **_latency_summary(total),
         "prediction_row_count": predictions.count(),
     }, observed
 
@@ -252,11 +321,13 @@ def parse_serving_payloads(
     output_prefix: str,
     start: datetime,
     end: datetime,
-) -> tuple[Any, Any, dict[str, int | float | None], datetime | None]:
+) -> tuple[Any, Any, dict[str, int | float | list[int] | None], datetime | None]:
     """Read one served version into distributed features and saved predictions.
 
-    Only scalar aggregates leave Spark. HTTP failures remain in operational
-    evidence, while successful named rows supply model monitoring populations.
+    Only scalar aggregates leave Spark. HTTP and logging failures remain in
+    operational counts. Only successful requests without logging errors supply
+    features and saved predictions; logging_error_count counts affected requests,
+    not error codes or prediction rows. Identity and sampling checks remain strict.
     """
     fn = _spark_functions()
     _require_columns(payloads, _PAYLOAD_COLUMNS, "inference payloads")
@@ -270,7 +341,10 @@ def parse_serving_payloads(
     selected = _identity(window, entities, endpoint_name, model_name, model_version)
     _check_capture(selected)
     selected = _deduplicate(selected)
-    successes = selected.filter(fn.col("status_code").between(200, 299))
+    successes = selected.filter(
+        fn.col("status_code").between(200, 299)
+        & (fn.col("logging_error_codes").isNull() | (fn.size("logging_error_codes") == 0))
+    )
     parsed = _parse_envelopes(successes)
     current = _typed_records(_expand(parsed, "_inputs"), input_columns)
     predictions = _typed_records(_expand(parsed, "_outputs"), output_columns, output_prefix)

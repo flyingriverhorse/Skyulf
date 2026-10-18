@@ -800,6 +800,16 @@ class SkyulfPipeline:
             )
             validate_schema(self._inference_schemas[0], input_schema, check_order=True)
         transformed_data = self.feature_engineer.transform(data, preserve_rows=True)
+        return self._predict_transformed(
+            transformed_data, use_tuned_thresholds=use_tuned_thresholds
+        )
+
+    def _predict_transformed(
+        self, transformed_data: Any, *, use_tuned_thresholds: bool = False
+    ) -> Any:
+        """Predict already transformed eligible rows using the saved decision policy."""
+        if self.model_estimator is None:
+            raise ValueError("Pipeline not fitted or no model configured.")
         if self._inference_schemas is not None:
             validate_schema(
                 self._inference_schemas[1], transformed_data, check_order=True, where="model input"
@@ -811,7 +821,7 @@ class SkyulfPipeline:
                 cast(Any, transformed_data), self.model_estimator.model
             )
             validate_prediction_rows(
-                len(data), prediction_row_count(predictions), stage="Model prediction"
+                len(transformed_data), prediction_row_count(predictions), stage="Model prediction"
             )
             return self._original_predictions(predictions)
 
@@ -823,7 +833,7 @@ class SkyulfPipeline:
 
         proba_df = self._predict_proba_transformed(transformed_data)
         validate_prediction_rows(
-            len(data), prediction_row_count(proba_df), stage="Model probabilities"
+            len(transformed_data), prediction_row_count(proba_df), stage="Model probabilities"
         )
         model = self.model_estimator._unwrap_tuned_model()
         classes = np.asarray(model.classes_)

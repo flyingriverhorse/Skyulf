@@ -1,0 +1,14 @@
+bundle:
+  name: air_quality_no2
+
+include:
+  - deployment/variables.yml
+  - deployment/targets.yml
+  - resources/*.yml
+
+sync:
+  include:
+    - src/**/*.py
+    - deployment/*requirements.txt
+    - src/features/requirements.txt
+    - config/*.yml

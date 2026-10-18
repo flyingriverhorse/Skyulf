@@ -159,6 +159,7 @@ def test_details_keep_versions_and_missing_metadata_separate(database):
             "aliases": ["champion"],
             "training_experiment_id": "9",
             "algorithm": "linear_regression",
+            "training": {"format_version": 1, "parameters": {"status": "recorded", "rows": []}},
         },
     }
     database.executemany(
@@ -174,6 +175,11 @@ def test_details_keep_versions_and_missing_metadata_separate(database):
     assert by_version["1"]["aliases_at_capture"] == '["champion"]'
     assert by_version["2"]["metadata_status"] == "not_recorded"
     assert by_version["2"]["training_run_id"] is None
+    assert (
+        json.loads(by_version["1"]["training_summary_json"])
+        == evidence["model_metadata"]["training"]
+    )
+    assert by_version["2"]["training_summary_json"] is None
 
 
 def test_never_observed_details_remain_selectable_without_lineage(database):

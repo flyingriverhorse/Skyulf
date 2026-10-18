@@ -30,7 +30,11 @@ from ...mlflow.lifecycle.promotion import (
     verify_staged_challenger,
 )
 from ...mlflow.lifecycle.rejection import reject_candidate
-from ...mlflow.lifecycle.validation import ModelComparisonReport, validate_quality_policy
+from ...mlflow.lifecycle.validation import (
+    ModelComparisonReport,
+    validate_coverage_policy,
+    validate_quality_policy,
+)
 from ...mlflow.registration.registry import resolve_model
 from ..shared._contracts import input_budget_bytes
 from ..training.fitting import candidate
@@ -41,17 +45,35 @@ from ..training.shared.training_evidence import (
 )
 
 
+def _require_lookup_policy(
+    config: dict[str, Any], action: str, allow_unloadable_champion: bool
+) -> None:
+    """Allow saved-proof lookup for manual decisions or the explicit override approval."""
+    manual = config.get("promotion_policy") == "manual_approval"
+    override = action == "approve" and allow_unloadable_champion
+    if action not in {"approve", "reject"} or not (manual or override):
+        raise ValueError(
+            "Evidence lookup requires manual_approval and approve/reject, "
+            "or approve with allow_unloadable_champion=true."
+        )
+
+
 def resolve_candidate_comparison_digest(
-    config: dict[str, Any], candidate_version: str, *, action: str
+    config: dict[str, Any],
+    candidate_version: str,
+    *,
+    action: str,
+    allow_unloadable_champion: bool = False,
 ) -> str:
     """Resolve a named candidate's proof from its active committed lifecycle receipt.
 
     This is the Bundle convenience path, not a latest-candidate lookup. The
     strict approval/rejection service still verifies the downloaded comparison,
     expected champion and active receipt against the full returned digest.
+    The unloadable-champion override is the one approval allowed under automatic
+    promotion, so its lookup is allowed there too.
     """
-    if config.get("promotion_policy") != "manual_approval" or action not in {"approve", "reject"}:
-        raise ValueError("Evidence lookup requires manual_approval and approve/reject.")
+    _require_lookup_policy(config, action, allow_unloadable_champion)
     if not isinstance(candidate_version, str) or not re.fullmatch(
         r"[1-9][0-9]*", candidate_version
     ):
@@ -178,6 +200,7 @@ def approve_candidate(
     candidate_version: str | None,
     comparison_sha256: str | None,
     expected_champion_version: str | None,
+    allow_unloadable_champion: bool = False,
 ) -> AliasChangeReceipt:
     """Re-evaluate the saved holdout and approve without retraining or changing score selection.
 
@@ -186,7 +209,11 @@ def approve_candidate(
     saved training specification. A repeated committed request returns its
     original receipt only while that transition remains active.
     """
-    if config.get("promotion_policy") != "manual_approval":
+    # An unloadable champion holds automatic promotion, so its explicit override is
+    # the one approval allowed under either policy.
+    if "promotion_policy" not in config or (
+        config["promotion_policy"] != "manual_approval" and not allow_unloadable_champion
+    ):
         raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
     return approve_saved_candidate(
         spark,
@@ -195,6 +222,7 @@ def approve_candidate(
         comparison_sha256=comparison_sha256,
         expected_champion_version=expected_champion_version,
         admission=ExclusiveAliasWriterAdmission(),
+        allow_unloadable_champion=allow_unloadable_champion,
     )
 
 
@@ -207,6 +235,7 @@ def approve_saved_candidate(
     expected_champion_version: str | None,
     admission: AliasAdmission,
     fresh_approval_guard: Callable[[], None] | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> AliasChangeReceipt:
     """Approve pinned saved evidence under the caller's shared alias authority.
 
@@ -267,10 +296,27 @@ def approve_saved_candidate(
     }
     if fresh_approval_guard is not None:
         fresh_approval_guard()
+    return _activate(report, native, expected_champion_version, allow_unloadable_champion, options)
+
+
+def _activate(
+    report: Any,
+    native: Any,
+    expected_champion_version: str | None,
+    allow_unloadable_champion: bool,
+    options: dict[str, Any],
+) -> AliasChangeReceipt:
+    """Initialize the first champion or promote over the expected one."""
     if expected_champion_version is None:
+        if allow_unloadable_champion:
+            raise ValueError("allow_unloadable_champion needs an existing champion version.")
         return initialize_champion(report, native, **options)
     return promote_candidate(
-        report, native, expected_champion_version=expected_champion_version, **options
+        report,
+        native,
+        expected_champion_version=expected_champion_version,
+        allow_unloadable_champion=allow_unloadable_champion,
+        **options,
     )
 
 
@@ -317,12 +363,17 @@ def _validate_approval_policy(
     validate_quality_policy(
         config.get("metric", ""), config.get("quality_threshold"), config.get("quality_gates")
     )
+    validate_coverage_policy(
+        config.get("min_scored_fraction", 0.90), config.get("max_coverage_drop", 0.05)
+    )
     if (
         any(
             config.get(field) != getattr(report, field)
             for field in ("metric", "min_improvement", "quality_threshold")
         )
         or (config.get("quality_gates") or None) != report.quality_gates
+        or config.get("min_scored_fraction", 0.90) != report.min_scored_fraction
+        or config.get("max_coverage_drop", 0.05) != report.max_coverage_drop
         or report.quality_threshold is None
     ):
         raise ValueError("Approval policy must match the saved, absolute-quality-gated comparison.")

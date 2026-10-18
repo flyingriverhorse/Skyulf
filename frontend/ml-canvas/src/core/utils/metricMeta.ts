@@ -45,6 +45,7 @@ const LOWER_IS_BETTER = new Set([
   'rmsle',
   'log_loss',
   'mape',
+  'wape',
   'smape',
   'median_absolute_error',
   'max_error',

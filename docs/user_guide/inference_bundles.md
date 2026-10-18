@@ -8,13 +8,36 @@ Importing `skyulf.inference` requires neither PySpark nor MLflow.
 Start with [How inference works](inference_flow.md) for training and inference
 diagrams and a worked example of reusing the same fitted FE and model.
 
+## Install and choose the artifact
+
+Use Python 3.12 or newer and an activated virtual environment:
+
+```bash
+uv venv --python 3.12
+# Activate .venv using your shell.
+uv pip install skyulf-core
+```
+
+For repository development, use `uv pip install -e ./skyulf-core` instead.
+Local prediction needs no Spark or MLflow service. To use the Spark example,
+prepare compatible driver/worker dependencies and your own `spark` session as
+shown in the [Spark guide](spark.md). Existing artifacts require their recorded
+runtime versions, rather than whichever versions a fresh installation selects.
+
+An **InferenceBundle** is a model artifact directory. A **Databricks deployment
+Bundle** is a project describing jobs, configuration and deployment resources.
+Creating one does not create the other; this guide creates only a local model
+artifact. See [Databricks Bundles](databricks_bundle.md) to deploy a project.
+
 ## Fitted pipeline or portable bundle?
 
 Use `FittedPipelineArtifact` from `skyulf.inference.fitted_pipeline` to save and
 restore the complete pandas/Polars pipeline with its recorded engine and schemas.
-`save_pipeline`, `load_pipeline` and `predict_pipeline` use that format. It carries
-the persisted `kind="local_pipeline"` and `execution_scope="whole_frame_local"`
-values for compatibility; those strings do not restrict it to a workstation.
+`save_pipeline`, `load_pipeline` and `predict_pipeline` use that format. Its
+manifest records `execution_scope="whole_frame_local"`; this scope describes
+how the complete request is applied, and permits execution on a suitable cloud
+Python process as well as a workstation. `kind="local_pipeline"` is a model
+selection setting in the workflow API, not a field in this artifact manifest.
 
 Use `InferenceBundle` for the explicitly portable preprocessing state and
 `predict_local`/`predict_spark` API described here. These two artifact formats are
@@ -35,6 +58,12 @@ stages differ. A stage is an explicit caller contract: numeric values alone
 cannot reveal whether a column has already been scaled. Keep raw and prepared
 data on the corresponding path.
 
+The example below fits `amount` to `target` with `target = 10 * amount`, saves
+and reloads a raw-input artifact, then checks equivalent prepared-feature input.
+Training includes the target; both prediction inputs exclude it. All numeric
+features are explicitly floating point so the captured schema is consistent.
+
+<!-- skyulf-example: native portable-local -->
 ```python
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -63,6 +92,9 @@ bundle = build_bundle(pipeline, input_stage="raw", feature_order=("amount",))
 with TemporaryDirectory() as temporary:
     destination = Path(temporary) / "model"
     save_bundle(bundle, destination)
+    assert {path.name for path in destination.iterdir()} == {
+        "manifest.json", "features.json", "model.pkl",
+    }
     restored = load_bundle(destination)
     output = predict_local(raw, restored)
     np.testing.assert_allclose(output["prediction"], [40.0, 20.0], atol=1e-12)
@@ -71,12 +103,19 @@ prepared = pipeline.feature_engineer.transform(raw)
 features_bundle = build_bundle(pipeline, input_stage="features", feature_order=("amount",))
 np.testing.assert_allclose(predict_local(prepared, features_bundle)["prediction"],
                            output["prediction"], atol=1e-12)
+print(output.to_string(index=False))
 ```
 
-The repository also includes `skyulf-core/examples/inference_bundle.py`. Run
-it from the root with `.venv/Scripts/python.exe skyulf-core/examples/inference_bundle.py`.
-Add `--bundle-dir path/to/new-model` to retain the artifact. An existing
-destination is rejected, so an earlier package cannot be overwritten accidentally.
+Expected predictions are 40.0 for `amount=4.0` and 20.0 for the missing value:
+the latter uses the saved mean, 2.0. Output contains one floating-point
+`prediction` per input row. The final assertion confirms that applying FE once
+outside a `features` bundle matches applying it once inside a `raw` bundle.
+Never pass `prepared` to the raw bundle; scaling an already scaled feature
+changes the model input even when its name and dtype still look valid.
+
+To retain the artifact, replace the temporary directory above with a new
+destination directory. `save_bundle` rejects an existing destination, so an
+earlier package cannot be overwritten accidentally.
 
 ## Input and output contracts
 
@@ -166,6 +205,7 @@ even when switching from pandas or Polars inputs to Spark inputs.
 This example continues the local training example above. `spark` is an existing,
 caller-owned SparkSession; the runner neither creates nor closes it:
 
+<!-- skyulf-example: spark_runtime portable-spark -->
 ```python
 from skyulf.core.execution import ExecutionOptions, FrameSpec
 from skyulf.inference import predict_spark
@@ -187,19 +227,6 @@ rows = predictions.orderBy("id").collect()
 assert [row.id for row in rows] == [101, 102]
 np.testing.assert_allclose([row.prediction for row in rows], [40.0, 20.0], atol=1e-12)
 ```
-
-The runnable `skyulf-core/examples/spark_batch_inference.py` example trains a
-small pandas classification model, builds a bundle, and runs the same keyed
-batch through either mode:
-
-```text
-.venv-spark/Scripts/python.exe skyulf-core/examples/spark_batch_inference.py --mode native_features
-.venv-spark/Scripts/python.exe skyulf-core/examples/spark_batch_inference.py --mode python_pipeline
-```
-
-Both modes return `prediction`, `probability_0` and `probability_1` in the
-declared class order. A production job can replace the final `show()` action
-with a Delta-table write or another caller-owned sink.
 
 Production consumers receive a Spark DataFrame and can select their own action
 or output sink. Output rows have no guaranteed physical order; match them by
@@ -298,12 +325,28 @@ need neighboring rows cannot be made correct merely by putting them inside a
 worker batch. Unsupported combinations fail explicitly; there is no automatic
 conversion of a whole Spark dataset to local pandas or Polars.
 
-MLflow is a separate packaging/integration layer. Logging only an estimator
-does not include external feature engineering; log a fitted pipeline or provide
-a model wrapper that runs it. MLflow's
+MLflow is a separate packaging/integration layer. Logging only an estimator does not include
+external feature engineering; log a fitted pipeline or provide a model wrapper that runs it.
+MLflow's
 [Spark UDF](https://mlflow.org/docs/latest/api_reference/python_api/mlflow.pyfunc.html#mlflow.pyfunc.spark_udf)
-executes Python model inference through pandas batches; it does not compile
-arbitrary Python transformations into native Spark expressions. Skyulf's [MLflow adapter](mlflow_models.md) packages the selected artifact
-contract. The certified fitted-pipeline pyfunc route has separate admission
-checks from this portable bundle format. See the [Databricks Bundle guide](databricks_bundle.md)
-for generated jobs, source snapshots and publication.
+executes Python model inference through pandas batches; it does not compile arbitrary Python
+transformations into native Spark expressions. Skyulf's [MLflow adapter](mlflow_models.md) packages
+the selected artifact contract. The certified fitted-pipeline pyfunc route has separate admission
+checks from this portable bundle format. See the [Databricks Bundle guide](databricks_bundle.md) for
+generated jobs, source snapshots and publication.
+
+## Troubleshoot a package or prediction
+
+| Failure | Action |
+| --- | --- |
+| Destination already exists | Save a new artifact version in a new directory; do not overwrite another package in place |
+| Unsupported fitted node/state | Use the fitted-pipeline format and its consumer, or an adapter that explicitly admits the recipe |
+| Schema/order/type mismatch | Compare raw versus prepared stage, remove target/extra fields and select/cast columns deliberately |
+| Runtime version mismatch | Recreate the recorded environment before loading on driver and workers |
+| Missing/duplicate Spark keys | Correct identity in the source; do not use row position as a key |
+| State/model byte budget exceeded | Measure the artifact and choose an explicit appropriate budget; wire size is not worker memory |
+| Checksum or structural validation failure | Obtain a verified artifact from its producer; do not bypass validation |
+
+Continue with [Spark execution](spark.md), [MLflow model packaging](mlflow_models.md) or
+[context diagnostics](preprocessing_context.md). The [pipeline quickstart](pipeline_quickstart.md)
+shows a broader categorical recipe whose whole-pipeline pickle remains a separate artifact choice.

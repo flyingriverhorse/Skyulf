@@ -1,5 +1,7 @@
 # Look up online features before prediction
 
+## When you need it
+
 An online feature model accepts entity keys, lets Databricks fetch current
 feature values, and then runs the saved Skyulf preprocessing and predictor. An
 explicit saved policy rejects missing or stale feature values before
@@ -12,14 +14,74 @@ must use pandas and supported independent-row preprocessing. The initial online
 request contract supports non-temporal scalar source inputs. It does not omit
 required source fields to make an incompatible model appear to accept only keys.
 
-## Generate, train and set up an online Bundle
+### Follow the data through the system
 
-From a Skyulf checkout, save these selections as `online-init.json`, completing
-the ordinary project, source and target answers when prompted:
+```mermaid
+flowchart LR
+    D["Delta feature table"] --> P["TRIGGERED or CONTINUOUS publication"]
+    P --> O["Existing online feature store"]
+    K["Request keys and other required inputs"] --> L["Native feature lookup"]
+    O --> L
+    L --> F["Saved freshness and missing-value checks"]
+    F --> M["Saved preprocessing and model"]
+    M --> R["Prediction response"]
+```
+
+Training binds the offline feature source to the model. Publication copies the
+source's values into an online store. Endpoint setup verifies that the model's
+saved source has an accessible matching publication. At request time Databricks
+performs the lookup; Skyulf applies the saved validation and prediction logic.
+
+| Bundle choice | What it adds | What you must supply |
+| --- | --- | --- |
+| `include_online_serving=true` | An unscheduled endpoint setup job and training lookup placeholders | Lookup fields, freshness policy, registered version and existing publication |
+| `include_online_publication=true` | A feature synchronization job | Existing source table, source ID, destination and store name |
+| `online_publication_mode=TRIGGERED` | Manual or scheduled synchronization; hourly schedule starts paused | Run a sync and observe completion before relying on the new values |
+| `online_publication_mode=CONTINUOUS` | Start/status/stop/restart controls for native synchronization | Start once and inspect propagation and native pipeline health |
+| `include_daily_rollout=true` | A separate gradual traffic controller | Two serving versions, saved comparison and initialized rollout state |
+
+You can use online serving without this project's publication job when another
+owner publishes the features. Conversely, publishing features does not create a
+model endpoint. Continuous publication updates features; it is not a continuous
+prediction job. Rollout is optional for either publication mode.
+
+## What to edit
+
+### Prepare identities and resources
+
+Use the template's matching Core and Feature Engineering dependencies. On a new
+workspace, arrange these before running the examples:
+
+| Resource or identity | Required role in this flow |
+| --- | --- |
+| Source and destination UC schemas | Existing namespaces with access for the intended owners |
+| Offline feature table | One row per key, declared non-null primary key, CDF and a feature timestamp |
+| Online store | Explicitly provisioned and available; copy its exact name into the configuration |
+| Training identity | Read observations/features and log/register the fitted native feature model |
+| Publication identity | Read the source and manage its owned online publication |
+| Endpoint identity | Read the published features and the registered package |
+| Endpoint caller | Query permission and a request matching the saved input schema |
+
+The online store is backed by Lakebase. Provisioning chooses its name and capacity in the
+authenticated workspace; Bundle selection only references it. See
+[Databricks Online Feature Stores](https://docs.databricks.com/aws/en/machine-learning/feature-store/online-feature-store)
+for the current platform provisioning requirements. The examples below use the Skyulf adapter's
+stricter latest-value, non-temporal contract.
+
+### Generate, train and set up an online Bundle
+
+From a Skyulf checkout, save these selections as `online-init.json`. This
+answer-file command takes missing answers from their defaults; it does not ask
+for missing table or target names. Replace the explicit example identities with
+your own before generating:
 
 ```json
 {
   "project_name": "customer_online",
+  "catalog": "features",
+  "schema": "customer",
+  "source_table_name": "customer_observations",
+  "target_column": "next_month_spend",
   "engine": "pandas",
   "training_layout": "single_model",
   "task": "regression",
@@ -39,29 +101,33 @@ databricks bundle init ./skyulf-core/templates/databricks --config-file online-i
 cd generated/customer_online
 ```
 
-The three serving selections are independent and default to `"false"`.
-`include_online_serving` adds an unscheduled `online_serving_setup` job and its
-notebook. It installs the native Feature Engineering dependency for training
-even when another project owns publication. Initialization creates files only.
-Selecting `include_online_publication: "true"` asks for
-`online_publication_mode`: `TRIGGERED` (default) keeps the paused hourly job;
-`CONTINUOUS` generates explicit start/status/stop/restart controls without a
-periodic schedule. The mode is independent of online serving and rollout.
+The three serving selections are independent and default to `"false"`. Only detailed setup asks
+them; quick setup keeps `"false"`, so use detailed setup or an answer file like the one above.
+`include_online_serving` adds an unscheduled `online_serving_setup` job and its notebook. It
+installs the native Feature Engineering dependency for training even when another project owns
+publication. Initialization creates files only. With `include_online_publication: "true"`, detailed
+setup asks for `online_publication_mode`; an answer file can set it directly: `TRIGGERED` (default)
+keeps the paused hourly job; `CONTINUOUS` generates explicit start/status/stop/restart controls
+without a periodic schedule. The mode is independent of online serving and rollout.
 
-Complete the generated `config/training.yml` defaults, retaining the source,
-label, split and model settings for your project. For example:
+Complete the generated placeholders under `defaults:` in `config/training.yml`,
+retaining the source, label, split and model settings for your project. Both
+mappings belong under `defaults:`; a top-level
+`feature_lookup` is rejected. For example:
 
 ```yaml
-feature_lookup:
-  lookups:
-    - table_name: "{catalog}.{input_schema}.customer_features"
-      lookup_key: [customer_id]
-      feature_names: [total_spend, feature_updated_at]
-online_features:
-  required_features: [total_spend, feature_updated_at]
-  freshness:
-    - column: feature_updated_at
-      max_age_seconds: 3600.0
+defaults:
+  # ... keep the generated source, keys, target and model settings ...
+  feature_lookup:
+    lookups:
+      - table_name: "{catalog}.{input_schema}.customer_features"
+        lookup_key: [customer_id]
+        feature_names: [total_spend, feature_updated_at]
+  online_features:
+    required_features: [total_spend, feature_updated_at]
+    freshness:
+      - column: feature_updated_at
+        max_age_seconds: 3600.0
 ```
 
 All lookup features must be declared in `input_columns`; the required features
@@ -73,85 +139,29 @@ enforced. This generated flow supports pandas single-model and competition
 training; multi-target policy transport and temporal feature lookups are rejected.
 No Spark scoring job or batch prediction table needs to run or exist.
 
-Keep the published Core release pinned in `deployment/requirements.txt`
-(`skyulf-core[mlflow]==0.9.2`) and complete your Bundle target and ordinary training
+Keep the generated Core release pinned in `deployment/requirements.txt`
+and complete your Bundle target and ordinary training
 settings. Change only this requirement's version to upgrade Core and redeploy.
 The optional online jobs inherit this pin through `serving-requirements.txt`,
 which also installs the pinned feature-engineering SDK. Validate saved-model
-runtime compatibility before upgrading production.
+runtime compatibility before upgrading production; see
+[runtime packaging](databricks_deployment.md#runtime-packaging).
 Provision and publish the feature source as described below, or use an existing
 publication maintained externally. Then validate, deploy and train:
 
 ```bash
-databricks bundle validate -t test
+databricks bundle validate --strict -t test
 databricks bundle deploy -t test
 databricks bundle run train -t test
 ```
 
-Take the **concrete registered version** from the training result and complete
-`online_serving` in `config/serving.yml`:
+Continue with [online endpoint setup](databricks_serving.md#set-up-an-online-bundle-endpoint)
+using the concrete version from training. The setup verifies publication binding
+and first-sync evidence; it does not provision the store or publish features.
 
-```yaml
-online_serving:
-  enabled: true
-  exclusive_writer: true
-  tracking_uri: databricks
-  registry_uri: databricks-uc
-  endpoint:
-    endpoint_name: customer-online-v3
-    model_name: models.risk.customer_online
-    model_version: "3"
-    logging_catalog: ops
-    logging_schema: serving
-    logging_table_prefix: customer_online_v3
-    logging_mode: telemetry
-  publications:
-    - source_table: features.customer.customer_features
-      source_table_id: "REPLACE_WITH_DESCRIBE_DETAIL_ID"
-      online_table: features.online.customer_features
-      online_store: customer-features
-      publish_mode: TRIGGERED # Match the existing publication; use CONTINUOUS for a stream.
-```
+## The command
 
-Use actual resolved UC names here; the source table must be the model's saved
-lookup source with the same Delta identity. Configure exclusive endpoint writer
-permissions before setting `exclusive_writer: true`. The setup identity must be
-able to inspect the source, publication and store; the serving identity also
-needs access to the online features. Grant visibility of all publications for
-these sources and prevent concurrent publication changes during setup. UC
-enumeration covers the setup identity's visible inventory, not hidden resources.
-Setup rejects missing, mismatched or ambiguous accessible publications and requires
-evidence of a completed first sync before admitting creation. It reports a
-validation error while the first sync is incomplete; it does not poll or republish.
-
-```bash
-databricks bundle deploy -t test
-databricks bundle run online_serving_setup -t test
-```
-
-The setup result reports `SUBMITTED`, `model_uri`, `input_schema` and a typed
-`request_example` derived from the actual native signature. Replace its example
-values with a real entity and all other required request values. Wait for native
-endpoint readiness, then send that request body to
-`POST /serving-endpoints/customer-online-v3/invocations` or use
-`query_named_records` below. A setup submission does not establish feature
-availability. Rerunning setup never overwrites an existing endpoint; inspect an
-ambiguous creation result before taking another action.
-
-Save the returned `request_example` object as `request.json`, replace its sample
-values, and query after the endpoint reports readiness:
-
-```bash
-databricks serving-endpoints get customer-online-v3
-databricks serving-endpoints query customer-online-v3 --json @request.json
-```
-
-Required source metadata can survive in the native signature, even when excluded
-from estimator inputs. Inspect `input_schema`; do not assume every model accepts
-keys alone. Direct REST callers can override fetched values. Freshness validation
-checks the received values and does not attest their source.
-
-## Create a latest-value source and an online store
+### Create a latest-value source and an online store
 
 Use a Unity Catalog Delta feature table containing one current row per entity.
 Declare its primary key columns `NOT NULL`, enable Change Data Feed, and include
@@ -186,7 +196,21 @@ choose the oldest online copy if the same source has several publications. The
 model's lookup contract identifies its source features, not a chosen online
 table replica.
 
-## Publish and inspect a sync
+Inspect provisioning before publishing; creation is not a readiness signal:
+
+```python
+store = features.get_online_store(name="customer-features")
+print(store.name, store.state, store.capacity)
+```
+
+Continue when the platform reports `AVAILABLE`. For the following publisher
+example, use `features.customer.customer_features` with `customer_id BIGINT NOT
+NULL`, `total_spend DOUBLE` and `feature_updated_at DOUBLE`, a primary key on
+`customer_id`, and CDF enabled. Keep the training observation table separate:
+it contains entity keys and labels, while the lookup supplies the selected
+feature values. Source and online destination are different objects.
+
+### Publish and inspect a sync
 
 ```python
 from databricks.sdk import WorkspaceClient
@@ -197,11 +221,11 @@ from skyulf.integrations.databricks.feature_store import (
     publish_online_features,
 )
 
-source = "features.customer.current_values"
+source = "features.customer.customer_features"
 detail = spark.sql(f"DESCRIBE DETAIL {source}").first()
 publication = OnlinePublicationSpec(
     source_table=source,
-    online_table="features.online.customer_values",
+    online_table="features.online.customer_features",
     online_store="customer-features",
     source_table_id=detail["id"],
     publish_mode="TRIGGERED", # Default; choose CONTINUOUS to start a native stream.
@@ -238,7 +262,7 @@ source version is the version checked during preflight, not a guarantee that
 native latest-value publication copied precisely that snapshot. Verify an actual
 endpoint lookup when testing propagation.
 
-## Operate continuous feature publication
+### Operate continuous feature publication
 
 Select `online_publication_mode: "CONTINUOUS"` together with
 `include_online_publication: "true"` in the Bundle initialization answers. Complete
@@ -249,9 +273,9 @@ online_publication:
   enabled: true
   exclusive_writer: true
   publish_mode: CONTINUOUS
-  source_table: features.customer.current_values
+  source_table: features.customer.customer_features
   source_table_id: "REPLACE_WITH_DESCRIBE_DETAIL_ID"
-  online_table: features.online.customer_values
+  online_table: features.online.customer_features
   online_store: customer-features
 ```
 
@@ -259,7 +283,7 @@ After configuring exclusive source/publication ownership and deploying the Bundl
 run one explicit operation at a time:
 
 ```bash
-databricks bundle validate -t test
+databricks bundle validate --strict -t test
 databricks bundle deploy -t test
 databricks bundle run online_publication -t test --params publication_action=start
 databricks bundle run online_publication -t test --params publication_action=status
@@ -349,7 +373,11 @@ the resource owner before any mutation. Inspect native pipeline state after the
 stop request. Restart still requires restored, valid source identity/access and
 all normal source preflight checks.
 
-## Save the freshness policy with the model
+### Save the freshness policy with the model
+
+The Bundle training path above saves this policy for you. The next snippet is
+the equivalent SDK packaging stage, continuing an existing fitted model and
+native training set; its named objects are prerequisites, not standalone inputs.
 
 Build the native training set with explicit lookup fields and train from its
 `load_df()` result, retaining that same native training-set object for packaging.
@@ -400,56 +428,16 @@ lookup to repeat those transformations. `log_feature_model_set` also accepts
 `online_policy`; its raw saved guard covers the model-set request before its
 components run.
 
-## Admit and query the registered package
+### Next: create the endpoint
 
-Register the native outer package, then inspect a concrete version:
+Continue with
+[endpoint admission and requests](databricks_serving.md#admit-and-query-the-registered-package).
+That page owns endpoint creation, readiness and the inspected request schema; the publication and
+saved freshness policy above are prerequisites.
 
-```python
-from skyulf.integrations.databricks.serving import (
-    PinnedEndpointSpec,
-    create_pinned_endpoint,
-    prepare_online_endpoint,
-    query_named_records,
-    require_pinned_endpoint_ready,
-)
+## What you should see
 
-spec = PinnedEndpointSpec(
-    endpoint_name="customer-risk-online",
-    model_name="models.risk.customer_risk_online",
-    model_version="3",
-    logging_catalog="ops",
-    logging_schema="serving",
-    logging_table_prefix="customer_risk_online",
-)
-plan = prepare_online_endpoint(
-    spec, tracking_uri="databricks", registry_uri="databricks-uc"
-)
-print(plan.input_schema)
-create_pinned_endpoint(workspace, plan)  # Once, using a new endpoint name.
-```
-
-After deployment is ready:
-
-```python
-require_pinned_endpoint_ready(workspace, plan)
-response = query_named_records(workspace, plan, [{"customer_id": 42}])
-print(response)
-```
-
-The example request is valid only if the inspected input schema requires exactly
-`customer_id`. Native Feature Engineering can retain excluded training-source
-columns in its outer signature. Supply every field reported by
-`plan.input_schema`, or train from a narrower source. Temporal/date and binary
-source inputs are rejected by this bridge. The endpoint identity must have
-permission to read the required online features.
-
-The helper's exact schema excludes feature overrides. Direct native REST calls
-can still provide feature values, including a freshness value. The saved guard
-checks the values it receives; it cannot prove that those values came from the
-online store after enrichment. Restrict direct endpoint access or use an
-application boundary if your application must prohibit caller overrides.
-
-## Schedule publication and test updates
+### Schedule publication and test updates
 
 Generate a Bundle project with `include_online_publication: "true"`. Fill
 `online_publication` in `config/serving.yml` with the explicit source table ID,
@@ -466,15 +454,123 @@ key-only request reflects the new value. Check that an absent entity and an
 expired timestamp produce the intended feature error. A successful local model
 load or native batch `score_batch` call does not establish online endpoint lookup.
 
-The native Feature Engineering wrapper can return a generic model-evaluation
-error to the REST caller. Inspect the served model's logs for the underlying
-`Online required feature` or `Online freshness feature` exception. Check that
-the traceback belongs to the rejected request; a generic HTTP error alone does
-not establish that the freshness policy ran.
+#### Repeat the same request after a feature update
 
-The latest-value policy does not weaken historical batch
-`training_snapshot` checks. Those checks still reject changed feature bindings.
-Reconstructing original heldout data for a later
-[automatic champion promotion](databricks_serving_rollout.md) can therefore stop
-when the original feature source has advanced; current features are not silently
-substituted for the saved training evidence.
+Continue the publication examples above and the
+[endpoint SDK example](databricks_serving.md#admit-and-query-the-registered-package) with their
+`workspace`, `features`, `publication`, `plan` and `receipt`. Use an isolated demonstration source,
+with an existing `customer_id=42`, a one-hour saved freshness limit and a model whose output depends
+on `total_spend`. This sequence uses `TRIGGERED` publication. Supply any additional fields required
+by `plan.input_schema`; the illustrated model accepts only the entity key.
+
+```python
+assert tuple(plan.input_columns) == ("customer_id",)
+assert spark.table(publication.source_table).where("customer_id = 42").count() == 1
+records = [{"customer_id": 42}]
+before = query_named_records(
+    workspace, plan, records, client_request_id="feature-demo-before",
+)
+print("Before:", before.as_dict())
+
+spark.sql(f"""
+UPDATE {publication.source_table}
+SET total_spend = total_spend + 100.0,
+    feature_updated_at = CAST(unix_timestamp() AS DOUBLE)
+WHERE customer_id = 42
+""")
+receipt = publish_online_features(
+    spark, publication, feature_client=features,
+    admission=SingleWriterAdmission(),
+)
+print(receipt)
+```
+
+Do not query immediately and treat an unchanged response as a failure. In a later
+cell, inspect the submitted synchronization:
+
+```python
+status = online_publication_status(workspace, receipt)
+print(status)
+assert status["status"] == "SYNCED", "Wait for this submitted sync; inspect FAILED separately"
+after = query_named_records(
+    workspace, plan, records, client_request_id="feature-demo-after",
+)
+print("After:", after.as_dict())
+```
+
+The request and model version are unchanged. Compare the response with a local
+prediction from the same fitted artifact using the **new** feature values. For a
+simple model `prediction = 2 * total_spend`, a change from 50 to 150 should change
+the prediction from 100 to 300. That arithmetic illustrates the acceptance check;
+it is not an expected value for an arbitrary trained model. A classifier label
+may remain unchanged even when its probabilities change.
+
+For `CONTINUOUS`, update the source once, inspect the existing publication and
+observe propagation; do not resubmit `publish_online_features` on every write.
+An active pipeline alone does not prove that a particular row reached the store.
+
+## Common errors and fixes
+
+### Check missing and stale features
+
+First use a key absent from the demonstration source. The following call should
+raise a native model-evaluation error, not return an imputed prediction:
+
+```python
+assert spark.table(publication.source_table).where("customer_id = 999999").count() == 0
+query_named_records(
+    workspace, plan, [{"customer_id": 999999}],
+    client_request_id="feature-demo-missing",
+)
+```
+
+Then change the existing entity's freshness field to two hours ago:
+
+```python
+spark.sql(f"""
+UPDATE {publication.source_table}
+SET feature_updated_at = CAST(unix_timestamp() - 7200 AS DOUBLE)
+WHERE customer_id = 42
+""")
+receipt = publish_online_features(
+    spark, publication, feature_client=features,
+    admission=SingleWriterAdmission(),
+)
+```
+
+Wait for this receipt's `SYNCED` status as above, then repeat `records` with
+`client_request_id="feature-demo-stale"`. A model saved with the one-hour limit
+must reject it. Inspect the matched request's model log for the freshness error;
+an unrelated network/authentication error does not pass this check. Afterwards
+restore the entity's real feature values and a current production timestamp,
+synchronize again and verify a successful request. Do not leave a shared entity
+with intentionally stale test features.
+
+The native Feature Engineering wrapper replaces every model error with a generic
+one, so the REST caller only sees `Encountered an unexpected error while evaluating
+the model. ... Error ''`. Read the reason from the served model's logs:
+
+```bash
+databricks serving-endpoints logs <endpoint-name> <served-model-name> --profile <profile>
+```
+
+The served model name is in `databricks serving-endpoints get <endpoint-name>`
+(`config.served_entities[].name`, for example `customer_model-1`). Look for one of:
+
+```text
+Online required features have no value in 1 of 1 rows (first row 0): total_spend, feature_updated_at. The lookup key has no row in the online table, or the published value is null.
+Online freshness feature 'feature_updated_at' is stale in 1 of 1 rows: oldest age 7200s exceeds 3600s (max_age_seconds). Refresh and republish the feature table.
+```
+
+Check that the traceback belongs to the rejected request; a generic HTTP error
+alone does not establish that the freshness policy ran.
+
+The latest-value policy does not replace historical evaluation evidence. New
+feature-bound candidates save their enriched holdout in
+`lifecycle/data/holdout.parquet`; later [champion promotion](databricks_serving_rollout.md)
+verifies that saved artifact and the original source identities. Advancing a
+feature table's version is allowed on this path; dropping/recreating a table or
+altering the saved holdout blocks it. A candidate without a saved holdout uses
+strict snapshot reconstruction, so a feature-source advance blocks it. Train a
+new candidate with the matching runtime rather than replacing
+historical values with today's online features.

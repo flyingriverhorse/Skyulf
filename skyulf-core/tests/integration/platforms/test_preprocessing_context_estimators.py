@@ -97,18 +97,14 @@ def _replay(directory):
         report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 3))
         step = report["steps"][0]
         assert step["state_validation"] == "node_owned", report
-        if node in ("IterativeImputer", "PowerTransformer"):
-            assert step["context"] == "global" and step["status"] == "requires_context", report
-        else:
-            assert step["context"] == "row" and report["status"] == "passed", report
-        if step["context"] == "row":
-            parts = [
-                sample.iloc[i : i + 1] if isinstance(sample, pd.DataFrame) else sample.slice(i, 1)
-                for i in range(len(sample))
-            ]
-            np.testing.assert_array_equal(
-                actual, np.concatenate([artifact.pipeline.predict(part) for part in parts])
-            )
+        assert step["context"] == "row" and report["status"] == "passed", report
+        parts = [
+            sample.iloc[i : i + 1] if isinstance(sample, pd.DataFrame) else sample.slice(i, 1)
+            for i in range(len(sample))
+        ]
+        np.testing.assert_array_equal(
+            actual, np.concatenate([artifact.pipeline.predict(part) for part in parts])
+        )
         assert artifact_digest(artifact.pipeline.feature_engineer.fitted_steps) == digest
         with pytest.raises(UnsupportedExecutionError):
             require_partition_safe_pipeline(artifact)

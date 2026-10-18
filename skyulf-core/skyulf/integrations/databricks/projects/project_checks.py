@@ -2,13 +2,40 @@
 
 import ast
 from pathlib import Path
+from typing import Any
 
+from ..jobs.serving_job import validate_serving_section
 from ..lifecycle.workflow import resolve_target_config
+from ..training.tuning.cv import CVSpec
+from ..training.tuning.search import prepare_search_pipeline
 from ._project_files import project_source
 from .workflow_config import validate_project_settings
-from .yaml_config import project_config_path, read_training_config, read_workflow_config
+from .yaml_config import (
+    project_config_path,
+    read_training_config,
+    read_workflow_config,
+    read_yaml_mapping,
+)
 from .yaml_models import static_workflows
 from .yaml_recipes import feature_project_source
+
+_SERVING_SECTIONS = ("online_serving", "rollout", "online_publication")
+
+
+def _check_search(checked: dict[str, Any]) -> None:
+    """Run preview's search and competition-metric admission on static settings."""
+    if checked.get("training_layout") == "model_competition":
+        from ..training.competition.competition_evaluation import (  # noqa: PLC0415
+            competition_metric,
+        )
+
+        competition_metric(checked["metric"], checked["task"])
+    prepare_search_pipeline(
+        checked["pipeline"],
+        CVSpec.from_workflow(checked),
+        target_column=checked["target_column"],
+        event_column=checked.get("event_column"),
+    )
 
 
 def _check_config(root: Path, bindings: dict[str, str]) -> dict:
@@ -23,11 +50,34 @@ def _check_config(root: Path, bindings: dict[str, str]) -> dict:
         checked = [
             validate_project_settings(resolve_target_config(item, bindings)) for item in configs
         ]
+        for item in checked:
+            _check_search(item)
         return checked[0]
     except KeyError as exc:
         raise ValueError(f"config/{path.name}: missing required setting {exc}.") from exc
     except (OSError, TypeError, ValueError) as exc:
         raise ValueError(f"config/{path.name}: {exc}") from exc
+
+
+def _check_serving(root: Path) -> None:
+    """Validate optional serving jobs' settings offline, as each job does before remote work."""
+    path = root / "config" / "serving.yml"
+    if not path.exists():
+        return
+    label = "config/serving.yml"
+    try:
+        document = read_yaml_mapping(path)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"{label}: {exc}") from exc
+    for section in _SERVING_SECTIONS:
+        if section not in document:
+            continue  # A job that was not generated has no section to read.
+        try:
+            validate_serving_section(section, document[section])
+        except KeyError as exc:
+            raise ValueError(f"{label}: {section}: missing required setting {exc}.") from exc
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{label}: {section}: {exc}") from exc
 
 
 def _check_packages(root: Path) -> list[str]:
@@ -57,10 +107,13 @@ def check_project(project_path: str | Path, bindings: dict[str, str]) -> dict[st
     cannot certify hook behavior, source data, cloud permissions or fitted models.
     Those checks require runtime verification; sampling is not a no-write mode.
     Present features/composition packages use the same snapshot checks as training;
-    declared dependencies are parsed, never installed or imported.
+    declared dependencies are parsed, never installed or imported. Search and
+    competition-metric settings get preview's checks, and an optional
+    config/serving.yml gets the serving jobs' own pre-remote checks.
     """
     root = Path(project_path).resolve(strict=True)
     config = _check_config(root, bindings)
+    _check_serving(root)
     sources = sorted((root / "src").rglob("*.py"))
     if not sources:
         raise ValueError("Project src must contain Python source files.")

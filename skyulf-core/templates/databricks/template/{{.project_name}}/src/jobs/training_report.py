@@ -10,6 +10,7 @@ if __name__ == "__main__":
             globals()["spark"],
             globals()["dbutils"],
             phase="complete",
+            display_html=globals().get("displayHTML"),
             exit_notebook=False,
         )
 

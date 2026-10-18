@@ -1,7 +1,7 @@
 """Two-version routes retain each admitted package and its logging contract."""
 
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import asdict, replace
 from importlib import import_module
 from importlib.util import find_spec
 
@@ -97,6 +97,37 @@ def test_two_version_plan_preserves_inputs_and_never_mutates_pinned_plan(api, pl
         {"served_model_name": "challenger", "traffic_percentage": 0},
     ]
     assert api.rollout_endpoint_ready(ready_endpoint(plan), plan, challenger_percentage=0)
+
+
+def test_rollout_refuses_unadmitted_compute_change(api, plans):
+    """A mutated served entity cannot silently bypass the spec's compute contract."""
+    changed = deepcopy(plans)
+    changed[1].config["config"]["served_entities"][0]["workload_size"] = "Medium"
+    with pytest.raises(ValueError, match="compute"):
+        api.build_rollout_endpoint(*changed)
+
+
+def test_rollout_requires_same_compute_settings(api, plans):
+    """Champion and challenger comparisons must use the same configured compute allocation."""
+    changed = deepcopy(plans)
+    second = replace(changed[1], spec=replace(changed[1].spec, workload_size="Medium"))
+    second.config["config"]["served_entities"][0]["workload_size"] = "Medium"
+    with pytest.raises(ValueError, match="same.*compute"):
+        api.build_rollout_endpoint(changed[0], second)
+
+
+def test_saved_default_rollout_without_new_settings_still_loads(api, plans):
+    """Adding defaults must not invalidate existing durable rollout plans or mutate their payload."""
+    from skyulf.integrations.databricks.serving.rollout import rollout_plan_from_dict
+
+    plan = api.build_rollout_endpoint(*plans)
+    saved = asdict(plan)
+    for role in ("champion", "challenger"):
+        for field in ("workload_type", "workload_size", "scale_to_zero_enabled", "ready_timeout_s"):
+            saved[role]["spec"].pop(field, None)
+    before = deepcopy(saved)
+    assert rollout_plan_from_dict(saved) == plan
+    assert saved == before
 
 
 @pytest.mark.parametrize(
@@ -370,3 +401,13 @@ def test_native_config_start_time_requires_bounded_integer_milliseconds(api, pla
     endpoint["config"]["start_time"] = stamp
     with pytest.raises(ValueError, match="configuration"):
         api.rollout_endpoint_ready(endpoint, plan, challenger_percentage=0)
+
+
+def test_rollout_rejects_endpoints_without_payload_logging(api, plans):
+    """Health evidence comes from payload logs, so a logging-disabled release cannot roll out."""
+    quiet = []
+    for plan in plans:
+        config = {key: value for key, value in plan.config.items() if key != "telemetry_config"}
+        quiet.append(replace(plan, spec=replace(plan.spec, logging_mode="disabled"), config=config))
+    with pytest.raises(ValueError, match="payload logs"):
+        api.build_rollout_endpoint(*quiet)

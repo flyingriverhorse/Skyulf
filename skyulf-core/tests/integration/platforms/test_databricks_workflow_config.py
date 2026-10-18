@@ -460,3 +460,27 @@ def test_saved_model_actions_do_not_expand_editable_training_search(workflow_con
     with pytest.raises(ValueError, match="above max_candidates"):
         validate_workflow_config(workflow_config, action="train")
     assert validate_workflow_config(workflow_config, action=action) == workflow_config
+
+
+@pytest.mark.parametrize("action", ["score", "approve", "reject", "rollback"])
+@pytest.mark.parametrize("layout", ["single_model", "model_competition"])
+def test_operator_actions_accept_the_unloaded_yaml_model_declaration(
+    workflow_config, layout, action
+):
+    """Score and operator jobs read raw YAML and reuse the saved model or competition winner."""
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+
+    workflow_config.update(training_layout=layout)
+    workflow_config["pipeline"]["modeling"] = {}
+    assert validate_workflow_config(workflow_config, action=action) == workflow_config
+    with pytest.raises(ValueError):
+        validate_workflow_config(workflow_config, action="train")
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.1, True, float("nan"), "0.05"])
+def test_workflow_rejects_invalid_coverage_drop_before_external_work(workflow_config, value):
+    """A malformed per-model coverage margin must fail in offline configuration checks."""
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+
+    with pytest.raises(ValueError, match="max_coverage_drop"):
+        validate_workflow_config({**workflow_config, "max_coverage_drop": value}, action="train")

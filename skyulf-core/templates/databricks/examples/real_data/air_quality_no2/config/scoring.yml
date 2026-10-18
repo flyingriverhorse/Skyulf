@@ -1,0 +1,25 @@
+# Scoring policy, saved with the next trained model. Full reference: SCORING.md.
+version: 1
+
+# combined: config/pre_split.yml filters first, then the eligibility rules below.
+mode: combined
+# Scoring requests have no NO2 value yet; skip target-reading pre-split filters.
+skip_target_pre_split_steps: true
+
+# Eligibility runs before the model; a failing row keeps its exclusion reason.
+eligibility:
+  # Custom because rows with missing humidity must stay eligible; the built-in
+  # value_range check would exclude them.
+  - name: plausible_humidity
+    custom: scoring.plausible_humidity   # function in src/features/scoring.py
+    params: {minimum: 10.0, maximum: 100.0}
+
+# Outputs add columns computed from each prediction.
+outputs:
+  - name: no2_band
+    rule: prediction_band       # below 40 low, 40-200 moderate, from 200 (EU hourly limit) high
+    params:
+      thresholds: [40.0, 200.0]
+      labels: [low, moderate, high]
+      output: no2_band
+    columns: [{name: no2_band, dtype: string}]

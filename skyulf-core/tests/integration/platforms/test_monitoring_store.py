@@ -1,11 +1,19 @@
 """Shared monitoring persistence binds snapshots and preserves unobserved models."""
 
-from datetime import UTC, datetime
+import json
+import os
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
+from threading import Barrier
+from types import SimpleNamespace
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 
 from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+
+COUNT_COLUMNS = ("reference_rows", "current_rows", "scored_rows", "labeled_rows", "drifted_columns")
 
 
 def config():
@@ -35,6 +43,36 @@ def test_result_identity_retries_and_late_labels():
     assert first["model_name"] == "models.risk.score"
 
 
+@pytest.mark.parametrize(
+    ("counts", "expected"),
+    [
+        ({}, dict.fromkeys(COUNT_COLUMNS)),
+        (dict.fromkeys(COUNT_COLUMNS), dict.fromkeys(COUNT_COLUMNS)),
+        (dict.fromkeys(COUNT_COLUMNS, 0), dict.fromkeys(COUNT_COLUMNS, 0)),
+        (
+            {"reference_rows": "12", "current_rows": 0, "scored_rows": 7},
+            {
+                "reference_rows": 12,
+                "current_rows": 0,
+                "scored_rows": 7,
+                "labeled_rows": None,
+                "drifted_columns": None,
+            },
+        ),
+    ],
+    ids=["absent", "null", "zero", "partial"],
+)
+def test_result_counts_distinguish_unmeasured_from_zero(counts, expected):
+    """Incomplete reports must not fabricate measured zeros or discard available counts."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import result_row
+
+    now = datetime(2026, 10, 1, tzinfo=UTC)
+    report = {"status": "failed", **counts}
+    row = result_row(config(), "2", now, now, now, report, {})
+    assert {key: row[key] for key in COUNT_COLUMNS} == expected
+    assert json.loads(row["report_json"]) == report
+
+
 def test_optional_metadata_refresh_preserves_observation_identity():
     """Registry metadata refreshes must not duplicate the same measured observation."""
     from skyulf.integrations.databricks.observability.monitoring.monitoring_store import result_row
@@ -50,7 +88,14 @@ def test_optional_metadata_refresh_preserves_observation_identity():
         now,
         now,
         report,
-        evidence | {"model_metadata": {"captured_at": "later", "aliases": ["champion"]}},
+        evidence
+        | {
+            "model_metadata": {
+                "captured_at": "later",
+                "aliases": ["champion"],
+                "training": {"format_version": 1, "parameters": {"status": "recorded", "rows": []}},
+            }
+        },
     )
     assert first["report_id"] == refresh["report_id"]
 
@@ -98,12 +143,12 @@ def test_current_health_does_not_rank_policy_only_windows_as_feature_observation
         {"status": "no_data", "metrics": [], "performance": {"status": "unavailable"}},
         {},
     )
-    assert row["current_rows"] == 0
+    assert row["current_rows"] is None
     assert "current_rows" not in json.loads(row["report_json"])
-    query = monitoring_views("ops.monitoring")["current_health"]
+    query = monitoring_views("ops.monitoring")["complete_observations"]
     assert "WHERE NOT (status = 'no_data'" in query
     assert "get_json_object(report_json, '$.current_rows') IS NULL" in query
-    assert "get_json_object(report_json, '$.performance') IS NOT NULL)" in query
+    assert "get_json_object(report_json, '$.performance') IS NOT NULL" in query
 
 
 def test_persistence_rejects_nonfinite_report_values():
@@ -197,3 +242,234 @@ def test_inventory_read_is_bounded_and_rejects_tampered_config(monkeypatch):
     collect.return_value = [row | {"enabled": False}]
     with pytest.raises(ValueError, match="integrity"):
         store.load_enrolled_models(spark, "ops.monitoring")
+
+
+def test_project_monitoring_selects_only_its_enabled_environment(monkeypatch):
+    """Sharing the physical store must not make one project's job observe another project's rows."""
+    from skyulf.integrations.databricks.jobs.monitoring import spark_monitoring_job as job
+
+    base = config().payload() | {
+        "execution_engine": "spark",
+        "reference_namespace": "ops.skyulf_monitoring",
+    }
+    entries = [
+        MonitorConfig.from_dict(base | changes)
+        for changes in ({}, {"project": "sales"}, {"environment": "prod"}, {"enabled": False})
+    ]
+    monkeypatch.setattr(
+        job, "load_enrolled_models", lambda *args: [item.payload() for item in entries]
+    )
+    selected = job.project_configs(
+        Mock(),
+        "ops.skyulf_monitoring",
+        {"monitoring_project": "risk", "monitoring_environment": "test"},
+    )
+    assert [item.monitor_id for item in selected] == [entries[0].monitor_id]
+
+
+@pytest.fixture
+def native_store_namespace(delta_spark):
+    """Isolate real store initialization and clean only this test's owned objects."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+    from skyulf.integrations.databricks.shared._contracts import table_name
+
+    catalog = os.environ.get("SKYULF_TEST_CATALOG", "spark_catalog")
+    schema = f"skyulf_store_test_{uuid4().hex}"
+    namespace = store.store_namespace(catalog, schema)
+    assert not delta_spark.catalog.databaseExists(namespace)
+    try:
+        yield catalog, schema
+    finally:
+        if delta_spark.catalog.databaseExists(namespace):
+            allowed = {
+                "model_inventory",
+                "monitoring_results",
+                "performance_actions",
+                "retraining_requests",
+                *store.monitoring_views(namespace),
+            }
+            for item in delta_spark.catalog.listTables(namespace):
+                if not item.isTemporary:
+                    assert item.name in allowed
+                    assert store.ensure_owned_object(delta_spark, f"{namespace}.{item.name}")
+            delta_spark.sql(f"DROP SCHEMA {table_name(namespace)} CASCADE").collect()
+            assert not delta_spark.catalog.databaseExists(namespace)
+
+
+def test_native_two_projects_share_first_bootstrap_and_keep_distinct_inventory(
+    delta_spark, native_store_namespace
+):
+    """Two fresh projects must create twelve shared objects and retain isolated enrollment identities."""
+    from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import project_configs
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    namespace = store.ensure_monitoring_store(delta_spark, *native_store_namespace)
+    entries = [
+        MonitorConfig.from_dict(
+            config().payload()
+            | {"project": project, "execution_engine": "spark", "reference_namespace": namespace}
+        )
+        for project in ("risk", "sales")
+    ]
+    for entry in entries:
+        assert store.ensure_monitoring_store(delta_spark, *native_store_namespace) == namespace
+        store.enroll_monitor(delta_spark, namespace, entry)
+    assert len(delta_spark.catalog.listTables(namespace)) == 12
+    assert len(store.load_enrolled_models(delta_spark, namespace)) == 2
+    for entry in entries:
+        selected = project_configs(
+            delta_spark,
+            namespace,
+            {"monitoring_project": entry.project, "monitoring_environment": entry.environment},
+        )
+        assert [item.monitor_id for item in selected] == [entry.monitor_id]
+
+
+def test_native_concurrent_first_bootstrap_reuses_owned_objects(
+    delta_spark, native_store_namespace
+):
+    """Simultaneous first use must retain one compatible store without replacing a winning creator's objects."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    start = Barrier(2)
+
+    def concurrent_sql(statement):
+        """Force both creators to reach each conditional DDL before either executes it."""
+        if statement.startswith("CREATE "):
+            start.wait(timeout=30)
+        return delta_spark.sql(statement)
+
+    concurrent = SimpleNamespace(
+        sql=concurrent_sql,
+        catalog=delta_spark.catalog,
+        table=delta_spark.table,
+        createDataFrame=delta_spark.createDataFrame,
+    )
+
+    def bootstrap():
+        """Release both first-time callers against the same empty namespace."""
+        return store.ensure_monitoring_store(concurrent, *native_store_namespace)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(bootstrap) for _ in range(2)]
+        namespaces = [future.result(timeout=180) for future in futures]
+    assert namespaces[0] == namespaces[1]
+    objects = delta_spark.catalog.listTables(namespaces[0])
+    assert len(objects) == 12
+    assert all(
+        store.ensure_owned_object(delta_spark, f"{namespaces[0]}.{item.name}") for item in objects
+    )
+
+
+def test_native_nullable_counts_preserve_zero_health_and_legacy_replays(
+    delta_spark, native_store_namespace
+):
+    """Real Delta and health views must distinguish unknown counts without rewriting history."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    spark = delta_spark
+    namespace = store.ensure_monitoring_store(spark, *native_store_namespace)
+    now = datetime(2026, 10, 1, tzinfo=UTC)
+    enrolled = config()
+    zero_config = MonitorConfig.from_dict(enrolled.payload() | {"model_name": "models.risk.zero"})
+    for entry in (enrolled, zero_config):
+        store.enroll_monitor(spark, namespace, entry)
+    legacy = store.result_row(enrolled, "2", now, now, now, {"status": "failed"}, {})
+    legacy.update(dict.fromkeys(COUNT_COLUMNS, 0))
+    store.persist_report(spark, namespace, legacy)
+    retry = store.result_row(enrolled, "2", now, now, now, {"status": "failed"}, {})
+    assert retry["report_id"] == legacy["report_id"]
+    store.persist_report(spark, namespace, retry)
+    later = now + timedelta(days=1)
+    failed = store.result_row(enrolled, "2", later, now, later, {"status": "failed"}, {})
+    zero = store.result_row(
+        zero_config,
+        "2",
+        later,
+        now,
+        later,
+        {"status": "no_data", **dict.fromkeys(COUNT_COLUMNS, 0)},
+        {},
+    )
+    store.persist_report(spark, namespace, failed)
+    store.persist_report(spark, namespace, zero)
+    rows = {
+        row.report_id: row.asDict()
+        for row in spark.table(f"{namespace}.monitoring_results").collect()
+    }
+    assert len(rows) == 3
+    assert all(rows[legacy["report_id"]][key] == 0 for key in COUNT_COLUMNS)
+    assert all(rows[failed["report_id"]][key] is None for key in COUNT_COLUMNS)
+    assert all(rows[zero["report_id"]][key] == 0 for key in COUNT_COLUMNS)
+    assert json.loads(rows[failed["report_id"]]["report_json"]) == {"status": "failed"}
+    summary = spark.sql(
+        f"SELECT count(current_rows) AS measured, avg(current_rows) AS average "
+        f"FROM {namespace}.monitoring_results WHERE report_id <> '{legacy['report_id']}'"
+    ).first()
+    assert summary.measured == 1 and summary.average == 0
+    health = {
+        row.model_name: row.asDict() for row in spark.table(f"{namespace}.current_health").collect()
+    }
+    assert health[enrolled.model_name]["health_status"] == "failed"
+    assert health[enrolled.model_name]["current_rows"] is None
+    assert health[zero_config.model_name]["health_status"] == "no_data"
+    assert health[zero_config.model_name]["current_rows"] == 0
+    latest = later + timedelta(days=1)
+    policy_only = store.result_row(
+        enrolled,
+        "2",
+        latest,
+        later,
+        latest,
+        {"status": "no_data", "performance": {"status": "unavailable"}},
+        {},
+    )
+    store.persist_report(spark, namespace, policy_only)
+    selected = (
+        spark.table(f"{namespace}.current_health")
+        .where(f"model_name = '{enrolled.model_name}'")
+        .first()
+    )
+    assert selected.report_id == failed["report_id"] and selected.current_rows is None
+
+
+@pytest.mark.parametrize("operation", ["ensure_monitoring_store", "initialize_monitoring_store"])
+def test_native_preprovisioned_store_accepts_requests_without_ddl(
+    delta_spark, native_store_namespace, operation
+):
+    """Both setup paths must prepare real Delta requests that runtime can use without DDL."""
+    from skyulf.integrations.databricks.lifecycle.retraining_requests import _RequestStore
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    catalog, schema = native_store_namespace
+    namespace = getattr(store, operation)(delta_spark, catalog, schema)
+    statements = []
+
+    def runtime_sql(statement):
+        """Reject setup SQL while executing metadata reads and writes on real Delta."""
+        statements.append(statement)
+        assert not statement.lstrip().upper().startswith(("CREATE", "ALTER", "DROP"))
+        return delta_spark.sql(statement)
+
+    runtime = SimpleNamespace(
+        sql=runtime_sql,
+        catalog=delta_spark.catalog,
+        table=delta_spark.table,
+        createDataFrame=delta_spark.createDataFrame,
+    )
+    assert store.ensure_monitoring_store(runtime, catalog, schema) == namespace
+    requests = _RequestStore(runtime, namespace)
+    row = {
+        "row_id": "request:17:" + "a" * 64,
+        "job_id": 17,
+        "request_id": "a" * 64,
+        "status": "intent",
+        "evidence_json": '{"model_version":"2"}',
+        "created_at_ms": 1000,
+        "submitted_at_ms": None,
+        "run_id": None,
+    }
+    requests.record(row)
+    requests.record(row | {"evidence_json": '{"later":true}'})
+    assert requests.read(row["row_id"]) == row
+    assert sum(statement.startswith("MERGE") for statement in statements) == 2

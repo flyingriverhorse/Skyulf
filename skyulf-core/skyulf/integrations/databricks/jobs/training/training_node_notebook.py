@@ -10,6 +10,7 @@ from ...model_sets.model_set_project import (
     render_model_set_result,
 )
 from ...observability.reports.training_node_output import render_training_node
+from ...observability.reports.training_summary import render_final_training_report
 from ..shared.job_output import render_lifecycle_output
 from ..shared.job_runtime import (
     lifecycle_widget_context,
@@ -131,10 +132,19 @@ def run_models_report_notebook(dbutils: Any, *, display_html: Any = None) -> str
     output = dict(store.receipt(phase)["output"])
     output["score_requested"] = _set_score_requested(store.request, output)
     dbutils.jobs.taskValues.set(key="score_requested", value=output["score_requested"])
+    render = render_model_set_result
+    if store.request["action"] == "train":
+        render = lambda payload: render_final_training_report(
+            payload,
+            tracking_uri=values.get("tracking_uri", "databricks"),
+            run_id=store.run_id,
+            workspace_host=values.get("workspace_host", ""),
+            render=render_model_set_result,
+        )
     return notebook_output(
         output,
         dbutils,
-        render=render_model_set_result,
+        render=render,
         display_html=display_html,
         exit_notebook=False,
     )

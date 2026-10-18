@@ -66,6 +66,45 @@ def baseline(**changes):
     return value
 
 
+@pytest.mark.parametrize(
+    ("observation", "reference", "status", "action"),
+    [
+        (current(value=0.91), baseline(), "healthy", "none"),
+        (current(), baseline(), "degraded", "report"),
+        (current(), None, "unavailable", "none"),
+        (current(labeled_rows=0), baseline(), "unavailable", "none"),
+    ],
+)
+def test_every_active_verdict_retains_required_windows(observation, reference, status, action):
+    """Reports must keep the configured denominator even when evidence is absent or invalid."""
+    result = evaluate_performance(
+        policy(consecutive_windows=3), observation, reference, [], now=NOW
+    )
+    assert result["status"] == status and result["action"] == action
+    assert result["required_windows"] == 3
+
+
+def test_disabled_policy_has_no_required_windows():
+    """A disabled policy must not invent a zero-window retraining requirement."""
+    result = evaluate_performance({"mode": "off"}, {}, None, [], now=NOW)
+    assert result["status"] == "disabled" and result["action"] == "none"
+    assert result["required_windows"] is None
+
+
+def test_wape_policy_minimizes_and_refuses_missing_evidence():
+    """WAPE must use a lower-is-better policy without acting on an undefined denominator."""
+    settings = policy(metric="wape", direction="lower", consecutive_windows=1)
+    assert validate_performance_policy(settings) == settings
+    result = evaluate_performance(
+        settings,
+        current(metric="wape", value=None),
+        baseline(metric="wape", value=0.2),
+        [],
+        now=NOW,
+    )
+    assert result["status"] == "unavailable" and result["action"] == "none"
+
+
 def test_historical_window_revisit_updates_evidence_without_authorizing_training():
     """Late labels can repair an older streak window without starting stale training."""
     end = datetime(2026, 10, 5, 10, tzinfo=UTC)
@@ -283,7 +322,8 @@ def test_missing_stale_or_incomparable_evidence_is_unavailable(observation, refe
     assert reason in checked["reason"]
 
 
-def test_distinct_contiguous_history_and_replay_do_not_inflate_streak():
+@pytest.mark.parametrize("legacy_first", [None, False, True])
+def test_distinct_contiguous_history_and_replay_do_not_inflate_streak(legacy_first):
     """Only one matching result for each adjacent completed window advances streak."""
     setting = policy(consecutive_windows=2)
     first = evaluate_performance(
@@ -297,7 +337,12 @@ def test_distinct_contiguous_history_and_replay_do_not_inflate_streak():
         [],
         now=datetime(2026, 10, 5, 11, 30, tzinfo=UTC),
     )
-    checked = evaluate_performance(setting, current(), baseline(), [first, first], now=NOW)
+    duplicate = dict(first)
+    if legacy_first is not None:
+        duplicate.pop("required_windows")
+    history = [duplicate, first] if legacy_first else [first, duplicate]
+    saved_history = deepcopy(history)
+    checked = evaluate_performance(setting, current(), baseline(), history, now=NOW)
     assert checked["status"] == "degraded"
     assert checked["action"] == "request_eligible"
     assert checked["consecutive_failures"] == 2
@@ -305,6 +350,29 @@ def test_distinct_contiguous_history_and_replay_do_not_inflate_streak():
     replay = evaluate_performance(setting, current(), baseline(), [first, checked], now=NOW)
     assert replay["consecutive_failures"] == 2
     assert len(replay["evaluated_windows"]) == 2
+    assert history == saved_history
+
+
+@pytest.mark.parametrize("change", [{"current_value": 0.7}, {"required_windows": 3}])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_conflicting_history_cannot_be_repaired_by_a_later_duplicate(change, reverse):
+    """Legacy field compatibility must not hide different measurements or conflicting thresholds."""
+    first = evaluate_performance(
+        policy(),
+        current(
+            window_start="2026-10-05T09:00:00Z",
+            window_end=START,
+            as_of="2026-10-05T11:00:00Z",
+        ),
+        baseline(),
+        [],
+        now=datetime(2026, 10, 5, 11, 30, tzinfo=UTC),
+    )
+    history = [first, first | change]
+    if reverse:
+        history.reverse()
+    result = evaluate_performance(policy(), current(), baseline(), [*history, first], now=NOW)
+    assert result["consecutive_failures"] == 1 and result["action"] == "report"
 
 
 def test_gap_and_policy_change_reset_streak():

@@ -2,6 +2,7 @@
 
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -114,6 +115,73 @@ def test_real_shap_explains_a_saved_training_artifact(tmp_path) -> None:
     assert result["sample_count"] == 3
     assert result["shap"]["feature_names"] == list(artifact.manifest.feature_columns)
     assert len(result["shap"]["samples"]) == 2
+    assert (
+        not {"sampled_rows", "explained_rows", "excluded_rows", "excluded_by_reason"}
+        & result.keys()
+    )
+
+
+def _exclusion_artifact(tmp_path, engine, transformer):
+    """Fit genuine filters on valid data before probing explicit excluded samples."""
+    frame = pd.DataFrame({"x": list(range(1, 41)), "target": list(range(2, 82, 2))}, dtype=float)
+    params = {"columns": ["x"]}
+    if transformer == "PowerTransformer":
+        params.update(method="box-cox", standardize=False)
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [{"name": "bounds", "transformer": transformer, "params": params}],
+            "modeling": {"type": "linear_regression"},
+        }
+    )
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(SplitDataset(train=native[:32], test=native[32:]), target_column="target")
+    cast(dict[str, Any], pipeline.config)["explainability"] = {
+        "method": "shap",
+        "max_samples": 10,
+        "max_display_samples": 2,
+    }
+    save_pipeline(pipeline, tmp_path / "model")
+    return load_pipeline(tmp_path / "model")
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "transformer, bad, reason",
+    [
+        ("IQR", [1000.0], "outlier:bounds"),
+        ("PowerTransformer", [0.0, -1.0, float("inf")], "invalid:bounds"),
+    ],
+)
+def test_shap_explains_survivors_and_counts_excluded_rows(
+    tmp_path, engine, transformer, bad, reason
+):
+    """A rejected row must not hide explanations for valid rows or disappear from the evidence."""
+    pytest.importorskip("shap")
+    artifact = _exclusion_artifact(tmp_path, engine, transformer)
+    frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, *bad]})
+    result = explain_training_artifact(artifact, frame)
+    assert result is not None and result["status"] == "completed"
+    assert result["sampled_rows"] == len(frame)
+    assert result["sample_count"] == result["explained_rows"] == 3
+    assert result["excluded_rows"] == len(bad)
+    assert result["excluded_by_reason"] == {reason: len(bad)}
+    assert result["shap"]["feature_names"] == ["x"]
+
+
+@pytest.mark.parametrize("survivors", [0, 1])
+def test_too_few_survivors_keeps_exclusion_evidence(tmp_path, monkeypatch, survivors):
+    """Zero or one accepted row cannot be presented as an explanation population."""
+    artifact = _exclusion_artifact(tmp_path, "pandas", "IQR")
+    monkeypatch.setattr(
+        "skyulf.integrations.databricks.observability.reports.explanations.compute_shap_explanation",
+        lambda *a, **k: pytest.fail("SHAP must not run below the survivor minimum"),
+    )
+    result = explain_training_artifact(artifact, pd.DataFrame({"x": [1.0] * survivors + [1000.0]}))
+    assert result is not None and result["status"] == "unavailable"
+    assert result["reason"] == "too_few_rows_after_exclusions"
+    assert result["explained_rows"] == survivors
+    assert result["sampled_rows"] == survivors + 1
+    assert result["excluded_by_reason"] == {"outlier:bounds": 1}
 
 
 @pytest.mark.parametrize(
@@ -124,6 +192,7 @@ def test_real_shap_explains_a_saved_training_artifact(tmp_path) -> None:
         {"method": "shap", "max_samples": True},
         {"method": "shap", "max_samples": 201},
         {"method": "shap", "max_features": 0},
+        {"method": "shap", "max_features": 101},
         {"method": "shap", "max_display_samples": 51},
         {"method": "shap", "max_samples": 2, "max_display_samples": 3},
         {"method": "shap", "unknown": 1},
@@ -175,6 +244,23 @@ def test_inference_row_change_is_visible(tmp_path, monkeypatch) -> None:
     assert result is not None
     assert result["status"] == "unavailable"
     assert result["reason"] == "row_count_changed"
+
+
+def test_context_row_change_stops_before_shap_even_above_sample_budget(tmp_path, monkeypatch):
+    """Returning a broken full-context frame must never bypass the bounded SHAP gate."""
+    artifact, frame = _artifact(tmp_path, "pandas", {"method": "shap", "max_samples": 3})
+    root = "skyulf.integrations.databricks.observability.reports.explanations"
+    monkeypatch.setattr(f"{root}._requires_context", lambda artifact: True)
+    monkeypatch.setattr(
+        artifact.pipeline.feature_engineer, "transform", lambda data, **kwargs: data.iloc[:-1]
+    )
+    monkeypatch.setattr(
+        f"{root}.compute_shap_explanation", lambda *a, **k: pytest.fail("SHAP budget bypassed")
+    )
+    result = explain_training_artifact(artifact, frame)
+    assert result is not None and result["status"] == "unavailable"
+    assert result["reason"] == "row_count_changed"
+    assert result["preprocessing_rows"] == len(frame)
 
 
 @pytest.mark.parametrize("empty", [True, False])
@@ -235,3 +321,111 @@ def test_explanation_failures_preserve_evidence(tmp_path, monkeypatch, failure) 
     assert result["reason"] == reasons[failure]
     if failure == "transform":
         assert result["detail"] == "inference blocked"
+
+
+def test_wide_feature_budget_up_to_100_is_accepted() -> None:
+    """Models with 51-100 transformed features (e.g. fixed one-hot sets) can be explained."""
+    validate_explanation_config({"explainability": {"method": "shap", "max_features": 100}})
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("transformer", ["LagFeatures", "RollingAggregate"])
+@pytest.mark.parametrize("exclude", [False, True])
+def test_history_features_are_computed_before_shap_sampling(
+    tmp_path, monkeypatch, engine, transformer, exclude
+):
+    """Nonadjacent sampled rows must retain their original history after artifact reload."""
+    frame = pd.DataFrame({"x": np.arange(1.0, 41.0), "target": np.arange(1.0, 41.0) * 3})
+    params = {"columns": ["x"]}
+    derived = "x_lag_1" if transformer == "LagFeatures" else "x_roll_mean_3"
+    params.update({"lags": [1]} if transformer == "LagFeatures" else {"window": 3})
+    steps = [
+        {"name": "history", "transformer": transformer, "params": params},
+        {
+            "name": "fill",
+            "transformer": "SimpleImputer",
+            "params": {"columns": [derived], "strategy": "constant", "fill_value": 0.0},
+        },
+    ]
+    if exclude:
+        steps.append(
+            {
+                "name": "bounds",
+                "transformer": "ManualBounds",
+                "params": {"bounds": {"x": {"lower": 0.0, "upper": 35.0}}},
+            }
+        )
+    pipeline = SkyulfPipeline({"preprocessing": steps, "modeling": {"type": "ridge_regression"}})
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(native, target_column="target")
+    cast(dict[str, Any], pipeline.config)["explainability"] = {
+        "method": "shap",
+        "max_samples": 6,
+        "max_display_samples": 6,
+    }
+    save_pipeline(pipeline, tmp_path / "history")
+    artifact = load_pipeline(tmp_path / "history")
+    raw = native.select("x") if isinstance(native, pl.DataFrame) else native[["x"]]
+    if exclude:
+        expected, _, reasons = artifact.pipeline.feature_engineer.transform_with_exclusions(raw)
+        assert reasons.notna().sum() == 5
+    else:
+        expected = artifact.pipeline.feature_engineer.transform(raw, preserve_rows=True)
+    expected = expected.to_pandas() if isinstance(expected, pl.DataFrame) else expected
+    positions = np.sort(np.random.default_rng(42).choice(len(frame), 6, replace=False))
+    expected = expected[expected["x"].isin(frame.iloc[positions]["x"])].reset_index(drop=True)
+    observed = {}
+
+    def capture_features(model, values, **kwargs):
+        """Inspect the real fitted features at the SHAP boundary, not an internal helper."""
+        observed["features"] = values.reset_index(drop=True)
+        return {"feature_names": list(values.columns), "samples": []}
+
+    monkeypatch.setattr(
+        "skyulf.integrations.databricks.observability.reports.explanations.compute_shap_explanation",
+        capture_features,
+    )
+    result = explain_training_artifact(artifact, native)
+    assert result is not None and result["status"] == "completed"
+    pd.testing.assert_frame_equal(observed["features"], expected)
+    assert result["sample_count"] == len(expected)
+    if exclude:
+        assert result["sampled_rows"] == 6
+        assert result["explained_rows"] == 5
+        assert result["excluded_rows"] == 1
+        assert result["excluded_by_reason"] == {"outlier:bounds": 1}
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_real_shap_history_values_match_full_training_population(tmp_path, engine):
+    """The exported explanation must contain full-history values, not sampled-row lags."""
+    pytest.importorskip("shap")
+    frame = pd.DataFrame({"x": np.arange(1.0, 41.0), "target": np.arange(1.0, 41.0) * 3})
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "history",
+                    "transformer": "RollingAggregate",
+                    "params": {"columns": ["x"], "window": 3},
+                },
+            ],
+            "modeling": {"type": "ridge_regression"},
+        }
+    )
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(native, target_column="target")
+    cast(dict[str, Any], pipeline.config)["explainability"] = {
+        "method": "shap",
+        "max_samples": 6,
+        "max_display_samples": 6,
+    }
+    save_pipeline(pipeline, tmp_path / "real_history")
+    artifact = load_pipeline(tmp_path / "real_history")
+    result = explain_training_artifact(artifact, native)
+    assert result is not None and result["status"] == "completed"
+    samples = result["shap"]["samples"]
+    assert len(samples) == 6
+    for sample in samples:
+        values = sample["feature_values"]
+        assert values["x_roll_mean_3"] == pytest.approx(values["x"] - 1.0)

@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { FeatureSelectionNode } from './FeatureSelectionNode';
+import FeatureSelectionSettings from './featureSelection/FeatureSelectionSettings';
 
 const sources = vi.hoisted(() => ({
   upstream: [] as Record<string, unknown>[],
@@ -29,7 +30,7 @@ vi.mock('../../../core/hooks/useIsWideContainer', () => ({
 }));
 
 type Config = ReturnType<typeof FeatureSelectionNode.getDefaultConfig>;
-const Settings = FeatureSelectionNode.settings;
+const Settings = FeatureSelectionSettings;
 const node = (id: string, data: Record<string, unknown> = {}) => ({ id, position: { x: 0, y: 0 }, data });
 const edge = (source: string, target: string) => ({ id: `${source}-${target}`, source, target });
 
@@ -60,6 +61,35 @@ beforeEach(() => {
 });
 
 describe('Feature Selection settings', () => {
+  it('loads the registered settings editor on demand without losing saved controls', async () => {
+    // Lazy editor loading must retain accessible progress and the saved selector configuration.
+    const LazySettings = FeatureSelectionNode.settings;
+    render(<LazySettings config={{ method: 'rfecv', target_column: 'target', cv: 3 }} onChange={vi.fn()} nodeId="selection" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading settings');
+    expect(await screen.findByRole('combobox', { name: 'Selection Method' })).toHaveValue('rfecv');
+    expect(screen.getByRole('spinbutton', { name: 'CV folds' })).toHaveValue(3);
+    expect(screen.queryByText('Loading settings...')).not.toBeInTheDocument();
+  });
+  it('edits RFECV and sequential CV without reusing hidden legacy feature count', () => {
+    // Switching from legacy K must not override sequential selection's explicit auto mode.
+    const { onChange } = renderSettings({ target_column: 'target', k: 10 });
+    changeMethod('rfecv');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Scorer name' }), { target: { value: 'neg_mean_absolute_error' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ scoring: 'neg_mean_absolute_error' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Scorer name' }), { target: { value: '' } });
+    expect(onChange.mock.lastCall?.[0]).not.toHaveProperty('scoring');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'CV folds' }), { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minimum features' }), { target: { value: '2' } });
+    changeMethod('sequential_feature_selection');
+    expect(screen.getByRole('textbox', { name: 'Features to select' })).toHaveValue('auto');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Direction' }), { target: { value: 'backward' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Features to select' }), { target: { value: '3' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ cv: 3, min_features_to_select: 2, n_features_to_select: 3, direction: 'backward', k: 10 }));
+  });
+  it.each(['rfecv', 'sequential_feature_selection'] as const)('validates explicit CV for %s', (method) => {
+    // Invalid fold counts must be actionable Canvas errors before the expensive fit.
+    expect(FeatureSelectionNode.validate({ method, target_column: 'target', cv: 1 })).toMatchObject({ isValid: false, field: 'cv' });
+  });
   it('keeps saved settings and the method control across all ten methods', () => {
     // Switching methods must preserve hidden configuration and the shared control.
     const saved = { target_column: 'target', k: 7, percentile: 25, step: 2, drop_columns: false };

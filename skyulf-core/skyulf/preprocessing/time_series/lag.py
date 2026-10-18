@@ -1,5 +1,6 @@
 """Lag features: shift columns by N rows to expose past values to the model."""
 
+import re
 from numbers import Integral
 from typing import Any, cast
 
@@ -28,6 +29,15 @@ from ._history_state import fit_history
 
 def _lag_name(col: str, lag: int) -> str:
     return f"{col}_lag_{lag}"
+
+
+def _shift_preserves_dtype(dtype: str) -> bool:
+    """Recognize labels whose nullable shift is stable without engine or row-value evidence."""
+    if re.fullmatch(r"(?:[fF]loat|U?Int)(?:8|16|32|64)", dtype):
+        return True
+    if dtype in {"boolean", "Boolean", "str", "string", "String", "category", "Categorical"}:
+        return True
+    return dtype.startswith(("datetime64[", "timedelta64[", "Datetime(", "Duration("))
 
 
 def _polars_lag_exprs(
@@ -180,13 +190,15 @@ class LagFeaturesCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
-        """Add one ``{col}_lag_{n}`` column per lag, as ``float64``."""
-        # Shifted lag columns are nullable by construction; pandas/polars keep
-        # them as ``float64`` because of the inserted missing row.
+        """Describe shift-stable columns and abstain for native integers, booleans or unknowns."""
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         lags = coerce_lags(config.get("lags", [1]))
+        if not lags:
+            return input_schema
+        if any(not _shift_preserves_dtype(input_schema.dtypes.get(col, "")) for col in cols):
+            return None
         schema = input_schema
         for col in cols:
             for lag in lags:
-                schema = schema.add(_lag_name(col, lag), "float64")
+                schema = schema.add(_lag_name(col, lag), input_schema.dtypes[col])
         return schema

@@ -1,0 +1,26 @@
+# Scoring policy, saved with the next registered model set. Full reference: SCORING.md.
+# Functions named by custom: live in src/features/scoring.py.
+version: 1
+
+# combined: config/pre_split.yml filters first, then the eligibility rules below.
+mode: combined
+# Scoring requests have no demand counts yet; skip target-reading pre-split filters.
+skip_target_pre_split_steps: true
+
+# Eligibility runs before the models; a failing row keeps its exclusion reason.
+eligibility:
+  - name: known_hour
+    custom: scoring.known_hour        # reason: missing_hour
+
+# Outputs add columns to each model's predictions.
+outputs:
+  - name: nonnegative_demand
+    custom: scoring.nonnegative_demand
+    columns: [{name: nonnegative_demand, dtype: float64}]
+
+# Combined rules read the predictions of several models in the set.
+combined:
+  - name: total_demand
+    custom: scoring.total_demand      # casual + registered
+    required_components: [casual, registered]
+    columns: [{name: total_demand, dtype: float64}]

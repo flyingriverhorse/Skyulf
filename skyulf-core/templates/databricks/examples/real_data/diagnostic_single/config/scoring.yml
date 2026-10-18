@@ -1,0 +1,19 @@
+# Scoring policy, saved with the next trained model. Full reference: SCORING.md.
+# Functions named by custom: live in src/features/scoring.py.
+version: 1
+
+# combined: config/pre_split.yml filters first, then the eligibility rules below.
+mode: combined
+# Scoring requests have no diagnosis yet; skip target-reading pre-split filters.
+skip_target_pre_split_steps: true
+
+# Eligibility runs before the model; a failing row keeps its exclusion reason.
+eligibility:
+  - name: required_shape
+    custom: scoring.required_shape    # reason: missing_shape
+
+# Outputs add columns computed from each prediction.
+outputs:
+  - name: probability_band
+    custom: scoring.probability_band
+    columns: [{name: probability_band, dtype: string}]

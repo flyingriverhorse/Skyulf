@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from numbers import Real
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -105,7 +105,7 @@ class SimpleTransformationApplier(BaseApplier):
     name="Simple Transformation",
     category="Preprocessing",
     description="Apply simple mathematical transformations (log, sqrt, etc.).",
-    params={"func": "log", "columns": []},
+    params={"transformations": []},
     learns_from_data=False,
 )
 class SimpleTransformationCalculator(BaseCalculator):
@@ -145,9 +145,19 @@ class SimpleTransformationCalculator(BaseCalculator):
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> SimpleTransformationArtifact:
-        """Return the ``transformations`` config as-is; nothing is fitted."""
+        """Validate requested math methods and save the ordered rules without fitting."""
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
-        return {
+        transformations = config.get("transformations", [])
+        artifact: SimpleTransformationArtifact = {
             "type": "simple_transformation",
-            "transformations": config.get("transformations", []),
+            "transformations": transformations,
         }
+        SimpleTransformationApplier.validate_inference_state(cast(dict[str, Any], artifact))
+        for item in transformations or []:
+            method = item.get("method")
+            if not isinstance(method, str) or method not in _PANDAS_OPS:
+                raise ValueError(
+                    f"Unknown SimpleTransformation method {method!r}. "
+                    f"Supported methods: {', '.join(_PANDAS_OPS)}."
+                )
+        return artifact

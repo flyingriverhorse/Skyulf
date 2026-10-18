@@ -581,7 +581,7 @@ class CastingApplier(BaseApplier):
     name="Type Casting",
     category="Data Operations",
     description="Cast columns to specific data types.",
-    params={"type_map": {}, "coerce_on_error": True},
+    params={"column_types": {}, "coerce_on_error": True},
     learns_from_data=True,
 )
 class CastingCalculator(BaseCalculator):

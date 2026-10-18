@@ -66,6 +66,9 @@ def _scalar(value: Any) -> None:
 
 def portable_config(node: str, raw: dict, state: dict) -> dict:
     """Normalize fitted defaults while rejecting changed explicit column selection."""
+    # Imputation owners import these shared validators during package loading.
+    from .imputation._constant import constant_matches  # noqa: PLC0415 - avoid owner import cycle
+
     columns = raw.get("columns")
     if (
         isinstance(columns, list)
@@ -77,7 +80,7 @@ def portable_config(node: str, raw: dict, state: dict) -> dict:
     if node == "SimpleImputer" and resolved["strategy"] == "constant":
         fill = resolved["fill_value"]
         if fill is not None and any(
-            value != fill for value in state.get("fill_values", {}).values()
+            not constant_matches(fill, value) for value in state.get("fill_values", {}).values()
         ):
             raise ValueError("Configured constant disagrees with fitted fill values.")
     return resolved

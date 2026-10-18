@@ -1,4 +1,4 @@
-"""Simple median context describes local replay without widening worker admission."""
+"""Saved simple medians support pandas workers while retaining codec boundaries."""
 
 import pickle
 from copy import deepcopy
@@ -68,7 +68,12 @@ def test_simple_median_local_context_replays_fitted_rows(engine, values):
     before = deepcopy(frame)
     assert get_inference_capability("SimpleImputer", config, state, engine=engine) == (
         ExecutionCapability(
-            engine, "apply", "local", "preserve", "row", config_match=(("strategy", "median"),)
+            engine,
+            "apply",
+            "python_batch" if engine == "pandas" else "local",
+            "preserve",
+            "row",
+            config_match=(("strategy", "median"),),
         )
     )
     target = np.array([0, 1, 1, 0])
@@ -97,7 +102,12 @@ def test_simple_median_context_query_does_not_fit_or_apply(fitted_engine, monkey
     for engine in ("pandas", "polars"):
         assert get_inference_capability("SimpleImputer", config, state, engine=engine) == (
             ExecutionCapability(
-                engine, "apply", "local", "preserve", "row", config_match=(("strategy", "median"),)
+                engine,
+                "apply",
+                "python_batch" if engine == "pandas" else "local",
+                "preserve",
+                "row",
+                config_match=(("strategy", "median"),),
             )
         )
     assert pickle.dumps((config, state)) == saved
@@ -178,13 +188,12 @@ def test_simple_median_override_and_mismatched_mode_stay_unknown():
     assert get_inference_capability("SimpleImputer", config, state, engine="polars") is None
 
 
-def test_simple_median_local_context_does_not_admit_workers_or_portable_codec():
-    """Local row metadata grants neither Python worker execution nor portable median encoding."""
+def test_simple_median_worker_context_does_not_admit_native_spark_or_portable_codec():
+    """Pandas worker admission must not bypass the mean/constant portable codec."""
     config, state = _fit("polars")
     owner = SimpleImputerApplier
     normalized = owner.resolve_fitted_config(config, owner.validate_fitted_state(state))
     for engine, kind in (
-        ("pandas", "python_batch"),
         ("polars", "python_batch"),
         ("polars", "native"),
         ("spark", "native"),
@@ -213,7 +222,7 @@ def test_simple_local_statistics_keep_normalized_python_strategy(strategy):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("strategy", ["mean", "median", "mode", "constant"])
 def test_simple_explicit_empty_selection_is_a_valid_saved_identity(engine, strategy):
-    """Explicitly disabling imputation must preserve rows while keeping median workers excluded."""
+    """Explicitly disabling imputation preserves rows with each engine's declared execution."""
     frame = _frame(engine, [1, None, 3, None])
     config = {"columns": [], "strategy": strategy}
     state = NodeRegistry.get_calculator("SimpleImputer")().fit(frame, config)
@@ -223,9 +232,7 @@ def test_simple_explicit_empty_selection_is_a_valid_saved_identity(engine, strat
     before = pickle.dumps((config, state))
     capability = get_inference_capability("SimpleImputer", config, state, engine=engine)
     assert capability is not None and capability.context == "row"
-    assert capability.execution_kind == (
-        "python_batch" if engine == "pandas" and strategy != "median" else "local"
-    )
+    assert capability.execution_kind == ("python_batch" if engine == "pandas" else "local")
     applier = SimpleImputerApplier()
     for positions in ([0, 1, 2, 3], [1], [3, 0, 1], []):
         sample = _take(frame, positions)
@@ -238,11 +245,7 @@ def test_simple_explicit_empty_selection_is_a_valid_saved_identity(engine, strat
         "applier": applier,
     }
     recipe = {"name": "empty", "transformer": "SimpleImputer", "params": config}
-    if strategy == "median":
-        with pytest.raises(UnsupportedExecutionError):
-            _inspect_step(record, recipe)
-    else:
-        assert _inspect_step(record, recipe).action == "apply"
+    assert _inspect_step(record, recipe).action == "apply"
     _equal(frame, original)
     assert pickle.dumps((config, state)) == before
 

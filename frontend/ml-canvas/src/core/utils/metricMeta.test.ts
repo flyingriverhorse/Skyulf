@@ -16,7 +16,7 @@ describe('getMetricDirection', () => {
     },
   );
 
-  it.each(['rmse', 'mae', 'mse', 'log_loss', 'mape'])('reports %s as lower-is-better', (key) => {
+  it.each(['rmse', 'mae', 'mse', 'log_loss', 'mape', 'wape'])('reports %s as lower-is-better', (key) => {
     expect(getMetricDirection(key)).toBe('lower');
   });
 

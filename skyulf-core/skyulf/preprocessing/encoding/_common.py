@@ -1,13 +1,41 @@
 """Shared helpers and constants for all encoder modules."""
 
 import logging
+import re
+import unicodedata
 from typing import Any
 
 import polars as pl
 
 from ...engines import EngineName, get_engine
+from ...utils import is_decimal_series
+from .._schema import SkyulfSchema
 
 logger = logging.getLogger(__name__)
+
+
+def encoded_columns_schema(
+    input_schema: SkyulfSchema, columns: list[str] | None, dtype: str
+) -> SkyulfSchema | None:
+    """Describe explicit in-place encoding; abstain when values determine column selection."""
+    if columns is None:
+        return None
+    output = input_schema
+    for column in columns:
+        if column in input_schema.columns:
+            output = output.with_dtype(column, dtype)
+    return output
+
+
+def _category_slug(value: str) -> str:
+    """Fold category text to an ASCII name without losing Danish or German letters."""
+    folded = value.lower().translate(str.maketrans({"æ": "ae", "ø": "oe", "å": "aa", "ß": "ss"}))
+    ascii_text = unicodedata.normalize("NFKD", folded).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "_", ascii_text).strip("_")
+    if not slug:
+        raise ValueError(f"OneHotEncoder category {value!r} produces an empty slug.")
+    return slug
+
 
 # Encoders that destroy the original column structure (create N new columns).
 # These must NEVER be applied to a target column.
@@ -29,12 +57,15 @@ _SUPERVISED_INPLACE_ENCODERS = frozenset(["WOEEncoder"])
 
 
 def _normalize_categories_lines(raw: Any) -> list[str]:
-    """Split raw string/list input into non-empty stripped lines; empty list if unsupported type."""
+    """Split string/list input into nonempty lines, rejecting unsupported explicit orders."""
     if isinstance(raw, str):
         return [ln.strip() for ln in raw.strip().splitlines() if ln.strip()]
-    if isinstance(raw, list):
-        return [str(ln).strip() for ln in raw if str(ln).strip()]
-    return []
+    if isinstance(raw, list) and all(isinstance(line, str) for line in raw):
+        return [line.strip() for line in raw if line.strip()]
+    raise ValueError(
+        "OrdinalEncoder categories_order must be a multiline string or a list "
+        "of comma-separated strings, one line per selected column."
+    )
 
 
 def _split_category_line(line: str) -> list[str]:
@@ -47,19 +78,24 @@ def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
 
     The frontend sends a newline-separated string where each line holds
     comma-separated category values for one column (in column-selection order).
-    If the number of non-empty lines matches n_cols, a list-of-lists is returned.
-    Any other case falls back to "auto".
+    Empty input selects automatic ordering. An explicit order must contain one
+    nonempty comma-separated category line per selected column.
     """
-    if not raw:
-        return "auto"
-    if not isinstance(raw, str | list):
+    if raw is None:
         return "auto"
 
     lines = _normalize_categories_lines(raw)
-    if not lines or len(lines) != n_cols:
+    if not lines:
         return "auto"
-
-    return [_split_category_line(line) for line in lines]
+    if len(lines) != n_cols:
+        raise ValueError(
+            f"OrdinalEncoder categories_order requires {n_cols} lines, one per selected "
+            f"column; got {len(lines)}."
+        )
+    categories = [_split_category_line(line) for line in lines]
+    if any(not values for values in categories):
+        raise ValueError("OrdinalEncoder categories_order lines must contain category values.")
+    return categories
 
 
 def _detect_target_column(config: dict[str, Any], y: Any) -> str | None:
@@ -145,4 +181,8 @@ def detect_categorical_columns(df: Any) -> list[str]:
             for c, t in zip(df_pl.columns, df_pl.dtypes, strict=True)
             if t in [pl.Utf8, pl.Categorical, pl.Object] or isinstance(t, pl.Enum)
         ]
-    return df.select_dtypes(include=["object", "category", "string"]).columns.tolist()
+    return [
+        col
+        for col in df.select_dtypes(include=["object", "category", "string"]).columns
+        if not is_decimal_series(df[col])
+    ]

@@ -1,0 +1,19 @@
+# Ordered model transformations, fitted on training rows after the split.
+# Select a recipe with preprocessing_recipe in config/training.yml (default: default).
+# Saved with the model and applied to every endpoint request, so use steps
+# that serving admits (mean imputation, clipping, scaling; see Spark scoring docs).
+version: 1
+recipes:
+  default:
+    - name: cap_trip
+      transformer: ClipValues
+      params: {bounds: {trip_distance: {lower: 0, upper: 60}, duration_min: {lower: 0, upper: 180}}}
+    - name: fill_numeric
+      transformer: SimpleImputer
+      params:
+        columns: [trip_distance, duration_min, zone_avg_distance, zone_trip_count]
+        strategy: mean
+    - name: scale
+      transformer: StandardScaler
+      params:
+        columns: [pickup_hour, pickup_dow, trip_distance, duration_min, zone_avg_distance, zone_trip_count]

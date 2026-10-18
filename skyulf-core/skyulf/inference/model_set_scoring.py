@@ -128,9 +128,10 @@ def validate_model_set_composition(
 def _composition_config(config: Any) -> dict:
     """Normalize absence to independent outputs and reject implicit extra policies."""
     config = _json_copy({"outputs": []} if config is None else config)
+    # Training may seal probe evidence for combined function rules next to the outputs.
     if (
         type(config) is not dict
-        or set(config) != {"outputs"}
+        or set(config) - {"partition_probe"} != {"outputs"}
         or type(config["outputs"]) is not list
     ):
         raise ValueError("Model-set composition requires exactly an outputs list.")

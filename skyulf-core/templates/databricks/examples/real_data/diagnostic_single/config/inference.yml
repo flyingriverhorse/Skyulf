@@ -1,0 +1,15 @@
+# Scoring controls and output destinations. No model is trained by this file.
+version: 1
+inference_mode: spark
+# from_now checkpoints without predictions on the first run; rebuilds keep that boundary.
+initial_scoring: full_snapshot
+spark_udf_env_manager: local
+spark_udf_prediction_batch_rows: 10000
+score_source_table: "{catalog}.{input_schema}.observations_score"
+prediction_table: "{catalog}.{output_schema}.predictions{resource_suffix}"
+score_model_selection: pinned_version
+model_version: "1"
+model_change_mode: incremental_append
+auto_rebuild_on_cdf_expiry: false
+score_handoff: disabled
+

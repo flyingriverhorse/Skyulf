@@ -1,4 +1,4 @@
-"""Saved group medians have row context without admitting independent workers."""
+"""Saved group medians support pandas workers without reading neighboring request rows."""
 
 import pickle
 from copy import deepcopy
@@ -26,8 +26,8 @@ def _fit(engine):
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_group_median_inspection_is_local_row_and_never_executes(engine, monkeypatch):
-    """Context describes saved lookups while the existing worker and Spark gates stay closed."""
+def test_group_median_inspection_is_row_and_never_executes(engine, monkeypatch):
+    """Admission inspects saved lookups without computing statistics or transforming data."""
     state = pickle.loads(pickle.dumps(_fit(engine)))
     before = pickle.dumps(state)
 
@@ -43,13 +43,14 @@ def test_group_median_inspection_is_local_row_and_never_executes(engine, monkeyp
         assert (capability.context, capability.row_effect, capability.execution_kind) == (
             "row",
             "preserve",
-            "local",
+            "python_batch" if native == "pandas" else "local",
         )
         assert capability.codec_version is None
-        with pytest.raises(UnsupportedExecutionError):
-            require_capability(
-                "GroupImputer", "apply", native, config=CONFIG, execution_kind="python_batch"
-            )
+        if native == "polars":
+            with pytest.raises(UnsupportedExecutionError):
+                require_capability(
+                    "GroupImputer", "apply", native, config=CONFIG, execution_kind="python_batch"
+                )
     assert get_inference_capability("GroupImputer", CONFIG, state, engine="spark") is None
     assert pickle.dumps(state) == before
 

@@ -4,7 +4,6 @@ import hashlib
 import importlib
 import json
 import re
-from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -21,7 +20,7 @@ from ..data.delta_io.cdf_recovery import (
     recovery_receipt_fields,
     validate_recovery_binding,
 )
-from ..data.delta_io.delta import DeltaPublishError, table_identity
+from ..data.delta_io.delta import DeltaPublishError, prediction_commit, table_identity
 from ..feature_store.scoring import (
     feature_source_columns,
     validate_feature_continuation,
@@ -46,6 +45,13 @@ from ..scoring.incremental.incremental_batch import (
     require_incremental_change_feed,
     select_incremental_rows,
     validate_source_change_policy,
+)
+from ..scoring.incremental.initial_scoring import (
+    PredictionCheckpoint,
+    scoring_snapshot,
+    snapshot_read_errors,
+    start_fields,
+    validate_initial_scoring,
 )
 from ..scoring.shared.prediction_output import OUTPUT_TYPES, check_existing_table
 from ..shared._contracts import column_name, table_name
@@ -287,6 +293,7 @@ def _publication_receipt(
     recovery_request: dict[str, Any] | None = None,
     execution: SparkSetExecution | None = None,
     feature_evidence: dict[str, Any] | None = None,
+    initial: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Bind provenance, progress and component continuation to one atomic write."""
     receipt = {
@@ -310,6 +317,7 @@ def _publication_receipt(
     if recovery_request is not None:
         receipt.update(recovery_receipt_fields(recovery_request))
     receipt.update(feature_evidence or {})
+    receipt.update(initial or {})
     if execution is not None:
         receipt.update(
             inference_mode="spark",
@@ -396,7 +404,7 @@ def _commit_set(
         raise DeltaPublishError(
             "Model-set write outcome unknown; inspect target receipt before retry."
         ) from exc
-    committed = latest_source_version(spark, target)
+    committed = prediction_commit(spark, target, latest_source_version(spark, target))
     recorded = _previous_set_receipt(committed, source_id, target_id)
     if recorded != receipt:
         raise DeltaPublishError("Model-set output has no matching committed receipt.")
@@ -412,6 +420,7 @@ def run_model_set_batch(
     prediction_table: str,
     admission: PublishAdmission | None,
     model_change_mode: str = "incremental_append",
+    initial_scoring: str = "full_snapshot",
     max_rows: int = 100_000,
     max_bytes: int = 64 * 1024 * 1024,
     publication: dict[str, Any] | None = None,
@@ -434,6 +443,7 @@ def run_model_set_batch(
     set changes require full rebuild to reconstruct component history safely.
     """
     source_change_policy = validate_source_change_policy(source_change_policy)
+    validate_initial_scoring(initial_scoring)
     _validate_request(
         model, artifact, source_table, prediction_table, model_change_mode, max_rows, max_bytes
     )
@@ -474,6 +484,7 @@ def run_model_set_batch(
             source_change_policy,
             recovery_request,
             execution,
+            initial_scoring=initial_scoring,
         )
 
 
@@ -492,6 +503,8 @@ def _run_admitted_set(
     source_change_policy: str = "reject",
     recovery_request: dict[str, Any] | None = None,
     execution: SparkSetExecution | None = None,
+    *,
+    initial_scoring: str = "full_snapshot",
 ) -> ModelSetBatchResult:
     """Hold the common target claim through snapshot selection and complete publication."""
     feature_evidence = validate_feature_snapshot(spark, artifact)
@@ -499,7 +512,8 @@ def _run_admitted_set(
         raise BatchConflictError("Source or target changed during model-set admission.")
     functions = importlib.import_module("pyspark.sql.functions")
     latest = latest_source_version(spark, target)
-    previous = _previous_set_receipt(latest, source_id, target_id)
+    receipt_commit = prediction_commit(spark, target, latest)
+    previous = _previous_set_receipt(receipt_commit, source_id, target_id)
     check_incremental_bootstrap(spark, target, previous, functions)
     upper, prior, write_mode, noop = _set_read_plan(
         spark,
@@ -514,8 +528,9 @@ def _run_admitted_set(
         recovery_request,
     )
     validate_feature_continuation(previous, feature_evidence, rebuilding=write_mode == "overwrite")
+    initial = start_fields(previous, initial_scoring, upper)
     if noop:
-        return ModelSetBatchResult(upper, 0, 0, int(latest["version"]), previous, True)
+        return ModelSetBatchResult(upper, 0, 0, int(receipt_commit["version"]), previous, True)
     frame, source_rebuilt = _read_set_frame(
         spark,
         model,
@@ -532,11 +547,17 @@ def _run_admitted_set(
         max_rows,
         max_bytes,
         execution,
+        boundary=initial.get("scoring_start_version"),
+        checkpoint=(
+            PredictionCheckpoint(
+                target, target_id, int(latest["version"]), previous["source_end_version"]
+            )
+            if previous is not None and recovery_request is None
+            else None
+        ),
     )
     if source_rebuilt:
         prior, write_mode = None, "overwrite"
-    if frame.empty and write_mode != "overwrite":
-        return ModelSetBatchResult(upper, 0, 0, int(latest["version"]), previous, True)
     scored = _score_increment(artifact, frame, previous, write_mode, max_rows, max_bytes)
     receipt = _publication_receipt(
         model,
@@ -553,6 +574,7 @@ def _run_admitted_set(
         recovery_request=recovery_request,
         execution=execution,
         feature_evidence=feature_evidence,
+        initial=initial,
     )
     selected_columns = [
         name for name in publication_columns(artifact, publication) if name not in _METADATA
@@ -630,12 +652,28 @@ def _read_set_frame(
     max_rows: int,
     max_bytes: int,
     execution: SparkSetExecution | None = None,
+    *,
+    boundary: int | None = None,
+    checkpoint: PredictionCheckpoint | None = None,
 ) -> tuple[Any, bool]:
     """Classify history loss only while reading an incremental window, never while writing."""
     try:
         selected, rebuilt = _select_set_source(spark, source, prior, upper, functions, policy)
-        context = normalize_cdf_error() if prior is not None and not rebuilt else nullcontext()
+        context = (
+            normalize_cdf_error()
+            if prior is not None and not rebuilt
+            else snapshot_read_errors(boundary)
+        )
         with context:
+            if boundary is not None and (prior is None or rebuilt):
+                selected = scoring_snapshot(
+                    spark,
+                    source,
+                    upper,
+                    artifact.manifest.record_key_columns,
+                    boundary,
+                    checkpoint=checkpoint,
+                )
             validate_feature_source(selected, artifact)
             columns = feature_source_columns(artifact)
             keys = artifact.manifest.record_key_columns

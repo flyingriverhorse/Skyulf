@@ -11,6 +11,9 @@ from pandas.testing import assert_frame_equal as assert_pandas_equal
 from polars.testing import assert_frame_equal as assert_polars_equal
 
 Frame = pd.DataFrame | pl.DataFrame
+FLOAT_RTOL = 1e-9
+FLOAT_ATOL = 1e-12
+COMPARISON_VERSION = 2
 _SCALARS = (str, bytes, bool, int, float, complex, date, datetime, time, timedelta, Decimal)
 
 
@@ -128,6 +131,118 @@ def slice_frame(frame: Frame, start: int, size: int) -> Frame:
     )
 
 
+def renumber_frame(frame: Frame, labels: pd.Index | None = None) -> Frame:
+    """Relabel pandas rows with a fresh RangeIndex, as each Spark Arrow batch arrives.
+
+    With ``labels`` the original labels are restored instead. Polars frames
+    carry no row labels and are returned unchanged.
+    """
+    if not isinstance(frame, pd.DataFrame):
+        return frame
+    if labels is None:
+        fresh = pd.RangeIndex(len(frame))
+        labels = fresh if not frame.index.equals(fresh) else pd.RangeIndex(1000, 1000 + len(frame))
+    return frame.set_axis(labels)
+
+
+_SAME = object()
+
+
+def _changed(
+    value: Any,
+    existing: list[Any],
+    categories: list[Any] | None,
+    bounds: tuple[int, int] | None,
+    text: bool,
+) -> Any:
+    """Return a noticeably different value of the same type, or _SAME to leave it."""
+    if value is None or value is pd.NA or value is pd.NaT:
+        return _SAME
+    if categories is not None:
+        return next((item for item in categories if item != value), _SAME)
+    if isinstance(value, str):
+        return _changed_text(existing) if text else _SAME
+    return _changed_number(value, bounds)
+
+
+def _changed_text(existing: list[Any]) -> str:
+    """Return a text value absent from the sample."""
+    text = "__skyulf_perturbed__"
+    while text in existing:
+        text += "_"
+    return text
+
+
+def _changed_number(value: Any, bounds: tuple[int, int] | None) -> Any:
+    """Flip booleans and move numbers by half their size, keeping integer dtypes."""
+    if isinstance(value, bool | np.bool_):
+        return not value
+    if isinstance(value, int | np.integer):
+        step = max(1, int(abs(int(value)) * 0.5))
+        low, high = bounds or (-(2**63), 2**63 - 1)
+        # Move down when moving up would overflow the column's integer type.
+        changed = int(value) + step if int(value) + step <= high else int(value) - step
+        return min(max(changed, low), high)
+    if isinstance(value, float | np.floating):
+        return _SAME if np.isnan(value) else value + max(1.0, abs(value)) * 0.5
+    return _SAME
+
+
+def _integer_bounds(dtype: Any) -> tuple[int, int] | None:
+    """Return the representable range of an integer dtype, or None for other dtypes."""
+    try:
+        info = np.iinfo(dtype)
+    except (TypeError, ValueError):
+        return None
+    return int(info.min), int(info.max)
+
+
+def perturb_row(frame: Frame, position: int, *, text: bool = True) -> Frame:
+    """Change one row's inputs noticeably while keeping every column's dtype.
+
+    Numbers move by half their size (at least 1 for integers, staying inside the
+    integer type's range), booleans flip, text becomes a value absent from the
+    sample (unless ``text`` is false), categoricals switch to another existing
+    category, and nulls and other types stay as they are.
+    """
+    if isinstance(frame, pd.DataFrame):
+        return _perturb_pandas(frame, position, text)
+    result = frame.clone()
+    for name, dtype in frame.schema.items():
+        values = frame.get_column(name).to_list()
+        categorical = dtype == pl.Categorical or isinstance(dtype, pl.Enum)
+        bounds = _integer_bounds(str(dtype).lower()) if dtype.is_integer() else None
+        value = _SAME if categorical else _changed(values[position], values, None, bounds, text)
+        if value is not _SAME:
+            values[position] = value
+            result = result.with_columns(pl.Series(name, values, dtype=dtype))
+    return result
+
+
+def _perturb_pandas(frame: pd.DataFrame, position: int, text: bool) -> pd.DataFrame:
+    """Perturb one pandas row column by column on a detached copy."""
+    result = cast(pd.DataFrame, copy_frame(frame))
+    for column in range(frame.shape[1]):
+        series = frame.iloc[:, column]
+        categories = (
+            list(series.cat.categories) if isinstance(series.dtype, pd.CategoricalDtype) else None
+        )
+        dtype = getattr(series.dtype, "numpy_dtype", series.dtype)
+        value = _changed(
+            series.iloc[position], series.tolist(), categories, _integer_bounds(dtype), text
+        )
+        if value is not _SAME:
+            result.iloc[position, column] = value
+    return result
+
+
+def without_row(frame: Frame, position: int) -> Frame:
+    """Drop one row by position, keeping the other rows' labels and dtypes."""
+    if isinstance(frame, pd.DataFrame):
+        return frame.iloc[[item for item in range(len(frame)) if item != position]]
+    return pl.concat([frame.slice(0, position), frame.slice(position + 1)])
+
+
 def reverse_frame(frame: Frame) -> Frame:
     """Reverse positions without adding a diagnostic feature or target."""
     if isinstance(frame, pd.DataFrame):
@@ -138,16 +253,83 @@ def reverse_frame(frame: Frame) -> Frame:
     return frame.reverse()
 
 
-def assert_same(expected: Frame, actual: Frame, reason: str = "output_mismatch") -> None:
-    """Compare engine, ordered schema, nulls, index and values exactly."""
+def float_tolerance() -> dict[str, float]:
+    """Return the fixed output policy recorded in diagnostic and admission evidence."""
+    return {"rtol": FLOAT_RTOL, "atol": FLOAT_ATOL}
+
+
+def assert_same(
+    expected: Frame,
+    actual: Frame,
+    reason: str = "output_mismatch",
+    *,
+    exact: bool = False,
+    exact_columns: tuple[str, ...] = (),
+) -> None:
+    """Compare structure exactly, tolerating only floating outputs outside exact columns.
+
+    Classification label columns must be supplied through ``exact_columns``;
+    input mutation checks use ``exact=True``. Integer and other nonfloating
+    values never receive a numerical tolerance. Null and NaN positions stay exact.
+    """
     if type(expected) is not type(actual):
         raise ProbeFailure(reason)
     try:
         if isinstance(expected, pd.DataFrame):
-            assert_pandas_equal(
-                expected, cast(pd.DataFrame, actual), check_exact=True, check_index_type=False
-            )
+            _assert_pandas_same(expected, cast(pd.DataFrame, actual), exact, exact_columns)
         else:
-            assert_polars_equal(expected, cast(pl.DataFrame, actual), check_exact=True)
+            _assert_polars_same(expected, cast(pl.DataFrame, actual), exact, exact_columns)
     except (AssertionError, TypeError, ValueError):
         raise ProbeFailure(reason) from None
+
+
+def _assert_float_values(expected: np.ndarray, actual: np.ndarray, exact: bool) -> None:
+    """Keep nullable floating labels exact instead of relying on pandas extension comparisons."""
+    if exact:
+        np.testing.assert_array_equal(actual, expected)
+    else:
+        np.testing.assert_allclose(
+            actual, expected, rtol=FLOAT_RTOL, atol=FLOAT_ATOL, equal_nan=True
+        )
+
+
+def _assert_pandas_same(
+    expected: pd.DataFrame, actual: pd.DataFrame, exact: bool, exact_columns: tuple[str, ...]
+) -> None:
+    """Bind pandas schema/index/null masks before comparing floating values separately."""
+    assert_pandas_equal(expected.iloc[:0], actual.iloc[:0], check_exact=True)
+    assert_pandas_equal(expected.isna(), actual.isna(), check_exact=True)
+    floating = [name for name in expected if pd.api.types.is_float_dtype(expected[name].dtype)]
+    strict = [name for name in expected if name not in floating]
+    assert_pandas_equal(expected[strict], actual[strict], check_exact=True)
+    for name in floating:
+        dtype = str(getattr(expected[name].dtype, "numpy_dtype", expected[name].dtype))
+        _assert_float_values(
+            expected[name].to_numpy(dtype=dtype, na_value=np.nan),
+            actual[name].to_numpy(dtype=dtype, na_value=np.nan),
+            exact or name in exact_columns,
+        )
+
+
+def _assert_polars_same(
+    expected: pl.DataFrame, actual: pl.DataFrame, exact: bool, exact_columns: tuple[str, ...]
+) -> None:
+    """Keep Polars height, schema and distinct null/NaN masks exact."""
+    if expected.shape != actual.shape:
+        raise AssertionError("Frame shapes differ")
+    assert_polars_equal(expected.head(0), actual.head(0), check_exact=True)
+    assert_polars_equal(
+        expected.select(pl.all().is_null()), actual.select(pl.all().is_null()), check_exact=True
+    )
+    floating = [name for name, dtype in expected.schema.items() if dtype.is_float()]
+    strict = [name for name in expected.columns if name not in floating]
+    assert_polars_equal(expected.select(strict), actual.select(strict), check_exact=True)
+    assert_polars_equal(
+        expected.select(floating).select(pl.all().is_nan()),
+        actual.select(floating).select(pl.all().is_nan()),
+        check_exact=True,
+    )
+    for name in floating:
+        _assert_float_values(
+            expected[name].to_numpy(), actual[name].to_numpy(), exact or name in exact_columns
+        )

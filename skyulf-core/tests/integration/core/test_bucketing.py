@@ -437,28 +437,19 @@ def test_apply_pandas_logs_warning_when_column_binning_fails(
     )
 
 
-def test_fit_one_column_into_maps_logs_warning_on_failure(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A column that can't be fit under the chosen strategy (e.g. a
-    non-numeric column with 'kmeans') must be skipped without raising, but
-    the failure must be logged for visibility (regression for previously
-    fully-silent `except Exception: return`).
-    """
+def test_fit_one_column_into_maps_raises_on_nonnumeric_fit() -> None:
+    """An unfittable selected column must fail the node instead of disappearing from state."""
     df = pd.DataFrame({"x": ["a", "b", "c", "a", "b"]})
     bin_edges_map: dict[str, list[float]] = {}
     custom_labels_map: dict[str, Any] = {}
     defaults = {"default_n_bins": 5, "n_bins": 5, "q_bins": 5, "duplicates": "drop"}
 
-    with caplog.at_level("WARNING"):
+    with pytest.raises(ValueError, match="could not convert string to float"):
         _fit_one_column_into_maps(
             df, "x", {"strategy": "kmeans"}, defaults, bin_edges_map, custom_labels_map
         )
 
     assert "x" not in bin_edges_map
-    assert any(
-        "x" in record.message and "bin" in record.message.lower() for record in caplog.records
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -763,32 +754,32 @@ def test_fit_general_binning_all_nan_column_is_skipped() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Fit — errors inside a per-column fit are swallowed
+# Fit — errors inside a per-column fit propagate
 # ---------------------------------------------------------------------------
 
 
-def test_fit_one_column_into_maps_swallows_sklearn_errors() -> None:
-    """An invalid n_bins that makes sklearn raise must be caught, leaving the maps untouched."""
+def test_fit_one_column_into_maps_propagates_sklearn_errors() -> None:
+    """An invalid bin count must preserve sklearn's error rather than save missing edges."""
     df = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
     bin_edges_map: dict[str, Any] = {}
     custom_labels_map: dict[str, Any] = {}
-    _fit_one_column_into_maps(
-        df,
-        "x",
-        {"strategy": "kmeans"},
-        {"default_n_bins": 1, "n_bins": 1, "q_bins": 1, "duplicates": "drop"},
-        bin_edges_map,
-        custom_labels_map,
-    )
+    with pytest.raises(ValueError, match="n_bins"):
+        _fit_one_column_into_maps(
+            df,
+            "x",
+            {"strategy": "kmeans"},
+            {"default_n_bins": 1, "n_bins": 1, "q_bins": 1, "duplicates": "drop"},
+            bin_edges_map,
+            custom_labels_map,
+        )
     assert "x" not in bin_edges_map
 
 
-def test_fit_general_binning_unknown_strategy_yields_no_edges() -> None:
-    """An unrecognised strategy name must produce no edges/labels for that column."""
+def test_fit_general_binning_unknown_strategy_raises() -> None:
+    """An unrecognised strategy must list valid choices instead of yielding a partial fit."""
     df = _series_0_to_9()
-    params = GeneralBinningCalculator().fit(df, {"columns": ["x"], "strategy": "not_a_strategy"})
-    assert "x" not in params["bin_edges"]
-    assert "x" not in params["custom_labels"]
+    with pytest.raises(ValueError, match="Unknown binning strategy.*not_a_strategy.*equal_width"):
+        GeneralBinningCalculator().fit(df, {"columns": ["x"], "strategy": "not_a_strategy"})
 
 
 # ---------------------------------------------------------------------------

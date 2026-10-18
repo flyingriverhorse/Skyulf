@@ -17,16 +17,20 @@ continue to work unchanged.
 
 from ._common import _exclude_target_column, detect_categorical_columns
 from .dummy import DummyEncoderApplier, DummyEncoderCalculator
+from .frequency import FrequencyEncoderApplier, FrequencyEncoderCalculator
 from .hash import HashEncoderApplier, HashEncoderCalculator
 from .label import LabelEncoderApplier, LabelEncoderCalculator
 from .one_hot import OneHotEncoderApplier, OneHotEncoderCalculator
 from .ordinal import OrdinalEncoderApplier, OrdinalEncoderCalculator
+from .rare import RareCategoryGroupingApplier, RareCategoryGroupingCalculator
 from .target import TargetEncoderApplier, TargetEncoderCalculator
 from .woe import WOEEncoderApplier, WOEEncoderCalculator
 
 __all__ = [
     "DummyEncoderApplier",
     "DummyEncoderCalculator",
+    "FrequencyEncoderApplier",
+    "FrequencyEncoderCalculator",
     "HashEncoderApplier",
     "HashEncoderCalculator",
     "LabelEncoderApplier",
@@ -35,6 +39,8 @@ __all__ = [
     "OneHotEncoderCalculator",
     "OrdinalEncoderApplier",
     "OrdinalEncoderCalculator",
+    "RareCategoryGroupingApplier",
+    "RareCategoryGroupingCalculator",
     "TargetEncoderApplier",
     "TargetEncoderCalculator",
     "WOEEncoderApplier",

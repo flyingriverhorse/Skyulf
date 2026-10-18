@@ -24,7 +24,7 @@ from .._category_keys import (
 from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import _parse_categories_order, detect_categorical_columns
+from ._common import _parse_categories_order, detect_categorical_columns, encoded_columns_schema
 from ._target import apply_target_encoder, fit_target_encoder
 
 # -----------------------------------------------------------------------------
@@ -304,7 +304,11 @@ class OrdinalEncoderApplier(BaseApplier):
 def _resolve_handle_unknown(config: dict[str, Any]) -> str:
     """OrdinalEncoder only accepts 'error' or 'use_encoded_value'."""
     raw = config.get("handle_unknown", "use_encoded_value")
-    return raw if raw in ("error", "use_encoded_value") else "use_encoded_value"
+    if raw not in ("error", "use_encoded_value"):
+        raise ValueError(
+            f"OrdinalEncoder handle_unknown must be 'error' or 'use_encoded_value'; got {raw!r}."
+        )
+    return raw
 
 
 def _make_ordinal_encoder(
@@ -431,7 +435,8 @@ def _ordinal_fit_dispatch(
     if not feature_cols and not encode_target:
         return {}
 
-    feature_config, target_config = _encoding_orders(config, feature_cols, encode_target)
+    target = config.get("target_column") or getattr(y, "name", None)
+    feature_config, target_config = _encoding_orders(config, feature_cols, encode_target, target)
     feature_encoder, counts = _maybe_fit_features(X, feature_cols, feature_config, build_subset)
     target_encoders = _maybe_fit_target_block(y, len(feature_cols), target_config, encode_target)
 
@@ -445,17 +450,18 @@ def _ordinal_fit_dispatch(
     }
 
 
-def _encoding_orders(config: dict, features: list[str], encode_target: bool) -> tuple[dict, dict]:
+def _encoding_orders(
+    config: dict, features: list[str], encode_target: bool, target: str | None
+) -> tuple[dict, dict]:
     """Keep explicit category rows attached to column names when separating the target."""
-    columns = config.get("columns") or []
+    columns = config.get("columns") or features
     parsed = _parse_categories_order(config.get("categories_order"), len(columns))
-    target = config.get("target_column")
     if not isinstance(parsed, list):
         return config, config
     orders = dict(zip(columns, parsed, strict=True))
     feature_rows = [",".join(orders[column]) for column in features]
     feature_config = {**config, "categories_order": feature_rows}
-    if not encode_target or target not in columns:
+    if not encode_target or target is None or target not in columns:
         return feature_config, config
     return (
         feature_config,
@@ -511,11 +517,13 @@ class OrdinalEncoderCalculator(BaseCalculator):
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
-    ) -> SkyulfSchema:
-        """Pass the input schema through: encoded columns keep their name and position."""
-        # Ordinal encoding replaces categorical values with ints in place;
-        # column set is preserved.
-        return input_schema
+    ) -> SkyulfSchema | None:
+        """Describe explicit float32 codes, including the embedded target-only empty selection."""
+        columns = config.get("columns")
+        if columns == []:
+            target = config.get("target_column")
+            columns = [target] if isinstance(target, str) else []
+        return encoded_columns_schema(input_schema, columns, "float32")
 
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> OrdinalArtifact:  # pylint: disable=arguments-differ

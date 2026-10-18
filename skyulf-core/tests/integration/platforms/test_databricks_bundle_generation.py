@@ -1,11 +1,14 @@
 """Opt-in real CLI generation checks for the deployable three-job operator graph."""
 
+import hashlib
 import json
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -16,10 +19,11 @@ from skyulf.integrations.databricks.projects.yaml_config import read_workflow_co
 PROFILE = os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE")
 OFFLINE_CLI = os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
 CLI = shutil.which("databricks")
-pytestmark = pytest.mark.skipif(
+CLI_ONLY = pytest.mark.skipif(
     not (PROFILE or OFFLINE_CLI) or not CLI,
     reason="Set SKYULF_BUNDLE_CLI_TEST_PROFILE to explicitly opt into installed CLI generation.",
 )
+pytestmark = CLI_ONLY
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
@@ -64,9 +68,50 @@ def test_evaluation_charts_are_an_optional_independent_leaf(
     assert "generate_charts" not in {task["task_key"] for task in jobs["score"]["tasks"]}
 
 
+TEMPLATE_ROOT = Path(__file__).resolve().parents[3] / "templates/databricks"
+# Read by the platforms conftest summary; per process, so per xdist worker.
+RENDER_STATS = {"hits": 0, "renders": 0}
+
+
+def _template_digest(root):
+    """Hash every template input so an edited template never reuses an older render."""
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if relative.parts[0] == "examples" or "__pycache__" in relative.parts:
+            continue
+        if path.is_file():
+            digest.update(relative.as_posix().encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def _render_cache_entry(root, values):
+    """Locate this answer set's session cache entry, or None when caching is off."""
+    cache_root = os.environ.get("SKYULF_RENDER_CACHE_DIR")
+    if not cache_root or os.environ.get("SKYULF_RENDER_CACHE") == "0":
+        return None
+    key = json.dumps(
+        {
+            "values": values,
+            "template": _template_digest(root),
+            "mode": "offline" if OFFLINE_CLI else f"profile:{PROFILE}",
+        },
+        sort_keys=True,
+    )
+    return Path(cache_root) / hashlib.sha256(key.encode()).hexdigest()[:32]
+
+
 def _initialize_project(tmp_path, *, omit_fields=(), **overrides):
-    """Render the actual template through the installed CLI without cloud writes."""
-    root = Path(__file__).resolve().parents[3] / "templates/databricks"
+    """Render the actual template through the installed CLI without cloud writes.
+
+    Identical successful renders are reused within a pytest session (see the
+    platforms conftest); each caller still gets its own copy to modify.
+    """
+    if not (PROFILE or OFFLINE_CLI):
+        pytest.skip("Set SKYULF_BUNDLE_OFFLINE_CLI=1 to opt into CLI generation.")
+    if not CLI:
+        pytest.fail("Databricks CLI is required when CLI generation is enabled.")
+    root = TEMPLATE_ROOT
     schema = json.loads((root / "databricks_template_schema.json").read_text())
     values = {key: spec["default"] for key, spec in schema["properties"].items()}
     values.update(project_name="sm33_generated", **overrides)
@@ -74,6 +119,27 @@ def _initialize_project(tmp_path, *, omit_fields=(), **overrides):
         values.pop(name)
     inputs = tmp_path / "init.json"
     inputs.write_text(json.dumps(values), encoding="utf-8")
+    output = tmp_path / "output"
+    entry = _render_cache_entry(root, values)
+    # An existing output directory keeps real CLI behaviour for a second render.
+    if entry is not None and (entry / "result.json").is_file() and not output.exists():
+        shutil.copytree(entry / "output", output)
+        RENDER_STATS["hits"] += 1
+        result = json.loads((entry / "result.json").read_text(encoding="utf-8"))
+        cached = subprocess.CompletedProcess(result["args"], 0, result["stdout"], result["stderr"])
+        return cached, output / "sm33_generated"
+    generated = _render_with_cli(root, inputs, output)
+    RENDER_STATS["renders"] += 1
+    # Failures are never cached, so a flaky CLI run cannot fail every identical test.
+    if entry is not None and generated.returncode == 0 and not entry.exists():
+        shutil.copytree(output, entry / "output")
+        result = {"args": generated.args, "stdout": generated.stdout, "stderr": generated.stderr}
+        (entry / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    return generated, output / "sm33_generated"
+
+
+def _render_with_cli(root, inputs, output):
+    """Run `databricks bundle init` once for an answer file."""
     command = [
         str(CLI),
         "bundle",
@@ -82,25 +148,23 @@ def _initialize_project(tmp_path, *, omit_fields=(), **overrides):
         "--config-file",
         str(inputs),
         "--output-dir",
-        str(tmp_path / "output"),
+        str(output),
     ]
-    environment = os.environ.copy()
+    environment = nullcontext(os.environ.copy())
     if OFFLINE_CLI:
-        environment.update(
-            DATABRICKS_HOST="https://127.0.0.1",
-            DATABRICKS_TOKEN="local-render-only",
-            DATABRICKS_AUTH_TYPE="pat",
-        )
+        builder = runpy.run_path(str(root / "build_example_project.py"))
+        environment = builder["offline_cli_environment"]()
     else:
         command.extend(["--profile", str(PROFILE)])
-    generated = subprocess.run(
-        command,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    return generated, tmp_path / "output" / "sm33_generated"
+    with environment as env:
+        return subprocess.run(
+            command,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
 
 
 def _generate_project(tmp_path, **overrides):
@@ -108,6 +172,43 @@ def _generate_project(tmp_path, **overrides):
     generated, project = _initialize_project(tmp_path, **overrides)
     assert generated.returncode == 0, generated.stdout + generated.stderr
     return project
+
+
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+def test_optional_runtime_pins_are_unique_across_selected_models(tmp_path, layout):
+    """Repeated tuning and ensemble choices must install each exact optional pin only once."""
+    settings = {
+        "training_layout": layout,
+        "task": "regression",
+        "regression_model": "stacking_regressor",
+        "search_strategy": "optuna",
+        "single_ensemble_regression_base_1": "lightgbm",
+        "single_ensemble_regression_base_2": "xgboost",
+        "single_ensemble_regression_final": "lightgbm",
+        "competition_candidate_count": "2",
+        "competition_regression_model_1": "lgbm_regressor",
+        "competition_regression_model_2": "xgboost_regressor",
+        "branch_count": "3",
+    }
+    for slot, model in enumerate(["lgbm_regressor", "xgboost_regressor", "lgbm_regressor"], 1):
+        settings.update(
+            {
+                f"branch_{slot}_task": "regression",
+                f"branch_{slot}_regression_model": model,
+                f"branch_{slot}_search_strategy": "optuna",
+            }
+        )
+    project = _generate_project(tmp_path, **settings)
+    lines = (project / "deployment/requirements.txt").read_text().splitlines()
+    for pin in (
+        "optuna==4.5.0",
+        "optuna-integration==4.5.0",
+        "cmaes==0.13.0",
+        "lightgbm==4.6.0",
+        "xgboost==3.0.5",
+    ):
+        assert lines.count(pin) == 1
+    assert "-r ../src/features/requirements.txt" in lines
 
 
 def _read_bundle(project):
@@ -205,6 +306,12 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
         assert notebook.index("# COMMAND ----------") < notebook.index(".notebook.exit(output)")
 
 
+MANAGERS = [
+    {"level": "CAN_MANAGE", "user_name": "${workspace.current_user.userName}"},
+    {"level": "CAN_MANAGE", "user_name": "${var.pipeline_owner}"},
+]
+
+
 def test_deployment_defaults_are_ci_independent(tmp_path):
     """Shared environments require explicit selection without company automation."""
     project = _generate_project(tmp_path)
@@ -215,16 +322,36 @@ def test_deployment_defaults_are_ci_independent(tmp_path):
     assert set(bundle["targets"]) == {"test", "syst", "prod"}
     assert not any(v.get("default") for v in bundle["targets"].values())
     assert not (project / ".github/workflows").exists()
+    owner = bundle["variables"]["pipeline_owner"]["default"]
+    assert owner == "${workspace.current_user.userName}"
     for env in ("test", "syst", "prod"):
         target = bundle["targets"][env]
         assert target["mode"] == "production"
-        assert target["permissions"] == []
+        assert target["permissions"] == MANAGERS  # Company CI pattern; no group by default.
         assert target["variables"]["resource_suffix"] == ""
         assert target["workspace"]["root_path"] == f"${{var.{env}_root_path}}"
         path = bundle["variables"][f"{env}_root_path"]["default"]
         assert path.startswith("/Workspace/Projects/")
         assert "current_user" not in path
         assert "resources" not in target  # Identity/ACL ownership remains external by default.
+
+
+def test_owner_and_view_groups_follow_setup_answers(tmp_path):
+    """Shared targets add only the answered read group; personal targets stay manager-only."""
+    project = _generate_project(
+        tmp_path,
+        personal_development_targets="true",
+        pipeline_owner="owner@example.com",
+        test_view_group="fT-DBX-team",
+        prod_view_group="Data Team",
+    )
+    bundle = _read_bundle(project)
+    assert bundle["variables"]["pipeline_owner"]["default"] == "owner@example.com"
+    views = {"test": "fT-DBX-team", "syst": None, "prod": "Data Team"}
+    for env, group in views.items():
+        extra = [{"level": "CAN_VIEW", "group_name": group}] if group else []
+        assert bundle["targets"][env]["permissions"] == MANAGERS + extra
+        assert bundle["targets"][f"{env}_development"]["permissions"] == MANAGERS
 
 
 @pytest.mark.parametrize("prefill", [False, True])
@@ -280,7 +407,7 @@ def test_personal_targets_keep_outputs_and_identity_separate(tmp_path, identity)
         personal = bundle["targets"][f"{env}_development"]
         assert personal["workspace"]["host"] == shared["workspace"]["host"]
         assert personal["mode"] == "development"
-        assert shared["permissions"] == personal["permissions"] == []
+        assert shared["permissions"] == personal["permissions"] == MANAGERS
         for key in ("input_schema", "output_schema", "metadata_schema"):
             variable = f"{env}_development_{key}"
             assert personal["variables"][key] == f"${{var.{variable}}}"
@@ -401,7 +528,7 @@ def test_multi_target_output_selection_renders_custom_destinations(tmp_path, mod
     assert settings["publication"]["mode"] == mode
     captured, source = capture_set_rules(values, settings)
     assert captured["composition_config"] == {"outputs": []}
-    assert load_project_module(source).build_scoring()["reuse_pre_split"] is True
+    assert load_project_module(source).build_model_rules()["reuse_pre_split"] is True
     if mode == "separate_views":
         assert (
             settings["publication"]["model_view_template"]
@@ -701,11 +828,20 @@ def test_cli_independent_schedules_preserve_shared_three_job_graph(
                 assert variables[f"{prefix}_{suffix}"]["default"] == expected
                 assert f"{prefix}_{suffix}" not in config
     tasks = {task["task_key"]: task for task in jobs["train"]["tasks"]}
-    readme = (project / "README.md").read_text(encoding="utf-8")
-    documented_contract = re.search(r'workflow_contract: "(\d+)"', readme)
+    guides = "\n".join(
+        (project / name).read_text(encoding="utf-8") for name in ("TRAINING.md", "SCORING.md")
+    )
+    public_guides = Path(__file__).resolve().parents[4] / "docs/user_guide"
+    assert "databricks_training_reports.html" in guides
+    assert "databricks_scoring.html" in guides
+    reference = "\n".join(
+        (public_guides / name).read_text(encoding="utf-8")
+        for name in ("databricks_training_reports.md", "databricks_scoring.md")
+    )
+    documented_contract = re.search(r'workflow_contract: "(\d+)"', reference)
     assert documented_contract is not None
     for task in jobs["train"]["tasks"] + jobs["score"]["tasks"]:
-        assert task["task_key"] in readme
+        assert task["task_key"] in reference
         if "notebook_task" in task:
             assert task["notebook_task"]["base_parameters"][
                 "workflow_contract"
@@ -1122,6 +1258,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
         "expected_champion_version",
         "rejection_reason",
         "promotion_receipt_json",
+        "allow_unloadable_champion",
     }
     parameters = tasks["initialize_run"]["notebook_task"]["base_parameters"]
     for name in defaults:

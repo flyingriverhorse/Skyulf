@@ -334,9 +334,13 @@ def test_legacy_dataset_id_omits_all_new_defaults():
         "max_rows",
         "max_bytes",
         "preprocessing_probe",
+        "admit_probed_custom_steps",
         "feature_lookup_json",
         "feature_binding_json",
         "online_policy_json",
+        "training_label_table",
+        "training_label_version",
+        "training_label_table_id",
     ):
         settings.pop(field)
     expected = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()

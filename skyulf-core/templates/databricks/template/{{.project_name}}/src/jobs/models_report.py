@@ -10,6 +10,7 @@ if __name__ == "__main__":
     with notebook_task("models_report", globals()["dbutils"]):
         output = run_models_report_notebook(
             globals()["dbutils"],
+            display_html=globals().get("displayHTML"),
         )
 
 # COMMAND ----------

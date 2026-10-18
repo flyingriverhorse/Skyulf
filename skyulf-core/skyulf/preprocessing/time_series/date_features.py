@@ -1,7 +1,9 @@
 """Calendar feature extraction from datetime columns (year, month, dow, ...)."""
 
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -19,6 +21,24 @@ from ._common import DATE_FEATURE_ACCESSORS, filter_existing_columns, parse_date
 # Default calendar parts when the user does not specify any.
 DEFAULT_FEATURES: list[str] = ["year", "month", "day", "dayofweek"]
 _EPOCH_NS_MULTIPLIERS = {"s": 1_000_000_000, "ms": 1_000_000, "us": 1_000, "ns": 1}
+_CYCLE_PARTS = {"hour": (0, 24), "dayofweek": (0, 7), "month": (1, 12), "dayofyear": (1, None)}
+_CYCLE_FEATURES = {
+    f"{part}_{wave}": (part, wave) for part in _CYCLE_PARTS for wave in ("sin", "cos")
+}
+_SUPPORTED_FEATURES = (*DATE_FEATURE_ACCESSORS, *_CYCLE_FEATURES)
+
+
+def _validate_timezone(value: Any) -> str:
+    """Require a named IANA zone so fitted local calendars can be replayed consistently."""
+    if not isinstance(value, str):
+        raise ValueError("DateFeatures timezone must be a valid IANA timezone name, such as UTC.")
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(
+            "DateFeatures timezone must be a valid IANA timezone name, such as UTC."
+        ) from exc
+    return value
 
 
 def _epoch_unit(params: dict[str, Any]) -> str | None:
@@ -59,7 +79,9 @@ def _pandas_datetime_series(series: pd.Series, params: dict[str, Any]) -> pd.Ser
             series = series.astype(nullable_dtype)
         series = series.where(series.between(lower, upper))
         options = {"unit": unit}
-    return pd.to_datetime(series, errors="coerce", utc=params.get("timezone") == "UTC", **options)
+    timezone = params.get("timezone")
+    parsed = pd.to_datetime(series, errors="coerce", utc=timezone is not None, **options)
+    return parsed.dt.tz_convert(_validate_timezone(timezone)) if timezone is not None else parsed
 
 
 def _validate_numeric_date_columns(df: Any, columns: list[str], unit: str | None) -> None:
@@ -90,20 +112,39 @@ def _validate_date_names(value: Any) -> None:
 
 
 def _resolve_features(config: dict[str, Any]) -> list[str]:
-    requested = config.get("features") or DEFAULT_FEATURES
-    return [f for f in requested if f in DATE_FEATURE_ACCESSORS]
+    """Validate calendar choices while retaining the default for an empty selection."""
+    requested = list(config.get("features") or DEFAULT_FEATURES)
+    for feature in requested:
+        if not isinstance(feature, str) or feature not in _SUPPORTED_FEATURES:
+            raise ValueError(
+                f"Unknown DateFeatures feature {feature!r}. "
+                f"Supported features: {', '.join(_SUPPORTED_FEATURES)}."
+            )
+    return requested
+
+
+def _pandas_cycle(dt: Any, feature: str) -> Any:
+    """Encode integer calendar positions; day-of-year uses the local year's actual length."""
+    part, wave = _CYCLE_FEATURES[feature]
+    offset, period = _CYCLE_PARTS[part]
+    if period is None:
+        period = np.where(dt.is_leap_year, 366, 365)
+    angle = 2 * np.pi * (getattr(dt, part).astype("float64") - offset) / period
+    return np.sin(angle) if wave == "sin" else np.cos(angle)
 
 
 def _pandas_feature(dt: Any, feature: str, is_null: Any) -> Any:
     """Compute one calendar feature from a pandas ``.dt`` accessor.
 
-    All numeric features are returned as nullable ``Int64`` (not plain
+    Calendar parts are returned as nullable ``Int64`` (not plain
     ``int64``/``float64``) so an invalid/unparseable date produces a proper
     null - matching polars' `Int32`/null semantics for the same input,
     instead of silently becoming `NaN` (for plain integer properties) or a
     misleading `0`/`False` (for the boolean-derived features below, whose
     NaN-vs-comparison behavior doesn't propagate nulls on its own).
     """
+    if feature in _CYCLE_FEATURES:
+        return _pandas_cycle(dt, feature)
     if feature == "weekofyear":
         return dt.isocalendar().week.astype("Int64")
     if feature == "is_weekend":
@@ -140,7 +181,20 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     return df, _y
 
 
+def _polars_cycle(col_expr: Any, feature: str) -> Any:
+    """Build a floating cycle expression with the same local calendar basis as pandas."""
+    part, wave = _CYCLE_FEATURES[feature]
+    offset, period = _CYCLE_PARTS[part]
+    if period is None:
+        period = pl.when(col_expr.dt.is_leap_year()).then(366).otherwise(365)
+    angle = 2 * np.pi * (_polars_feature(col_expr, part).cast(pl.Float64) - offset) / period
+    return angle.sin() if wave == "sin" else angle.cos()
+
+
 def _polars_feature(col_expr: Any, feature: str) -> Any:
+    """Extract one local calendar part or explicitly selected cyclic component."""
+    if feature in _CYCLE_FEATURES:
+        return _polars_cycle(col_expr, feature)
     dt = col_expr.dt
     builders = {
         "year": dt.year,
@@ -152,9 +206,10 @@ def _polars_feature(col_expr: Any, feature: str) -> Any:
         "weekofyear": dt.week,
         "hour": dt.hour,
         "minute": dt.minute,
+        "second": dt.second,
         "is_weekend": lambda: (dt.weekday() >= 6).cast(int),
         "is_month_start": lambda: (dt.day() == 1).cast(int),
-        "is_month_end": lambda: (dt.month() != col_expr.dt.offset_by("1d").dt.month()).cast(int),
+        "is_month_end": lambda: (dt.day() == dt.date().dt.month_end().dt.day()).cast(int),
     }
     return builders[feature]()
 
@@ -187,13 +242,19 @@ def _polars_base_expr(col: str, dtype: Any, epoch_unit: str | None = None) -> An
 
 
 def _polars_date_exprs(
-    columns: list[str], schema: dict[str, Any], features: list[str], epoch_unit: str | None = None
+    columns: list[str],
+    schema: dict[str, Any],
+    features: list[str],
+    epoch_unit: str | None = None,
+    timezone: str | None = None,
 ) -> list:
     exprs = []
     for col in columns:
         if col not in schema:
             continue
         base = _polars_base_expr(col, schema[col], epoch_unit)
+        if timezone is not None:
+            base = base.dt.convert_time_zone(_validate_timezone(timezone))
         exprs.extend(
             _polars_feature(base, feature).alias(_feat_name(col, feature)) for feature in features
         )
@@ -207,7 +268,9 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         return X, _y
 
     X_out = X
-    exprs = _polars_date_exprs(columns, dict(X_out.schema), features, _epoch_unit(params))
+    exprs = _polars_date_exprs(
+        columns, dict(X_out.schema), features, _epoch_unit(params), params.get("timezone")
+    )
     if exprs:
         X_out = X_out.with_columns(exprs)
     if params.get("drop_original"):
@@ -230,21 +293,21 @@ class DateFeaturesApplier(BaseApplier):
         local_state_fields(raw, "date_features", fields)
         _validate_date_names(raw["columns"])
         _validate_date_names(raw["features"])
-        if any(feature not in DATE_FEATURE_ACCESSORS for feature in raw["features"]):
+        if any(feature not in _SUPPORTED_FEATURES for feature in raw["features"]):
             raise ValueError("Fitted date features contain unsupported calendar parts.")
         local_boolean(raw.get("drop_original", False), "drop_original")
-        if raw.get("timezone") is not None and type(raw["timezone"]) is not str:
-            raise ValueError("Fitted date timezone must be a string or None.")
+        if raw.get("timezone") is not None:
+            _validate_timezone(raw["timezone"])
         _epoch_unit(raw)
         return raw
 
     @staticmethod
     def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
-        """Describe saved UTC parsing without promising legacy mixed-timezone behavior."""
+        """Describe explicit local calendars without promising legacy mixed-timezone behavior."""
         if engine not in ("pandas", "polars"):
             return None
         DateFeaturesApplier.validate_inference_state(state)
-        if state.get("timezone") != "UTC":
+        if state.get("timezone") is None:
             return None
         return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
@@ -265,21 +328,28 @@ class DateFeaturesApplier(BaseApplier):
         "features": DEFAULT_FEATURES,
         "drop_original": False,
         "epoch_unit": None,
+        "timezone": "UTC",
     },
     tags=["time-series"],
     learns_from_data=False,
 )
 class DateFeaturesCalculator(BaseCalculator):
-    """Record calendar features using UTC for every newly fitted artifact.
+    """Record calendar parts and cycles in a named timezone, defaulting to UTC.
 
-    Offset-aware timestamps are converted to UTC before extracting their
-    calendar parts; naive values are treated as UTC without shifting their
-    clock time. Unparseable values produce null features. Artifacts fitted
+    Offset-aware timestamps are converted to the selected IANA timezone before
+    extracting calendar parts; naive values are first interpreted as UTC.
+    Unparseable values produce null features. Artifacts fitted
     before this contract retain their original engine-specific interpretation
     so an existing model's input features do not silently change on reload.
-    Refit the complete pipeline to adopt UTC for such models. Numeric epochs
+    Refit the complete pipeline to adopt an explicit timezone for such models. Numeric epochs
     require an explicit ``epoch_unit`` (s, ms, us or ns), including on replay
     of legacy artifacts; units are never inferred from numeric magnitude.
+
+    Cycles are selected as ``hour_sin``, ``hour_cos`` and equivalent
+    ``dayofweek``, ``month`` or ``dayofyear`` names. They use integer calendar
+    positions with periods 24, 7, 12 and the local year's 365 or 366 days.
+    Month and day-of-year start at zero after subtracting one; Monday is zero.
+    Sine/cosine outputs are floating values; plain parts are nullable integers.
     """
 
     def fit(
@@ -289,32 +359,35 @@ class DateFeaturesCalculator(BaseCalculator):
     ) -> DateFeaturesArtifact:
         """Record the columns and supported features, defaulting to year/month/day/dayofweek."""
         unit = _epoch_unit(config)
+        timezone = _validate_timezone(config.get("timezone", "UTC"))
         _validate_numeric_date_columns(df, config.get("columns", []), unit)
         return {
             "type": "date_features",
             "columns": config.get("columns", []),
             "features": _resolve_features(config),
             "drop_original": bool(config.get("drop_original", False)),
-            "timezone": "UTC",
+            "timezone": timezone,
             "epoch_unit": unit,
         }
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
-        """Add a nullable-int column per (column, feature); drop originals on request."""
+        """Add nullable integer parts or floating cycles; drop originals on request."""
         # Calendar parts are nullable integers (an unparseable date yields a
         # null feature value, not 0/NaN) - "Int64" here is a best-effort,
         # engine-agnostic label communicating nullability; the *actual*
         # column width still varies per engine/feature (e.g. polars uses
         # Int8/Int16/Int32 for narrower fields like month/day/hour), so this
         # is intentionally not asserted via check_dtypes=True comparisons.
+        _validate_timezone(config.get("timezone", "UTC"))
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         features = _resolve_features(config)
         schema = input_schema
         for col in cols:
             for feature in features:
-                schema = schema.add(_feat_name(col, feature), "Int64")
+                dtype = "Float64" if feature in _CYCLE_FEATURES else "Int64"
+                schema = schema.add(_feat_name(col, feature), dtype)
         if config.get("drop_original"):
             schema = schema.drop(cols)
         return schema

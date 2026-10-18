@@ -38,6 +38,7 @@ from .training_dates import (
     instant_microseconds,
     normalize_training_dates,
 )
+from .training_labels import join_training_labels, validate_label_identity
 
 
 def _functions() -> Any:
@@ -203,7 +204,7 @@ def _training_partition(frame: Any, spec: TrainingSpec) -> Any:
         """Collect bounded split metadata on one executor, never a feature population."""
         metadata = pd.concat(list(batches), ignore_index=True)
         if len(metadata) > spec.max_rows:
-            raise ValueError("Training source exceeds max_rows.")
+            raise spec.row_limit_error(len(metadata))
         yield pd.DataFrame({"_ordinal": _metadata_train_ordinals(metadata, spec)}, dtype="int64")
 
     membership = frame.select(*columns).coalesce(1).mapInPandas(select_batches, "_ordinal long")
@@ -277,6 +278,7 @@ def _read_source(spark: Any, spec: TrainingSpec) -> Any:
     """Pin a projected Delta read and retain the local training row and byte budgets."""
     functions = _functions()
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
+    source = join_training_labels(spark, source, spec)
     source = normalize_training_dates(
         source.select(*spec.source_columns),
         event_column=spec.event_column,
@@ -291,16 +293,18 @@ def _read_source(spark: Any, spec: TrainingSpec) -> Any:
         )
     if spec.training_sample_rows is not None:
         source, _ = sample_training_source(source, spec)
-    if source.limit(spec.max_rows + 1).count() > spec.max_rows:
-        raise ValueError("Training source exceeds max_rows.")
+    if (count := source.limit(spec.max_rows + 1).count()) > spec.max_rows:
+        raise spec.row_limit_error(count, lower_bound=True)
     require_unique_keys(source, spec.record_key_columns, "training")
     size = functions.udf(lambda row: _source_size(row, spec), "long")
     total = source.agg(
         functions.sum(size(functions.struct(*source.columns))).alias("bytes")
     ).first()
     if int(total["bytes"] or 0) + 132 > spec.max_bytes:
-        raise ValueError("Training source exceeds conservative Spark max_bytes bound.")
-    return _pandas_source_types(source, spec)
+        raise spec.byte_limit_error(int(total["bytes"] or 0) + 132, estimate=True)
+    source = _pandas_source_types(source, spec)
+    validate_label_identity(spark, spec)
+    return source
 
 
 def _counts(frame: Any, columns: list[str]) -> Any:

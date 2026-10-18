@@ -10,6 +10,7 @@ from ...mlflow.lifecycle.validation import (
     comparison_digest,
     evaluate_quality_gates,
     quality_gate_results,
+    validate_coverage_policy,
     validate_quality_policy,
 )
 from ..observability.monitoring.monitoring_config import MonitorConfig
@@ -34,7 +35,7 @@ from .rollout_policy import RolloutEvidence, RolloutState
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RolloutHealthPolicy:
-    """Require explicit operational and label coverage thresholds for live admission."""
+    """Require operational and label bounds, using p99 latency or maximum when absent."""
 
     minimum_requests: int
     maximum_error_rate: float
@@ -142,6 +143,7 @@ def _comparison_verdict(report: Any, state: RolloutState, digest: str) -> tuple[
     if comparison_digest(report) != digest:
         return "HOLD", "Saved comparison digest differs from the requested evidence."
     validate_quality_policy(report.metric, report.quality_threshold, report.quality_gates)
+    validate_coverage_policy(report.min_scored_fraction, report.max_coverage_drop)
     verdict = _gates_verdict(quality_gate_results(report))
     if verdict[0] == "PASS" and report.eligible is not True:
         return "FAIL", "Saved comparison does not admit the candidate improvement."
@@ -310,7 +312,14 @@ def _health_verdict(summary: dict, policy: RolloutHealthPolicy) -> tuple[str, st
         return "HOLD", "Insufficient serving requests for this stage."
     if summary["error_count"] / count > policy.maximum_error_rate:
         return "FAIL", "Serving error rate exceeds the configured maximum."
-    latency = summary.get("latency_max_ms")
+    return _latency_verdict(summary, policy)
+
+
+def _latency_verdict(summary: dict, policy: RolloutHealthPolicy) -> tuple[str, str]:
+    """Bound measured p99, using the legacy maximum only when p99 is unavailable."""
+    latency = summary.get("latency_p99_ms")
+    if latency is None:
+        latency = summary.get("latency_max_ms")
     if not _finite(latency) or latency < 0:
         return "HOLD", "Serving latency is unavailable."
     if latency > policy.maximum_latency_ms:
@@ -403,6 +412,14 @@ def observe_live_rollout(
         if not _fresh_observation(observed, start, now, config):
             return _result(
                 state, now, "HOLD", "Serving observation is missing, stale or future.", details
+            )
+        if summary.get("logging_error_count", 0):
+            return _result(
+                state,
+                now,
+                "HOLD",
+                "Serving logging errors prevent complete rollout evidence.",
+                details,
             )
         verdict, reason = _health_verdict(summary, health_policy)
         if verdict != "PASS":

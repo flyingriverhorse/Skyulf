@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from ...data.delta_io.delta import history, table_identity
+from ...data.delta_io.delta import MAINTENANCE_OPERATIONS, history, table_identity
 from ...scoring.incremental.incremental_batch import bounded_frame
 from ...shared._contracts import column_name
 from .monitoring_config import MonitorConfig
@@ -79,15 +79,7 @@ def _commit_receipt(row: Any) -> dict | None:
         receipt = None
     if isinstance(receipt, dict) and receipt.get("run_id"):
         return receipt
-    if values.get("operation") in {
-        "CREATE TABLE",
-        "OPTIMIZE",
-        "VACUUM START",
-        "VACUUM END",
-        "SET TBLPROPERTIES",
-        "UNSET TBLPROPERTIES",
-        "COMPUTE STATS",
-    }:
+    if values.get("operation") in MAINTENANCE_OPERATIONS | {"CREATE TABLE"}:
         return None
     raise ValueError("Prediction window contains an unreceipted data or schema change.")
 
@@ -139,8 +131,9 @@ def window_receipts(spark: Any, config: MonitorConfig, start: datetime, end: dat
 def prediction_columns(frame: Any, keys: tuple[str, ...], probabilities: int) -> tuple[str, ...]:
     """Select only raw saved model outputs, excluding unrelated business projections."""
     columns = (*keys, "run_id", "prediction", *(f"probability_{i}" for i in range(probabilities)))
-    if "scoring_status" in frame.columns:
-        columns += ("scoring_status",)
+    columns += tuple(
+        name for name in ("scoring_status", "exclusion_reason") if name in frame.columns
+    )
     return columns
 
 
@@ -261,9 +254,11 @@ def model_predictions(
         & (functions.col("model_set_version") == config.model_set_version)
     )
     outputs = ["prediction", *(f"probability_{i}" for i in range(probabilities))]
-    status = f"{config.model_set_branch}__scoring_status"
-    if status in frame.columns:
-        outputs.append("scoring_status")
+    outputs.extend(
+        name
+        for name in ("scoring_status", "exclusion_reason")
+        if f"{config.model_set_branch}__{name}" in frame.columns
+    )
     return frame.select(
         *keys,
         "run_id",

@@ -2,6 +2,8 @@
 
 import importlib
 import math
+import re
+from collections.abc import Mapping
 from datetime import datetime
 from functools import reduce
 from operator import and_, or_
@@ -98,7 +100,7 @@ def scored_predictions(predictions: Any, task: str, classes: tuple) -> tuple[Any
 
 def _probability_names(scored: Any, classes: tuple, task: str) -> tuple[str, ...]:
     """Validate the saved probability schema and explicit class-index order."""
-    columns = tuple(name for name in scored.columns if name.startswith("probability_"))
+    columns = tuple(name for name in scored.columns if re.fullmatch(r"probability_\d+", name))
     if not columns:
         return ()
     expected = tuple(f"probability_{index}" for index in range(len(classes)))
@@ -152,7 +154,7 @@ def _join_pairs(scored: Any, labels: Any, keys: tuple, target: str) -> Any:
     """Project internal join keys so user columns cannot collide with evidence aliases."""
     key_aliases = [spark_column(key).alias(f"__sm_key_{index}") for index, key in enumerate(keys)]
     truth = labels.select(*key_aliases, spark_column(target).alias("__sm_truth"))
-    output_columns = [name for name in scored.columns if name.startswith("probability_")]
+    output_columns = [name for name in scored.columns if re.fullmatch(r"probability_\d+", name)]
     outputs = scored.select(
         *key_aliases, spark_column("prediction"), *[spark_column(name) for name in output_columns]
     )
@@ -180,7 +182,7 @@ def _pairs(scored: Any, labels: Any, keys: tuple, target: str, task: str, classe
     return pairs
 
 
-def _regression_values(summary: dict) -> dict[str, float]:
+def _regression_values(summary: dict) -> dict[str, float | None]:
     """Apply sklearn force-finite semantics to stable population variance aggregates."""
     mse, variance, residual = summary["mse"], summary["variance"], summary["residual_variance"]
     return {
@@ -190,10 +192,11 @@ def _regression_values(summary: dict) -> dict[str, float]:
         "r2": 1 - mse / variance if variance else float(mse == 0),
         "mape": summary["mape"],
         "explained_variance": 1 - residual / variance if variance else float(residual == 0),
+        "wape": summary["mae"] / summary["absolute_truth"] if summary["absolute_truth"] else None,
     }
 
 
-def _regression(pairs: Any) -> dict[str, float]:
+def _regression(pairs: Any) -> dict[str, float | None]:
     """Reduce regression populations to one stable finite-metric summary row."""
     f = spark_functions()
     truth, guess = (
@@ -204,6 +207,7 @@ def _regression(pairs: Any) -> dict[str, float]:
     summary = (
         pairs.agg(
             f.avg(f.abs(error)).alias("mae"),
+            f.avg(f.abs(truth)).alias("absolute_truth"),
             f.avg(error * error).alias("mse"),
             f.var_pop(truth).alias("variance"),
             f.var_pop(error).alias("residual_variance"),
@@ -272,6 +276,14 @@ def _classification(pairs: Any, classes: tuple) -> tuple[dict[str, float], dict]
     return _confusion_values(counts, len(classes)), matrix
 
 
+def _finite_performance_values(values: Mapping[str, float | None]) -> dict[str, float | None]:
+    """Retain undefined metrics as explicit nulls instead of dropping or serializing infinity."""
+    return {
+        name: value if value is not None and math.isfinite(value) else None
+        for name, value in values.items()
+    }
+
+
 def _performance(
     scored: Any,
     labels: Any,
@@ -302,10 +314,11 @@ def _performance(
         from .spark_monitoring_probability import probability_values  # noqa: PLC0415
 
         values.update(probability_values(pairs, classes, probabilities))
-    if any(not math.isfinite(value) for value in values.values()):
-        notes.append("A calculated performance metric was nonfinite.")
+    finite_values = _finite_performance_values(values)
+    if any(value is None for value in finite_values.values()):
+        notes.append("A calculated performance metric was undefined or nonfinite.")
     return (
-        {name: value if math.isfinite(value) else None for name, value in values.items()},
+        finite_values,
         count,
         notes,
         matrix,

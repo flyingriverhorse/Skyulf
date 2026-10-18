@@ -19,6 +19,7 @@ from ...lifecycle.workflow import (
     workflow_policies,
 )
 from ...observability.monitoring.monitoring_registration import (
+    monitoring_destination,
     publish_monitoring_request,
     register_scoring_monitor,
     validate_monitoring_settings,
@@ -33,6 +34,7 @@ OPERATOR_FIELDS = {
     "expected_champion_version",
     "rejection_reason",
     "promotion_receipt_json",
+    "allow_unloadable_champion",
 }
 
 
@@ -48,7 +50,12 @@ def parse_model_version(value: str, *, allow_none: bool = False) -> str | None:
 def operator_options(action: str, values: dict[str, str]) -> dict[str, Any]:
     """Reject incomplete and irrelevant operator inputs before any Core side effects."""
     allowed = {
-        "approve": {"candidate_version", "comparison_sha256", "expected_champion_version"},
+        "approve": {
+            "candidate_version",
+            "comparison_sha256",
+            "expected_champion_version",
+            "allow_unloadable_champion",
+        },
         "reject": {
             "candidate_version",
             "comparison_sha256",
@@ -74,12 +81,25 @@ def operator_options(action: str, values: dict[str, str]) -> dict[str, Any]:
     if digest and not re.fullmatch(r"[a-f0-9]{64}", digest):
         raise ValueError("comparison_sha256 must be empty or an exact 64-character digest.")
     options["comparison_sha256"] = digest
-    if action == "reject":
-        reason = values.get("rejection_reason", "")
-        if not reason.strip() or len(reason.encode("utf-8")) > 256:
-            raise ValueError("Rejection needs a reason of at most 256 UTF-8 bytes.")
-        options["rejection_reason"] = reason
-    return options
+    return options | _decision_options(action, values)
+
+
+def _decision_options(action: str, values: dict[str, str]) -> dict[str, Any]:
+    """Validate the approve override flag or the reject reason."""
+    if action == "approve":
+        return {"allow_unloadable_champion": _unloadable_flag(values)}
+    reason = values.get("rejection_reason", "")
+    if not reason.strip() or len(reason.encode("utf-8")) > 256:
+        raise ValueError("Rejection needs a reason of at most 256 UTF-8 bytes.")
+    return {"rejection_reason": reason}
+
+
+def _unloadable_flag(values: dict[str, str]) -> bool:
+    """Accept only an explicit true; anything else must be left empty."""
+    value = values.get("allow_unloadable_champion", "")
+    if value not in {"", "true"}:
+        raise ValueError("allow_unloadable_champion must be empty or exactly true.")
+    return value == "true"
 
 
 def _rollback_receipt(values: dict[str, str], expected: str | None) -> AliasChangeReceipt:
@@ -167,7 +187,10 @@ def _bundle_action_options(
         options["recovery_request"] = recovery_request
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
-            config, options["candidate_version"], action=action
+            config,
+            options["candidate_version"],
+            action=action,
+            allow_unloadable_champion=options.get("allow_unloadable_champion", False),
         )
     if action == "train":
         options.update(experiment_name=experiment_name, artifact_path=artifact_path)
@@ -338,12 +361,17 @@ def _prepared_notebook_request(
     options = operator_options(action, values)
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
-            config, options["candidate_version"], action=action
+            config,
+            options["candidate_version"],
+            action=action,
+            allow_unloadable_champion=options.get("allow_unloadable_champion", False),
         )
     return {
         "config": config,
         "action": action,
         "operator_options": options,
+        "monitoring_namespace": monitoring_destination(values),
+        "workspace_host": values.get("workspace_host") or None,
         "experiment_name": values.get("experiment_name"),
         "tracking_uri": config.get("tracking_uri", "databricks"),
     }
@@ -437,7 +465,13 @@ def run_lifecycle_notebook(
         )
     if phase in {"result", "complete"}:
         dbutils.jobs.taskValues.set(key="score_requested", value=outcome.output["score_requested"])
-    render = _lifecycle_notebook_renderer(phase, outcome, options["tracking_uri"], separate_shap)
+    render = _lifecycle_notebook_renderer(
+        phase,
+        outcome,
+        options["tracking_uri"],
+        separate_shap,
+        workspace_host=values.get("workspace_host", ""),
+    )
     return notebook_output(
         outcome.output,
         dbutils,
@@ -455,10 +489,22 @@ def run_lifecycle_notebook(
 
 
 def _lifecycle_notebook_renderer(
-    phase: str, outcome: Any, tracking_uri: str, separate_shap: bool
+    phase: str, outcome: Any, tracking_uri: str, separate_shap: bool, *, workspace_host: str = ""
 ) -> Callable:
     """Keep training settings visible when SHAP is displayed by a separate task."""
     if phase in {"result", "complete"}:
+        if outcome.output.get("action") == "train":
+            from ...observability.reports.training_summary import (  # noqa: PLC0415
+                render_final_training_report,
+            )
+
+            return lambda payload: render_final_training_report(
+                payload,
+                tracking_uri=tracking_uri,
+                run_id=outcome.reference.get("run_id", ""),
+                workspace_host=workspace_host,
+                render=render_bundle_output,
+            )
         return render_bundle_output
     if phase == "select_best_model" and outcome.output.get("selection_mode") == "single_candidate":
         return lambda payload: render_lifecycle_output("validate_model", payload)

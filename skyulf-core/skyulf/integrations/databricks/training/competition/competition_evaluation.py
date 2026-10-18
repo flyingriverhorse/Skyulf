@@ -113,8 +113,18 @@ def _validate_bounds(frame: Any, max_rows: int, max_bytes: int) -> None:
     for name, limit in (("max_rows", max_rows), ("max_bytes", max_bytes)):
         if type(limit) is not int or limit <= 0:
             raise ValueError(f"Competition {name} must be a positive integer.")
-    if len(frame) > max_rows or frame_bytes(frame) > max_bytes:
-        raise ValueError("Competition training data exceeds max_rows or max_bytes.")
+    if len(frame) > max_rows:
+        raise ValueError(
+            f"Competition training data ({len(frame)} rows) exceeds max_rows={max_rows}. "
+            "Reduce the shared training input or increase max_rows "
+            "in evaluate_competition_candidate."
+        )
+    if (size := frame_bytes(frame)) > max_bytes:
+        raise ValueError(
+            f"Competition training data size {size} bytes exceeds max_bytes={max_bytes}. "
+            "Reduce the shared training input or increase max_bytes "
+            "in evaluate_competition_candidate only if sufficient memory is available."
+        )
 
 
 def build_fold_plan(policy: TuningConfig, task: str, y: Any, metadata: dict) -> FrozenSplit:

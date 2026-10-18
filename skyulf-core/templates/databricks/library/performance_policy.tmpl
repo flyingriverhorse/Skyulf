@@ -1,0 +1,5 @@
+{{- define "performance_policy" -}}
+{{- $v := .values -}}
+{{- $metric := index $v (printf "performance_%s_metric" .task) -}}
+{"mode": {{printf "%q" $v.performance_policy_mode}}, "metric": {{printf "%q" $metric}}, "direction": "{{if or (eq .task "classification") (eq $metric "r2")}}higher{{else}}lower{{end}}", "baseline": {"kind": "training_holdout", "model_version": {{printf "%q" $v.performance_baseline_version}}}, "tolerance": {{$v.performance_tolerance}}, "tolerance_mode": {{printf "%q" $v.performance_tolerance_mode}}, "window_hours": 24, "label_delay_hours": 6, "minimum_labeled_rows": 20, "minimum_label_coverage": 0.8, "consecutive_windows": 2}
+{{- end -}}

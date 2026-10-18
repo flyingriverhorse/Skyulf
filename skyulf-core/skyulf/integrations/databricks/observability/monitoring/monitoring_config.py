@@ -6,13 +6,16 @@ import re
 from dataclasses import asdict, dataclass, fields
 from typing import Any, Self
 
+from skyulf.profiling._drift_settings import (
+    MAX_MONITOR_BYTES,
+    MAX_MONITOR_ROWS,
+    merge_drift_settings,
+)
+
 from ...shared._contracts import column_name, table_name
 from ...shared.json_contracts import finite_json_digest
+from .missing_markers import split_missing_markers
 from .performance.performance_policy import validate_performance_policy
-
-# Safety ceilings for the legacy local reader, not Spark observation row limits.
-MAX_MONITOR_ROWS = 1_000_000
-MAX_MONITOR_BYTES = 1024**3
 
 
 def qualified_name(value: str) -> str:
@@ -59,7 +62,7 @@ class MonitorConfig:
     max_bytes: int = 67108864
     max_batches: int = 100
     enabled: bool = True
-    thresholds: dict[str, float] | None = None
+    thresholds: dict[str, Any] | None = None
     model_set_name: str | None = None
     model_set_version: str | None = None
     model_set_branch: str | None = None
@@ -77,8 +80,9 @@ class MonitorConfig:
             qualified_name(value)
         _validate_selection(self.model_version, self.model_alias)
         _validate_label_source(self.label_table, self.result_available_at_column)
-        _validate_budgets(self)
         _validate_thresholds(self.thresholds)
+        _apply_budget_overrides(self)
+        _validate_budgets(self)
         _validate_model_set(self)
         _validate_performance_enrollment(self)
         _validate_execution(self)
@@ -184,20 +188,19 @@ def _validate_budgets(config: MonitorConfig) -> None:
         raise ValueError("expected_interval_hours must be finite and positive.")
 
 
-def _validate_thresholds(value: dict[str, float] | None) -> None:
-    """Accept only Core drift thresholds with finite positive values."""
-    if value is None:
+def _validate_thresholds(value: dict[str, Any] | None) -> None:
+    """Accept only Core drift thresholds with finite positive values, plus valid markers."""
+    merge_drift_settings(split_missing_markers(value)[0])
+
+
+def _apply_budget_overrides(config: MonitorConfig) -> None:
+    """Apply explicitly requested driver budgets only to the in-memory reader."""
+    if config.execution_engine != "local":
         return
-    if type(value) is not dict or set(value) - {
-        "psi",
-        "ks_statistic",
-        "wasserstein",
-        "kl_divergence",
-    }:
-        raise ValueError("Unknown monitoring drift thresholds.")
-    for threshold in value.values():
-        if type(threshold) not in (int, float) or not math.isfinite(threshold) or threshold <= 0:
-            raise ValueError("Drift thresholds must be finite and positive.")
+    for key in ("max_rows", "max_bytes"):
+        value = (config.thresholds or {}).get(f"monitor_{key}")
+        if value is not None:
+            object.__setattr__(config, key, value)
 
 
 def _validate_performance_enrollment(config: MonitorConfig) -> None:
@@ -214,7 +217,7 @@ def _validate_performance_enrollment(config: MonitorConfig) -> None:
     object.__setattr__(config, "performance_policy", policy)
 
 
-def parse_drift_thresholds(value: str) -> dict[str, float]:
+def parse_drift_thresholds(value: str) -> dict[str, Any]:
     """Parse the Bundle policy; an empty object selects Core's default thresholds."""
     try:
         thresholds = json.loads(value)

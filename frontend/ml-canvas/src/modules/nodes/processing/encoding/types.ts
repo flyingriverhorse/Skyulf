@@ -1,19 +1,29 @@
 export interface EncodingConfig {
-  method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe';
+  method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe' | 'frequency' | 'rare';
   columns: string[];
   // OneHot/Dummy specific
   drop_first?: boolean | undefined;
   drop_original?: boolean | undefined;
   handle_unknown?: 'error' | 'ignore' | 'use_encoded_value' | undefined;
   // OneHot specific
-  max_categories?: number | undefined;
+  max_categories?: number | null | undefined;
   include_missing?: boolean | undefined;
+  categories?: Record<string, string[]> | undefined;
+  column_names?: 'sklearn' | 'slug' | undefined;
   // Hash specific
   n_features?: number | undefined;
   // Target specific
   target_column?: string | undefined;
   smooth?: number | 'auto' | undefined;
   target_type?: 'auto' | 'continuous' | 'multiclass' | 'binary' | undefined;
+  cv?: number | undefined;
+  shuffle?: boolean | undefined;
+  random_state?: number | null | undefined;
+  // Frequency / rare grouping
+  mode?: 'frequency' | 'count' | undefined;
+  min_count?: number | undefined;
+  min_share?: number | undefined;
+  replacement?: string | undefined;
   // WOE specific
   regularization?: number | undefined;
   // Label/Ordinal specific

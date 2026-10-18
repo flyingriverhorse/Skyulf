@@ -88,7 +88,7 @@ def test_inspection_probes_are_pure_passthroughs_with_different_prediction_data(
     assert report["state_validation"] == "node_owned" and report["context"] == "row"
     assert report["checks"] == [
         {"name": name, "status": "passed"}
-        for name in ("full", "repeat", "chunks:1", "chunks:2", "reverse", "empty")
+        for name in ("full", "repeat", "chunks:1", "chunks:2", "reverse", "index_shift", "empty")
     ]
     assert len(result) == len(sample)
     assert artifact_digest(record["artifact"]) == artifact_digest(state)

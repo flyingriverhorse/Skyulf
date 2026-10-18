@@ -556,24 +556,22 @@ class TestInternalHelpers:
         result = _apply_power_to_polars_col(pl_df, item)
         assert result is pl_df
 
-    def test_apply_power_polars_malformed_lambdas_swallows_exception(
+    def test_apply_power_polars_malformed_lambdas_raises_with_column(
         self, pos_df: pd.DataFrame
     ) -> None:
-        """A malformed lambdas value must be caught and the frame returned unchanged (lines 52-54)."""
+        """Invalid fitted state must not silently send raw request values to the model."""
         pl_df = pl.from_pandas(pos_df)
         item: dict = {"column": "a", "method": "yeo-johnson", "lambdas": ["not_a_number"]}
-        result = _apply_power_to_polars_col(pl_df, item)
-        # Exception is swallowed; original frame returned untouched.
-        assert result.equals(pl_df)
+        with pytest.raises(ValueError, match="yeo-johnson.*column.*a"):
+            _apply_power_to_polars_col(pl_df, item)
 
-    def test_apply_power_pandas_malformed_lambdas_swallows_exception(
+    def test_apply_power_pandas_malformed_lambdas_raises_with_column(
         self, pos_df: pd.DataFrame
     ) -> None:
-        """A malformed lambdas value must be caught and the column left unchanged (lines 82-83)."""
+        """Invalid fitted state must not silently send raw request values to the model."""
         item: dict = {"column": "a", "method": "yeo-johnson", "lambdas": ["not_a_number"]}
-        original = pos_df.copy()
-        result = _apply_power_to_pandas_col(pos_df.copy(), item)
-        pd.testing.assert_series_equal(result["a"], original["a"])
+        with pytest.raises(ValueError, match="yeo-johnson.*column.*a"):
+            _apply_power_to_pandas_col(pos_df.copy(), item)
 
     def test_fit_power_for_column_swallows_exception(
         self, calc: GeneralTransformationCalculator

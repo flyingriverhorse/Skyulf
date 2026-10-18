@@ -1,0 +1,7 @@
+# Scoring policy, saved with the next trained model. Full reference: SCORING.md.
+# mode: pre_split (the default) reuses the training filters from config/pre_split.yml.
+version: 1
+
+# Scoring requests have no fare yet, so skip the pre-split filters that read the
+# target column. Feature filters still apply.
+skip_target_pre_split_steps: true

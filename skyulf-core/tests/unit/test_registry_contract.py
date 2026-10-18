@@ -90,6 +90,9 @@ _COLUMN_HINTS: dict[str, dict[str, Any]] = {
     "MaxAbsScaler": {"columns": _NUM},
     "StandardScaler": {"columns": _NUM},
     "RobustScaler": {"columns": _NUM},
+    "QuantileTransformer": {"columns": _NUM},
+    # Row normalization requires finite inputs; the other columns still carry NaN.
+    "Normalizer": {"columns": ["lat1", "lat2"]},
     # Transformations
     "PowerTransformer": {"columns": ["num_a"]},
     "GeneralTransformation": {"columns": ["num_a"], "transformation": "log"},
@@ -106,6 +109,8 @@ _COLUMN_HINTS: dict[str, dict[str, Any]] = {
     "ClipValues": {"bounds": {"num_a": {"lower": -1.0, "upper": 1.0}, "num_b": {"upper": 6}}},
     "ManualBounds": {"columns": _NUM, "lower_bound": -10, "upper_bound": 10},
     "EllipticEnvelope": {"columns": ["num_a", "num_b"], "contamination": 0.1},
+    "IsolationForest": {"columns": _NUM},
+    "LocalOutlierFactor": {"columns": _NUM},
     # Bucketing
     "GeneralBinning": {"columns": ["num_a"], "n_bins": 4, "strategy": "uniform"},
     "KBinsDiscretizer": {"columns": ["num_a"], "n_bins": 4, "strategy": "uniform"},
@@ -116,6 +121,8 @@ _COLUMN_HINTS: dict[str, dict[str, Any]] = {
     "OrdinalEncoder": {"columns": _CAT},
     "LabelEncoder": {"columns": _CAT},
     "HashEncoder": {"columns": _CAT, "n_features": 4},
+    "FrequencyEncoder": {"columns": _CAT},
+    "RareCategoryGrouping": {"columns": _CAT},
     "TargetEncoder": {"columns": _CAT, "target_column": "y"},
     "WOEEncoder": {"columns": _CAT, "target_column": "y"},
     # Drop / missing
@@ -256,6 +263,8 @@ _ROW_DROPPING: set[str] = {
     "ZScore",
     "ManualBounds",
     "EllipticEnvelope",
+    "IsolationForest",
+    "LocalOutlierFactor",
     "Deduplicate",
     "DropMissingRows",
     "RowFilterFunction",
@@ -596,6 +605,13 @@ def test_applied_output_parity_pandas_vs_polars(node_id: str) -> None:
         # Default to_pandas widens nullable integers; preserve the native codes.
         bins = pd.Series(pl_x["num_a_binned"].to_list(), dtype="Int64")
         pl_x = pl_x.to_pandas().assign(num_a_binned=bins)
+    if node_id == "RareCategoryGrouping":
+        # Default to_pandas produces object; retain the node's nullable-string contract.
+        strings = {}
+        for column in config["columns"]:
+            assert pl_x.schema[column] == pl.String
+            strings[column] = pd.Series(pl_x[column].to_list(), dtype="string")
+        pl_x = pl_x.to_pandas().assign(**strings)
     _assert_applied_outputs_equal(pd_x, pl_x, pd_y, pl_y, node_id)
 
 

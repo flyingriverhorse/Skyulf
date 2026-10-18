@@ -20,7 +20,7 @@ from .._fitted_validation import _columns, _fields, _scalar, fitted_columns
 from .._output_names import validate_generated_column_names
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _exclude_target_column, detect_categorical_columns
+from ._common import _category_slug, _exclude_target_column, detect_categorical_columns
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,83 @@ _DEFAULT_OPTIONS = {
     "prefix_separator": "_",
     "drop_original": True,
     "include_missing": False,
+    "categories": None,
+    "column_names": "sklearn",
 }
+
+
+def _column_name_style(value: Any) -> str:
+    """Reject unsupported naming modes before deriving fitted output names."""
+    if value not in ("sklearn", "slug"):
+        raise ValueError("OneHotEncoder column_names must be 'sklearn' or 'slug'.")
+    return value
+
+
+def _fixed_levels(levels: Any) -> None:
+    """Require an ordered, nonempty vocabulary of distinct string levels."""
+    if type(levels) is not list or not levels or any(type(level) is not str for level in levels):
+        raise ValueError("OneHotEncoder categories must be nonempty lists of strings.")
+    if len(set(levels)) != len(levels):
+        raise ValueError("OneHotEncoder categories must contain unique levels.")
+
+
+def _fixed_category_options(config: dict[str, Any]) -> dict[str, list[str]] | None:
+    """Validate fixed vocabularies without inferring columns or silently changing options."""
+    _column_name_style(config.get("column_names", "sklearn"))
+    categories = config.get("categories")
+    if categories is None:
+        return None
+    columns = _columns(config.get("columns"))
+    if not columns:
+        raise ValueError("OneHotEncoder fixed categories require explicit unique columns.")
+    if type(categories) is not dict or set(categories) != set(columns):
+        raise ValueError("OneHotEncoder categories keys must match columns exactly.")
+    if (
+        config.get("max_categories", 20) is not None
+        or config.get("include_missing", False) is not False
+    ):
+        raise ValueError("Fixed categories require max_categories=None and include_missing=False.")
+    for levels in categories.values():
+        _fixed_levels(levels)
+    return categories
+
+
+def _fixed_input_categories(X: Any, opts: dict[str, Any], columns: list[str]) -> Any:
+    """Bind fixed vocabularies to surviving string columns, including target exclusion."""
+    categories = opts["categories"]
+    if categories is None:
+        return "auto"
+    if set(columns) != set(categories):
+        raise ValueError("OneHotEncoder fixed categories require every selected input column.")
+    if set(columns) - set(detect_categorical_columns(X)):
+        raise ValueError("OneHotEncoder fixed categories require string or categorical inputs.")
+    return [categories[column] for column in columns]
+
+
+def _fixed_text_values(values: Any) -> np.ndarray:
+    """Normalize null representations without casting observed fixed-category values to text."""
+    output = np.asarray(values, dtype=object).copy()
+    missing = pd.isna(output)
+    if any(not isinstance(value, str) for value in output[~missing]):
+        raise ValueError("OneHotEncoder fixed categories require string input values.")
+    output[missing] = None
+    return output
+
+
+def _onehot_feature_names(encoder: Any, columns: list[str], style: str) -> list[str]:
+    """Derive names from actual grouped/dropped outputs without changing encoder callbacks."""
+    names = encoder.get_feature_names_out(columns).tolist()
+    if _column_name_style(style) == "sklearn":
+        return names
+    result = []
+    offset = 0
+    for column, width in zip(columns, encoder._n_features_outs, strict=True):
+        result.extend(
+            f"{column}_{_category_slug(name[len(column) + 1 :])}"
+            for name in names[offset : offset + width]
+        )
+        offset += width
+    return result
 
 
 def _uses_missing_encoding(params: dict[str, Any]) -> bool:
@@ -126,10 +202,14 @@ def _to_dense(encoded_array: Any) -> Any:
     return encoded_array
 
 
-def _transform_partition(encoder: Any, values: Any, feature_names: list[str]) -> Any:
+def _transform_partition(
+    encoder: Any, values: Any, feature_names: list[str], fixed_categories: bool = False
+) -> Any:
     """Preserve fitted output schema for an empty fit-only test partition."""
     if len(values) == 0:
         return np.empty((0, len(feature_names)), dtype=encoder.dtype)
+    if fixed_categories:
+        values = _fixed_text_values(values)
     return _to_dense(encoder.transform(values))
 
 
@@ -147,7 +227,9 @@ def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
         X_subset = _prepare_missing_polars(X_subset, escape_literals)
 
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
-    encoded = _transform_partition(encoder, X_np, feature_names)
+    encoded = _transform_partition(
+        encoder, X_np, feature_names, params.get("fixed_categories", False)
+    )
 
     encoded_df = pl.DataFrame(encoded, schema=feature_names)
     retained = X.drop(valid_cols) if drop_original else X
@@ -169,7 +251,9 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
         X_subset = _prepare_missing_pandas(X_subset, escape_literals)
 
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
-    encoded = _transform_partition(encoder, X_input, feature_names)
+    encoded = _transform_partition(
+        encoder, X_input, feature_names, params.get("fixed_categories", False)
+    )
     encoded_df = pd.DataFrame(encoded, columns=feature_names, index=X_out.index)
     if drop_original:
         X_out = X_out.drop(columns=valid_cols)
@@ -231,6 +315,8 @@ def _resolve_fit_options(config: dict[str, Any]) -> dict[str, Any]:
         "prefix_separator": options["prefix_separator"],
         "drop_original": options["drop_original"],
         "include_missing": options["include_missing"],
+        "categories": _fixed_category_options(config),
+        "column_names": options["column_names"],
     }
 
 
@@ -256,7 +342,11 @@ def _warn_degenerate_categories(encoder: OneHotEncoder, cols: list[str], drop: A
 def _fit_sklearn_onehot(X_subset: Any, opts: dict[str, Any], cols: list[str]) -> OneHotEncoder:
     """Run the sklearn ``OneHotEncoder.fit`` step on a prepared subset."""
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    categories = _fixed_input_categories(X_subset, opts, cols)
+    if opts["categories"] is not None:
+        X_np = _fixed_text_values(X_np)
     encoder = OneHotEncoder(
+        categories=categories,
         drop=opts["drop"],
         max_categories=opts["max_categories"],
         handle_unknown=opts["handle_unknown"],
@@ -264,7 +354,8 @@ def _fit_sklearn_onehot(X_subset: Any, opts: dict[str, Any], cols: list[str]) ->
         dtype=np.int8,
     )
     encoder.fit(X_np)
-    _warn_degenerate_categories(encoder, cols, opts["drop"])
+    if opts["categories"] is None:
+        _warn_degenerate_categories(encoder, cols, opts["drop"])
     return encoder
 
 
@@ -272,7 +363,7 @@ def _build_onehot_artifact(
     X: Any, encoder: OneHotEncoder, cols: list[str], opts: dict[str, Any]
 ) -> Mapping[str, Any]:
     """Validate the fitted feature names before returning the reusable artifact."""
-    feature_names = encoder.get_feature_names_out(cols).tolist()
+    feature_names = _onehot_feature_names(encoder, cols, opts["column_names"])
     validate_generated_column_names(
         X.columns,
         feature_names,
@@ -287,6 +378,8 @@ def _build_onehot_artifact(
         "prefix_separator": opts["prefix_separator"],
         "drop_original": opts["drop_original"],
         "include_missing": opts["include_missing"],
+        "fixed_categories": opts["categories"] is not None,
+        "column_names": opts["column_names"],
     }
     if opts["include_missing"]:
         artifact["missing_encoding_version"] = 1
@@ -296,6 +389,8 @@ def _build_onehot_artifact(
 def _onehot_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     cols = resolve_columns(X, config, detect_categorical_columns)
     cols = _exclude_target_column(cols, config, "OneHotEncoder", y)
+    if config.get("categories") is not None and set(cols) != set(config["categories"]):
+        raise ValueError("OneHotEncoder fixed categories require every selected input column.")
     if not cols:
         return {}
 
@@ -311,6 +406,8 @@ def _onehot_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
 def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     cols = resolve_columns(X, config, detect_categorical_columns)
     cols = _exclude_target_column(cols, config, "OneHotEncoder", y)
+    if config.get("categories") is not None and set(cols) != set(config["categories"]):
+        raise ValueError("OneHotEncoder fixed categories require every selected input column.")
     if not cols:
         return {}
 
@@ -350,6 +447,8 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
         "max_categories": 20,
         "columns": [],
         "include_missing": False,
+        "categories": None,
+        "column_names": "sklearn",
     },
     learns_from_data=True,
 )
@@ -362,11 +461,19 @@ class OneHotEncoderCalculator(BaseCalculator):
     finding no categorical columns, yields an empty artifact so the applier
     no-ops. Degenerate columns (zero categories, or one category with
     ``drop_first``) are warned about rather than silently producing nothing.
+
+    Optional ``categories`` maps every explicitly selected column to an ordered
+    list of unique strings. Unobserved levels retain outputs. Fixed categories
+    require ``max_categories=None`` and ``include_missing=False``; unknowns and
+    nulls produce zeros with ``handle_unknown='ignore'`` or raise with ``'error'``.
+    ``drop_first`` removes the first configured level. ``column_names='slug'``
+    folds category labels to ASCII; the default ``'sklearn'`` preserves names.
     """
 
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> OneHotArtifact:  # pylint: disable=arguments-differ
         """Short-circuit an explicit empty column selection, else fit on the frame's own engine."""
+        _fixed_category_options(config)
         if user_picked_no_columns(config):
             return {}
         return cast(
@@ -382,7 +489,7 @@ class OneHotEncoderCalculator(BaseCalculator):
 __all__ = ["OneHotEncoderApplier", "OneHotEncoderCalculator"]
 
 
-def _check_encoder(encoder: Any, columns: list[str]) -> None:
+def _check_encoder(encoder: Any, columns: list[str], fixed_categories: bool = False) -> None:
     """Admit the exact dense fitted sklearn encoder without arbitrary callables."""
     if type(encoder) is not OneHotEncoder:
         raise ValueError("Expected exact OneHotEncoder.")
@@ -405,21 +512,45 @@ def _check_encoder(encoder: Any, columns: list[str]) -> None:
     if vars(encoder).get("max_categories") is not None:
         expected.update({"_infrequent_indices", "_default_to_infrequent_mappings"})
     _fields(vars(encoder), expected)
-    _encoder_options(encoder)
+    _encoder_options(encoder, fixed_categories)
     if encoder.drop not in (None, "first") or encoder.n_features_in_ != len(columns):
         raise ValueError("Encoder feature count or dropped-category policy disagrees.")
     _encoder_categories(encoder, columns)
 
 
-def _encoder_options(encoder: Any) -> None:
+def _encoder_options(encoder: Any, fixed_categories: bool = False) -> None:
     """Restrict inspected state to deterministic dense encoding with an optional category cap."""
     if encoder.dtype is not np.int8 or encoder.feature_name_combiner != "concat":
         raise ValueError("Unsupported encoder dtype or feature-name callback.")
-    if encoder.categories != "auto" or encoder.sparse_output is not False:
-        raise ValueError("Encoder requires automatic categories and dense output.")
+    if encoder.sparse_output is not False:
+        raise ValueError("Encoder requires dense output.")
+    _encoder_category_policy(encoder, fixed_categories)
     _encoder_grouping_options(encoder)
     if encoder.handle_unknown not in ("ignore", "error"):
         raise ValueError("Unsupported encoder inference policy.")
+
+
+def _encoder_category_policy(encoder: Any, fixed: bool) -> None:
+    """Bind explicit estimator categories to the inspected fitted category vectors."""
+    if not fixed:
+        if type(encoder.categories) is not str or encoder.categories != "auto":
+            raise ValueError("Encoder requires automatic categories.")
+        return
+    _fixed_encoder_categories(encoder)
+
+
+def _fixed_encoder_categories(encoder: Any) -> None:
+    """Inspect both explicit and learned category arrays before admitting fixed replay."""
+    if type(encoder.categories) is not list or encoder.max_categories is not None:
+        raise ValueError("Fixed encoder categories require an uncapped ordered list.")
+    for levels in encoder.categories:
+        _fixed_levels(levels)
+    if type(encoder.categories_) is not list or any(
+        type(values) is not np.ndarray for values in encoder.categories_
+    ):
+        raise ValueError("Encoder categories must be fitted vectors.")
+    if [values.tolist() for values in encoder.categories_] != encoder.categories:
+        raise ValueError("Encoder fixed categories disagree with fitted categories.")
 
 
 def _encoder_grouping_options(encoder: Any) -> None:
@@ -539,8 +670,7 @@ def _onehot_state(raw: dict) -> dict:
         "drop_original",
         "include_missing",
     }
-    if "missing_encoding_version" in raw:
-        fields.add("missing_encoding_version")
+    fields.update(set(raw) & {"missing_encoding_version", "fixed_categories", "column_names"})
     _fields(raw, fields)
     versioned = _uses_missing_encoding(raw)
     scalar = _normalize({key: value for key, value in raw.items() if key != "encoder_object"})
@@ -550,8 +680,11 @@ def _onehot_state(raw: dict) -> dict:
         raise ValueError("Expected one-hot artifact.")
     _onehot_output_options(scalar, versioned)
     encoder = raw["encoder_object"]
-    _check_encoder(encoder, columns)
-    if encoder.get_feature_names_out(columns).tolist() != scalar["feature_names"]:
+    _check_encoder(encoder, columns, scalar.get("fixed_categories", False))
+    if (
+        _onehot_feature_names(encoder, columns, scalar.get("column_names", "sklearn"))
+        != scalar["feature_names"]
+    ):
         raise ValueError("Encoder feature names disagree with fitted categories.")
     return {**scalar, "encoder_object": encoder}
 
@@ -560,6 +693,10 @@ def _onehot_output_options(scalar: dict, versioned: bool) -> None:
     """Validate saved output flags without upgrading an unversioned missing policy."""
     if versioned and scalar["include_missing"] is not True:
         raise ValueError("Versioned missing encoding requires include_missing=True.")
+    _column_name_style(scalar.get("column_names", "sklearn"))
+    fixed = scalar.get("fixed_categories", False)
+    if type(fixed) is not bool or (fixed and scalar["include_missing"] is not False):
+        raise ValueError("Invalid fixed category output options.")
     if (
         type(scalar["drop_original"]) is not bool
         or type(scalar["include_missing"]) is not bool
@@ -572,6 +709,7 @@ def _onehot_config(params: dict, state: dict) -> dict:
     """Check recipe options against the encoder that will actually transform rows."""
     resolved = {**_DEFAULT_OPTIONS, **params}
     _fields(resolved, {"columns", *_DEFAULT_OPTIONS})
+    _fixed_category_options(resolved)
     if not state:
         _onehot_output_options(resolved, False)
         _category_cap(resolved["max_categories"])
@@ -586,6 +724,10 @@ def _onehot_config(params: dict, state: dict) -> dict:
         "drop_first": encoder.drop == "first",
         "max_categories": _normalize(encoder.max_categories),
         "handle_unknown": encoder.handle_unknown,
+        "column_names": state.get("column_names", "sklearn"),
+        "categories": dict(zip(state["columns"], encoder.categories, strict=True))
+        if state.get("fixed_categories", False)
+        else None,
         **{key: state[key] for key in ("prefix_separator", "drop_original", "include_missing")},
     }
     for key, value in expected.items():

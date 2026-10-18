@@ -1,0 +1,14 @@
+bundle:
+  name: taxi_trips
+
+include:
+  - deployment/variables.yml
+  - deployment/targets.yml
+  - resources/*.yml
+
+sync:
+  include:
+    - src/**/*.py
+    - deployment/*requirements.txt
+    - src/features/requirements.txt
+    - config/*.yml

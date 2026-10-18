@@ -1,10 +1,107 @@
 """Distributed drift statistics retain exact effect sizes and explicit evidence methods."""
 
 import importlib
+import json
+from decimal import Decimal, localcontext
 
+import numpy as np
 import pandas as pd
 import pytest
 from scipy.stats import ks_2samp
+
+
+@pytest.mark.parametrize(
+    "reference,current,ref_type,cur_type",
+    [
+        ([0, 0, 1, 2], [0, 0, 2, 2], "long", "long"),
+        ([0, 0, 1, 2], [0.5, 0.5, 1.5, 1.5], "long", "double"),
+        ([0.0, 0.0, 1.0, 2.0], [-100.0, -100.0, 100.0, 100.0], "double", "double"),
+        ([2**53, 2**53 + 1, 2**53 + 2], [2**53 + 2] * 3, "long", "long"),
+        ([2**63 - 3, 2**63 - 2, 2**63 - 1], [2**63 - 1] * 3, "long", "long"),
+        ([-(2**63), -(2**63) + 1, -(2**63) + 2], [-(2**63)] * 3, "long", "long"),
+        ([2**53, 2**53 + 1, 2**53 + 2], [float(2**53)] * 3, "long", "double"),
+        (
+            [1.0, float(np.nextafter(1.0, np.inf))],
+            [float(np.nextafter(1.0, np.inf))] * 2,
+            "double",
+            "double",
+        ),
+        (
+            [1.0, float(np.nextafter(np.float32(1), np.float32(np.inf)))],
+            [1.0] * 2,
+            "float",
+            "float",
+        ),
+        (
+            [Decimal("0"), Decimal("1"), Decimal("2")],
+            [Decimal("2")] * 3,
+            "decimal(8,2)",
+            "decimal(8,2)",
+        ),
+        ([7, 7, 7], [100, 200], "long", "long"),
+        (list(range(10)), [9] * 10, "long", "long"),
+        (list(range(11)), [10] * 11, "long", "long"),
+        (list(range(40)), [-5, 30, 70], "long", "long"),
+    ],
+    ids=[
+        "lost-middle-level",
+        "fractional-midpoints",
+        "clipped-float-tails",
+        "large-integers",
+        "int64-upper-edge",
+        "int64-lower-edge",
+        "integer-reference-float-current",
+        "adjacent-doubles",
+        "adjacent-floats",
+        "decimals",
+        "constant-reference",
+        "ten-levels",
+        "eleven-levels",
+        "continuous-tails",
+    ],
+)
+def test_numeric_histograms_match_core(spark, reference, current, ref_type, cur_type):
+    """Spark PSI/KL must retain every discrete level and use Core's exact boundary rules."""
+    import polars as pl
+
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (
+        _histogram_metrics,
+    )
+    from skyulf.profiling.drift import DriftCalculator
+
+    frames = [
+        spark.createDataFrame([(value,) for value in values], f"value {dtype}")
+        for values, dtype in ((reference, ref_type), (current, cur_type))
+    ]
+    columns = [
+        pl.Series("value", values).cast(pl.Float32)
+        if dtype == "float"
+        else pl.Series("value", values)
+        for values, dtype in ((reference, ref_type), (current, cur_type))
+    ]
+    calculator = DriftCalculator(columns[0].to_frame(), columns[1].to_frame())
+    ref, cur = (calculator._numeric_values(series) for series in columns)
+    expected = (calculator._calculate_psi(ref, cur), calculator._calculate_kl(ref, cur))
+    observed = _histogram_metrics(frames[0], frames[1], len(reference), len(current))
+    if reference == [0, 0, 1, 2] and ref_type == cur_type == "long":
+        assert expected[0] > 2
+    assert observed == pytest.approx(expected, abs=1e-12)
+
+
+@pytest.mark.parametrize("origin", [2**63 - 3, -(2**63)], ids=["positive", "negative"])
+def test_integer_histograms_ignore_decimal_precision(spark, origin):
+    """A caller's low Decimal precision cannot merge adjacent signed int64 levels."""
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (
+        _histogram_metrics,
+    )
+
+    reference = spark.createDataFrame([(origin + index,) for index in range(3)], "value long")
+    current = spark.createDataFrame([(origin + 2,)] * 3, "value long")
+    with localcontext() as context:
+        context.prec = 10
+        observed = _histogram_metrics(reference, current, 3, 3)
+    # Core's equal three-level reference versus concentration in the top level.
+    assert observed == pytest.approx((6.138604569034126, 1.0965706089309952))
 
 
 @pytest.mark.parametrize(
@@ -21,7 +118,8 @@ def test_exact_small_ks_probability(reference, current):
     assert evidence.test == "ks_2samp"
 
 
-def test_numeric_drift_effect_parity(spark):
+@pytest.mark.parametrize("discrete", [False, True], ids=["continuous", "discrete"])
+def test_numeric_drift_effect_parity(spark, discrete):
     """Distributed CDF integration and reference quantile bins retain Core effect values."""
     import polars as pl
 
@@ -32,8 +130,16 @@ def test_numeric_drift_effect_parity(spark):
         drift_evidence,
     )
 
-    reference = pd.DataFrame({"x": [float(index) for index in range(40)]})
-    current = pd.DataFrame({"x": [float(index + 30) for index in range(40)]})
+    reference = pd.DataFrame(
+        {
+            "x": [0.0] * 50 + [1.0] * 25 + [2.0] * 25
+            if discrete
+            else [float(index) for index in range(40)]
+        }
+    )
+    current = pd.DataFrame(
+        {"x": [0.0] * 50 + [2.0] * 50 if discrete else [float(index + 30) for index in range(40)]}
+    )
     expected, drifted, _, _ = _drift_evidence(
         pl.from_pandas(reference), pl.from_pandas(current), ("x",), None
     )
@@ -87,3 +193,40 @@ def test_missing_input_requires_saved_prediction(spark):
     missing = next(item for item in report["metrics"] if item["metric_name"] == "missing_fraction")
     assert missing["has_issue"]
     assert report["status"] == "degraded"
+    assert report["excluded_rows"] == 0
+
+
+@pytest.mark.parametrize("excluded", [0, 1, 3, None], ids=["none", "some", "all", "empty"])
+def test_full_report_retains_explicit_exclusion_count(spark, excluded):
+    """Full Spark reports must count only saved exclusions, including empty populations."""
+    from datetime import UTC, datetime
+
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
+        build_spark_monitoring_report,
+    )
+
+    current = spark.createDataFrame([(i, float(i)) for i in range(1, 5)], "id long, x double")
+    rows = (
+        []
+        if excluded is None
+        else [
+            (i, None if i <= excluded else float(i), "excluded" if i <= excluded else "predicted")
+            for i in range(1, 4)
+        ]
+    )
+    predictions = spark.createDataFrame(rows, "id long, prediction double, scoring_status string")
+    report = build_spark_monitoring_report(
+        current,
+        current,
+        predictions,
+        None,
+        feature_columns=("x",),
+        record_key_columns=("id",),
+        target_column="y",
+        result_available_at_column="available",
+        as_of=datetime(2026, 1, 2, tzinfo=UTC),
+        task="regression",
+    )
+    assert report["current_rows"] == 4
+    assert report["scored_rows"] == (0 if excluded is None else 3 - excluded)
+    assert json.loads(json.dumps(report, allow_nan=False))["excluded_rows"] == (excluded or 0)

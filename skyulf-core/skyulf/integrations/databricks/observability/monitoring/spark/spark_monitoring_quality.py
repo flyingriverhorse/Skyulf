@@ -4,7 +4,14 @@ from typing import Any
 
 from scipy.stats import fisher_exact
 
+from ..missing_markers import (
+    Marker,
+    require_marked_features,
+    split_missing_markers,
+    typed_markers,
+)
 from ..monitoring_metrics import (
+    exclusion_metrics,
     monitoring_metric,
     monitoring_report_status,
     validate_monitoring_inputs,
@@ -19,6 +26,30 @@ from .spark_monitoring_metrics import (
     spark_functions,
     validate_record_keys,
 )
+
+# Spark integer and floating-point types named as missing_markers dtype kinds.
+_SPARK_KINDS = {
+    "ByteType": "Int8",
+    "ShortType": "Int16",
+    "IntegerType": "Int32",
+    "LongType": "Int64",
+    "FloatType": "Float32",
+    "DoubleType": "Float64",
+}
+
+
+def _without_markers(frame: Any, markers: dict[str, tuple[Marker, ...]]) -> Any:
+    """Replace marked values with typed nulls lazily, comparing in the column's own type."""
+    f = spark_functions()
+    for column, values in markers.items():
+        if column not in frame.columns:
+            continue
+        dtype = frame.schema[column].dataType
+        exact = typed_markers(column, values, _SPARK_KINDS.get(type(dtype).__name__))
+        marked = spark_column(column).isin([f.lit(value).cast(dtype) for value in exact])
+        null = f.lit(None).cast(dtype)
+        frame = frame.withColumn(column, f.when(marked, null).otherwise(spark_column(column)))
+    return frame
 
 
 def _missing(frame: Any, column: str) -> Any:
@@ -156,6 +187,10 @@ def monitoring_report(
 ) -> dict:
     """Build the existing monitoring result contract without materializing populations."""
     validate_monitoring_inputs(as_of, task, classes, thresholds)
+    thresholds, markers = split_missing_markers(thresholds)
+    require_marked_features(markers, feature_columns)
+    reference = _without_markers(reference, markers)
+    current = _without_markers(current, markers)
     validate_record_keys(current, record_key_columns, "current")
     validate_record_keys(predictions, record_key_columns, "predictions")
     scored, excluded = scored_predictions(predictions, task, classes)
@@ -178,6 +213,13 @@ def monitoring_report(
         monitoring_metric("performance", target_column, name, value)
         for name, value in performance["values"].items()
     )
+    metrics.extend(
+        exclusion_metrics(
+            performance["scored_rows"] + excluded,
+            excluded,
+            _invalid_exclusions(predictions, excluded),
+        )
+    )
     notes = (
         ([f"{excluded} excluded predictions were not scored."] if excluded else [])
         + notes
@@ -196,6 +238,7 @@ def monitoring_report(
         "reference_rows": reference_count,
         "current_rows": current_count,
         "scored_rows": performance["scored_rows"],
+        "excluded_rows": excluded,
         "labeled_rows": performance["labeled_rows"],
         "label_coverage": performance["label_coverage"],
         "confusion_matrix": performance["confusion_matrix"],
@@ -203,3 +246,19 @@ def monitoring_report(
         "metrics": metrics,
         "notes": notes,
     }
+
+
+def _invalid_exclusions(predictions: Any, excluded: int) -> int | None:
+    """Count invalid outcomes without collecting requests or discarding unknown reasons."""
+    if not excluded:
+        return 0
+    if "exclusion_reason" not in predictions.columns:
+        return None
+    f = spark_functions()
+    reasons = predictions.where(spark_column("scoring_status") == "excluded")
+    reason = spark_column("exclusion_reason")
+    counts = reasons.agg(
+        f.sum(f.when(reason.isNull(), 1).otherwise(0)).alias("unknown"),
+        f.sum(f.when(reason.startswith("invalid:"), 1).otherwise(0)).alias("invalid"),
+    ).first()
+    return None if counts.unknown else int(counts.invalid)

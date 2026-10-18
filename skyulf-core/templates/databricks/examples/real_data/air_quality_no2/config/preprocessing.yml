@@ -1,0 +1,31 @@
+# Ordered model transformations, fitted on training rows after the chronological split.
+# Custom steps live in src/features/preprocessing.py; built-ins use transformer + params.
+version: 1
+recipes:
+  default:
+    # Custom: the reference CO analyzer is often offline (-200); make those hours missing.
+    - custom: preprocessing.missing_marker
+      params: {columns: [co_gt]}
+    # Custom: a categorical part of day for the encoder below.
+    - custom: preprocessing.day_part
+    # Custom fitted step: learns the training mean temperature per hour, applies it per row.
+    - custom: preprocessing.temperature_anomaly
+    # Built-in outlier exclusion: at scoring an outlier row stays with an empty prediction and
+    # reason outlier:nox_sensor_outliers. 1.5 x IQR excludes about 3% of the hours here.
+    - name: nox_sensor_outliers
+      transformer: IQR
+      params: {columns: [pt08_s3_nox], multiplier: 1.5}
+    # Built-in: Yeo-Johnson for the skewed CO readings; missing values pass through.
+    - name: co_power
+      transformer: PowerTransformer
+      params: {columns: [co_gt], method: yeo-johnson, standardize: false}
+    # Built-in imputation of the remaining CO gaps with the training median.
+    - name: fill_co
+      transformer: SimpleImputer
+      params: {columns: [co_gt], strategy: median}
+    - name: encode_day_part
+      transformer: OneHotEncoder
+      params: {columns: [day_part], handle_unknown: ignore, max_categories: null, include_missing: false}
+    - name: scale
+      transformer: StandardScaler
+      params: {columns: [temperature_anomaly, abs_humidity, rel_humidity]}

@@ -1,11 +1,21 @@
 # Shared environments are independent of your CI/CD provider.
 # Personal development targets deliberately have no shared run_as or job ACL overrides.
+# Every target lets the deployer and pipeline_owner manage its resources;
+# shared targets can add a read-only group chosen in setup.
 # Personal names retain the train/score/monitoring role after the user prefix.
 targets:
   test:
     mode: production
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+{{- if .test_view_group}}
+      - level: CAN_VIEW
+        group_name: {{printf "%q" .test_view_group}}
+{{- end}}
     workspace:
       host: https://replace-test.example.invalid
       root_path: ${var.test_root_path}
@@ -54,12 +64,30 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.monitoring_permissions}
 {{end}}
+{{if .monitoring_catalog}}
+        monitoring_cleanup:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.monitoring_permissions}
+{{end}}
+{{end}}
 {{end}}
 {{if eq .personal_development_targets "true"}}
   test_development:
     mode: development
     default: true
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
     presets:
       name_prefix: "dev_${workspace.current_user.short_name}_"
       trigger_pause_status: PAUSED
@@ -71,6 +99,10 @@ targets:
           name: score
         monitoring:
           name: monitoring
+{{if .monitoring_catalog}}
+        monitoring_cleanup:
+          name: monitoring_cleanup
+{{end}}
     workspace:
       host: https://replace-test.example.invalid
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/test_development
@@ -83,6 +115,7 @@ targets:
       # Ephemeral dev models never enter the shared monitoring inventory.
       monitoring_enabled: "false"
       monitoring_pause_status: PAUSED
+      monitoring_cleanup_pause_status: PAUSED
       monitoring_performance_policies: '{}'
       on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
@@ -96,7 +129,15 @@ targets:
   syst:
     mode: production
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+{{- if .syst_view_group}}
+      - level: CAN_VIEW
+        group_name: {{printf "%q" .syst_view_group}}
+{{- end}}
     workspace:
       host: https://replace-syst.example.invalid
       root_path: ${var.syst_root_path}
@@ -145,12 +186,30 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.monitoring_permissions}
 {{end}}
+{{if .monitoring_catalog}}
+        monitoring_cleanup:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.monitoring_permissions}
+{{end}}
+{{end}}
 {{end}}
 {{if eq .personal_development_targets "true"}}
   syst_development:
     mode: development
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
     presets:
       name_prefix: "dev_${workspace.current_user.short_name}_"
       trigger_pause_status: PAUSED
@@ -162,6 +221,10 @@ targets:
           name: score
         monitoring:
           name: monitoring
+{{if .monitoring_catalog}}
+        monitoring_cleanup:
+          name: monitoring_cleanup
+{{end}}
     workspace:
       host: https://replace-syst.example.invalid
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/syst_development
@@ -174,6 +237,7 @@ targets:
       # Ephemeral dev models never enter the shared monitoring inventory.
       monitoring_enabled: "false"
       monitoring_pause_status: PAUSED
+      monitoring_cleanup_pause_status: PAUSED
       monitoring_performance_policies: '{}'
       on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
@@ -187,7 +251,15 @@ targets:
   prod:
     mode: production
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+{{- if .prod_view_group}}
+      - level: CAN_VIEW
+        group_name: {{printf "%q" .prod_view_group}}
+{{- end}}
     workspace:
       host: https://replace-prod.example.invalid
       root_path: ${var.prod_root_path}
@@ -236,12 +308,30 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.monitoring_permissions}
 {{end}}
+{{if .monitoring_catalog}}
+        monitoring_cleanup:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.monitoring_permissions}
+{{end}}
+{{end}}
 {{end}}
 {{if eq .personal_development_targets "true"}}
   prod_development:
     mode: development
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
     presets:
       name_prefix: "dev_${workspace.current_user.short_name}_"
       trigger_pause_status: PAUSED
@@ -253,6 +343,10 @@ targets:
           name: score
         monitoring:
           name: monitoring
+{{if .monitoring_catalog}}
+        monitoring_cleanup:
+          name: monitoring_cleanup
+{{end}}
     workspace:
       host: https://replace-prod.example.invalid
       root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/prod_development
@@ -265,6 +359,7 @@ targets:
       # Ephemeral dev models never enter the shared monitoring inventory.
       monitoring_enabled: "false"
       monitoring_pause_status: PAUSED
+      monitoring_cleanup_pause_status: PAUSED
       monitoring_performance_policies: '{}'
       on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}

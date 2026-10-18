@@ -1,5 +1,5 @@
 site_name: Skyulf
-site_url: https://flyingriverhorse.github.io/Skyulf/
+site_url: https://www.skyulf.com/manual/
 repo_url: https://github.com/flyingriverhorse/Skyulf
 repo_name: flyingriverhorse/Skyulf
 
@@ -79,19 +79,7 @@ nav:
   - User Guide:
     - Overview: user_guide/overview.md
     - Installation: user_guide/installation.md
-    - Spark (Development): user_guide/spark.md
-    - Inference Bundles (Development): user_guide/inference_bundles.md
-    - Inference Flow: user_guide/inference_flow.md
     - Preprocessing Diagnostics and Context: user_guide/preprocessing_context.md
-    - MLflow Tracking (Development): user_guide/mlflow_tracking.md
-    - MLflow Models (Development): user_guide/mlflow_models.md
-    - MLflow Registry (Development): user_guide/mlflow_registry.md
-    - Databricks Batch (Development): user_guide/databricks_batch.md
-    - Databricks Python SDK: user_guide/databricks_sdk.md
-    - Gradual Serving Rollout: user_guide/databricks_serving_rollout.md
-    - Online Feature Lookup: user_guide/databricks_online_features.md
-    - Databricks Bundle: user_guide/databricks_bundle.md
-    - Databricks Bundle Operator Walkthrough: user_guide/databricks_bundle_walkthrough.md
     - Pipeline Quickstart: user_guide/pipeline_quickstart.md
     - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
     - Automated EDA: user_guide/eda_profiling.md
@@ -113,6 +101,79 @@ nav:
     - Serialization: user_guide/serialization.md
     - Extending Skyulf-Core: user_guide/extending_custom_nodes.md
     - Troubleshooting: user_guide/troubleshooting.md
+  - Integrations:
+    - Documentation Index: user_guide/integrations.md
+    - Databricks:
+      - Get Started:
+        - End-to-End Project Guide: user_guide/databricks_bundle_walkthrough.md
+        - Topic Index: user_guide/databricks_bundle.md
+        - Choose a Project Shape: user_guide/databricks_choose.md
+        - Project Setup and Preview: user_guide/databricks_project_setup.md
+        - Tables in Your Workspace: user_guide/databricks_workspace_tables.md
+        - Check or Create Source Tables: user_guide/databricks_source_tables.md
+        - Deployment and Access: user_guide/databricks_deployment.md
+        - Project Upgrades: user_guide/databricks_project_upgrade.md
+        - Remove a Project: user_guide/databricks_teardown.md
+      - Train:
+        - Training Data and Holdout: user_guide/databricks_training_data.md
+        - Training Configuration: user_guide/databricks_training_config.md
+        - Model and Search-Space Catalog: user_guide/databricks_model_catalog.md
+        - Search Strategies: user_guide/databricks_tuning.md
+        - Voting and Stacking Ensembles: user_guide/databricks_ensembles.md
+        - Preprocessing YAML Catalog:
+          - Build Preprocessing with YAML: user_guide/preprocessing_yaml_walkthrough.md
+          - Overview: user_guide/preprocessing_recipes.md
+          - Missing Values, Cleaning and Types: user_guide/preprocessing_recipes_cleaning.md
+          - Scaling and Numeric Transforms: user_guide/preprocessing_recipes_scaling.md
+          - Bounds and Outliers: user_guide/preprocessing_recipes_outliers.md
+          - Categorical Encoding: user_guide/preprocessing_recipes_encoding.md
+          - Binning: user_guide/preprocessing_recipes_binning.md
+          - Feature Generation and Selection: user_guide/preprocessing_recipes_features.md
+          - Time and Geography: user_guide/preprocessing_recipes_time_geo.md
+          - Text and Embeddings: user_guide/preprocessing_recipes_text.md
+          - Split, Sampling and Diagnostics: user_guide/preprocessing_recipes_sampling.md
+          - Custom Factory Contracts: user_guide/preprocessing_recipes_custom.md
+        - Custom Preprocessing Steps: user_guide/databricks_custom_steps.md
+        - Custom Pre-Split Filters: user_guide/databricks_custom_pre_split.md
+        - Feature Tables and Merges: user_guide/databricks_features.md
+        - Decision Thresholds: user_guide/databricks_decision_thresholds.md
+        - Model Sets (Multi-Target): user_guide/databricks_model_sets.md
+      - Decide:
+        - Training Reports and Charts: user_guide/databricks_training_reports.md
+        - SHAP Explanations: user_guide/databricks_explanations.md
+        - Approve, Reject and Roll Back: user_guide/databricks_lifecycle.md
+        - Interrupted Alias Recovery: user_guide/databricks_lifecycle_recovery.md
+      - Score:
+        - Scoring and Publication: user_guide/databricks_scoring.md
+        - Score on Spark Workers: user_guide/databricks_spark_scoring.md
+        - Python SDK: user_guide/databricks_sdk.md
+        - Monthly Batch: user_guide/databricks_batch.md
+      - Monitor:
+        - Overview: user_guide/databricks_monitoring.md
+        - Store Setup and Upgrades: user_guide/databricks_monitoring_setup.md
+        - Enrollment and References: user_guide/databricks_monitoring_enrollment.md
+        - Delayed Labels: user_guide/databricks_monitoring_labels.md
+        - Drift and Data Quality: user_guide/databricks_drift.md
+        - Performance Loss: user_guide/databricks_performance.md
+        - Automatic Retraining: user_guide/databricks_retraining.md
+        - Dashboard: user_guide/databricks_monitoring_dashboard.md
+      - Serve:
+        - Endpoint Setup and Queries: user_guide/databricks_serving.md
+        - Online Feature Lookup: user_guide/databricks_online_features.md
+        - Gradual Serving Rollout: user_guide/databricks_serving_rollout.md
+        - Serving Observations: user_guide/databricks_serving_monitoring.md
+      - Reference:
+        - Troubleshooting: user_guide/databricks_troubleshooting.md
+        - Glossary: user_guide/databricks_glossary.md
+    - MLflow:
+      - Tracking: user_guide/mlflow_tracking.md
+      - Model Packages: user_guide/mlflow_models.md
+      - Registry and Lifecycle: user_guide/mlflow_registry.md
+    - Spark:
+      - How Inference Works: user_guide/inference_flow.md
+      - Execution and Inference: user_guide/spark.md
+      - Measure Inference Capacity: user_guide/spark_benchmark.md
+      - Portable Inference Bundles: user_guide/inference_bundles.md
   - Reference:
     - Preprocessing Nodes: reference/preprocessing_nodes.md
     - Modeling Nodes: reference/modeling_nodes.md

@@ -7,10 +7,39 @@ import pandas as pd
 import pytest
 
 pytest.importorskip("matplotlib")
+from skyulf.integrations.databricks.observability.charts.evaluation_chart_report import _cv_charts
 from skyulf.integrations.databricks.observability.charts.evaluation_charts import (
     diagnostic_charts,
     model_charts,
 )
+
+
+@pytest.mark.parametrize(
+    "metric,scores", [("f1", [0.8, 0.9]), ("neg_root_mean_squared_error", [-8.0, -6.0])]
+)
+def test_nested_cv_charts_use_outer_scores_with_exact_metric(metric, scores):
+    """Nested folds store outer scores, not the ordinary per-fold metrics mapping."""
+    evidence = {
+        "method": "nested_cv",
+        "status": "nested_cv",
+        "scoring_metric": metric,
+        "folds": [
+            {"fold": i + 1, "outer_score": score, "inner_best_score": 1.0}
+            for i, score in enumerate(scores)
+        ],
+    }
+    figures = _cv_charts(evidence, "classification" if metric == "f1" else "regression")
+    axis = figures[f"cv_{metric}"].axes[0]
+    assert list(axis.lines[0].get_ydata()) == scores
+    assert axis.get_ylabel() == metric
+    assert "metrics" not in evidence["folds"][0]
+
+
+def test_regular_cv_charts_keep_each_saved_metric():
+    """Ordinary CV retains its measured metrics and never substitutes selection scores."""
+    figures = _cv_charts({"folds": [{"fold": 1, "metrics": {"accuracy": 0.75}}]}, "classification")
+    assert set(figures) == {"cv_accuracy"}
+    assert list(figures["cv_accuracy"].axes[0].lines[0].get_ydata()) == [0.75]
 
 
 def test_regression_charts_use_paired_holdout_errors():

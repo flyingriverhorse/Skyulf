@@ -132,6 +132,12 @@ def _performance_policy_section(report: dict, row: dict) -> str:
         status = "unavailable"
     status_label = status.capitalize()
     action = row.get("performance_action") or {}
+    logging_errors = (
+        evidence.get("measurement", {})
+        .get("evidence", {})
+        .get("serving", {})
+        .get("logging_error_count")
+    )
     fields = (
         ("Report ID", row.get("report_id")),
         ("Model", row.get("model_name")),
@@ -155,7 +161,8 @@ def _performance_policy_section(report: dict, row: dict) -> str:
         ("Window end", evidence.get("window_end")),
         (
             "Failure streak",
-            f"{evidence.get('consecutive_failures', 0)} / {evidence.get('required_windows', 0)}",
+            f"{evidence.get('consecutive_failures', 0)} / "
+            f"{evidence.get('required_windows') or 'Unavailable'}",
         ),
         ("Evaluated windows", json.dumps(evidence.get("evaluated_windows") or [], default=str)),
         ("Action", action.get("action", evidence.get("action", "No action recorded"))),
@@ -163,7 +170,16 @@ def _performance_policy_section(report: dict, row: dict) -> str:
         ("Request ID", action.get("request_id", evidence.get("request_id"))),
         ("Run ID", action.get("run_id", evidence.get("run_id"))),
     )
-    return heading + output_table(("Evidence", "Saved value"), list(fields))
+    note = (
+        "<p>This policy measures only usable payloads. Requests with logging errors are "
+        "excluded; the missing population may differ. Retraining remains subject to "
+        "the configured policy and training checks.</p>"
+        if logging_errors
+        else ""
+    )
+    if logging_errors is not None:
+        fields += (("Requests with logging errors", logging_errors),)
+    return heading + note + output_table(("Evidence", "Saved value"), list(fields))
 
 
 def _drift_status(report: dict) -> str:
@@ -244,6 +260,7 @@ def render_drift_output(row: dict, dashboard_url: str = "") -> str:
     """Render saved drift and performance evidence through the compatible report API."""
     features: dict[str, dict] = {}
     report = json.loads(row["report_json"])
+    notes = report.get("notes", [])
     for metric in report.get("metrics", []):
         if metric["category"] == "drift":
             features.setdefault(metric["column_name"], {})[metric["metric_name"]] = metric
@@ -296,6 +313,7 @@ def render_drift_output(row: dict, dashboard_url: str = "") -> str:
         "<h2>Monitoring report</h2><p>Saved results for this scoring batch. Each metric has its own limit. "
         "KS p-value is diagnostic only. Timestamps use the Spark session timezone.</p>"
         + summary
+        + (output_table(("Observation notes",), [(note,) for note in notes]) if notes else "")
         + output_table(
             ("Feature drift", "Observed performance", "Performance loss policy"),
             [tuple(_monitoring_statuses(report).values())],

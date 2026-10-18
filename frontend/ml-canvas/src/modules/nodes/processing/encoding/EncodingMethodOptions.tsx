@@ -2,6 +2,7 @@ import { ValidationField } from '../../../../components/shared/ValidationField';
 import { parseIntSafe } from '../../../../core/utils/numberInput';
 import type { AnalysisProfile } from '../../../../core/api/client';
 import type { EncodingConfig, EncodingSettingsProps } from './types';
+import { OnehotCategories } from './OnehotCategories';
 
 interface EncodingMethodOptionsProps extends EncodingSettingsProps {
   schema: AnalysisProfile | undefined;
@@ -9,6 +10,7 @@ interface EncodingMethodOptionsProps extends EncodingSettingsProps {
 }
 
 function OnehotOptions({ config, onChange }: EncodingSettingsProps) {
+  const fixed = config.categories !== undefined;
   return (
     <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
       <label className="flex items-center gap-2 text-sm">
@@ -44,8 +46,9 @@ function OnehotOptions({ config, onChange }: EncodingSettingsProps) {
           min="2"
           max="200"
           className="w-full p-1 text-sm border rounded"
-          value={config.max_categories ?? 20}
-          onChange={(e) => onChange({ ...config, max_categories: parseIntSafe(e.target.value, config.max_categories) })}
+          value={config.max_categories === null ? '' : (config.max_categories ?? 20)}
+          disabled={fixed}
+          onChange={(e) => onChange({ ...config, max_categories: parseIntSafe(e.target.value, config.max_categories ?? undefined) })}
           title="Caps the number of one-hot columns per feature."
         />
         <p className="text-[10px] text-muted-foreground">Caps columns per feature (default 20).</p>
@@ -54,11 +57,13 @@ function OnehotOptions({ config, onChange }: EncodingSettingsProps) {
         <input
           type="checkbox"
           checked={config.include_missing || false}
+          disabled={fixed}
           onChange={(e) => onChange({ ...config, include_missing: e.target.checked })}
           className="rounded border-gray-300"
         />
         Include missing as category
       </label>
+      <OnehotCategories config={config} onChange={onChange} />
     </div>
   );
 }
@@ -132,6 +137,74 @@ function TargetOptions({ config, onChange, schema, categoricalColumns }: Encodin
           <option value="multiclass">Multiclass classification</option>
         </select>
       </div>
+      <TargetCrossFitOptions config={config} onChange={onChange} />
+    </div>
+  );
+}
+
+function TargetCrossFitOptions({ config, onChange }: EncodingSettingsProps) {
+  return (
+    <div className="space-y-2">
+      <ValidationField field="cv">
+      <label className="block text-xs">Maximum CV folds
+        <input aria-label="Maximum CV folds" type="number" min="2" step="1" className="w-full p-1 border rounded"
+          value={config.cv ?? 5} onChange={(e) => onChange({ ...config, cv: Number(e.target.value) })} />
+      </label>
+      </ValidationField>
+      <label className="flex items-center gap-2 text-xs">
+        <input type="checkbox" checked={config.shuffle ?? true}
+          onChange={(e) => onChange({ ...config, shuffle: e.target.checked })} />
+        Shuffle folds
+      </label>
+      <ValidationField field="random_state">
+      <label className="block text-xs">Random seed
+        <input aria-label="Random seed" type="number" min="0" max="4294967295" step="1" className="w-full p-1 border rounded"
+          value={config.random_state === null ? '' : (config.random_state ?? 42)} disabled={config.shuffle === false}
+          onChange={(e) => onChange({ ...config, random_state: e.target.value === '' ? null : Number(e.target.value) })} />
+      </label>
+      </ValidationField>
+      <p className="text-[10px] text-muted-foreground">Folds are capped by available rows and class counts. Disabling shuffle does not provide temporal or grouped CV.</p>
+    </div>
+  );
+}
+
+function FrequencyOptions({ config, onChange }: EncodingSettingsProps) {
+  return (
+    <div className="space-y-2 p-3 bg-muted/20 rounded border">
+      <label className="block text-xs">Statistic
+        <select aria-label="Statistic" className="w-full p-1 border rounded" value={config.mode ?? 'frequency'}
+          onChange={(e) => onChange({ ...config, mode: e.target.value as EncodingConfig['mode'] })}>
+          <option value="frequency">Frequency (share of all training rows)</option>
+          <option value="count">Count</option>
+        </select>
+      </label>
+      <p className="text-[10px] text-muted-foreground">Missing values learn their own statistic. Unseen categories become zero.</p>
+    </div>
+  );
+}
+
+function RareOptions({ config, onChange }: EncodingSettingsProps) {
+  return (
+    <div className="space-y-2 p-3 bg-muted/20 rounded border">
+      <ValidationField field="min_count">
+      <label className="block text-xs">Minimum count
+        <input aria-label="Minimum count" type="number" min="1" step="1" className="w-full p-1 border rounded"
+          value={config.min_count ?? 2} onChange={(e) => onChange({ ...config, min_count: Number(e.target.value) })} />
+      </label>
+      </ValidationField>
+      <ValidationField field="min_share">
+      <label className="block text-xs">Minimum share
+        <input aria-label="Minimum share" type="number" min="0" max="1" step="0.01" className="w-full p-1 border rounded"
+          value={config.min_share ?? 0} onChange={(e) => onChange({ ...config, min_share: Number(e.target.value) })} />
+      </label>
+      </ValidationField>
+      <ValidationField field="replacement">
+      <label className="block text-xs">Replacement label
+        <input aria-label="Replacement label" type="text" className="w-full p-1 border rounded"
+          value={config.replacement ?? 'Other'} onChange={(e) => onChange({ ...config, replacement: e.target.value })} />
+      </label>
+      </ValidationField>
+      <p className="text-[10px] text-muted-foreground">Text categories must meet both thresholds. Frequent missing values stay null; rare and unseen values use the label. Cast numeric categories to text first.</p>
     </div>
   );
 }
@@ -178,9 +251,9 @@ function WoeOptions({ config, onChange, schema }: EncodingMethodOptionsProps) {
 function HashOptions({ config, onChange }: EncodingSettingsProps) {
   return (
     <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
-      <span className="block text-xs font-medium">Number of Features</span>
+      <span className="block text-xs font-medium">Number of Buckets</span>
       <input
-        aria-label="Number of Features"
+        aria-label="Number of Buckets"
         type="number"
         min="1"
         className="w-full p-2 border rounded"
@@ -188,7 +261,7 @@ function HashOptions({ config, onChange }: EncodingSettingsProps) {
         onChange={(e) => onChange({ ...config, n_features: parseIntSafe(e.target.value, config.n_features) })}
         title="Number of hash buckets."
       />
-      <p className="text-[10px] text-muted-foreground">Buckets to hash categories into (default 8).</p>
+      <p className="text-[10px] text-muted-foreground">One integer bucket index per source column, from 0 to buckets − 1 (default 8). Categories can collide.</p>
     </div>
   );
 }
@@ -272,6 +345,8 @@ const methodOptions = {
   hash: HashOptions,
   ordinal: OrdinalOptions,
   label: LabelOptions,
+  frequency: FrequencyOptions,
+  rare: RareOptions,
 };
 
 export function EncodingMethodOptions(props: EncodingMethodOptionsProps) {

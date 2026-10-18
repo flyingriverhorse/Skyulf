@@ -1,0 +1,77 @@
+{
+  "label_table_name": {
+    "order": 7.2,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Actual outcomes table for performance monitoring: short name in the input schema or catalog.schema.table. Blank disables label-based monitoring",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*)?)?$"
+  },
+  "label_available_at_column": {
+    "order": 7.3,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | UTC timestamp column recording when the actual outcome became available; required with an outcomes table",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+  },
+  "monitoring_catalog": {
+    "order": 749,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | Monitoring store catalog for drift and performance tracking. Use the same catalog and schema in every project so all models appear in one dashboard. Leave blank to start without monitoring; enable it later in deployment/variables.yml",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+  },
+  "monitoring_schema": {
+    "order": 750,
+    "type": "string",
+    "default": "skyulf_monitoring",
+    "description": "6. Deployment | Shared monitoring store schema; omitted or blank uses skyulf_monitoring when a catalog is set. Choose another existing store if needed. Ignored when the catalog is blank. Created on first use when the run-as identity may create schemas",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+  },
+  "performance_policy_mode": {
+    "order": 760,
+    "type": "string",
+    "default": "off",
+    "enum": ["off", "report", "retrain"],
+    "description": "6. Monitoring | off disables loss policy; report records loss; retrain may request guarded training. Requires an outcomes table and monitoring store"
+  },
+  "performance_regression_metric": {
+    "order": 761,
+    "type": "string",
+    "default": "wape",
+    "enum": ["wape", "mae", "rmse", "mse", "mape", "r2"],
+    "description": "6. Monitoring | Regression metric for completed outcome windows; WAPE is undefined when total absolute actual outcome is zero",
+    "skip_prompt_if": {"anyOf": [{"properties": {"performance_policy_mode": {"const": "off"}}}, {"properties": {"training_layout": {"enum": ["single_model", "model_competition"]}, "task": {"const": "classification"}}}]}
+  },
+  "performance_classification_metric": {
+    "order": 762,
+    "type": "string",
+    "default": "accuracy",
+    "enum": ["accuracy", "balanced_accuracy", "f1_weighted", "precision_weighted", "recall_weighted", "matthews_corrcoef"],
+    "description": "6. Monitoring | Classification metric for completed outcome windows; model-set branches each keep their own metric and baseline",
+    "skip_prompt_if": {"anyOf": [{"properties": {"performance_policy_mode": {"const": "off"}}}, {"properties": {"training_layout": {"enum": ["single_model", "model_competition"]}, "task": {"const": "regression"}}}]}
+  },
+  "performance_tolerance_mode": {
+    "order": 763,
+    "type": "string",
+    "default": "relative",
+    "enum": ["relative", "absolute"],
+    "description": "6. Monitoring | relative scales the allowed loss by the absolute baseline; absolute uses metric units",
+    "skip_prompt_if": {"properties": {"performance_policy_mode": {"const": "off"}}}
+  },
+  "performance_tolerance": {
+    "order": 764,
+    "type": "string",
+    "default": "0.2",
+    "description": "6. Monitoring | Allowed performance loss: 0.2 means 20% of baseline in relative mode, or 0.2 metric units in absolute mode",
+    "pattern": "^(?:[1-9][0-9]*(?:\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*)$",
+    "skip_prompt_if": {"properties": {"performance_policy_mode": {"const": "off"}}}
+  },
+  "performance_baseline_version": {
+    "order": 765,
+    "type": "string",
+    "default": "1",
+    "description": "6. Monitoring | Concrete registered model version whose saved holdout supplies the baseline. Verify it before activation; edit each component policy if model-set versions differ",
+    "pattern": "^[1-9][0-9]*$",
+    "skip_prompt_if": {"properties": {"performance_policy_mode": {"const": "off"}}}
+  }
+}

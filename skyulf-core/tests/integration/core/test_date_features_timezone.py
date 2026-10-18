@@ -73,16 +73,20 @@ def test_native_date_features_match_string_instants(engine, timezone):
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_legacy_artifact_keeps_its_saved_calendar_interpretation(engine):
+@pytest.mark.parametrize("include_timezone", [False, True])
+def test_legacy_artifact_keeps_its_saved_calendar_interpretation(engine, include_timezone):
     """Loading an old trained model must not silently change its feature values."""
     data = {"date": ["2024-01-01T00:30:00+02:00"]}
     data = pd.DataFrame(data) if engine == "pandas" else pl.DataFrame(data)
     artifact = {"type": "date_features", "columns": ["date"], "features": ["year", "day", "hour"]}
+    if include_timezone:
+        artifact["timezone"] = None
     result = DateFeaturesApplier().apply(data, artifact)
 
     assert result["date_year"].to_list() == ([2024] if engine == "pandas" else [2023])
     assert result["date_day"].to_list() == ([1] if engine == "pandas" else [31])
     assert result["date_hour"].to_list() == ([0] if engine == "pandas" else [22])
+    assert DateFeaturesApplier.inference_capability(artifact, engine=engine) is None
 
 
 def test_date_pipeline_replays_equivalent_instants_after_serialization():

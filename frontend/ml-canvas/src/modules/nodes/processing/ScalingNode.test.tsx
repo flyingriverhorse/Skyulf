@@ -44,6 +44,48 @@ beforeEach(() => {
 });
 
 describe('ScalingNode public settings', () => {
+  it.each([
+    ['minmax', 'Clip values to feature range', 'clip'],
+    ['robust', 'Unit variance for normal data', 'unit_variance'],
+  ] as const)('saves the optional %s flag', (method, label, key) => {
+    // Both flags default to false so old recipes keep their original learned transform.
+    const { onChange } = setup({ columns: ['age'], method });
+    expect(screen.getByRole('checkbox', { name: label })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: label }));
+    expect(onChange).toHaveBeenLastCalledWith({ columns: ['age'], method, [key]: true });
+  });
+  it('edits quantile options and rejects an emptied quantile count', () => {
+    // New methods must remain usable through the same persisted settings control.
+    const { onChange } = setup({ columns: ['age'] });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Scaling Method' }), { target: { value: 'quantile' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Output distribution' }), { target: { value: 'normal' } });
+    const count = screen.getByRole('spinbutton', { name: 'Quantile count' });
+    expect(count).toHaveValue(1000);
+    fireEvent.change(count, { target: { value: '20' } });
+    expect(onChange).toHaveBeenLastCalledWith({ columns: ['age'], method: 'quantile', output_distribution: 'normal', n_quantiles: 20 });
+    fireEvent.change(count, { target: { value: '' } });
+    expect(ScalingNode.validate(onChange.mock.lastCall![0] as Config).isValid).toBe(false);
+    fireEvent.change(count, { target: { value: '5' } });
+    expect(ScalingNode.validate(onChange.mock.lastCall![0] as Config).isValid).toBe(true);
+  });
+  it('saves row normalization without clearing selected columns', () => {
+    // Choosing a row norm changes only normalization settings, not the feature vector.
+    const { onChange } = setup({ columns: ['age', 'score'] });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Scaling Method' }), { target: { value: 'normalize' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Row norm' }), { target: { value: 'l1' } });
+    expect(onChange).toHaveBeenLastCalledWith({ columns: ['age', 'score'], method: 'normalize', norm: 'l1' });
+  });
+  it.each([0, -1, 2.5, null, Infinity])('rejects invalid quantile count %s', (n_quantiles) => {
+    // Imported or emptied numeric drafts must not reach sklearn as a different recipe.
+    expect(ScalingNode.validate({ columns: ['age'], method: 'quantile', n_quantiles }).isValid).toBe(false);
+  });
+  it('describes robust unit variance without promising an IQR of one', () => {
+    // The adjusted fitted scale targets normally distributed variance rather than raw IQR.
+    source.metrics = { columns: ['age'], center: [1], scale: [2] };
+    setup({ columns: ['age'], method: 'robust', unit_variance: true });
+    expect(screen.getByText('Target: Unit variance for normal data')).toBeInTheDocument();
+    expect(screen.queryByText('Target: Median \u2248 0, IQR \u2248 1')).not.toBeInTheDocument();
+  });
   it.each([false, true])('filters columns and preserves picker state at wide=%s', (wide) => {
     // Numeric eligibility, dropped columns and local search survive method updates.
     source.wide = wide;

@@ -1,74 +1,34 @@
-# Spark feature groups
+# Spark feature groups in this project
 
-This folder ships two editable Spark examples. They do nothing until selected
-in [config/features.yml](../../../config/features.yml). That file contains a
-complete commented configuration; replace its active `version: 1` / `groups: {}`
-lines with the uncommented example, and use your actual catalog/schema names.
+These examples run only when selected in
+[config/features.yml](../../../config/features.yml). Empty `groups: {}` creates
+no feature job. Replace the disabled configuration with the adapted commented
+example; use actual catalog/schema names and one owner per output table.
 
-| File | Expected source columns | Features returned |
+## Files and function contract
+
+| File | Source columns | Returned features |
 | --- | --- | --- |
-| [company.py](company.py) | `company_id`, `observed_at`, `employee_count` | `employee_count` |
-| [activity.py](activity.py) | `company_id`, `observed_at`, `amount` | `monthly_amount`, `transaction_count` |
+| [company.py](company.py) | company_id, observed_at, employee_count | employee_count |
+| [activity.py](activity.py) | company_id, observed_at, amount | monthly_amount, transaction_count |
 
-Each output also includes `company_id` and `observed_at`. Keep their types equal
-to the base table. `activity.py` aggregates multiple transaction rows at an
-already defined monthly availability date; it does not infer calendar windows
-from raw event timestamps. Read its docstring before adapting it.
+Each function receives only its pinned source Spark `frame`; there is no YAML
+`params` field. Return unique keys/time plus exactly the declared feature columns.
+`transform: src/features/groups/company.py:compute_features` selects the file
+and callable; the group/file/function names need not match. One function can
+produce many columns. Keep reads, collection and writes outside the function.
 
-## How YAML selects a function
+`activity.py` assumes an existing availability date; it does not infer monthly
+windows from raw events. `asof` chooses the latest available row at or before
+each observation, not a cumulative sum. Keep company/time as the feature grain;
+use a separate stable observation_id BIGINT as prediction identity, not a timestamp.
 
-This is the `company` entry **inside** `features.yml` -> `groups`:
+## Commands and result
 
-```yaml
-company:
-  source_table: workspace.demo.company_source
-  output_table: workspace.demo.company_features
-  transform: src/features/groups/company.py:compute_features
-  columns: [employee_count]
-  lookup: exact
-  allow_missing: false
-```
+From the project root, using your configured target and profile:
 
-The part before `:` is a file path relative to the project root. The part after
-it is the function to call. Group names, file names and function names do not
-have to match. One function can create several feature columns; you do not need
-one file per column or per model. Group functions accept only `frame`; this
-configuration has no `params` field. Keep fixed business constants in the module.
-
-The feature job reads the pinned `source_table` version, calls your function,
-validates its result, and writes `output_table`. Do not call `spark.table`,
-`toPandas`, `collect` or a table writer inside these example functions. Return a
-Spark DataFrame with exactly the configured keys, timestamp and feature columns.
-No labels belong in group outputs. Your source may contain multiple rows per
-key/time when the function aggregates them; the returned frame must be unique.
-
-## Base table, merge and training
-
-The existing `base_table` supplies the observation rows and optional labels.
-It has no group function. For the shipped configuration:
-
-```text
-company_observations (company_id, observed_at, churn)
-  + company_features (employee_count, exact key/time match)
-  + activity_features (monthly_amount, transaction_count, latest past match)
-  = company_merged (all base columns plus the three features)
-```
-
-For company `1`, suppose activity has two amounts `10` and `20` available on
-January 31, one amount `40` available on February 28, and a future amount `9999`
-available on March 31. Company snapshots match each observation date exactly.
-The merged result is:
-
-| company_id | observed_at | churn | employee_count | monthly_amount | transaction_count |
-| --- | --- | --- | --- | --- | --- |
-| 1 | 2026-02-01 | 0 | 10 | 30 | 2 |
-| 1 | 2026-03-01 | 1 | 12 | 40 | 1 |
-
-The future amount is not joined into either observation. `asof` chooses the
-latest available group row; it does not sum all prior months or fill gaps with
-zero. All-null amounts remain null, while transaction count includes those rows.
-
-Run these commands from the generated project root after editing the config:
+Replace `test` with your target (`test_development` for personal targets) and `YOUR_PROFILE`
+with that target's authenticated profile.
 
 ```powershell
 python src/tools/refresh_feature_graph.py
@@ -77,26 +37,22 @@ databricks bundle deploy -t test --profile YOUR_PROFILE
 databricks bundle run features -t test --profile YOUR_PROFILE
 ```
 
-Initialization pins inputs, the two group tasks can run in parallel, and the
-merge waits for both. Set `config/training.yml` -> `defaults.training_table`
-and `config/inference.yml` -> `score_source_table` to the merged table, then run
-the downstream jobs. Choose `employee_count`, `monthly_amount` and
-`transaction_count` as model input columns; keep `churn` as the training target.
-Use `[company_id, observed_at]` as record keys so different months stay distinct.
-For independent-target projects, update each model's overriding input settings.
+Inspect `initialize_features`, each `feature_<group>` receipt and `merge_features`.
+Point training_table and score_source_table at the merged output before running
+downstream jobs. Keep labels and record keys outside model inputs. Adding a new
+group requires its module/configuration, graph refresh and redeployment.
+`selected_groups` chooses groups to recompute; reused outputs must already exist.
 
-To add another domain, create e.g. `balances.py`, define `compute_features(frame)`
-and add `groups.balances` with its input, output and new column names. Refresh the
-feature graph and redeploy. To rerun one existing group, set the job parameter
-`selected_groups` to its name; unselected outputs must already exist. See
-[FEATURE_TABLES.md](../../../FEATURE_TABLES.md) for joins, reuse and repair limits.
+Use upstream groups for fixed shared calculations. Learned transformations
+belong in preprocessing.yml inside training folds. This folder is excluded
+from model source snapshots; do not import it from model recipes or add it to
+features/__init__.py. No groups/__init__.py is needed; only each configured
+transform file is hashed, not undeclared helpers.
 
-Use this stage for shared aggregations and fixed calculations. Learned imputers,
-scalers and encoders belong in `config/preprocessing.yml`; their custom functions
-belong in `../preprocessing.py`. They learn within training folds and replay saved state
-during inference. Apply a transformation in one stage, not both.
+## Detailed instructions and version
 
-This folder is excluded from model source snapshots. Do not import it from model
-recipes or add it to `../__init__.py`. No `__init__.py` is required here. The feature
-job hashes each configured transform file; it does not freeze helper modules.
-Empty `groups: {}` keeps feature production disabled and creates no extra job.
+[Feature tables](../../../FEATURE_TABLES.md) lists project entry points.
+The [public feature guide](https://www.skyulf.com/manual/user_guide/databricks_features.html)
+contains complete SQL/YAML, transform examples, field contracts, join results,
+reuse and repair. Public links show the latest manual; [README.md](../../../README.md)
+explains how to match them to this project's pinned Core release.

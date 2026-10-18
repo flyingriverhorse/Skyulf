@@ -1,0 +1,15 @@
+# Read by src/serve.py only; these are raw inputs, with no online feature lookup.
+# Fill the exact approved version from the training report before running the notebook.
+endpoint:
+  endpoint_name: taxi-fare-robust-v1
+  model_name: workspace.taxi_fare_robust.taxi_fare_robust_model
+  model_version: "" # Concrete numeric version, never an alias.
+  workload_type: CPU # CPU | CPU_MEDIUM | CPU_LARGE, subject to workspace support.
+  workload_size: Small # Small | Medium | Large.
+  scale_to_zero_enabled: true # Some workspaces require true; false is billable while idle.
+  ready_timeout_s: 3600 # Wait for READY + NOT_UPDATING; an expired wait keeps the endpoint.
+  logging_mode: disabled # This example returns results to callers without a payload table.
+  logging_catalog: ""
+  logging_schema: ""
+  logging_table_prefix: ""
+sql_function: workspace.taxi_fare_robust.score_fare_v1

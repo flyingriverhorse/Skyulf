@@ -56,11 +56,11 @@
           "extra_params": {},
           "expected": [-2.0, 2.0]
         },
-        "unknown_method_skipped": {
+        "unknown_method_rejected": {
           "values": [1.0, 2.0],
           "method": "bogus_method",
           "extra_params": {},
-          "expected": [1.0, 2.0]
+          "expected": null
         }
       }
     }

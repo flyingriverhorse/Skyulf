@@ -365,7 +365,7 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
         target_column="changed_target",
         engine="polars" if engine == "pandas" else "pandas",
     )
-    args = {
+    args: dict[str, Any] = {
         "candidate_version": candidate.model_version,
         "comparison_sha256": digest,
         "expected_champion_version": None,

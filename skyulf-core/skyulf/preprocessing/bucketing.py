@@ -465,6 +465,13 @@ def _fit_one_column_edges(
     defaults: dict[str, Any],
 ) -> tuple[Any, Any]:
     """Dispatch one column to its strategy-specific fitter; returns ``(edges, labels)``."""
+    if strategy not in ("equal_width", "uniform", "equal_frequency", "kmeans", "custom", "kbins"):
+        raise ValueError(
+            f"Unknown binning strategy {strategy!r}; choose from equal_width (uniform), "
+            "equal_frequency, kmeans, custom, kbins."
+        )
+    if series.empty:
+        return None, None
     default_n_bins = defaults["default_n_bins"]
     if strategy in ("equal_width", "uniform"):
         return _fit_equal_width(series, override.get("equal_width_bins", defaults["n_bins"])), None
@@ -481,11 +488,9 @@ def _fit_one_column_edges(
         return _fit_kmeans(series, override.get("n_bins", default_n_bins)), None
     if strategy == "custom":
         return _resolve_custom_edges(str(series.name or ""), override, config)
-    if strategy == "kbins":
-        n_bins = override.get("kbins_n_bins", config.get("kbins_n_bins", default_n_bins))
-        k_strategy = override.get("kbins_strategy", config.get("kbins_strategy", "quantile"))
-        return _fit_kbins(series, n_bins, k_strategy), None
-    return None, None
+    n_bins = override.get("kbins_n_bins", config.get("kbins_n_bins", default_n_bins))
+    k_strategy = override.get("kbins_strategy", config.get("kbins_strategy", "quantile"))
+    return _fit_kbins(series, n_bins, k_strategy), None
 
 
 def _passthrough_artifact_options(config: dict[str, Any]) -> dict[str, Any]:
@@ -536,24 +541,12 @@ def _fit_one_column_into_maps(
     global_strategy = config.get("strategy", "equal_width")
     override = column_strategies.get(col, {})
     strategy = override.get("strategy", global_strategy)
-    try:
-        series = X[col].dropna()
-        if series.empty:
-            return
-        edges, labels = _fit_one_column_edges(series, strategy, override, config, defaults)
-        if labels:
-            custom_labels_map[col] = labels
-        if edges is not None:
-            bin_edges_map[col] = edges.tolist()
-    except Exception:  # noqa: BLE001 - per-column fit failure is logged and column skipped
-        # Skip columns whose binning strategy can't be fit (e.g. all-NaN
-        # after dropna, degenerate quantiles), but log for visibility.
-        logger.warning(
-            "Bucketing: failed to fit binning strategy for column %r, skipping it.",
-            col,
-            exc_info=True,
-        )
-        return
+    series = X[col].dropna()
+    edges, labels = _fit_one_column_edges(series, strategy, override, config, defaults)
+    if labels:
+        custom_labels_map[col] = labels
+    if edges is not None:
+        bin_edges_map[col] = edges.tolist()
 
 
 @NodeRegistry.register("GeneralBinning", GeneralBinningApplier)
@@ -576,8 +569,8 @@ class GeneralBinningCalculator(BaseCalculator):
         (the user unchecked everything), whereas an absent one falls through to
         :func:`detect_numeric_columns`. Only the selected columns are converted
         to pandas, since the fits are ``pd.cut`` / ``pd.qcut`` / sklearn-bound.
-        Columns whose strategy cannot be fit are logged and skipped rather than
-        failing the node, so the artifact may cover fewer columns than requested.
+        Unsupported strategies and fit errors raise rather than saving a partial
+        artifact. All-missing columns still have no learned edges.
         """
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
@@ -807,7 +800,7 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
     name="K-Bins Discretizer",
     category="Preprocessing",
     description="Bin continuous data into intervals using sklearn KBinsDiscretizer.",
-    params={"n_bins": 5, "encode": "ordinal", "strategy": "quantile", "columns": []},
+    params={"n_bins": 5, "label_format": "ordinal", "strategy": "quantile", "columns": []},
     learns_from_data=True,
 )
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):

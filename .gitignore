@@ -183,3 +183,7 @@ docs/reports/2026-09-21-spark-databricks-readiness.md
 *mlruns
 .tmp-review-model/
 .claude/settings.local.json
+
+# Local agent coordination
+/AGENT_CHAT.md
+AGENT_CHAT.md

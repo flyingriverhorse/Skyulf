@@ -169,13 +169,21 @@ def test_h3_rejects_out_of_range_coordinates(h3_nodes, fit_engine, apply_engine)
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("all_invalid", [False, True])
-def test_box_cox_warns_for_excluded_columns(engine, all_invalid, caplog):
-    """Fit must identify excluded nonpositive columns while retaining the documented policy."""
-    data = {"has_zero": [0.0, 2.0, 4.0], "has_negative": [-1.0, 2.0, 4.0]}
+@pytest.mark.parametrize("invalid_rows", [1, 2])
+def test_box_cox_excludes_rows_within_training_limit(engine, all_invalid, invalid_rows, caplog):
+    """Domain errors filter aligned rows up to 10%, and larger losses stop training."""
+    valid = list(np.arange(invalid_rows + 1.0, 11.0))
+    data = {"has_zero": [0.0] * invalid_rows + valid, "has_negative": [-1.0] * invalid_rows + valid}
     if not all_invalid:
-        data["positive"] = [1.0, 2.0, 4.0]
+        data["positive"] = list(np.arange(1.0, 11.0))
     frame = _native(pd.DataFrame(data), engine)
     with caplog.at_level(logging.WARNING, logger="skyulf.preprocessing.transformations.power"):
+        if invalid_rows > 1:
+            with pytest.raises(ValueError, match=r"exclude 2/10 .*fixed 10% limit"):
+                PowerTransformerCalculator().fit(
+                    frame, {"method": "box-cox", "columns": list(data)}
+                )
+            return
         artifact = PowerTransformerCalculator().fit(
             frame, {"method": "box-cox", "columns": list(data)}
         )
@@ -185,14 +193,15 @@ def test_box_cox_warns_for_excluded_columns(engine, all_invalid, caplog):
         if record.name == "skyulf.preprocessing.transformations.power"
     ]
     assert len(messages) == 1
-    assert "Box-Cox" in messages[0]
-    assert "has_zero" in messages[0] and "has_negative" in messages[0]
-    assert "positive" not in messages[0].replace("non-positive", "")
-    assert artifact.get("columns", []) == ([] if all_invalid else ["positive"])
-    result = _pandas(PowerTransformerApplier().apply(frame, artifact))
-    pd.testing.assert_frame_equal(
-        result[["has_zero", "has_negative"]], pd.DataFrame(data)[["has_zero", "has_negative"]]
+    assert "excluded 1 invalid row" in messages[0]
+    assert artifact["columns"] == list(data)
+    result, targets = PowerTransformerApplier().apply(
+        (frame, np.arange(10)), pickle.loads(pickle.dumps(artifact))
     )
+    result = _pandas(result)
+    assert targets.tolist() == list(range(1, 10))
+    assert len(result) == 9 and np.isfinite(result.to_numpy()).all()
+    assert not np.array_equal(result["has_zero"].to_numpy(), valid)
     assert result.columns.tolist() == list(data)
 
 

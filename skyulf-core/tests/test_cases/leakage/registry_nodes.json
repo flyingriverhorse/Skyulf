@@ -10,10 +10,12 @@
     "DummyEncoder": {},
     "EllipticEnvelope": {},
     "FittedFunction": {},
+    "FrequencyEncoder": {},
     "GeneralBinning": {},
     "GroupImputer": {},
     "HashEncoder": {},
     "IQR": {},
+    "IsolationForest": {},
     "IterativeImputer": {},
     "KBinsDiscretizer": {},
     "KNNImputer": {},
@@ -22,6 +24,7 @@
         "x"
       ]
     },
+    "LocalOutlierFactor": {},
     "MaxAbsScaler": {},
     "MinMaxScaler": {},
     "MissingIndicator": {},
@@ -40,6 +43,8 @@
       "auto_detect": true
     },
     "PowerTransformer": {},
+    "QuantileTransformer": {},
+    "RareCategoryGrouping": {},
     "RobustScaler": {},
     "SimpleImputer": {},
     "StandardScaler": {},
@@ -141,6 +146,7 @@
     "InvalidValueReplacement": {},
     "LagFeatures": {},
     "ManualBounds": {},
+    "Normalizer": {},
     "RollingAggregate": {},
     "RowFilterFunction": {},
     "SimpleTransformation": {},

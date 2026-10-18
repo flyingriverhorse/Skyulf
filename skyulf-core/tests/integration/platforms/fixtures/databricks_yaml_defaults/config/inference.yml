@@ -1,5 +1,6 @@
 version: 1
 inference_mode: local
+initial_scoring: full_snapshot
 score_source_table: "{catalog}.{input_schema}.sm33_generated_source"
 prediction_table: "{catalog}.{output_schema}.sm33_generated_predictions{resource_suffix}"
 score_model_selection: pinned_version

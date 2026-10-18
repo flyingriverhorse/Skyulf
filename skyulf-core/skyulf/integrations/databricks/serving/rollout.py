@@ -119,16 +119,19 @@ def _request(client: Any, name: str, body: dict[str, Any] | None = None) -> Any:
 def rollout_plan_from_dict(value: dict[str, Any]) -> RolloutEndpointPlan:
     """Rebuild all admitted selectors and recheck mutable configuration composition."""
     plans = []
+    normalized = deepcopy(value)
     for role in ("champion", "challenger"):
         saved = deepcopy(value[role])
         saved["spec"] = PinnedEndpointSpec(**saved["spec"])
+        for field in ("workload_type", "workload_size", "scale_to_zero_enabled", "ready_timeout_s"):
+            normalized[role]["spec"].setdefault(field, getattr(saved["spec"], field))
         for field in ("input_columns", "input_schema", "output_schema"):
             saved[field] = tuple(
                 tuple(item) if isinstance(item, list) else item for item in saved[field]
             )
         plans.append(PinnedEndpointPlan(**saved))
     plan = build_rollout_endpoint(champion=plans[0], challenger=plans[1])
-    if finite_json_digest(asdict(plan)) != finite_json_digest(value):
+    if finite_json_digest(asdict(plan)) != finite_json_digest(normalized):
         raise ValueError("Rollout plan differs from its admitted composition.")
     return plan
 

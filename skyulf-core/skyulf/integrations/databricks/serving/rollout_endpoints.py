@@ -43,6 +43,9 @@ def _validate_plans(champion: PinnedEndpointPlan, challenger: PinnedEndpointPlan
     if not champion.input_schema or not champion.output_schema:
         raise ValueError("Rollout requires complete named input/output schemas.")
     _matching_contract(champion, challenger)
+    for field in ("workload_type", "workload_size", "scale_to_zero_enabled"):
+        if getattr(champion.spec, field) != getattr(challenger.spec, field):
+            raise ValueError("Rollout plans must use the same compute settings.")
 
 
 def _matching_contract(champion: PinnedEndpointPlan, challenger: PinnedEndpointPlan) -> None:
@@ -54,6 +57,10 @@ def _matching_contract(champion: PinnedEndpointPlan, challenger: PinnedEndpointP
     second = {key: value for key, value in challenger.config.items() if key != "config"}
     if first != second or champion.spec.logging_mode != challenger.spec.logging_mode:
         raise ValueError("Rollout plans must use the same endpoint logging configuration.")
+    if champion.spec.logging_mode == "disabled":
+        raise ValueError(
+            "Daily rollout reads endpoint payload logs; use logging_mode telemetry or ai_gateway."
+        )
 
 
 def _served_entity(plan: PinnedEndpointPlan, name: str) -> dict[str, Any]:
@@ -77,12 +84,21 @@ def _served_entity(plan: PinnedEndpointPlan, name: str) -> dict[str, Any]:
     }
     if set(entity) != allowed:
         raise ValueError("Rollout configuration contains unadmitted served entity settings.")
+    _require_admitted_compute(entity, plan)
     if (entity.get("entity_name"), entity.get("entity_version")) != (
         plan.spec.model_name,
         plan.spec.model_version,
     ):
         raise ValueError("Rollout package configuration differs from its concrete selector.")
     return deepcopy(entity) | {"name": name}
+
+
+def _require_admitted_compute(entity: dict[str, Any], plan: PinnedEndpointPlan) -> None:
+    """Reject changes to the workload selected by the validated endpoint spec."""
+    for field in ("workload_type", "workload_size", "scale_to_zero_enabled"):
+        expected = getattr(plan.spec, field)
+        if type(entity[field]) is not type(expected) or entity[field] != expected:
+            raise ValueError("Rollout configuration contains unadmitted compute settings.")
 
 
 def build_rollout_endpoint(

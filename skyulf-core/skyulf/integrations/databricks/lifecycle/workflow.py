@@ -38,7 +38,7 @@ from ..scoring.shared.prediction_output import (
     IDENTIFIER_PATTERN,
     TABLE_NAME_PATTERN,
     activate_prediction_view,
-    managed_prediction_view_exists,
+    active_prediction_generation,
     provision_prediction_table,
     scoring_target,
 )
@@ -91,17 +91,29 @@ class BundleActionResult:
     next_actions: dict[str, dict[str, str]]
 
 
+def _decision_actions(candidate: Any, policy: str) -> dict[str, dict[str, str]]:
+    """Offer approve/reject, or only the explicit override when the champion is unloadable."""
+    if not isinstance(candidate, CandidateResult):
+        return {}
+    unloadable = candidate.comparison.reason == "champion_runtime_unavailable"
+    if policy != "manual_approval" and not unloadable:
+        return {}
+    evidence = {
+        "candidate_version": candidate.model_version,
+        "expected_champion_version": candidate.comparison.champion_version or "none",
+    }
+    actions = {"approve": {"lifecycle_action": "approve", **evidence}}
+    if unloadable:
+        actions["approve"]["allow_unloadable_champion"] = "true"
+    if policy == "manual_approval":
+        actions["reject"] = {"lifecycle_action": "reject", **evidence}
+    return actions
+
+
 def next_actions(result: Any, policy: str) -> dict[str, dict[str, str]]:
     """Expose the exact evidence accepted by existing Core approval and rollback APIs."""
-    actions: dict[str, dict[str, str]] = {}
     candidate = result.candidate if isinstance(result, AutoTrainingOutcome) else result
-    if isinstance(candidate, CandidateResult) and policy == "manual_approval":
-        for action in ("approve", "reject"):
-            actions[action] = {
-                "lifecycle_action": action,
-                "candidate_version": candidate.model_version,
-                "expected_champion_version": candidate.comparison.champion_version or "none",
-            }
+    actions = _decision_actions(candidate, policy)
     receipt = result.alias_change if isinstance(result, AutoTrainingOutcome) else result
     if isinstance(receipt, AliasChangeReceipt) and receipt.kind == "promotion":
         actions["rollback"] = {
@@ -184,6 +196,10 @@ def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> d
     resolved = config.copy()
     for name in _TABLE_FIELDS:
         resolved[name] = bind_target_name(name, config[name], bindings, suffix)
+    if config.get("training_label_table") is not None:
+        resolved["training_label_table"] = bind_target_name(
+            "training_label_table", config["training_label_table"], bindings, suffix
+        )
     if config.get("feature_lookup") is not None:
         from ..feature_store.lifecycle_config import bind_lookup_tables  # noqa: PLC0415
 
@@ -215,6 +231,7 @@ def _scoring_config(config: dict[str, Any]) -> WorkflowConfig:
         runtime="databricks",
         engine=config["engine"],
         inference_mode=config.get("inference_mode", "local"),
+        initial_scoring=config.get("initial_scoring", "full_snapshot"),
         spark_udf_env_manager=config.get("spark_udf_env_manager", "virtualenv"),
         spark_udf_prediction_batch_rows=config.get("spark_udf_prediction_batch_rows", 10_000),
         source=InputSource(
@@ -235,6 +252,21 @@ def _scoring_config(config: dict[str, Any]) -> WorkflowConfig:
     )
 
 
+def probed_admission(config: dict[str, Any]) -> Any:
+    """Probe custom steps and rules automatically when Spark or online serving will run them.
+
+    Training sees ``inference_mode`` and ``online_features``; endpoint-only
+    projects configured in ``config/serving.yml`` keep the manual
+    ``admit_probed_custom_steps`` opt-in. A non-boolean opt-in is passed through
+    unchanged so the spec rejects it.
+    """
+    flag = config.get("admit_probed_custom_steps", False)
+    if type(flag) is not bool:
+        return flag
+    automatic = config.get("inference_mode") == "spark" or config.get("online_features") is not None
+    return flag or automatic
+
+
 def training_spec(config: dict[str, Any]) -> TrainingSpec:
     """Keep the evaluation split and source snapshot identical across actions."""
     training_window_mode(config)
@@ -250,10 +282,13 @@ def training_spec(config: dict[str, Any]) -> TrainingSpec:
 
     return TrainingSpec(
         preprocessing_probe=config.get("preprocessing_probe", False),
+        admit_probed_custom_steps=probed_admission(config),
         online_policy_json=workflow_online_policy_json(config),
         feature_lookup_json=workflow_lookup_json(config),
         table=config["training_table"],
         version=version,
+        training_label_table=config.get("training_label_table"),
+        training_label_version=config.get("training_label_version"),
         split_strategy=config.get("split_strategy", "random"),
         test_size=config.get("test_size", 0.2),
         random_state=config.get("random_state", 42),
@@ -452,22 +487,22 @@ def training_settings(config: dict[str, Any], now: datetime) -> dict[str, Any]:
 
 def resolve_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> TrainingSpec:
     """Pin an explicit or latest snapshot once, using the configured data window."""
+    from ..data.training.training_labels import pin_training_labels  # noqa: PLC0415
     from ..feature_store.training import pin_training_lookup  # noqa: PLC0415
 
     spec = training_spec(training_settings(config, now))
     validate_cv_holdout_policy(spec, CVSpec.from_workflow(config))
-    if config.get("training_version") is not None:
-        return pin_training_lookup(spark, spec)
-    table = spec.table
-    latest = (
-        spark.sql(f"DESCRIBE HISTORY {table}")
-        .select("version")
-        .orderBy("version", ascending=False)
-        .first()
-    )
-    if latest is None or type(latest["version"]) is not int or latest["version"] < 0:
-        raise ValueError("Training source has no concrete Delta version.")
-    return pin_training_lookup(spark, replace(spec, version=latest["version"]))
+    if config.get("training_version") is None:
+        latest = (
+            spark.sql(f"DESCRIBE HISTORY {spec.table}")
+            .select("version")
+            .orderBy("version", ascending=False)
+            .first()
+        )
+        if latest is None or type(latest["version"]) is not int or latest["version"] < 0:
+            raise ValueError("Training source has no concrete Delta version.")
+        spec = replace(spec, version=latest["version"])
+    return pin_training_labels(spark, pin_training_lookup(spark, spec))
 
 
 def _current_champion_version(config: dict[str, Any]) -> str | None:
@@ -638,6 +673,8 @@ def _run_training_action(
             champion_version=champion_version,
             quality_threshold=config.get("quality_threshold"),
             quality_gates=config.get("quality_gates"),
+            min_scored_fraction=config.get("min_scored_fraction", 0.90),
+            max_coverage_drop=config.get("max_coverage_drop", 0.05),
             on_registered=lifecycle.registered,
             risk_category=config.get("risk_category"),
             cv=cv,
@@ -682,8 +719,9 @@ def _run_scoring_action(
             raise ValueError("Champion scoring requires a committed champion.")
         config = {**config, "model_version": champion_version}
     target = scoring_target(config)
+    previous_target = None
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
-        managed_prediction_view_exists(spark, config["prediction_table"])
+        previous_target = active_prediction_generation(spark, config["prediction_table"])
     score_config = {**config, "prediction_table": target}
     prepared = prepare_workflow(_scoring_config(score_config))
     from ..scoring.batch.spark_scoring import validate_prepared_spark  # noqa: PLC0415
@@ -697,6 +735,11 @@ def _run_scoring_action(
         prepared,
         record_key_columns=tuple(config["record_key_columns"]),
         admission=SingleWriterAdmission(),
+        **(
+            {"previous_prediction_table": previous_target}
+            if previous_target != target and previous_target
+            else {}
+        ),
         **({"recovery_request": recovery_request} if recovery_request is not None else {}),
     )
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
@@ -747,6 +790,7 @@ def run_action(
     rejection_reason: str = "",
     promotion_receipt: AliasChangeReceipt | None = None,
     recovery_request: dict[str, Any] | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> Any:
     """Delegate training, scoring and explicit lifecycle actions to existing Core services."""
     _validate_action_layout(config, action)
@@ -768,14 +812,13 @@ def run_action(
             rejection_reason=rejection_reason,
         )
     if action == "approve":
-        if policy != "manual_approval" or "promotion_policy" not in config:
-            raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
         return approve_candidate(
             spark,
             config,
             candidate_version=candidate_version,
             comparison_sha256=comparison_sha256,
             expected_champion_version=expected_champion_version,
+            allow_unloadable_champion=allow_unloadable_champion,
         )
     if action == "train":
         return _run_training_action(

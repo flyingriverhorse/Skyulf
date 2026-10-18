@@ -75,7 +75,11 @@ def test_canonical_modules_own_code_without_legacy_paths(old, new):
     for legacy in (old, old.rsplit(".", 1)[-1], "_compat." + old.rsplit(".", 1)[-1]):
         with pytest.raises(ModuleNotFoundError) as error:
             importlib.import_module(prefix + legacy)
-        assert error.value.name == prefix + legacy
+        missing = error.value.name
+        # A clean checkout has no _compat package; stale caches can leave a namespace.
+        assert missing == prefix + legacy or (
+            legacy.startswith("_compat.") and missing == prefix + "_compat"
+        )
 
 
 def _workflow(path, **changes):
@@ -169,6 +173,7 @@ def test_training_spec_serialization_keeps_saved_keys():
     assert restored == spec
     historical = dict(payload)
     assert historical.pop("online_policy_json") is None
+    assert historical.pop("admit_probed_custom_steps") is False
     assert TrainingSpec.from_payload(json.loads(json.dumps(historical))) == spec
     digest = sha256(
         json.dumps(historical, sort_keys=True, separators=(",", ":")).encode()

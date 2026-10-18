@@ -24,9 +24,11 @@ from ..shared._nullable_transport import TRANSPORT_KEY, transport_spec
 from ._spark_environment import package_source_root, source_digest
 from ._spark_output import (
     DEFAULT_PREDICTION_BATCH_ROWS,
-    SPARK_BATCH_ROWS_PARAM,
-    SPARK_OUTPUT_PARAM,
+    SPARK_NULL_TEXT,
+    nullable_outputs,
     spark_output_params,
+    spark_transport_dtype,
+    spark_udf_params,
     validate_prediction_batch_rows,
 )
 
@@ -318,9 +320,9 @@ def predict_spark_pyfunc(
     validate_feature_source(frame, artifact)
     _validate_model_keys(artifact, keys, inputs, outputs)
     package_path, package = _download_package(model_uri, tracking_uri, registry_uri)
-    _validate_package(
-        _scoring_package(artifact, package_path, package), certificate, inputs, outputs
-    )
+    scoring = _scoring_package(artifact, package_path, package)
+    _validate_package(scoring, certificate, inputs, outputs)
+    udf_params = spark_udf_params(prediction_batch_rows)
     if binding is not None:
         return _predict_feature_frame(
             spark,
@@ -330,7 +332,7 @@ def predict_spark_pyfunc(
             keys,
             outputs,
             env_manager,
-            prediction_batch_rows,
+            udf_params,
             tracking_uri,
             registry_uri,
         )
@@ -338,18 +340,16 @@ def predict_spark_pyfunc(
     import mlflow  # noqa: PLC0415  # ty: ignore[unresolved-import]
     from pyspark.sql import types  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
-    result_type = types.StructType(
-        [types.StructField(column.name, _spark_type(column.dtype), True) for column in outputs]
-    )
+    result_type = _result_type(types, outputs, _nullable(artifact))
     named = _named_inputs(frame, inputs)
     udf = mlflow.pyfunc.spark_udf(
         spark,
         package_path,
         result_type=result_type,
         env_manager=env_manager,
-        params={SPARK_OUTPUT_PARAM: True, SPARK_BATCH_ROWS_PARAM: prediction_batch_rows},
+        params=udf_params,
     )
-    return _keyed_result(frame, keys, outputs, udf(named))
+    return _keyed_result(frame, keys, outputs, udf(named), nullable=_nullable(artifact))
 
 
 def _predict_feature_frame(
@@ -360,7 +360,7 @@ def _predict_feature_frame(
     keys: tuple[str, ...],
     outputs: tuple,
     env_manager: str,
-    prediction_batch_rows: int,
+    udf_params: dict[str, Any],
     tracking_uri: str | None,
     registry_uri: str | None,
 ) -> Any:
@@ -368,21 +368,21 @@ def _predict_feature_frame(
     from pyspark.sql import functions, types  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     validate_feature_snapshot(spark, artifact)
-    result_type = types.StructType(
-        [types.StructField(column.name, _spark_type(column.dtype), True) for column in outputs]
-    )
+    result_type = _result_type(types, outputs, _nullable(artifact))
     scored = native_feature_score(
         frame,
         model_uri=model_uri,
         result_type=result_type,
         env_manager=env_manager,
-        prediction_batch_rows=prediction_batch_rows,
+        params=udf_params,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
     if scored.schema["prediction"].dataType != result_type:
         raise ValueError("Native feature prediction schema differs from the artifact contract.")
-    result = _keyed_result(scored, keys, outputs, functions.col("prediction"))
+    result = _keyed_result(
+        scored, keys, outputs, functions.col("prediction"), nullable=_nullable(artifact)
+    )
     _validate_feature_keys(frame, result, keys)
     validate_feature_snapshot(spark, artifact)
     return result
@@ -401,7 +401,38 @@ def _validate_feature_keys(source: Any, output: Any, keys: tuple[str, ...]) -> N
         raise ValueError("Native feature lookup changed source record keys.")
 
 
-def _keyed_result(frame: Any, keys: tuple[str, ...], outputs: tuple, result: Any) -> Any:
+def _nullable(artifact: Any) -> bool:
+    """Saved scoring rules leave predictions and rule outputs null for excluded rows."""
+    return nullable_outputs(artifact)
+
+
+def _result_type(types: Any, outputs: tuple, nullable: bool) -> Any:
+    """Declare each field with the dtype it travels in from the workers."""
+    return types.StructType(
+        [
+            types.StructField(
+                column.name, _spark_type(spark_transport_dtype(column.dtype, nullable)), True
+            )
+            for column in outputs
+        ]
+    )
+
+
+def _decoded(field: Any, dtype: str, nullable: bool) -> Any:
+    """Turn the workers' null markers back into SQL nulls and restore the declared type."""
+    from pyspark.sql import functions  # noqa: PLC0415  # ty: ignore[unresolved-import]
+
+    if dtype == "string":
+        return functions.when(field == SPARK_NULL_TEXT, functions.lit(None)).otherwise(field)
+    if not nullable or dtype not in ("float64", "int64", "bool"):
+        return field
+    value = functions.when(functions.isnan(field), functions.lit(None)).otherwise(field)
+    return value if dtype == "float64" else value.cast(_spark_type(dtype))
+
+
+def _keyed_result(
+    frame: Any, keys: tuple[str, ...], outputs: tuple, result: Any, *, nullable: bool = False
+) -> Any:
     """Keep raw record identities separate from expanded model output fields."""
     from pyspark.sql import functions  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
@@ -413,7 +444,9 @@ def _keyed_result(frame: Any, keys: tuple[str, ...], outputs: tuple, result: Any
     return scored.select(
         *(functions.col(_quoted(key)) for key in keys),
         *(
-            functions.col(_quoted(prediction)).getField(column.name).alias(column.name)
+            _decoded(
+                functions.col(_quoted(prediction)).getField(column.name), column.dtype, nullable
+            ).alias(column.name)
             for column in outputs
             if column.name not in keys
         ),

@@ -121,11 +121,17 @@ def test_recovery_node_refuses_disabled_config_before_reading_task_values(monkey
 
 
 @pytest.mark.parametrize("active_generation", ["predictions_v2", "predictions_v1", None])
-def test_empty_recovered_generation_remains_readable_without_new_view_activation(active_generation):
+def test_empty_recovered_generation_remains_readable_without_new_view_activation(
+    active_generation, monkeypatch
+):
     """A recovered empty active generation is valid, but a new empty generation cannot replace it."""
+    from skyulf.integrations.databricks.scoring.shared import prediction_output
     from skyulf.integrations.databricks.scoring.shared.prediction_output import (
         activate_prediction_view,
     )
+
+    checkpoint = Mock(return_value=False)
+    monkeypatch.setattr(prediction_output, "_empty_start_generation", checkpoint)
 
     spark = Mock()
     spark.table.return_value.limit.return_value.count.return_value = 0
@@ -145,11 +151,13 @@ def test_empty_recovered_generation_remains_readable_without_new_view_activation
         assert all(
             not call.args[0].startswith(("ALTER", "CREATE")) for call in spark.sql.call_args_list
         )
+        checkpoint.assert_not_called()
     else:
         with pytest.raises(ValueError, match="contain predictions"):
             activate_prediction_view(
                 spark, "workspace.test.predictions", "workspace.test.predictions_v2"
             )
+        checkpoint.assert_called_once_with(spark, "workspace.test.predictions_v2")
 
 
 def test_recovery_notebook_pins_version_and_publishes_only_completed_result(monkeypatch):

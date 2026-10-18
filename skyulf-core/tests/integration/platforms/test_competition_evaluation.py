@@ -341,8 +341,8 @@ def test_shuffle_plan_is_not_kfold(tmp_path):
 @pytest.mark.parametrize(
     "changes,match",
     [
-        ({"max_rows": 10}, "exceeds"),
-        ({"max_bytes": 1}, "exceeds"),
+        ({"max_rows": 10}, r"exceeds max_rows=10.*Reduce.*max_rows"),
+        ({"max_bytes": 1}, r"exceeds max_bytes=1.*Reduce.*max_bytes"),
         ({"max_rows": True}, "positive integer"),
         ({"max_bytes": None}, "positive integer"),
         ({"target_column": "missing"}, "separate target"),

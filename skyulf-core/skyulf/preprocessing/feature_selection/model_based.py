@@ -1,6 +1,5 @@
 """Model-based (importance-weight) feature selector."""
 
-import logging
 from typing import Any, cast
 
 from ...core.capabilities import ExecutionCapability
@@ -26,8 +25,6 @@ from ._common import (
     _resolve_estimator,
     _resolve_problem_type,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class ModelBasedSelectionApplier(BaseApplier):
@@ -78,22 +75,37 @@ class ModelBasedSelectionApplier(BaseApplier):
     id="ModelBasedSelection",
     name="Model-Based Selection",
     category="Feature Selection",
-    description="Select features based on importance weights.",
-    params={"estimator": "RandomForest", "threshold": "mean", "max_features": None},
+    description="Select features using importance weights, RFE, RFECV or sequential CV.",
+    params={
+        "method": "select_from_model",
+        "estimator": "RandomForest",
+        "threshold": "mean",
+        "max_features": None,
+        "step": 1,
+        "cv": 5,
+        "scoring": None,
+        "min_features_to_select": 1,
+        "direction": "forward",
+    },
+    tags=["rfe", "rfecv", "sequential_feature_selection"],
     learns_from_data=True,
 )
 class ModelBasedSelectionCalculator(BaseCalculator):
-    """Fit a ``SelectFromModel`` or ``RFE`` selector around a resolved estimator."""
+    """Fit importance, recursive, or sequential selection around a resolved estimator.
+
+    RFECV and sequential selection use integer unshuffled cross-validation,
+    defaulting to five folds. Small datasets must choose a valid lower fold
+    count; folds are not silently capped. Saved replay only uses feature names.
+    """
 
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> ModelBasedSelectionArtifact:  # pylint: disable=arguments-differ
         """Return the features the fitted estimator's support keeps.
 
         This selector is supervised: with no target there is nothing to score
-        against, so a missing target is treated as an error. Every failure mode
-        returns an empty artifact instead of raising, which degrades the node to
-        a passthrough — though an unsupported ``method`` does so silently,
-        without the log line the other branches emit.
+        against, so a missing target raises. Unsupported methods, estimators and
+        problem types also raise, and estimator fit errors propagate unchanged.
+        No candidate columns still produces an empty no-op artifact.
         """
         target_col = config.get("target_column")
         # Resolve candidate columns natively on the raw frame first (works on
@@ -109,26 +121,17 @@ class ModelBasedSelectionCalculator(BaseCalculator):
 
         y = _extract_target(X_pd, y, target_col)
         if y is None:
-            logger.error(
+            raise ValueError(
                 f"ModelBasedSelection requires target column '{target_col}' "
                 "to be present in training data."
             )
-            return cast(ModelBasedSelectionArtifact, {})
 
         method = config.get("method", "select_from_model")
         estimator_name = config.get("estimator", "auto")
         problem_type = _resolve_problem_type(config.get("problem_type", "auto"), y)
 
         estimator = _resolve_estimator(estimator_name, problem_type)
-        if estimator is None:
-            logger.error(
-                f"Could not resolve estimator '{estimator_name}' for problem type '{problem_type}'"
-            )
-            return cast(ModelBasedSelectionArtifact, {})
-
         selector = _build_model_selector(method, estimator, config)
-        if selector is None:
-            return cast(ModelBasedSelectionArtifact, {})
 
         X_np, _ = SklearnBridge.to_sklearn(_fillna_zero_with_warning(X_pd, cols))
         selector.fit(X_np, _prepare_sklearn_y(y, problem_type))

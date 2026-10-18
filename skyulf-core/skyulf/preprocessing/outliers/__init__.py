@@ -16,6 +16,8 @@ All public names are re-exported here so existing imports such as
 from .clip_values import ClipValuesApplier, ClipValuesCalculator
 from .elliptic import EllipticEnvelopeApplier, EllipticEnvelopeCalculator
 from .iqr import IQRApplier, IQRCalculator
+from .isolation_forest import IsolationForestApplier, IsolationForestCalculator
+from .local_outlier_factor import LocalOutlierFactorApplier, LocalOutlierFactorCalculator
 from .manual_bounds import ManualBoundsApplier, ManualBoundsCalculator
 from .winsorize import WinsorizeApplier, WinsorizeCalculator
 from .zscore import ZScoreApplier, ZScoreCalculator
@@ -27,6 +29,10 @@ __all__ = [
     "EllipticEnvelopeCalculator",
     "IQRApplier",
     "IQRCalculator",
+    "IsolationForestApplier",
+    "IsolationForestCalculator",
+    "LocalOutlierFactorApplier",
+    "LocalOutlierFactorCalculator",
     "ManualBoundsApplier",
     "ManualBoundsCalculator",
     "WinsorizeApplier",

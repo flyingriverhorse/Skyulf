@@ -5,6 +5,7 @@ import math
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from time import monotonic, sleep
 from typing import Any
 
 from ....inference.fitted_pipeline import FittedPipelineArtifact, load_pipeline
@@ -137,9 +138,9 @@ def build_pinned_endpoint(
                 {
                     "entity_name": spec.model_name,
                     "entity_version": spec.model_version,
-                    "workload_type": "CPU",
-                    "workload_size": "Small",
-                    "scale_to_zero_enabled": True,
+                    "workload_type": spec.workload_type,
+                    "workload_size": spec.workload_size,
+                    "scale_to_zero_enabled": spec.scale_to_zero_enabled,
                 }
             ],
         },
@@ -155,7 +156,7 @@ def build_pinned_endpoint(
             "inference_table_config": {"sampling_fraction": 1.0},
             "enabled_telemetry_features": ["TELEMETRY_FEATURE_INFERENCE_TABLE"],
         }
-    else:
+    elif spec.logging_mode == "ai_gateway":
         config["ai_gateway"] = {
             "inference_table_config": {
                 "enabled": True,
@@ -241,8 +242,10 @@ def _require_config(endpoint: Any, plan: PinnedEndpointPlan) -> None:
             raise ValueError("Serving endpoint config differs from the pinned plan.")
     if plan.spec.logging_mode == "telemetry":
         _require_telemetry(endpoint, plan.spec)
-    else:
+    elif plan.spec.logging_mode == "ai_gateway":
         _require_gateway(endpoint, expected["ai_gateway"])
+    else:
+        _require_no_payload_logging(endpoint)
 
 
 def _require_telemetry(endpoint: Any, spec: PinnedEndpointSpec) -> None:
@@ -272,6 +275,16 @@ def _require_gateway(endpoint: Any, expected: dict[str, Any]) -> None:
         raise ValueError("Serving endpoint config differs from the pinned plan.")
 
 
+def _require_no_payload_logging(endpoint: Any) -> None:
+    """A disabled-logging plan must not silently admit an endpoint that logs payloads."""
+    telemetry = _field(_field(endpoint, "telemetry_config"), "inference_table_config")
+    gateway = _field(_field(endpoint, "ai_gateway"), "inference_table_config")
+    if telemetry is not None or _field(gateway, "enabled") is True:
+        raise ValueError(
+            "Serving endpoint config differs from the pinned plan: payload logging is on."
+        )
+
+
 def endpoint_ready(endpoint: Any, plan: PinnedEndpointPlan) -> bool:
     """Require exact remote config and both settled Databricks state fields."""
     state = _field(endpoint, "state")
@@ -284,17 +297,41 @@ def endpoint_ready(endpoint: Any, plan: PinnedEndpointPlan) -> bool:
     return True
 
 
-def require_pinned_endpoint_ready(client: Any, plan: PinnedEndpointPlan) -> Any:
-    """Read and admit only an exact, fully settled endpoint through an injected SDK client."""
+def _read_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
+    """Read native telemetry fields without losing them through older SDK models."""
     if plan.spec.logging_mode == "telemetry":
-        endpoint = _telemetry_request(
+        return _telemetry_request(
             client, "GET", f"/api/2.0/serving-endpoints/{plan.spec.endpoint_name}"
         )
-    else:
-        endpoint = client.serving_endpoints.get(plan.spec.endpoint_name)
+    return client.serving_endpoints.get(plan.spec.endpoint_name)
+
+
+def require_pinned_endpoint_ready(client: Any, plan: PinnedEndpointPlan) -> Any:
+    """Read and admit only an exact, fully settled endpoint through an injected SDK client."""
+    endpoint = _read_endpoint(client, plan)
     if not endpoint_ready(endpoint, plan):
         raise RuntimeError("Serving endpoint is not ready or its config update is pending.")
     return endpoint
+
+
+def wait_for_pinned_endpoint_ready(client: Any, plan: PinnedEndpointPlan) -> Any:
+    """Wait for the exact settled config, leaving the endpoint intact on timeout.
+
+    Only explicit setup uses this wait. Prediction and SQL enrollment retain
+    their immediate readiness checks. API errors and failed updates propagate.
+    """
+    deadline = monotonic() + plan.spec.ready_timeout_s
+    while True:
+        endpoint = _read_endpoint(client, plan)
+        if endpoint_ready(endpoint, plan):
+            return endpoint
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"Serving endpoint {plan.spec.endpoint_name!r} did not become ready "
+                f"within {plan.spec.ready_timeout_s} seconds; the endpoint was not deleted."
+            )
+        sleep(min(5.0, remaining))
 
 
 def _telemetry_request(client: Any, method: str, path: str, body: dict | None = None) -> Any:
@@ -314,7 +351,7 @@ def api_transport(client: Any) -> Any:
 
 
 def create_pinned_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
-    """Create a new endpoint only; an existing name is never overwritten."""
+    """Create once and wait for the exact ready config; never overwrite an existing name."""
     from databricks.sdk.errors import NotFound  # noqa: PLC0415
     from databricks.sdk.service import serving  # noqa: PLC0415
 
@@ -325,13 +362,16 @@ def create_pinned_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
     else:
         raise ValueError("Serving endpoint already exists; refusing to overwrite it.")
     if plan.spec.logging_mode == "telemetry":
-        return _telemetry_request(client, "POST", "/api/2.0/serving-endpoints", plan.config)
-    kwargs = {
-        "name": plan.spec.endpoint_name,
-        "config": serving.EndpointCoreConfigInput.from_dict(plan.config["config"]),
-    }
-    kwargs["ai_gateway"] = serving.AiGatewayConfig.from_dict(plan.config["ai_gateway"])
-    return client.serving_endpoints.create(**kwargs)
+        _telemetry_request(client, "POST", "/api/2.0/serving-endpoints", plan.config)
+    else:
+        kwargs = {
+            "name": plan.spec.endpoint_name,
+            "config": serving.EndpointCoreConfigInput.from_dict(plan.config["config"]),
+        }
+        if "ai_gateway" in plan.config:
+            kwargs["ai_gateway"] = serving.AiGatewayConfig.from_dict(plan.config["ai_gateway"])
+        client.serving_endpoints.create(**kwargs)
+    return wait_for_pinned_endpoint_ready(client, plan)
 
 
 def query_named_records(

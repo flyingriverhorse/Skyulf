@@ -7,13 +7,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .project_scoring import _identifier, _validate_columns
+from .project_scoring import is_scoring_identifier, validate_scoring_columns
 
 _FIELDS = {"name", "version", "operation", "params", "columns", "required_components"}
 _OPERATIONS = {"weighted_sum", "weighted_mean"}
 
 
-def _weights(rule: dict) -> list[float]:
+def operation_weights(rule: dict) -> list[float]:
     """Require finite native numeric weights with explicit weighted-mean semantics."""
     raw = rule["params"]["weights"]
     inputs = rule["params"]["inputs"]
@@ -49,7 +49,7 @@ def _weight_sum(weights: list[float]) -> float:
         raise ValueError("Composition weight sum must be finite.") from exc
 
 
-def _inputs(rule: dict) -> list[str]:
+def operation_inputs(rule: dict) -> list[str]:
     """Reject implicit parameters, repeated inputs and arbitrary expression strings."""
     params = rule["params"]
     if type(params) is not dict or set(params) != {"inputs", "weights"}:
@@ -70,13 +70,13 @@ def validate_operation(rule: dict, components: Any) -> None:
         or rule["operation"] not in _OPERATIONS
     ):
         raise ValueError("Unknown declarative composition operation or rule fields.")
-    if not _identifier(rule["name"]) or rule["version"] != "1":
+    if not is_scoring_identifier(rule["name"]) or rule["version"] != "1":
         raise ValueError("Declarative composition requires a simple name and version '1'.")
-    _validate_columns(rule["columns"])
+    validate_scoring_columns(rule["columns"])
     if len(rule["columns"]) != 1 or rule["columns"][0]["dtype"] != "float64":
         raise ValueError("Declarative composition requires exactly one float64 output column.")
-    inputs = _inputs(rule)
-    _weights(rule)
+    inputs = operation_inputs(rule)
+    operation_weights(rule)
     _input_dependencies(inputs, _prediction_columns(components), rule["required_components"])
 
 
@@ -102,8 +102,8 @@ def _input_dependencies(inputs: list[str], available: dict, required: list[str])
 
 def apply_operation(predictions: pd.DataFrame, rule: dict) -> pd.DataFrame:
     """Evaluate fixed-order per-row arithmetic without source loading or batch statistics."""
-    inputs = _inputs(rule)
-    weights = _weights(rule)
+    inputs = operation_inputs(rule)
+    weights = operation_weights(rule)
     values = np.zeros(len(predictions), dtype="float64")
     try:
         with np.errstate(over="raise", invalid="raise"):

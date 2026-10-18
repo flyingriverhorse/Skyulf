@@ -39,7 +39,8 @@ def test_generated_jobs_install_core_from_one_shared_requirement(
         training_layout=layout,
         compute_mode=compute,
         include_online_publication="true",
-        include_online_serving="true",
+        # Core supports online serving only for single-model and competition training.
+        include_online_serving=str(layout != "multi_target").lower(),
         include_daily_rollout="true",
     )
     requirements = (project / "deployment/requirements.txt").read_text().splitlines()
@@ -56,13 +57,14 @@ def test_generated_jobs_install_core_from_one_shared_requirement(
     jobs = {}
     for resource in (project / "resources").glob("*.yml"):
         jobs.update(yaml.safe_load(resource.read_text())["resources"]["jobs"])
+    online_serving = {"online_serving_setup"} if layout != "multi_target" else set()
     assert set(jobs) == {
         "train",
         "score",
         "monitoring",
         "online_publication",
-        "online_serving_setup",
         "daily_rollout",
+        *online_serving,
     }
     for role, job in jobs.items():
         filename = (
@@ -202,3 +204,12 @@ def test_selected_runtime_dependencies_reach_both_job_types(
                     assert not any("whl" in item for item in task["libraries"])
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     assert "artifacts" not in bundle
+
+
+def test_shared_requirements_pin_sqlalchemy_to_a_wheel_release():
+    """mlflow pulls sqlalchemy<3; 2.1.5 has no serverless aarch64 wheel and fails to build there."""
+    template = (
+        Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
+    )
+    lines = (template / "deployment/requirements.txt.tmpl").read_text().splitlines()
+    assert "sqlalchemy==2.0.43" in lines

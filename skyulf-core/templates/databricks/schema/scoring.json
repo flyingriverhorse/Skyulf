@@ -5,13 +5,7 @@
     "default": "",
     "description": "1. Data | Prediction INPUT table: rows the model will read to make predictions. This is NOT the output table. Blank = same input as training",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
-    "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "multi_target"
-        }
-      }
-    }
+    "skip_prompt_if": {"properties": {"source_layout": {"enum": ["single_table", "separate_outcomes"]}}}
   },
   "prediction_table_name": {
     "order": 8,
@@ -27,11 +21,18 @@
       }
     }
   },
+  "initial_scoring": {
+    "order": 722.5,
+    "type": "string",
+    "default": "full_snapshot",
+    "enum": ["full_snapshot", "from_now"],
+    "description": "4. Scoring | First run: full_snapshot predicts existing rows; from_now records the current Delta version without predictions, then scores new inserts. Rebuilds keep the boundary using saved keys and recent CDF; CDF-expiry recovery needs the original snapshot"
+  },
   "model_change_mode": {
     "order": 723,
     "type": "string",
     "default": "incremental_append",
-    "description": "4. Lifecycle | When the selected model/model set changes: incremental_append keeps old predictions and scores new rows; full_rebuild recomputes the complete source with the new selection. Independent of source UPDATE/DELETE handling",
+    "description": "4. Lifecycle | When the selected model/model set changes: incremental_append keeps old predictions and scores new rows; full_rebuild recomputes eligible source rows with the new selection, preserving any from_now boundary. Independent of source UPDATE/DELETE handling",
     "enum": [
       "incremental_append",
       "full_rebuild"
@@ -164,6 +165,22 @@
     "default": 0.0,
     "minimum": 0,
     "description": "4. Lifecycle | Minimum metric improvement required for manual or automatic promotion; ties never pass",
+    "skip_prompt_if": {}
+  },
+  "min_scored_fraction": {
+    "order": 755,
+    "type": "string",
+    "default": "0.90",
+    "description": "4. Lifecycle | Minimum fraction of holdout rows the candidate must score (0 to 1); null disables this coverage gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+    "skip_prompt_if": {}
+  },
+  "max_coverage_drop": {
+    "order": 756,
+    "type": "string",
+    "default": "0.05",
+    "description": "4. Lifecycle | Maximum scored-fraction loss versus champion (0 to 1); 0.05 means five percentage points; null disables this gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
     "skip_prompt_if": {}
   },
   "quality_threshold": {

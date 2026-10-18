@@ -134,16 +134,14 @@ def native_feature_score(
     model_uri: str,
     result_type: Any,
     env_manager: str,
-    prediction_batch_rows: int,
+    params: dict[str, Any],
     tracking_uri: str | None,
     registry_uri: str | None,
 ) -> Any:
-    """Invoke native batch lookup using one immutable release and exact named outputs."""
-    from ...mlflow.spark._spark_output import (  # noqa: PLC0415
-        SPARK_BATCH_ROWS_PARAM,
-        SPARK_OUTPUT_PARAM,
-    )
+    """Invoke native batch lookup using one immutable release and exact named outputs.
 
+    ``params`` are the Spark output and batch-row parameters (``spark_udf_params``).
+    """
     _validate_feature_stores(tracking_uri, registry_uri)
     client = require_feature_engineering().FeatureEngineeringClient(model_registry_uri=registry_uri)
     return client.score_batch(
@@ -151,5 +149,5 @@ def native_feature_score(
         df=frame,
         result_type=result_type,
         env_manager=env_manager,
-        params={SPARK_OUTPUT_PARAM: True, SPARK_BATCH_ROWS_PARAM: prediction_batch_rows},
+        params=params,
     )

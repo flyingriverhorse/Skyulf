@@ -23,6 +23,16 @@ from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import _imputation_config
+from ._group_hierarchy import (
+    fit_group_hierarchy,
+    group_columns,
+    group_fallback,
+    hierarchy_fills,
+    validate_group_hierarchy,
+)
+from ._group_hierarchy import (
+    group_statistic as _statistic,
+)
 
 _NUMERIC_STRATEGIES = {"mean", "median"}
 _STRATEGIES = (*sorted(_NUMERIC_STRATEGIES), "most_frequent")
@@ -38,19 +48,6 @@ def _python_value(value: Any) -> Any:
     return value.item() if isinstance(value, np.generic) else value
 
 
-def _statistic(values: pd.Series, strategy: str) -> Any:
-    """Return the strategy's statistic of the observed values, or None when none exist."""
-    values = values.dropna()
-    if values.empty:
-        return None
-    if strategy == "mean":
-        return float(values.mean())
-    if strategy == "median":
-        return float(values.median())
-    # Series.mode() is sorted, so a tie picks the smallest value like SimpleImputer.
-    return _python_value(values.mode().iloc[0])
-
-
 def _strategy(config: dict[str, Any]) -> str:
     """Normalize and validate the configured strategy."""
     strategy = config.get("strategy", "mean")
@@ -60,22 +57,32 @@ def _strategy(config: dict[str, Any]) -> str:
     return strategy
 
 
-def _require_group_column(columns: Any, group_by: str) -> None:
+def _key_columns(group_by: str | list[str]) -> list[str]:
+    """Read both legacy scalar and new ordered key configurations without changing either."""
+    return group_by if isinstance(group_by, list) else [group_by]
+
+
+def _require_group_column(columns: Any, group_by: str | list[str]) -> None:
     """Fail clearly when the column that selects each row's group is absent."""
-    if group_by not in columns:
+    keys = _key_columns(group_by)
+    missing = [key for key in keys if key not in columns]
+    if missing:
         raise ValueError(
-            f"GroupImputer group_by column '{group_by}' is missing from the data; "
+            f"GroupImputer group_by column '{missing[0]}' is missing from the data; "
             "it is needed to pick each row's fill value."
         )
 
 
-def _fill_columns(X: Any, config: dict[str, Any], group_by: str, strategy: str) -> list[str]:
+def _fill_columns(
+    X: Any, config: dict[str, Any], group_by: str | list[str], strategy: str
+) -> list[str]:
     """Resolve the columns to fill; mean/median need numeric ones and the group key is excluded."""
-    if group_by in (config.get("columns") or []):
+    keys = _key_columns(group_by)
+    if set(keys).intersection(config.get("columns") or []):
         raise ValueError(f"GroupImputer cannot fill its group_by column '{group_by}' by itself.")
     numeric = strategy in _NUMERIC_STRATEGIES
     detect = detect_numeric_columns if numeric else (lambda frame: list(frame.columns))
-    columns = [column for column in resolve_columns(X, config, detect) if column != group_by]
+    columns = [column for column in resolve_columns(X, config, detect) if column not in keys]
     if numeric:
         allowed = set(auto_detect_numeric_columns(X))
         invalid = [column for column in columns if column not in allowed]
@@ -87,12 +94,15 @@ def _fill_columns(X: Any, config: dict[str, Any], group_by: str, strategy: str) 
     return columns
 
 
-def _training_frame(X: Any, columns: list[str], group_by: str, strategy: str) -> pd.DataFrame:
+def _training_frame(
+    X: Any, columns: list[str], group_by: str | list[str], strategy: str
+) -> pd.DataFrame:
     """Convert selected columns, retaining integer group identities and modal values."""
-    selected = [*columns, group_by]
+    keys = _key_columns(group_by)
+    selected = [*columns, *keys]
     if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
         frame = X.select(selected).to_pandas()
-        exact = selected if strategy == "most_frequent" else [group_by]
+        exact = selected if strategy == "most_frequent" else keys
         for column in exact:
             dtype = X.schema[column]
             if dtype.is_integer() and dtype != pl.Int128:
@@ -150,6 +160,8 @@ class GroupImputerApplier(BaseApplier):
     Rows whose group was unseen in training, whose group key is null, or whose
     group had no observed value fall back to the column's global training
     value. The scoring batch's own values are never used to compute fills.
+    Ordered list keys may first try saved prefix statistics when the configured
+    fallback is hierarchical. Legacy string keys retain their original lookup.
     """
 
     @staticmethod
@@ -176,15 +188,12 @@ class GroupImputerApplier(BaseApplier):
     @staticmethod
     def _apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         out = X.copy()
-        keys = out[params["group_by"]].astype(object)
         numeric = params["strategy"] in _NUMERIC_STRATEGIES
         for column in params["columns"]:
             if column not in out.columns:
                 continue
             series = out[column]
-            group_fill = _pandas_group_fill(
-                keys, series, params["group_values"][column], params["fill_values"].get(column)
-            )
+            group_fill = _pandas_fills(out, series, column, params)
             if numeric:
                 if not pd.api.types.is_float_dtype(series) or is_decimal_series(series):
                     series = pd.to_numeric(series).astype("float64")
@@ -196,6 +205,13 @@ class GroupImputerApplier(BaseApplier):
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         numeric = params["strategy"] in _NUMERIC_STRATEGIES
+        if "group_key_version" in params:
+            exprs = [
+                _polars_hierarchy_fill(X, column, params, numeric)
+                for column in params["columns"]
+                if column in X.columns
+            ]
+            return X.with_columns(exprs), y
         keys = pl.col(params["group_by"])
         key_dtype = X.schema[params["group_by"]]
         if isinstance(key_dtype, (pl.Categorical, pl.Enum)):
@@ -207,6 +223,31 @@ class GroupImputerApplier(BaseApplier):
             if column in X.columns
         ]
         return X.with_columns(exprs), y
+
+
+def _pandas_fills(frame: pd.DataFrame, series: pd.Series, column: str, params: dict) -> pd.Series:
+    """Route saved legacy scalars or versioned tuple levels without changing value dtypes."""
+    if "group_key_version" in params:
+        dtype = series.dtype if pd.api.types.is_float_dtype(series.dtype) else object
+        return pd.Series(hierarchy_fills(frame, params, column), index=frame.index, dtype=dtype)
+    return _pandas_group_fill(
+        frame[params["group_by"]].astype(object),
+        series,
+        params["group_values"][column],
+        params["fill_values"].get(column),
+    )
+
+
+def _polars_hierarchy_fill(
+    frame: pl.DataFrame, column: str, params: dict, numeric: bool
+) -> pl.Expr:
+    """Fill one native column from fixed level lookups, retaining exact modal scalars."""
+    dtype = pl.Float64 if numeric else frame.schema[column]
+    values = pl.col(column).cast(dtype)
+    if dtype.is_float():
+        values = values.fill_nan(None)
+    fills = pl.Series(column, hierarchy_fills(frame, params, column), dtype=dtype)
+    return values.fill_null(fills).alias(column)
 
 
 def _polars_group_mapping(pairs: list[list], key_dtype: Any) -> tuple[Any, list[Any]]:
@@ -271,13 +312,7 @@ def _polars_fill(
             config_match=(("strategy", strategy),),
         )
         for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
-        for strategy in ("mean", "most_frequent")
-    )
-    + tuple(
-        ExecutionCapability(
-            engine, "apply", "local", "preserve", "row", config_match=(("strategy", "median"),)
-        )
-        for engine in ("pandas", "polars")
+        for strategy in ("mean", "most_frequent", "median")
     ),
 )
 @node_meta(
@@ -288,13 +323,15 @@ def _polars_fill(
         "Fills missing values with the mean, median or most frequent value of each row's "
         "group (for example per industry), falling back to the overall value."
     ),
-    params={"group_by": "", "strategy": "mean", "columns": []},
+    params={"group_by": "", "strategy": "mean", "columns": [], "fallback": "global"},
     learns_from_data=True,
 )
 class GroupImputerCalculator(BaseCalculator):
     """Learn per-group and global fill values from training rows.
 
-    ``group_by`` names the column that defines the groups. ``strategy`` is
+    ``group_by`` names one column or an ordered list of group columns. Lists
+    support ``fallback="hierarchical"`` to try successively shorter prefixes
+    before the global training value; the default is ``"global"``. ``strategy`` is
     ``mean``, ``median`` or ``most_frequent`` (``mode`` is an alias). Leave
     ``columns`` empty to fill every numeric column (mean/median) or every
     column (most_frequent), excluding the group key and the target.
@@ -302,10 +339,14 @@ class GroupImputerCalculator(BaseCalculator):
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
-    ) -> SkyulfSchema:
-        """Promote filled columns to ``float64`` for mean/median; keep the schema otherwise."""
+    ) -> SkyulfSchema | None:
+        """Describe explicit fills; automatic numeric selection depends on row values."""
         if config.get("strategy", "mean") not in _NUMERIC_STRATEGIES:
             return input_schema
+        if not config.get("columns"):
+            # Automatic selection excludes constant and binary-valued columns,
+            # which cannot be identified from dtypes alone.
+            return None
         return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method
@@ -317,10 +358,19 @@ class GroupImputerCalculator(BaseCalculator):
                 "GroupImputer needs group_by: the column whose groups get their own fill value."
             )
         strategy = _strategy(config)
+        fallback = group_fallback(config.get("fallback", "global"))
+        if isinstance(group_by, list):
+            group_by = group_columns(group_by)
+        elif fallback != "global":
+            raise ValueError(
+                "GroupImputer hierarchical fallback requires an ordered group_by list."
+            )
         X = _native(X)
         _require_group_column(X.columns, group_by)
         columns = _fill_columns(X, config, group_by, strategy)
         frame = _training_frame(X, columns, group_by, strategy)
+        if isinstance(group_by, list):
+            return fit_group_hierarchy(frame, config, columns, strategy)
         fill_values = {}
         for column in columns:
             values = frame[column]
@@ -358,6 +408,8 @@ def _group_pairs(pairs: Any, numeric: bool) -> None:
 def _group_state(raw: dict) -> dict:
     """Validate learned group maps and the global fallback without recomputing either."""
     state = _normalize(raw)
+    if "group_key_version" in state:
+        return validate_group_hierarchy(state)
     _fields(state, {"type", "group_by", "strategy", "columns", "group_values", "fill_values"})
     columns = _columns(state["columns"])
     if state["type"] != "group_imputer" or state["strategy"] not in _STRATEGIES:

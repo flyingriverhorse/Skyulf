@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { NodeDefinition } from '../../../core/types/nodes';
 
@@ -60,10 +60,12 @@ const cases = definitions.flatMap(definition => [undefined, ...(variants[definit
 })));
 
 describe('preprocessing settings accessible controls', () => {
-  it.each(cases)('$name names every form control and action', ({ definition, config }) => {
+  it.each(cases)('$name names every form control and action', async ({ definition, config }) => {
     // Every rendered settings variant must expose a usable name without relying on a placeholder.
     const Settings = definition.settings;
     const { container } = render(<Settings config={config} onChange={() => {}} nodeId="settings-node" />);
+    // Inspect the loaded editor, never an empty lazy-loading fallback.
+    await waitFor(() => expect(container.querySelector('input, select, textarea, button')).not.toBeNull());
     if (definition.type === 'TransformationNode') {
       for (const header of container.querySelectorAll('button[aria-expanded]')) fireEvent.click(header);
     }
@@ -130,7 +132,7 @@ describe('preprocessing settings accessible controls', () => {
     expect(screen.getByRole('button', { name, pressed: true })).toBeInTheDocument();
   });
 
-  it.each(['BinningNode', 'feature_selection', 'TransformationNode'])('keeps %s checkbox labels local to each settings instance', type => {
+  it.each(['BinningNode', 'feature_selection', 'TransformationNode'])('keeps %s checkbox labels local to each settings instance', async type => {
     // Repeated settings instances must never point a visible label at another instance's checkbox.
     const definition = definitions.find(node => node.type === type)!;
     const Settings = definition.settings;
@@ -140,7 +142,7 @@ describe('preprocessing settings accessible controls', () => {
       for (const header of container.querySelectorAll('[role="button"], button[aria-expanded]')) fireEvent.click(header);
     }
     for (const section of container.querySelectorAll('section')) {
-      const checkboxes = within(section).queryAllByRole('checkbox');
+      const checkboxes = await within(section).findAllByRole('checkbox');
       expect(checkboxes.length).toBeGreaterThan(0);
       for (const checkbox of checkboxes) {
         const labels = Array.from((checkbox as HTMLInputElement).labels ?? []);

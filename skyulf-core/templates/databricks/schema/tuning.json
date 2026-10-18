@@ -430,9 +430,9 @@
   "search_max_resources": {
     "order": 710,
     "type": "string",
-    "default": "null",
-    "description": "3. Validation and search | Maximum estimator resource count for n_estimators halving; enter a positive integer compatible with the selected model",
-    "pattern": "^(?:null|[1-9][0-9]*)$",
+    "default": "100",
+    "description": "3. Validation and search | Maximum estimator count for n_estimators halving (integer 2 or more; at least the starting budget)",
+    "pattern": "^(?:[2-9]|[1-9][0-9]+)$",
     "skip_prompt_if": {
       "anyOf": [
         {

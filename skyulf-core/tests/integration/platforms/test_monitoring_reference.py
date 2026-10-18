@@ -13,16 +13,21 @@ def test_optional_training_metadata_permission_failure_is_explicit():
 
     client = Mock()
     client.get_run.side_effect = PermissionError("no navigation permission")
+    client.list_artifacts.side_effect = PermissionError("no evidence permission")
     model = SimpleNamespace(run_id="owning", creation_timestamp=1000, aliases=[])
     artifact = SimpleNamespace(
         pipeline=SimpleNamespace(config={"modeling": {"type": "linear_regression"}}),
         manifest=SimpleNamespace(project_source_sha256=None),
     )
-    metadata = monitoring_reference._model_metadata(client, model, artifact)
+    metadata = monitoring_reference._model_metadata(client, model, artifact, {}, {})
     assert metadata["status"] == "unavailable"
     assert metadata["reason"] == "training_run_metadata:PermissionError"
     assert metadata["training_experiment_id"] is None
     assert metadata["aliases"] == []
+    assert all(
+        metadata["training"][section]["status"] == "unavailable"
+        for section in ("candidates", "parameters", "datasets")
+    )
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -70,7 +75,33 @@ def test_registered_reference_replays_training_membership(staged, monkeypatch, e
         "training_experiment_id",
         "reason",
         "training_source_commit",
+        "training",
     }
+    training = metadata["training"]
+    assert training["format_version"] == 1
+    assert {
+        section: training[section]["status"] for section in ("candidates", "parameters", "datasets")
+    } == {"candidates": "recorded", "parameters": "recorded", "datasets": "recorded"}
+    assert training["candidates"]["rows"][0]["registered_version"] == "1"
+    assert {row["role"] for row in training["datasets"]["rows"]} == {"training", "holdout"}
+    assert {row["source_version"] for row in training["datasets"]["rows"]} == {4}
+    assert all(row["inputs_status"] == "recorded" for row in training["datasets"]["rows"])
+    client = monitoring_reference.make_registry_client(
+        monitoring_reference.require_mlflow(), config["tracking_uri"], config["registry_uri"]
+    )
+    with monkeypatch.context() as optional:
+        denied = Mock(side_effect=PermissionError("optional training metadata denied"))
+        optional.setattr(client, "get_run", denied)
+        optional.setattr(client, "list_artifacts", denied)
+        optional.setattr(monitoring_reference, "make_registry_client", lambda *args: client)
+        loaded, _, _, unavailable = monitoring_reference.load_monitoring_artifact(
+            monitor, tracking_uri=config["tracking_uri"], registry_uri=config["registry_uri"]
+        )
+        assert loaded.manifest.pipeline_sha256 == artifact.manifest.pipeline_sha256
+        assert all(
+            unavailable["model_metadata"]["training"][section]["status"] == "unavailable"
+            for section in ("candidates", "parameters", "datasets")
+        )
     frame["id"] += 1000
     with pytest.raises(ValueError):
         monitoring_reference.load_monitoring_reference(

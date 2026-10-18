@@ -26,12 +26,15 @@ interface TimeSeriesConfig {
   // Date
   features?: string[] | undefined;
   drop_original?: boolean | undefined;
+  timezone?: string | undefined;
 }
 
 const ROLLING_AGGS = ['mean', 'sum', 'min', 'max', 'std', 'median'];
 const DATE_FEATURES = [
   'year', 'month', 'day', 'dayofweek', 'dayofyear', 'quarter',
-  'weekofyear', 'hour', 'minute', 'is_weekend', 'is_month_start', 'is_month_end',
+  'weekofyear', 'hour', 'minute', 'second', 'is_weekend', 'is_month_start', 'is_month_end',
+  'hour_sin', 'hour_cos', 'dayofweek_sin', 'dayofweek_cos',
+  'month_sin', 'month_cos', 'dayofyear_sin', 'dayofyear_cos',
 ];
 
 function ChipMultiSelect({ options, selected, onChange }: {
@@ -204,6 +207,19 @@ function RollingSettings({ config, update }: { config: TimeSeriesConfig; update:
 function DateSettings({ config, update }: { config: TimeSeriesConfig; update: UpdateFn }) {
   return (
   <div className="space-y-2 p-3 bg-muted/20 rounded border">
+    <ValidationField field="timezone">
+      <label className="block space-y-1 text-xs font-medium">
+        <span>Timezone</span>
+        <input
+          type="text"
+          className="w-full p-1.5 border rounded bg-background text-sm"
+          value={config.timezone ?? 'UTC'}
+          onChange={e => { update({ timezone: e.target.value }); }}
+          placeholder="Europe/Istanbul"
+        />
+      </label>
+      <p className="text-[10px] text-muted-foreground">Use an IANA name such as Europe/Istanbul. Naive dates are treated as UTC before conversion.</p>
+    </ValidationField>
     <div className="space-y-1">
       <span className="block text-xs font-medium">Calendar Features</span>
       <ValidationField field="features">
@@ -213,6 +229,7 @@ function DateSettings({ config, update }: { config: TimeSeriesConfig; update: Up
           onChange={feats => { update({ features: feats }); }}
         />
       </ValidationField>
+      <p className="text-[10px] text-muted-foreground">Sine/cosine pairs encode hourly, weekly, monthly or yearly cycles. Yearly cycles use 365 or 366 days.</p>
     </div>
     <label className="flex items-center gap-2 text-xs">
       <input
@@ -315,11 +332,22 @@ function validateMethodSettings(config: TimeSeriesConfig): { isValid: boolean; m
         ? { isValid: false, field: 'aggregations', message: 'Select at least one aggregation' }
         : { isValid: true };
     case 'date':
-      return (config.features?.length ?? 0) === 0
-        ? { isValid: false, field: 'features', message: 'Select at least one calendar feature' }
-        : { isValid: true };
+      return validateDateSettings(config);
     default:
       return { isValid: true };
+  }
+}
+
+function validateDateSettings(config: TimeSeriesConfig): { isValid: boolean; message?: string; field?: string } {
+  if ((config.features?.length ?? 0) === 0)
+    return { isValid: false, field: 'features', message: 'Select at least one calendar feature' };
+  const timezone = config.timezone ?? 'UTC';
+  try {
+    if (/^[+-]/.test(timezone)) throw new RangeError('Numeric offsets are not IANA names');
+    new Intl.DateTimeFormat('en', { timeZone: timezone });
+    return { isValid: true };
+  } catch {
+    return { isValid: false, field: 'timezone', message: 'Enter an IANA timezone, such as UTC or Europe/Istanbul' };
   }
 }
 
@@ -357,5 +385,6 @@ export const TimeSeriesNode: NodeDefinition<TimeSeriesConfig> = {
     min_periods: 1,
     features: ['year', 'month', 'day', 'dayofweek'],
     drop_original: false,
+    timezone: 'UTC',
   }),
 };

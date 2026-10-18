@@ -1,0 +1,50 @@
+resources:
+  jobs:
+    monitoring_cleanup:
+      name: ${bundle.name}_monitoring_cleanup
+      tags: ${var.job_tags}
+      budget_policy_id: ${var.monitoring_budget_policy_id}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: ${var.monitoring_timeout_seconds}
+      email_notifications: ${var.monitoring_email_notifications}
+      webhook_notifications: ${var.monitoring_webhook_notifications}
+      health:
+        rules: ${var.monitoring_health_rules}
+      schedule:
+        quartz_cron_expression: ${var.monitoring_cleanup_cron}
+        timezone_id: UTC
+        pause_status: ${var.monitoring_cleanup_pause_status}
+      parameters:
+        - name: cleanup_confirm
+          default: ${var.monitoring_cleanup_confirm}
+        - name: reference_retention_days
+          default: ${var.monitoring_reference_retention_days}
+      tasks:
+        - task_key: cleanup_references
+          timeout_seconds: ${var.monitoring_task_timeout_seconds}
+          max_retries: ${var.monitoring_max_retries}
+          min_retry_interval_millis: 60000
+          environment_key: monitoring
+          notebook_task:
+            notebook_path: ../src/jobs/monitor_project.py
+            base_parameters:
+              job_run_id: '{{job.run_id}}'
+              task_key: cleanup_references
+              workspace_host: ${workspace.host}
+              monitoring_action: cleanup_references
+              cleanup_confirm: '{{job.parameters.cleanup_confirm}}'
+              reference_retention_days: '{{job.parameters.reference_retention_days}}'
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_environment: ${bundle.target}
+              monitoring_deployment_mode: ${bundle.mode}
+              monitoring_project: ${bundle.name}
+      environments:
+        - environment_key: monitoring
+          spec:
+            client: ${var.monitoring_environment_version}
+            dependencies:
+              - -r ${workspace.file_path}/deployment/requirements.txt

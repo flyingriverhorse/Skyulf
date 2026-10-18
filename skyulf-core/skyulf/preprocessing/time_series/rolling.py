@@ -1,5 +1,6 @@
 """Rolling-window aggregates (mean/sum/min/max/std/median) over time series."""
 
+import re
 from typing import Any, cast
 
 import pandas as pd
@@ -27,6 +28,15 @@ from ._history_state import fit_history
 
 def _roll_name(col: str, agg: str, window: int) -> str:
     return f"{col}_roll_{agg}_{window}"
+
+
+def _rolling_is_double(dtype: str, aggregations: list[str]) -> bool:
+    """Identify shared double results while excluding Polars narrow and integral aggregates."""
+    if dtype.lower() == "float64":
+        return True
+    return re.fullmatch(r"u?int(?:8|16|32|64)", dtype.lower()) is not None and set(
+        aggregations
+    ) <= {"mean", "median", "std"}
 
 
 def _polars_rolling_expr(col_expr: Any, agg: str, window: int, min_periods: int) -> Any:
@@ -212,11 +222,14 @@ class RollingAggregateCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
-        """Add one float64 ``{col}_roll_{agg}_{window}`` column per (column, aggregation)."""
-        # Rolling outputs are float64 regardless of source dtype.
+        """Predict shared double outputs; abstain when engine-specific aggregate types differ."""
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         aggs = coerce_aggregations(config.get("aggregations", ["mean"]))
         window = int(config.get("window", 3))
+        if not aggs:
+            return input_schema
+        if any(not _rolling_is_double(input_schema.dtypes.get(col, ""), aggs) for col in cols):
+            return None
         schema = input_schema
         for col in cols:
             for agg in aggs:

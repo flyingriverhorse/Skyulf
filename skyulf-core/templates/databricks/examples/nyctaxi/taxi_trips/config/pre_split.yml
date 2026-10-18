@@ -1,0 +1,15 @@
+# Fixed row eligibility before the training split; never learn statistics here.
+# Select with pre_split_recipe in config/training.yml (default: default).
+# Competition shares its pre-split recipe. Scoring can reuse the saved filters.
+version: 1
+recipes:
+  default: []
+  valid_fare:
+    # Reads the fare target: scoring must skip it explicitly.
+    - custom: pre_split.value_range
+      params: {column: fare_amount, minimum: 0.01, maximum: 300}
+    - custom: pre_split.value_range
+      params: {column: trip_distance, minimum: 0.01, maximum: 100}
+  known_zones:
+    - custom: trip_rules.known_zips
+      params: {columns: [pickup_zip, dropoff_zip]}

@@ -1,5 +1,6 @@
 """Saved numeric transformations expose local context while reusing their native apply."""
 
+import pickle
 from copy import deepcopy
 from decimal import Decimal
 from typing import Any, cast
@@ -248,9 +249,18 @@ def test_simple_modes_reuse_domain_null_and_clipping_rules(engine, method, monke
         [{"column": "x"}],
     ],
 )
-def test_simple_real_noop_states_remain_noops(engine, transformations, monkeypatch):
+def test_simple_real_noop_states_remain_noops(engine, transformations, monkeypatch, tmp_path):
     """Existing missing-column, unknown-method and empty-sequence skips must remain valid."""
-    record = _record("SimpleTransformation", engine, {"transformations": transformations})
+    state = {"type": "simple_transformation", "transformations": transformations}
+    path = tmp_path / "historical-simple.pkl"
+    path.write_bytes(pickle.dumps(state))
+    record = {
+        "name": "numeric",
+        "type": "SimpleTransformation",
+        "params": {"transformations": transformations},
+        "artifact": pickle.loads(path.read_bytes()),
+        "applier": NodeRegistry.get_applier("SimpleTransformation")(),
+    }
     frame = _frame(engine)
     detail, output = _probe(record, frame, engine, monkeypatch)
     assert detail["status"] == "passed"
@@ -296,6 +306,9 @@ def test_numeric_invalid_state_shape_cannot_gain_context(node, change):
     "transformations",
     [
         "square",
+        "",
+        {},
+        False,
         [1],
         [{"column": ["x"], "method": "square"}],
         [{"column": "x", "method": []}],
@@ -303,23 +316,63 @@ def test_numeric_invalid_state_shape_cannot_gain_context(node, change):
         [{"column": "x", "method": "square", "callback": object()}],
     ],
 )
-def test_simple_malformed_rules_are_rejected(transformations):
-    """Inspection must reject unsupported containers or behavior without invoking callbacks."""
-    state = _record("SimpleTransformation", "pandas", {"transformations": transformations})[
-        "artifact"
-    ]
+@pytest.mark.parametrize("stage", ["fit", "saved"])
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_simple_malformed_rules_are_rejected(transformations, stage, engine):
+    """Fit and saved inspection must reject malformed rules without executing payloads."""
+    state = {"type": "simple_transformation", "transformations": transformations}
     with pytest.raises(ValueError):
-        get_inference_capability("SimpleTransformation", {}, state, engine="pandas")
+        if stage == "fit":
+            NodeRegistry.get_calculator("SimpleTransformation")().fit(
+                _frame(engine), {"transformations": transformations}
+            )
+        else:
+            get_inference_capability("SimpleTransformation", {}, state, engine=engine)
 
 
 def test_simple_iterator_state_is_not_consumed():
     """One-shot rules must be rejected before inspection changes later inference behavior."""
     rule = {"column": "x", "method": "square"}
     rules = iter([rule])
-    state = _record("SimpleTransformation", "pandas", {"transformations": rules})["artifact"]
+    state = {"type": "simple_transformation", "transformations": rules}
     with pytest.raises(ValueError):
         get_inference_capability("SimpleTransformation", {}, state, engine="pandas")
     assert next(rules) is rule
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_simple_fit_rejects_iterator_without_consuming_it(engine):
+    """Rejected one-shot configuration must remain intact for caller inspection or retry."""
+    rule = {"column": "x", "method": "square"}
+    rules = iter([rule])
+    config = {"transformations": rules}
+    with pytest.raises(ValueError, match="list or tuple"):
+        NodeRegistry.get_calculator("SimpleTransformation")().fit(_frame(engine), config)
+    assert config["transformations"] is rules
+    assert next(rules) is rule
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("rule", [{}, {"column": "x"}, {"column": "x", "method": "unknown"}])
+def test_simple_new_fit_rejects_legacy_noop_choices(engine, rule):
+    """Historical replay compatibility must not allow missing or unknown methods in new fits."""
+    config = {"transformations": [rule]}
+    before = deepcopy(config)
+    with pytest.raises(ValueError, match="Unknown SimpleTransformation method.*Supported"):
+        NodeRegistry.get_calculator("SimpleTransformation")().fit(_frame(engine), config)
+    assert config == before
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("rules", [[], (), None])
+def test_simple_empty_fit_states_remain_noops(engine, rules):
+    """Shape validation must preserve the supported empty configuration containers."""
+    frame = _frame(engine)
+    state = NodeRegistry.get_calculator("SimpleTransformation")().fit(
+        frame, {"transformations": rules}
+    )
+    assert state["transformations"] is rules
+    assert NodeRegistry.get_applier("SimpleTransformation")().apply(frame, state).equals(frame)
 
 
 @pytest.mark.parametrize("labels", [[], {"x": object()}, {"x": [object()]}])

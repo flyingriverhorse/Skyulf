@@ -12,7 +12,8 @@ from typing import Any
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
 from ....inference._manifest import ColumnSpec
-from ....inference.model_set import ComponentReference, save_model_set
+from ....inference.model_set import ComponentReference, load_model_set, save_model_set
+from ....inference.probed_composition import requires_composition_probe, sealed_composition_config
 from ....inference.project_code import load_project_module
 from ...mlflow.lifecycle.promotion import ExclusiveAliasWriterAdmission, controlled_champion_version
 from ...mlflow.registration.registry import (
@@ -38,7 +39,11 @@ from ..feature_store.scoring import (
     validate_feature_snapshot,
     validate_feature_source,
 )
-from ..jobs.shared.job_output import render_bundle_output, render_scoring_summary
+from ..jobs.shared.job_output import (
+    render_bundle_output,
+    render_operator_options,
+    render_scoring_summary,
+)
 from ..jobs.shared.job_runtime import (
     OPERATOR_FIELDS,
     notebook_output,
@@ -46,10 +51,11 @@ from ..jobs.shared.job_runtime import (
     read_notebook_config,
     validate_job_parameters,
 )
-from ..lifecycle.workflow import bind_target_name, resolve_target_config
+from ..lifecycle.workflow import bind_target_name, probed_admission, resolve_target_config
 from ..projects._project_files import project_source, read_source
 from ..projects.workflow_config import validate_workflow_config
 from ..projects.yaml_config import read_inference_config
+from ..projects.yaml_recipes import feature_project_source
 from ..scoring.incremental.incremental_batch import (
     bounded_frame,
     latest_source_version,
@@ -87,6 +93,7 @@ def load_project_model_set(
     _set_policy(bound)
     result = {key: bound[key] for key in settings}
     result["publication"] = _bind_publication(settings.get("publication"), bindings)
+    result["admit_probed_custom_steps"] = probed_admission(base)
     return result
 
 
@@ -171,21 +178,57 @@ def capture_set_composition(values: dict[str, str]) -> str:
     return project_source(path) if path.exists() else ""
 
 
+def _combined_rules_path(values: dict[str, str], settings: dict) -> str | None:
+    """Choose one declaration owner, defaulting YAML to the generated feature package."""
+    if "combined_rules_path" in settings and not isinstance(settings["combined_rules_path"], str):
+        raise ValueError("combined_rules_path must name a feature package within src.")
+    yaml = Path(values["config_path"]).parent / "scoring.yml"
+    if not yaml.exists() and not yaml.is_symlink():
+        return settings.get("combined_rules_path")
+    if "composition_config" in settings:
+        raise ValueError("Combined rules defined in both scoring.yml and composition_config.")
+    return settings.get("combined_rules_path", "../features")
+
+
+def _combined_package(root: Path, relative: str) -> Path:
+    """Reject traversals and linked package roots before resolving captured files."""
+    if not isinstance(relative, str) or not relative:
+        raise ValueError("combined_rules_path must name a feature package within src.")
+    candidate = root / "modeling" / relative
+    path = candidate.resolve()
+    if not path.is_relative_to(root.resolve()):
+        raise ValueError("combined_rules_path must stay within src.")
+    _validate_yaml_package(root, path)
+    for parent in (candidate, *candidate.parents):
+        if parent.is_symlink() or parent.is_junction():
+            raise ValueError("combined_rules_path cannot use a symlink or junction.")
+        if parent == root:
+            break
+    return path
+
+
+def _validate_yaml_package(root: Path, path: Path) -> None:
+    """Keep canonical YAML visible instead of silently loading a nested or file-only hook."""
+    yaml = root.parent / "config/scoring.yml"
+    if (yaml.exists() or yaml.is_symlink()) and (
+        not path.is_dir() or path.parent != root.resolve()
+    ):
+        raise ValueError(
+            "YAML combined_rules_path must name a feature package directly within src."
+        )
+
+
 def capture_set_rules(values: dict[str, str], settings: dict) -> tuple[dict, str]:
     """Capture the shared scoring package without consulting it at inference time."""
-    if "combined_rules_path" not in settings:
+    relative = _combined_rules_path(values, settings)
+    if relative is None:
         return {
             **settings,
             "composition_config": settings.get("composition_config", {"outputs": []}),
         }, capture_set_composition(values)
     root = Path(values["config_path"]).parent.parent / "src"
-    relative = settings["combined_rules_path"]
-    if not isinstance(relative, str) or not relative:
-        raise ValueError("combined_rules_path must name a feature package within src.")
-    path = (root / "modeling" / relative).resolve()
-    if not path.is_relative_to(root.resolve()):
-        raise ValueError("combined_rules_path must stay within src.")
-    source = project_source(path, exclude_feature_groups=True)
+    path = _combined_package(root, relative)
+    source = feature_project_source(path)
     factory = getattr(load_project_module(source), "build_combined_rules", None)
     if not callable(factory):
         raise ValueError("The shared feature package must export build_combined_rules().")
@@ -346,21 +389,34 @@ def package_training_model_set(
         component_artifacts=component_artifacts,
     )
     validate_component_bindings(branches, component_artifacts)
+    quality_evidence = {
+        "expected_champion_version": config.get("expected_champion_version"),
+        "comparisons": {
+            name: result.comparison_sha256 for name, result in outcome.components.items()
+        },
+    }
     with tempfile.TemporaryDirectory(prefix="skyulf-model-set-") as directory:
-        path = Path(directory) / "set"
-        saved = save_model_set(
-            path,
-            components=components,
-            record_key_schema=keys,
-            composition_source=composition_source,
-            composition_config=config["composition_config"],
-            quality_evidence={
-                "expected_champion_version": config.get("expected_champion_version"),
-                "comparisons": {
-                    name: result.comparison_sha256 for name, result in outcome.components.items()
-                },
-            },
-        )
+
+        def save(name: str, composition: dict[str, Any] | None) -> Any:
+            """Save one complete package copy with the given composition config."""
+            return save_model_set(
+                Path(directory) / name,
+                components=components,
+                record_key_schema=keys,
+                composition_source=composition_source,
+                composition_config=composition,
+                quality_evidence=quality_evidence,
+            )
+
+        composition = dict(config["composition_config"] or {"outputs": []})
+        composition.pop("partition_probe", None)  # only training writes the evidence
+        saved = save("set", composition)
+        if probed_admission(config) and requires_composition_probe(load_model_set(saved.directory)):
+            # Include arithmetic that can amplify tolerated component prediction noise.
+            sample = _composition_sample(source, saved.manifest)
+            sealed = sealed_composition_config(load_model_set(saved.directory), sample)
+            saved = save("sealed", sealed)
+        path = saved.directory
         binding = union_feature_binding(
             component_artifacts,
             tuple(column.name for column in saved.manifest.input_schema),
@@ -388,6 +444,14 @@ def package_training_model_set(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+
+
+def _composition_sample(source: Any, manifest: Any) -> Any:
+    """Collect up to 256 source rows with the set's keys and inputs for the probe."""
+    names = list(dict.fromkeys(column.name for column in manifest.input_schema))
+    keys = list(manifest.record_key_columns)
+    # Ordered by record keys so retrying the same training run probes the same rows.
+    return source.select(*names).orderBy(*keys).limit(256).toPandas()
 
 
 def _log_training_set_package(
@@ -482,6 +546,11 @@ def run_model_set_operator(
     from ...mlflow.lifecycle.model_set_lifecycle import rollback_model_set  # noqa: PLC0415
 
     action = values["lifecycle_action"]
+    if options.get("allow_unloadable_champion"):
+        raise ValueError(
+            "allow_unloadable_champion is not supported for model sets; approve the set with "
+            "the Core release that produced its champion."
+        )
     config = validate_workflow_config(
         read_notebook_config(values) if config is None else config, action=action
     )
@@ -535,13 +604,52 @@ def run_model_set_operator(
     return {"action": action, "model_set_name": settings["model_name"], "receipt": asdict(result)}
 
 
+def _set_decision_actions(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Offer approval only for a passing pending set; rejection needs no passing gates."""
+    candidate = payload.get("model_set_candidate")
+    quality = payload.get("quality") or {}
+    if (
+        not candidate
+        or payload.get("promotion_policy") != "manual_approval"
+        or payload.get("alias_change") is not None
+        or "passed" not in quality
+    ):
+        return {}
+    evidence = {
+        "candidate_version": str(candidate["version"]),
+        "expected_champion_version": quality.get("expected_champion_version") or "none",
+    }
+    actions = {"approve": {"lifecycle_action": "approve", **evidence}} if quality["passed"] else {}
+    return {**actions, "reject": {"lifecycle_action": "reject", **evidence}}
+
+
+def set_operator_actions(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Derive the exact train-job parameters a set decision or promotion accepts next."""
+    actions = _set_decision_actions(payload)
+    receipt = payload.get("alias_change") or payload.get("receipt")
+    if isinstance(receipt, dict) and receipt.get("kind") == "promotion":
+        actions["rollback"] = {
+            "lifecycle_action": "rollback",
+            "expected_champion_version": receipt["new_version"],
+            "promotion_receipt_json": json.dumps(receipt, sort_keys=True, separators=(",", ":")),
+        }
+    return actions
+
+
 def render_model_set_result(payload: dict[str, Any]) -> str:
     """Show concrete set identity and explicit operator actions with escaped evidence."""
     if payload.get("recovery_required"):
         return render_bundle_output(payload)
     raw = html.escape(json.dumps(payload, indent=2, default=str, allow_nan=False))
     if "noop" not in payload:
-        return "<h2>Model set result</h2><pre>" + raw + "</pre>"
+        receipt = payload.get("alias_change") or payload.get("receipt") or {}
+        return (
+            "<h2>Model set result</h2>"
+            + render_operator_options(set_operator_actions(payload), receipt)
+            + "<h3>Decision details (JSON)</h3><pre>"
+            + raw
+            + "</pre>"
+        )
     summary = render_scoring_summary(
         {
             **payload,
@@ -639,6 +747,7 @@ def score_model_set_payload(
         prediction_table=settings["prediction_table"],
         admission=SingleWriterAdmission(),
         model_change_mode=config["model_change_mode"],
+        initial_scoring=config.get("initial_scoring", "full_snapshot"),
         max_rows=config["max_rows"],
         max_bytes=input_budget_bytes(config.get("max_input_mb")),
         publication=settings.get("publication"),

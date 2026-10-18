@@ -26,6 +26,8 @@ from skyulf.integrations.databricks.shared._frames import frame_bytes
 
 from .....data.dataset import SplitDataset
 from .....inference.pipeline_evaluation import evaluate_holdout
+from .....inference.probed_rules import scoring_rules
+from .....inference.probed_steps import PROBED_NODES
 from .....inference.project_code import is_project_filter_step
 from .....leakage import step_learns_from_data
 from .....preprocessing.split import DataSplitter
@@ -36,6 +38,7 @@ from ....mlflow.lifecycle.validation import (
     comparison_digest,
     comparison_payload,
     quality_gate_results,
+    validate_coverage_policy,
     validate_quality_policy,
 )
 from ....mlflow.registration.registry import ResolvedModel, register_model, resolve_model
@@ -48,6 +51,15 @@ from ...data.training.training_dates import (
     normalize_training_dates,
     parse_training_date,
     training_date_spec,
+)
+from ...data.training.training_labels import (
+    LABEL_FIELDS,
+    join_training_labels,
+    label_binding,
+    pin_training_labels,
+    validate_label_binding,
+    validate_label_identity,
+    validate_training_labels,
 )
 from ...feature_store.training import (
     enrich_training_source,
@@ -67,7 +79,11 @@ from ...observability.reports.explanations import (
 from ...scoring.batch.frame_batch import fit_workflow
 from ...shared._contracts import column_name, table_name
 from ..shared.holdout_evidence import save_holdout_reference
-from ..shared.preprocessing_checks import log_preprocessing_probe
+from ..shared.preprocessing_checks import (
+    log_partition_probe,
+    log_preprocessing_probe,
+    seal_partition_probe,
+)
 from ..shared.training_evidence import build_training_evidence, evidence_digest
 from ..shared.training_inputs import capture_training_uc_id, log_training_inputs
 from ..shared.training_parameters import log_training_parameters
@@ -136,6 +152,10 @@ class TrainingSpec:
     feature_binding_json: str | None = None
     online_policy_json: str | None = None
     preprocessing_probe: bool = False
+    admit_probed_custom_steps: bool = False
+    training_label_table: str | None = None
+    training_label_version: int | None = None
+    training_label_table_id: str | None = None
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> TrainingSpec:
@@ -178,12 +198,36 @@ class TrainingSpec:
         self._validate_budgets_and_sampling()
         self._validate_evidence_digests()
         training_lookup(self)
+        validate_training_labels(self)
 
     def _validate_label_policy(self) -> None:
         """Require explicit booleans for label eligibility and optional diagnostics."""
-        for field in ("filter_unavailable_results", "drop_missing_labels", "preprocessing_probe"):
+        for field in (
+            "filter_unavailable_results",
+            "drop_missing_labels",
+            "preprocessing_probe",
+            "admit_probed_custom_steps",
+        ):
             if type(getattr(self, field)) is not bool:
                 raise ValueError(f"{field} must be boolean.")
+
+    def row_limit_error(self, observed: int, *, lower_bound: bool = False) -> ValueError:
+        """Explain a bounded read without claiming a complete table count."""
+        count = f"at least {observed}" if lower_bound else str(observed)
+        return ValueError(
+            f"Training source has {count} rows, exceeding max_rows={self.max_rows}. "
+            "In config/training.yml, increase max_rows within the memory budget or "
+            "set training_sample_rows to sample eligible rows before splitting."
+        )
+
+    def byte_limit_error(self, observed: int, *, estimate: bool = False) -> ValueError:
+        """Identify the input size limit and its public YAML setting."""
+        kind = "estimated" if estimate else "observed"
+        return ValueError(
+            f"Training source {kind} size {observed} bytes exceeds max_bytes={self.max_bytes}. "
+            "In config/training.yml, increase max_input_mb within the memory budget or "
+            "set training_sample_rows to reduce input size."
+        )
 
     def _validate_random_split(self) -> None:
         """Check the random split and its optional event-selection window."""
@@ -329,7 +373,12 @@ class TrainingSpec:
     def _identity_settings(self) -> dict[str, Any]:
         """Keep optional lookup and weight controls out of older unbound identities."""
         settings = asdict(self)
-        for field in ("feature_lookup_json", "feature_binding_json", "online_policy_json"):
+        for field in (
+            "feature_lookup_json",
+            "feature_binding_json",
+            "online_policy_json",
+            *LABEL_FIELDS,
+        ):
             if settings[field] is None:
                 settings.pop(field)
         return settings
@@ -355,7 +404,7 @@ class TrainingSpec:
             settings.pop("training_evidence_sha256")
         if not self.pre_split_steps:
             settings.pop("pre_split_steps")
-        for field in ("max_rows", "max_bytes", "preprocessing_probe"):
+        for field in ("max_rows", "max_bytes", "preprocessing_probe", "admit_probed_custom_steps"):
             settings.pop(field)
         for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
             value = getattr(self, field)
@@ -505,7 +554,7 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     """Project and cap a versioned Delta read before materializing driver rows."""
     if not isinstance(spec, TrainingSpec):
         raise TypeError("spec must be TrainingSpec.")
-    spec = pin_training_lookup(spark, spec)
+    spec = pin_training_labels(spark, pin_training_lookup(spark, spec))
     source_id = table_identity(spark, spec.table)
     uc_id = capture_training_uc_id(spec.table)
     _pre_split_columns(
@@ -522,6 +571,7 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     )
     names = spec.source_columns
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
+    source = join_training_labels(spark, source, spec)
     source = enrich_training_source(spark, source, spec)
     source = normalize_training_dates(
         source.select(*names),
@@ -543,6 +593,9 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
     selected = source.orderBy(*ordering).limit(spec.max_rows + 1)
     frame = _materialize_training_rows(selected, spec, names)
+    validate_label_identity(spark, spec)
+    if spec.training_label_table is not None:
+        frame.attrs["training_labels"] = label_binding(spec)
     retain_training_binding(spark, frame, spec)
     if table_identity(spark, spec.table) != source_id:
         raise ValueError("Training source table identity changed while reading rows.")
@@ -846,6 +899,9 @@ def log_pipeline_model(
 def training_spec_payload(spec: TrainingSpec, engine: str) -> dict[str, Any]:
     """Serialize concrete selection settings before and after membership enrichment."""
     payload = asdict(spec)
+    for field in LABEL_FIELDS:
+        if payload[field] is None:
+            payload.pop(field)
     for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
         value = getattr(spec, field)
         payload[field] = None if value is None else value.isoformat()
@@ -881,6 +937,8 @@ def candidate_config(
     champion_version: str | None,
     quality_threshold: float | None,
     quality_gates: dict[str, float] | None = None,
+    min_scored_fraction: float | None = 0.90,
+    max_coverage_drop: float | None = 0.05,
     risk_category: str | None,
 ) -> dict[str, Any]:
     """Validate one training request and derive its effective preprocessing recipe."""
@@ -921,6 +979,12 @@ def candidate_config(
     pipeline_config.pop("pre_split_target_contract", None)
     if contract:
         pipeline_config["pre_split_target_contract"] = contract
+    # Only the training spec opts in, and only training writes the probe evidence.
+    pipeline_config.pop("partition_probe", None)
+    pipeline_config.pop("admit_probed_custom_steps", None)
+    if spec.admit_probed_custom_steps and _needs_probe(pipeline_config):
+        # Sealed in the fitted pipeline so Spark admission reads the opt-in from the payload.
+        pipeline_config["admit_probed_custom_steps"] = True
     cv.validate_pipeline(
         pipeline_config, target_column=spec.target_column, event_column=spec.event_column
     )
@@ -930,6 +994,7 @@ def candidate_config(
     ):
         raise ValueError("stratify requires a classification model.")
     _validate_candidate_metadata(risk_category, min_improvement)
+    validate_coverage_policy(min_scored_fraction, max_coverage_drop)
     validate_quality_policy(
         metric,
         quality_threshold,
@@ -938,6 +1003,14 @@ def candidate_config(
     )
     _validate_champion_version(champion_version)
     return pipeline_config
+
+
+def _needs_probe(pipeline_config: dict[str, Any]) -> bool:
+    """Report whether the recipe has function steps or scoring rules to probe."""
+    steps = pipeline_config.get("preprocessing", [])
+    return any(step.get("transformer") in PROBED_NODES for step in steps) or bool(
+        scoring_rules(pipeline_config.get("project_scoring"))
+    )
 
 
 def _candidate_cv(
@@ -1010,7 +1083,7 @@ def fit_candidate(
     evaluate_cv: bool = True,
 ) -> _FittedCandidate:
     """Fit CV and final training rows, persisting selection and provenance evidence."""
-    spec = pin_fit_lookup(spark, spec, engine)
+    spec = pin_training_labels(spark, pin_fit_lookup(spark, spec, engine))
     run.log_config(pipeline_config, artifact_file="pipeline_config.json")
     run.client.log_dict(run.run_id, config, "training_pipeline_config.json")
     run.log_params({key: getattr(cv, field) for key, field in CV_FIELDS.items()})
@@ -1020,6 +1093,7 @@ def fit_candidate(
     frame, train_frame, holdout, unavailable = prepared_data or read_training_partitions(
         spark, spec, temporal_cv=temporal_cv, engine=engine
     )
+    validate_label_binding(frame, spec)
     validate_training_frame(frame, spec)
     spec = replace(
         spec,
@@ -1053,6 +1127,9 @@ def fit_candidate(
         max_rows=spec.max_rows,
         max_bytes=spec.max_bytes,
     )
+    artifact = seal_partition_probe(
+        artifact, native_holdout, artifact_path, enabled=spec.admit_probed_custom_steps
+    )
     if _native_search_cv(search, evaluate_cv, pipeline_config):
         cv_results = post_selection_cv(
             native_train,
@@ -1065,6 +1142,8 @@ def fit_candidate(
     if pipeline_config.get("explainability"):
         log_training_explanations(run, artifact, native_train)
     log_preprocessing_probe(run, artifact, native_holdout, enabled=spec.preprocessing_probe)
+    if spec.admit_probed_custom_steps:
+        log_partition_probe(run, artifact)
     evidence = build_training_evidence(
         spec, holdout, project_source_sha256=artifact.manifest.project_source_sha256
     )
@@ -1253,6 +1332,8 @@ def compare_candidate(
     min_improvement: float,
     quality_threshold: float | None,
     quality_gates: dict[str, float] | None = None,
+    min_scored_fraction: float | None = 0.90,
+    max_coverage_drop: float | None = 0.05,
     tracking_uri: str,
     registry_uri: str,
     engine: str,
@@ -1273,6 +1354,8 @@ def compare_candidate(
         max_bytes=spec.max_bytes,
         quality_threshold=quality_threshold,
         quality_gates=quality_gates,
+        min_scored_fraction=min_scored_fraction,
+        max_coverage_drop=max_coverage_drop,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
@@ -1337,6 +1420,8 @@ def train_candidate(
     champion_version: str | None = None,
     quality_threshold: float | None = None,
     quality_gates: dict[str, float] | None = None,
+    min_scored_fraction: float | None = 0.90,
+    max_coverage_drop: float | None = 0.05,
     on_registered: Callable[[ResolvedModel], None] | None = None,
     risk_category: str | None = None,
     cv: CVSpec | None = None,
@@ -1361,6 +1446,8 @@ def train_candidate(
         champion_version=champion_version,
         quality_threshold=quality_threshold,
         quality_gates=quality_gates,
+        min_scored_fraction=min_scored_fraction,
+        max_coverage_drop=max_coverage_drop,
         risk_category=risk_category,
     )
     champion = (
@@ -1442,6 +1529,8 @@ def train_candidate(
         min_improvement=min_improvement,
         quality_threshold=quality_threshold,
         quality_gates=quality_gates,
+        min_scored_fraction=min_scored_fraction,
+        max_coverage_drop=max_coverage_drop,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
         engine=engine,
@@ -1526,18 +1615,18 @@ def _materialize_training_rows(
     serialized_bytes = 0
     for row in selected.toLocalIterator():
         if len(records) >= spec.max_rows:
-            raise ValueError("Training source exceeds max_rows.")
+            raise spec.row_limit_error(len(records) + 1, lower_bound=True)
         record = row.asDict(recursive=True) if hasattr(row, "asDict") else dict(row)
         for name in (spec.event_column, spec.result_available_at_column):
             if name is not None:
                 record[name] = instant_from_microseconds(record[name])
         serialized_bytes += len(pickle.dumps(record, protocol=pickle.HIGHEST_PROTOCOL))
         if serialized_bytes > spec.max_bytes:
-            raise ValueError("Training source exceeds max_bytes.")
+            raise spec.byte_limit_error(serialized_bytes)
         records.append(record)
     frame = pd.DataFrame.from_records(records, columns=names)
     if frame_bytes(frame) > spec.max_bytes:
-        raise ValueError("Training frame exceeds max_bytes.")
+        raise spec.byte_limit_error(frame_bytes(frame))
     return frame
 
 
@@ -1668,8 +1757,10 @@ def _validate_labeled_snapshot(frame: pd.DataFrame, spec: TrainingSpec, engine: 
         raise ValueError(
             f"Training snapshot is missing required source columns: {missing_columns}."
         )
-    if len(frame) > spec.max_rows or frame_bytes(frame) > spec.max_bytes:
-        raise ValueError("Training snapshot exceeds max_rows or max_bytes.")
+    if len(frame) > spec.max_rows:
+        raise spec.row_limit_error(len(frame))
+    if frame_bytes(frame) > spec.max_bytes:
+        raise spec.byte_limit_error(frame_bytes(frame))
     if frame.loc[:, list(spec.record_key_columns)].isna().any().any():
         raise ValueError("Training row keys must not be null.")
     if frame.duplicated(subset=list(spec.record_key_columns)).any():

@@ -370,3 +370,22 @@ def test_manifest_component_path_traversal_fails_before_loading(tmp_path, compon
     path.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(ValueError, match="branch name"):
         _api().load_model_set(artifact.directory)
+
+
+def test_manifest_reader_verifies_bytes_without_loading_components(
+    tmp_path, components, monkeypatch
+):
+    """Metadata-only lifecycle checks must survive a Core upgrade yet still detect tampering."""
+    from skyulf.inference import fitted_pipeline
+
+    artifact = _save(tmp_path, components)
+
+    def runtime_moved(*args, **kwargs):
+        raise AssertionError("component pipelines must not be loaded")
+
+    monkeypatch.setattr(fitted_pipeline, "load_pipeline", runtime_moved)
+    assert _api().read_model_set_manifest(artifact.directory) == artifact.manifest
+    path = artifact.directory / "components/pandas/pipeline.pkl"
+    path.write_bytes(path.read_bytes() + b" ")
+    with pytest.raises(ValueError, match="checksum|digest"):
+        _api().read_model_set_manifest(artifact.directory)

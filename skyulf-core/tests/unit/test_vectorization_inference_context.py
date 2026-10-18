@@ -111,14 +111,10 @@ def _probe(record, frame, engine, monkeypatch):
     return detail, output
 
 
-def _assert_native_checks(detail, node, *, cached_stop_words=False, nullable_polars=False):
-    """Keep exact diagnostics for native cache mutation and nullable boolean rendering."""
+def _assert_native_checks(detail, node, *, nullable_polars=False):
+    """Keep exact diagnostics for nullable boolean rendering."""
     failures = [check for check in detail["checks"] if check["status"] != "passed"]
-    if cached_stop_words:
-        assert detail["checks"] == [
-            {"name": "full", "status": "failed", "reason": "state_mutation"}
-        ], detail
-    elif nullable_polars:
+    if nullable_polars:
         assert [(check["name"], check["reason"]) for check in failures] == [
             ("chunks:1", "output_mismatch"),
             ("chunks:3", "output_mismatch"),
@@ -202,11 +198,7 @@ def test_text_modes_replay_saved_outputs_without_refitting(node, options, engine
     if node == "hashing_vectorizer":
         record["applier"].apply(frame, record["artifact"])
     detail, output = _probe(record, frame, engine, monkeypatch)
-    _assert_native_checks(
-        detail,
-        node,
-        cached_stop_words=isinstance(options.get("stop_words"), list) and node != "tokenizer",
-    )
+    _assert_native_checks(detail, node)
     assert len(output) == len(frame)
     native_output = record["applier"].apply(frame, record["artifact"])
     assert list(native_output.columns) == ["keep", *record["artifact"]["output_columns"]]
@@ -252,11 +244,13 @@ def test_text_default_and_unselected_artifacts_are_actual_noops(node, config, en
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_pristine_hash_vectorizer_reports_native_lazy_cache_mutation(engine, monkeypatch):
-    """The first native analyzer cache write must remain visible to exact diagnostics."""
+def test_pristine_hash_vectorizer_cache_write_is_not_state_mutation(engine, monkeypatch):
+    """Sklearn's first stop-word pointer cache write is not learned state, so the probe passes."""
     record = _record("hashing_vectorizer", engine)
+    vectorizer = record["artifact"]["vectorizer_object"]
+    assert not hasattr(vectorizer, "_stop_words_id")
     detail, output = _probe(record, _frame(engine), engine, monkeypatch)
-    assert detail["checks"] == [{"name": "full", "status": "failed", "reason": "state_mutation"}]
+    assert detail["status"] == "passed", detail
     assert len(output) == 4
 
 

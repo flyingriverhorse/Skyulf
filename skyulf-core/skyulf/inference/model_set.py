@@ -273,6 +273,16 @@ def verify_model_set_files(artifact: ModelSetArtifact) -> None:
         raise ValueError("Model set manifest changed after loading.")
 
 
+def read_model_set_manifest(path: str | Path) -> ModelSetManifest:
+    """Verify every package byte and return the manifest without unpickling components.
+
+    Metadata-only lifecycle checks use this so a later Core release can still read
+    a set whose component pipelines it may not load.
+    """
+    manifest, _ = _verified_contents(_safe_directory(Path(path)))
+    return manifest
+
+
 def load_model_set(path: str | Path) -> ModelSetArtifact:
     """Validate trusted local bytes and fitted schemas without resolving any aliases."""
     source = _safe_directory(Path(path))

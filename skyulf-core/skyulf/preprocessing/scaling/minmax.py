@@ -64,6 +64,9 @@ class MinMaxScalerApplier(BaseApplier):
         exprs = [
             (pl.col(c) * scale[cols.index(c)] + min_val[cols.index(c)]).alias(c) for c in valid
         ]
+        if params.get("clip", False):
+            lower, upper = params["feature_range"]
+            exprs = [expression.clip(lower, upper) for expression in exprs]
         return X.with_columns(exprs), _y
 
     @staticmethod
@@ -80,6 +83,8 @@ class MinMaxScalerApplier(BaseApplier):
         subset = decimal_columns_to_float(X_out[valid], valid)
         vals = subset.to_numpy(dtype=np.float64, na_value=np.nan)
         vals = vals * np.array(scale)[col_indices] + np.array(min_val)[col_indices]
+        if params.get("clip", False):
+            vals = np.clip(vals, *params["feature_range"])
         X_out[valid] = vals
         return X_out, _y
 
@@ -97,7 +102,7 @@ class MinMaxScalerApplier(BaseApplier):
     name="Min-Max Scaler",
     category="Preprocessing",
     description="Transform features by scaling each feature to a given range.",
-    params={"feature_range": [0, 1], "columns": []},
+    params={"feature_range": [0, 1], "clip": False, "columns": []},
     learns_from_data=True,
 )
 class MinMaxScalerCalculator(BaseCalculator):
@@ -138,10 +143,10 @@ def _fit_minmax(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[
     # `feature_range` may arrive as a JSON-loaded list (e.g. ``[0, 1]``) from the
     # frontend or pipeline config; sklearn enforces ``tuple`` via param validation.
     feature_range = validate_scaling_range(config.get("feature_range", (0, 1)), "feature_range")
-    scaler = MinMaxScaler(feature_range=feature_range)
+    scaler = MinMaxScaler(feature_range=feature_range, clip=config.get("clip", False))
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     scaler.fit(X_np)
-    return {
+    state = {
         "type": "minmax_scaler",
         "min": scaler.min_.tolist(),
         "scale": scaler.scale_.tolist(),
@@ -150,6 +155,9 @@ def _fit_minmax(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[
         "feature_range": feature_range,
         "columns": cols,
     }
+    if "clip" in config:
+        state["clip"] = bool(scaler.clip)
+    return state
 
 
 def _minmax_values(raw: dict) -> dict:
@@ -191,7 +199,11 @@ def _minmax_state(raw: dict) -> dict:
     state = _minmax_values(raw)
     if not state:
         return state
-    _fields(state, {"type", "columns", "min", "scale", "data_min", "data_max", "feature_range"})
+    fields = {"type", "columns", "min", "scale", "data_min", "data_max", "feature_range"}
+    if "clip" in state:
+        fields.add("clip")
+    _fields(state, fields)
+    _minmax_clip(state)
     columns = _columns(state["columns"])
     if state["type"] != "minmax_scaler" or not columns:
         raise ValueError("MinMax requires nonempty fitted affine state.")
@@ -208,8 +220,20 @@ def _minmax_state(raw: dict) -> dict:
 def _minmax_config(params: dict, state: dict) -> dict:
     """Bind defaults and explicit range options to the saved fitted column contract."""
     resolved = {"feature_range": [0, 1], **params}
-    _fields(resolved, {"columns", "feature_range"})
+    fields = {"columns", "feature_range"}
+    if "clip" in resolved:
+        fields.add("clip")
+    _fields(resolved, fields)
+    _minmax_clip(resolved)
     _minmax_range(resolved["feature_range"])
     if state and resolved["feature_range"] != state["feature_range"]:
         raise ValueError("Configured MinMax range disagrees with fitted state.")
+    if state and resolved.get("clip", False) != state.get("clip", False):
+        raise ValueError("Configured MinMax clip disagrees with fitted state.")
     return resolved
+
+
+def _minmax_clip(values: dict) -> None:
+    """Treat legacy absence as false while requiring an explicit boolean when present."""
+    if type(values.get("clip", False)) is not bool:
+        raise ValueError("MinMax clip must be a boolean.")

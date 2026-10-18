@@ -223,6 +223,21 @@ def test_drift_report_marks_missing_policy_disabled_and_escapes_reason():
     assert "<script>" not in html and "Healthy" not in html
 
 
+@pytest.mark.parametrize("extra", [{}, {"required_windows": None}])
+def test_legacy_policy_report_does_not_invent_required_windows(extra):
+    """Old reports with no stored threshold must show an unknown count instead of zero."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
+
+    row = _report_row(performance_status="unavailable", metric_value=None)
+    report = json.loads(row["report_json"])
+    report["performance"].update(extra)
+    row["report_json"] = json.dumps(report)
+    html = render_drift_output(row)
+    assert "0 / Unavailable" in html and "0 / 0" not in html and "0 / None" not in html
+
+
 def test_drift_report_shows_later_saved_retraining_action():
     """A saved action override must identify the later request without altering the metric verdict."""
     from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (

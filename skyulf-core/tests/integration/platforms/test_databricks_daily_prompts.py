@@ -18,6 +18,7 @@ def test_daily_selection_prompts_for_active_controls(branch, strategy, temporal_
     """Root and branch daily windows must expose the actual date column and active duration."""
     fields = json.loads((ROOT / "databricks_template_schema.json").read_text())["properties"]
     values = {key: field["default"] for key, field in fields.items()}
+    values["setup_mode"] = "detailed"
     prefix = "branch_1_" if branch else ""
     values.update(training_layout="multi_target" if branch else "single_model")
     values.update(

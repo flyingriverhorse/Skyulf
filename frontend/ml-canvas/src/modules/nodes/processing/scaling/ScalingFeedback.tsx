@@ -4,10 +4,17 @@ function getTargetExplanation(config: ScalingConfig) {
   switch (config.method) {
     case 'standard': return "Target: μ ≈ 0, σ ≈ 1";
     case 'minmax': return `Target: ${config.feature_range_min ?? 0} to ${config.feature_range_max ?? 1}`;
-    case 'robust': return "Target: Median ≈ 0, IQR ≈ 1";
+    case 'robust': return config.unit_variance ? 'Target: Unit variance for normal data' : "Target: Median ≈ 0, IQR ≈ 1";
     case 'maxabs': return "Target: MaxAbs = 1";
+    case 'quantile':
+    case 'normalize': return getDistributionTarget(config);
     default: return "";
   }
+}
+
+function getDistributionTarget(config: ScalingConfig) {
+  if (config.method === 'normalize') return `Target: Row ${config.norm ?? 'l2'} norm = 1 (zero rows stay 0)`;
+  return config.output_distribution === 'normal' ? 'Target: Normal marginal distribution' : 'Target: Uniform distribution from 0 to 1';
 }
 
 function formatPair(metrics: Record<string, unknown>, idx: number, firstKey: string, secondKey: string, firstLabel: string, secondLabel: string): string {
@@ -21,7 +28,7 @@ function getColumnDetails(config: ScalingConfig, metrics: Record<string, unknown
   switch (config.method) {
     case 'standard': return formatPair(metrics, idx, 'mean', 'scale', '\u03bc', '\u03c3');
     case 'minmax': return formatPair(metrics, idx, 'data_min', 'data_max', 'Min', 'Max');
-    case 'robust': return formatPair(metrics, idx, 'center', 'scale', 'Med', 'IQR');
+    case 'robust': return formatPair(metrics, idx, 'center', 'scale', 'Med', config.unit_variance ? 'Scale' : 'IQR');
     case 'maxabs': {
       const maxAbs = metrics.max_abs ? (metrics.max_abs as number[])[idx] : undefined;
       return typeof maxAbs === 'number' ? `MaxAbs=${maxAbs.toFixed(2)}` : '';

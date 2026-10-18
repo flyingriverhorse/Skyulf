@@ -27,7 +27,7 @@ from skyulf.registry import NodeRegistry
 def test_simple_restores_saved_columns_at_exact_input_height(lazy, height, value, dtype):
     """Restoration must neither create a row nor collapse existing rows without an input column."""
     state = SimpleImputerCalculator().fit(
-        pl.DataFrame({"x": [1, 2]}),
+        pl.DataFrame({"x": pl.Series([value, None], dtype=dtype)}),
         {"columns": ["x"], "strategy": "constant", "fill_value": value},
     )
     state_bytes = pickle.dumps(state)

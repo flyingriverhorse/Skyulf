@@ -14,6 +14,8 @@ continue to work unchanged.
 
 from .maxabs import MaxAbsScalerApplier, MaxAbsScalerCalculator
 from .minmax import MinMaxScalerApplier, MinMaxScalerCalculator
+from .normalizer import NormalizerApplier, NormalizerCalculator
+from .quantile import QuantileTransformerApplier, QuantileTransformerCalculator
 from .robust import RobustScalerApplier, RobustScalerCalculator
 from .standard import StandardScalerApplier, StandardScalerCalculator
 
@@ -22,6 +24,10 @@ __all__ = [
     "MaxAbsScalerCalculator",
     "MinMaxScalerApplier",
     "MinMaxScalerCalculator",
+    "NormalizerApplier",
+    "NormalizerCalculator",
+    "QuantileTransformerApplier",
+    "QuantileTransformerCalculator",
     "RobustScalerApplier",
     "RobustScalerCalculator",
     "StandardScalerApplier",

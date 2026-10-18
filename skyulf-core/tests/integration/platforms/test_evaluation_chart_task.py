@@ -149,6 +149,31 @@ def test_disabled_task_does_not_save_holdout_or_images(staged):
     )
 
 
+def test_chart_report_discloses_sample_exclusions():
+    """Readers must not confuse plotted survivor counts with the full holdout population."""
+    report = render_chart_report(
+        {
+            "status": "complete",
+            "run_id": "run",
+            "image_keys": [],
+            "reports": {
+                "main": {
+                    "destination_run_id": "charts",
+                    "image_keys": [],
+                    "sample_rows": 100,
+                    "holdout_rows": 2000,
+                    "sample_scored_rows": 80,
+                    "sample_excluded_rows": 20,
+                }
+            },
+        }
+    )
+    assert (
+        report == "main: 80 of 100 sampled holdout rows accepted for diagnostics; "
+        "20 excluded rows are not plotted."
+    )
+
+
 def test_chart_failure_does_not_rewrite_successful_training(staged, monkeypatch):
     """A report error must not change promotion or tempt a training retry."""
     from skyulf.integrations.databricks.observability.charts import evaluation_chart_report

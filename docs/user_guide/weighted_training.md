@@ -216,16 +216,16 @@ contributions. Neither is `sample_weight`.
 
 ## Preprocessing support
 
-All 67 registered names below, including aliases, have a supported weight
+All 73 registered names below, including aliases, have a supported weight
 transport contract. Required columns, feature types and optional dependencies
 still apply. This means weights reach the model correctly; it does not mean
 each preprocessor learns weighted statistics.
 
 | Group | Registered names |
 | --- | --- |
-| Scaling | StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler |
+| Scaling | StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler, QuantileTransformer, Normalizer |
 | Imputation | SimpleImputer, KNNImputer, IterativeImputer, GroupImputer |
-| Encoding | OneHotEncoder, OrdinalEncoder, LabelEncoder, DummyEncoder, HashEncoder, TargetEncoder, WOEEncoder |
+| Encoding | OneHotEncoder, OrdinalEncoder, LabelEncoder, DummyEncoder, HashEncoder, TargetEncoder, WOEEncoder, FrequencyEncoder, RareCategoryGrouping |
 | Vectorization | count_vectorizer, tfidf_vectorizer, hashing_vectorizer, sentence_embedder, tokenizer |
 | Feature selection | feature_selection, VarianceThreshold, UnivariateSelection, ModelBasedSelection, CorrelationThreshold |
 | Feature generation | FeatureGeneration, FeatureGenerationNode, FeatureMath, PolynomialFeatures, PolynomialFeaturesNode, FeatureInteraction |
@@ -238,7 +238,7 @@ each preprocessor learns weighted statistics.
 | Sampling | Oversampling, Undersampling |
 | Inspection | DataSnapshot, DatasetProfile |
 | Splitting | TrainTestSplitter, Split, feature_target_split |
-| Outliers | ClipValues, IQR, ZScore, Winsorize, EllipticEnvelope, ManualBounds |
+| Outliers | ClipValues, IQR, ZScore, Winsorize, EllipticEnvelope, ManualBounds, IsolationForest, LocalOutlierFactor |
 | Cleaning | TextCleaning, AliasReplacement, ValueReplacement, InvalidValueReplacement |
 
 Row-preserving operations retain the weights. Row removal also removes the
@@ -246,6 +246,12 @@ corresponding labels and weights. Lag/rolling sorting and filtering use the
 same positional mapping for features, labels and weights. Inspection nodes
 preserve the underlying data. DataFrame index labels and equal row counts are
 not sufficient evidence of correct alignment.
+
+LocalOutlierFactor uses its training outlier scores to retain the same feature,
+label and weight positions; novelty predictions are reserved for new rows.
+IsolationForest also carries original positions through exclusions. Frequency,
+rare grouping, quantile transformation and row normalization preserve weights;
+their learned statistics remain unweighted.
 
 **KNNImputer is supported before a weighted model.** It is a preprocessing step;
 the unsupported KNN classifiers/regressors above are final estimators.

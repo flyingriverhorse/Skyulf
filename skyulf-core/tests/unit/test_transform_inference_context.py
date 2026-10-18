@@ -1,4 +1,4 @@
-"""Saved power transforms expose batch fallback without learning request statistics."""
+"""Saved power transforms describe their actual per-value or whole-request behavior."""
 
 from copy import deepcopy
 from typing import Any
@@ -56,7 +56,7 @@ def _probe(record, sample, engine):
 @pytest.mark.parametrize("node", ["GeneralTransformation", "PowerTransformer"])
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_power_contract_inspection_does_not_execute(node, engine, monkeypatch):
-    """Inspection must neither fit nor run transforms while describing global fallback."""
+    """Inspection must describe context without fitting or running transforms."""
     record = _record(node, engine)
     state = record["artifact"]
     before = artifact_digest(state)
@@ -71,20 +71,24 @@ def test_power_contract_inspection_does_not_execute(node, engine, monkeypatch):
     monkeypatch.setattr(SkPowerTransformer, "fit", forbidden)
     assert applier.validate_inference_state(state) is state
     assert get_inference_capability(node, {}, state, engine=engine) == ExecutionCapability(
-        engine, "apply", "local", "preserve", "global"
+        engine,
+        "apply",
+        "local",
+        "filter" if node == "PowerTransformer" else "preserve",
+        "row" if node == "PowerTransformer" else "global",
     )
     assert get_inference_capability(node, {}, state, engine="spark") is None
     assert artifact_digest(state) == before
 
 
-@pytest.mark.parametrize("node", ["GeneralTransformation", "PowerTransformer"])
+@pytest.mark.parametrize("node", ["GeneralTransformation"])
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("method,bad", [("box-cox", -1.0), ("yeo-johnson", np.inf)])
 @pytest.mark.parametrize("standardize", [False, True])
-def test_power_bad_neighbor_changes_full_request_fallback(
+def test_power_bad_neighbor_rejects_request_without_raw_fallback(
     node, engine, method, bad, standardize, monkeypatch
 ):
-    """A bad neighbor leaves valid rows untransformed, so independent chunks are unsafe."""
+    """Invalid requests fail visibly while conservative global admission remains unchanged."""
     record = _record(node, engine, method, standardize)
     before = artifact_digest(record)
 
@@ -95,10 +99,10 @@ def test_power_bad_neighbor_changes_full_request_fallback(
     monkeypatch.setattr(NodeRegistry.get_calculator(node), "fit", forbidden)
     monkeypatch.setattr(SkPowerTransformer, "fit", forbidden)
     sample = _frame(engine, [2.0, bad])
-    full = record["applier"].apply(sample, record["artifact"])
+    with pytest.raises(ValueError, match=f"{method}.*column.*x"):
+        record["applier"].apply(sample, record["artifact"])
     single = record["applier"].apply(_frame(engine, [2.0]), record["artifact"])
-    assert full["x"].to_numpy()[0] == 2.0
-    assert single["x"].to_numpy()[0] != full["x"].to_numpy()[0]
+    assert single["x"].to_numpy()[0] != 2.0
     detail, output = _probe(record, sample, engine)
     assert detail["context"] == "global" and detail["status"] == "requires_context", detail
     assert output is sample
@@ -153,7 +157,7 @@ def test_power_genuine_numpy_selection_and_flag(engine):
     config = {"columns": [np.str_("x")], "standardize": np.bool_(True)}
     state = NodeRegistry.get_calculator("PowerTransformer")().fit(_frame(engine), config)
     capability = get_inference_capability("PowerTransformer", config, state, engine=engine)
-    assert capability is not None and capability.context == "global"
+    assert capability is not None and capability.context == "row"
 
 
 @pytest.mark.parametrize("node", ["GeneralTransformation", "PowerTransformer"])

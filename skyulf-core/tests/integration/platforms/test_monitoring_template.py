@@ -34,18 +34,31 @@ def test_template_job_notebooks_have_current_callers():
     assert unused == []
 
 
-@pytest.mark.skipif(not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in")
+@pytest.mark.skipif(
+    not (
+        os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE")
+        or os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
+    ),
+    reason="CLI opt-in",
+)
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 @pytest.mark.parametrize("recovery", ["false", "true"])
 @pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
+@pytest.mark.parametrize("destination", [("", ""), ("main", "mlops_monitoring")])
 def test_generated_projects_bind_independent_monitoring_destination(
-    tmp_path, layout, recovery, compute
+    tmp_path, layout, recovery, compute, destination
 ):
-    """Every scoring branch receives the central destination independently of model namespaces."""
+    """A blank setup answer starts runnable without monitoring; a destination enables it."""
     from test_databricks_bundle_generation import _generate_project
 
+    catalog, schema = destination
     project = _generate_project(
-        tmp_path, training_layout=layout, auto_rebuild_on_cdf_expiry=recovery, compute_mode=compute
+        tmp_path,
+        training_layout=layout,
+        auto_rebuild_on_cdf_expiry=recovery,
+        compute_mode=compute,
+        monitoring_catalog=catalog,
+        monitoring_schema=schema,
     )
     retired = {
         "drift_report.py",
@@ -64,11 +77,11 @@ def test_generated_projects_bind_independent_monitoring_destination(
             assert target["variables"]["on_drift"] == "disabled"
             assert target["variables"]["monitoring_performance_policies"] == "{}"
         else:
-            assert target["variables"].get("monitoring_enabled", "true") == "true"
-    assert variables["monitoring_enabled"]["default"] == "true"
+            assert "monitoring_enabled" not in target["variables"]
+    assert variables["monitoring_enabled"]["default"] == ("true" if catalog else "false")
     assert "monitoring_execution_engine" not in variables
-    assert variables["monitoring_catalog"]["default"] == ""
-    assert variables["monitoring_schema"]["default"] == ""
+    assert variables["monitoring_catalog"]["default"] == catalog
+    assert variables["monitoring_schema"]["default"] == schema
     assert variables["monitoring_drift_thresholds"]["default"] == "{}"
     assert variables["monitoring_performance_policies"]["default"] == "{}"
     assert variables["on_drift"]["default"] == "disabled"

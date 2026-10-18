@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from monitoring_sql_helpers import install_shared_views
 
 ASSET = (
     Path(__file__).resolve().parents[3]
@@ -70,6 +71,7 @@ def test_facet_identity_is_a_dataset_column(widget_name: str) -> None:
 def _connection() -> sqlite3.Connection:
     """Provide independent identities, including one with no measured policy."""
     connection = sqlite3.connect(":memory:")
+    install_shared_views(connection)
     connection.row_factory = sqlite3.Row
     connection.create_function(
         "concat", -1, lambda *parts: None if None in parts else "".join(str(p) for p in parts)
@@ -164,6 +166,13 @@ def _connection() -> sqlite3.Connection:
     )
     connection.execute("ALTER TABLE performance_history ADD COLUMN model_catalog TEXT")
     connection.execute("ALTER TABLE performance_history ADD COLUMN model_schema TEXT")
+    connection.execute(
+        "ALTER TABLE performance_history ADD COLUMN tolerance_mode TEXT DEFAULT 'absolute'"
+    )
+    connection.execute("ALTER TABLE performance_history ADD COLUMN tolerance REAL")
+    connection.execute(
+        "UPDATE performance_history SET tolerance = abs(baseline_value - threshold_value)"
+    )
     return connection
 
 

@@ -40,7 +40,19 @@ recipes:
 # - name: cap
 #   transformer: ClipValues
 #   params: {bounds: {feature_value: {lower: 0, upper: 1000}}}
+# IQR learns bounds after splitting. At scoring, outliers keep their row with an
+# empty prediction and reason outlier:<name>. Fixed eligibility uses pre_split.yml.
+# - name: outliers
+#   transformer: IQR
+#   params: {columns: [feature_value], multiplier: 1.5}
+# Missing values pass through PowerTransformer. Yeo-Johnson accepts zero/negatives;
+# Box-Cox excludes them with reason invalid:<name>. Training stops if invalid rows
+# exceed 10% of all input rows; null/NaN values alone do not make a row invalid.
+# - name: power
+#   transformer: PowerTransformer
+#   params: {columns: [feature_value], method: yeo-johnson, standardize: false}
 # Time-based history needs an input observation_time different from event_column:
+# Window/history steps need inference_mode: local; Spark/endpoints do not admit them.
 # - name: recent_value
 #   transformer: RollingAggregate
 #   params:

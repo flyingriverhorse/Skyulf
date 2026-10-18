@@ -1,15 +1,16 @@
 """Pandas-engine op handlers for FeatureGeneration."""
 
 import builtins
-import logging
 from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from .._category_keys import category_keys_pandas
 from ._common import (
     DEFAULT_EPSILON,
+    NUMERIC_DATETIME_FEATURES,
     SEASON_BY_MONTH,
     TIME_OF_DAY_BUCKETS,
     TIME_OF_DAY_DEFAULT,
@@ -19,9 +20,9 @@ from ._common import (
     _resolve_similarity_pair,
     _safe_divide,
     _vectorised_similarity,
+    report_operation_failure,
+    uses_operation_contract,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _pandas_arith_terms(op: dict[str, Any], df_out: Any) -> tuple[list[pd.Series], list[float]]:
@@ -182,7 +183,15 @@ _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
 }
 
 
-def _pandas_datetime_apply(op: dict[str, Any], df_out: Any, allow_overwrite: bool = False) -> None:
+def _pandas_datetime_value(dt: Any, feature: str, strict: bool) -> Any:
+    """Keep numeric calendar types stable in the versioned contract, including empty batches."""
+    value = _PANDAS_DT_FEATURES[feature](dt)
+    return value.astype("Int64") if strict and feature in NUMERIC_DATETIME_FEATURES else value
+
+
+def _pandas_datetime_apply(
+    op: dict[str, Any], df_out: Any, allow_overwrite: bool = False, strict: bool = False
+) -> None:
     """Materialise datetime-extract features onto ``df_out`` in place."""
     valid = [c for c in op.get("input_columns", []) if c in df_out.columns]
     features = op.get("datetime_features", [])
@@ -196,9 +205,11 @@ def _pandas_datetime_apply(op: dict[str, Any], df_out: Any, allow_overwrite: boo
                 output_col = _resolve_datetime_output_col(
                     op, col, feat, list(df_out.columns), allow_overwrite
                 )
-                df_out[output_col] = builder(dt)
+                df_out[output_col] = _pandas_datetime_value(dt, feat, strict)
         except Exception as e:  # noqa: BLE001 - per-column datetime feature failure is logged and skipped
-            logger.warning(f"Failed to extract datetime features for column {col}: {e}")
+            report_operation_failure(
+                e, strict, f"Failed to extract datetime features for column {col}"
+            )
 
 
 _PANDAS_AGG_METHODS = {"mean", "sum", "count", "min", "max", "std", "median"}
@@ -213,6 +224,12 @@ def _pandas_group_agg(op: dict[str, Any], df_out: Any, _eps: float) -> pd.Series
             return None
         mapping = dict(zip(fitted["keys"], fitted["values"], strict=True))
         groups = df_out[group_col]
+        if op.get("method") == "deviation":
+            result = category_keys_pandas(groups).map(mapping).astype("float64")
+            if fitted["global_value"] is not None:
+                result = result.fillna(fitted["global_value"])
+            source = pd.to_numeric(df_out[op["secondary_columns"][0]], errors="coerce")
+            return source - result
         result = groups.map(mapping).astype("float64")
         null_value = fitted.get("null_value")
         return result.where(groups.notna(), np.nan if null_value is None else null_value)
@@ -243,13 +260,14 @@ def _featgen_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
         return X, y
     epsilon = params.get("epsilon", DEFAULT_EPSILON)
     allow_overwrite = params.get("allow_overwrite", False)
+    strict = uses_operation_contract(params)
 
     df_out = X.copy()
     for i, op in enumerate(operations, start=params.get("_operation_offset", 0)):
         op_type = op.get("operation_type", "arithmetic")
         try:
             if op_type == "datetime_extract":
-                _pandas_datetime_apply(op, df_out, allow_overwrite)
+                _pandas_datetime_apply(op, df_out, allow_overwrite, strict)
                 continue
             handler = _PANDAS_OP_HANDLERS.get(op_type)
             if handler is None:
@@ -263,5 +281,5 @@ def _featgen_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
                 result = result.round(round_digits)
             df_out[output_col] = result
         except Exception as e:  # noqa: BLE001 - per-operation failure is logged and skipped
-            logger.warning(f"Failed to apply {op_type} operation (index {i}): {e}")
+            report_operation_failure(e, strict, f"Failed to apply {op_type} operation (index {i})")
     return df_out, y

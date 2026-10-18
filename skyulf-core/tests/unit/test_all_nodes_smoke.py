@@ -92,6 +92,8 @@ _COLUMN_OVERRIDES: dict[str, dict[str, Any]] = {
         "upper_bound": 10,
     },
     "EllipticEnvelope": {"columns": ["num_a", "num_b"], "contamination": 0.1},
+    "IsolationForest": {"columns": ["num_a", "num_b"], "contamination": 0.1},
+    "LocalOutlierFactor": {"columns": ["num_a", "num_b"], "contamination": 0.1},
     # Bucketing.
     "GeneralBinning": {"columns": ["num_a"], "n_bins": 4, "strategy": "uniform"},
     "KBinsDiscretizer": {"columns": ["num_a"], "n_bins": 4, "strategy": "uniform"},
@@ -105,6 +107,10 @@ _COLUMN_OVERRIDES: dict[str, dict[str, Any]] = {
     "OrdinalEncoder": {"columns": _CATEGORICAL_COLS},
     "LabelEncoder": {"columns": _CATEGORICAL_COLS},
     "HashEncoder": {"columns": ["cat_high"], "n_features": 4},
+    "FrequencyEncoder": {"columns": _CATEGORICAL_COLS},
+    "RareCategoryGrouping": {"columns": _CATEGORICAL_COLS},
+    "QuantileTransformer": {"columns": ["num_a"], "n_quantiles": 20},
+    "Normalizer": {"columns": ["num_a", "num_b"]},
     "TargetEncoder": {"columns": _CATEGORICAL_COLS, "target_column": "target"},
     "WOEEncoder": {"columns": _CATEGORICAL_COLS},
     # Cleaning defaults often select no columns; exercise a real operation.

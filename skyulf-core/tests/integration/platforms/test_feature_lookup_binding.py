@@ -9,13 +9,20 @@ import pytest
 from skyulf.integrations.databricks.feature_store.config import (
     FeatureLookupSpec,
     FeatureTrainingSpec,
+    validate_uc_name,
 )
 from skyulf.integrations.databricks.feature_store.lifecycle_config import (
+    bind_lookup_tables,
     binding_json,
     deserialize_feature_spec,
     parse_feature_binding,
     parse_lookup_config,
     serialize_feature_spec,
+)
+
+UC_NAME_MESSAGE = (
+    "Unity Catalog names must be catalog.schema.name; each part a simple identifier "
+    "(letters, digits, underscore; not starting with a digit)."
 )
 
 
@@ -112,3 +119,63 @@ def test_workflow_lookup_rejects_unconsumed_feature():
             label="target",
             input_columns=("another_feature",),
         )
+
+
+@pytest.mark.parametrize(
+    "lookup",
+    [
+        {"table_name": "{catalog}.{input_schema}.bad name"},
+        {"table_name": "a.b.c.d"},
+        {"table_name": "{catalog}.history"},
+        {"table_name": "", "lookup_key": ["id"], "feature_names": ["amount"]},
+    ],
+)
+def test_unbound_lookup_table_error_names_the_setting_to_complete(lookup):
+    """A partly filled lookup must name its indexed field and the one valid name shape."""
+    lookups = [{"table_name": "{catalog}.{input_schema}.history"}, lookup]
+    original = deepcopy(lookups)
+    bindings = {"catalog": "workspace", "input_schema": "features"}
+    with pytest.raises(ValueError) as error:
+        bind_lookup_tables({"lookups": lookups}, bindings)
+    assert str(error.value) == f"feature_lookup.lookups[1].table_name: {UC_NAME_MESSAGE}"
+    assert lookups == original  # editable YAML values stay untouched
+
+
+@pytest.mark.parametrize(
+    "stub",
+    [
+        {"table_name": "", "lookup_key": [], "feature_names": []},
+        {"table_name": "  "},
+    ],
+)
+def test_unfilled_generated_lookup_stub_reports_one_actionable_message(stub):
+    """The include_online_serving stub must say what to fill, not misreport a name syntax."""
+    with pytest.raises(ValueError) as error:
+        bind_lookup_tables({"lookups": [stub]}, {"catalog": "workspace"})
+    assert str(error.value) == (
+        "feature_lookup.lookups[0] is not filled in: complete feature_lookup and "
+        "online_features in config/training.yml, or regenerate with "
+        "include_online_serving=false."
+    )
+
+
+def test_filled_lookup_binding_is_unchanged():
+    """A completed lookup must keep binding placeholders exactly as before the stub check."""
+    lookup = {"table_name": "{catalog}.f.t", "lookup_key": ["id"], "feature_names": ["x"]}
+    bound = bind_lookup_tables({"lookups": [lookup]}, {"catalog": "workspace"})
+    assert bound == {"lookups": [{**lookup, "table_name": "workspace.f.t"}]}
+
+
+@pytest.mark.parametrize(
+    "name", ["", "a", "a.b", "a.b.c.d", "1a.b.c", "a.b.bad name", "a.b.c\n", "a..c", None]
+)
+def test_uc_name_errors_use_one_message(name):
+    """Every invalid UC name must fail with the same complete rule, never a two-step hint."""
+    with pytest.raises(ValueError) as error:
+        validate_uc_name(name)
+    assert str(error.value) == UC_NAME_MESSAGE
+
+
+def test_uc_name_accepts_three_simple_identifiers():
+    """Valid catalog.schema.name values must keep passing the narrowed validator."""
+    validate_uc_name("_c1.schema_2.Table3")

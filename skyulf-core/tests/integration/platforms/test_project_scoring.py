@@ -338,3 +338,34 @@ def test_estimator_missing_and_nonfinite_outputs_cannot_be_published(engine, col
             row_keys=["id"],
             prediction_dtypes={"prediction": "float64", "probability_0": "float64"},
         )
+
+
+@pytest.mark.parametrize("hook", ["eligibility", "outputs"])
+def test_rule_reading_an_unavailable_column_names_the_rule_and_columns(hook):
+    """A callback asking for a column the model never receives must explain what it can read."""
+    source = (
+        SOURCE
+        + """
+def needs_zone(frame, params):
+    return pd.Series([None] * len(frame), index=frame.index).where(frame["zone"].isna(), None)
+def zone_output(frame, predictions, params):
+    return pd.DataFrame({"zone_copy": frame["zone"]}, index=frame.index)
+"""
+    )
+    config = _config()
+    if hook == "eligibility":
+        config["eligibility"] = [
+            {"name": "zone_check", "version": "1", "function": "needs_zone", "params": {}}
+        ]
+    else:
+        config["outputs"] = [
+            {
+                "name": "zone_check",
+                "version": "1",
+                "function": "zone_output",
+                "params": {},
+                "columns": [{"name": "zone_copy", "dtype": "string"}],
+            }
+        ]
+    with pytest.raises(ValueError, match=r"zone_check.*'zone'.*\['id', 'x'\]"):
+        _run(pd.DataFrame({"id": [1, 2], "x": [1.0, 2.0]}), source=source, config=config)

@@ -208,3 +208,168 @@ def test_smoke_cli_success_reports_checked_packages(tmp_path, workflow_config, m
     assert result["status"] == "passed"
     assert result["project_packages"] == []
     assert not output.err
+
+
+_TUNER = {
+    "type": "hyperparameter_tuner",
+    "base_model": {"type": "linear_regression", "params": {}},
+    "strategy": "random",
+    "metric": "rmse",
+    "n_trials": 2,
+    "random_state": 42,
+    "search_space": {"fit_intercept": [True, False]},
+}
+_HALVING = {
+    **_TUNER,
+    "base_model": {"type": "random_forest_regressor", "params": {}},
+    "strategy": "halving_random",
+    "strategy_params": {
+        "factor": 3,
+        "resource": "n_estimators",
+        "min_resources": "10",
+        "max_resources": None,
+    },
+    "search_space": {"max_depth": [None, 5]},
+}
+_STRATIFIED = {"cv_enabled": True, "cv_folds": 3, "cv_type": "stratified_k_fold"}
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        (
+            {"pipeline": {"preprocessing": [], "modeling": _HALVING}},
+            "halving max_resources must be auto",
+        ),
+        (
+            {**_STRATIFIED, "pipeline": {"preprocessing": [], "modeling": _TUNER}},
+            "Stratified CV requires a classification model",
+        ),
+        (
+            {"training_layout": "model_competition", "metric": "heldout_mape"},
+            "Unsupported competition metric heldout_mape for regression",
+        ),
+    ],
+)
+def test_smoke_rejects_search_settings_that_preview_rejects(
+    tmp_path, workflow_config, changes, message
+):
+    """Smoke must not pass a search or competition setting that preview and training reject."""
+    root = _project(tmp_path, {**workflow_config, **changes})
+    with pytest.raises(ValueError) as caught:
+        check_project(root, _bindings())
+    assert str(caught.value).startswith("config/workflow.json: ")
+    assert message in str(caught.value)
+
+
+def test_smoke_accepts_an_admissible_search(tmp_path, workflow_config):
+    """The added search preflight must keep a valid tuner and its hooks inert."""
+    settings = {**workflow_config, "pipeline": {"preprocessing": [], "modeling": _TUNER}}
+    result = check_project(_project(tmp_path, settings), _bindings())
+    assert result["status"] == "passed"
+    assert result["project_hooks_executed"] is False
+
+
+_ENDPOINT = {
+    "endpoint_name": "",
+    "model_name": "",
+    "model_version": "",
+    "logging_catalog": "",
+    "logging_schema": "",
+    "logging_table_prefix": "",
+    "logging_mode": "disabled",
+}
+_PUBLICATION = {
+    "source_table": "workspace.features.latest",
+    "source_table_id": "0f0e",
+    "online_table": "workspace.features.latest_online",
+    "online_store": "store",
+}
+
+
+def _online_serving(**changes):
+    """Return an online_serving section shaped like the generated config/serving.yml."""
+    return {
+        "enabled": False,
+        "exclusive_writer": False,
+        "tracking_uri": "databricks",
+        "registry_uri": "databricks-uc",
+        "endpoint": _ENDPOINT,
+        "publications": [{**_PUBLICATION, "publish_mode": "TRIGGERED"}],
+        **changes,
+    }
+
+
+def _serving_project(tmp_path, workflow_config, document):
+    """Write config/serving.yml as JSON, which the YAML reader accepts unchanged."""
+    root = _project(tmp_path, workflow_config)
+    (root / "config/serving.yml").write_text(json.dumps(document), encoding="utf-8")
+    return root
+
+
+def test_smoke_accepts_generated_disabled_serving_sections(tmp_path, workflow_config):
+    """An unmodified generated project keeps every serving job paused and must pass smoke."""
+    document = {
+        "online_serving": _online_serving(),
+        "rollout": {"enabled": False, "exclusive_writer": False, "run_id": ""},
+        "online_publication": {"enabled": False, "exclusive_writer": False, "source_table": ""},
+    }
+    result = check_project(_serving_project(tmp_path, workflow_config, document), _bindings())
+    assert result["status"] == "passed"
+
+
+def test_smoke_accepts_complete_enabled_online_serving_offline(tmp_path, workflow_config):
+    """A complete endpoint pin is checked locally; no endpoint or publication is contacted."""
+    endpoint = {
+        **_ENDPOINT,
+        "endpoint_name": "risk-endpoint",
+        "model_name": "workspace.models.risk",
+        "model_version": "3",
+    }
+    document = {"online_serving": _online_serving(enabled=True, exclusive_writer=True)}
+    document["online_serving"]["endpoint"] = endpoint
+    result = check_project(_serving_project(tmp_path, workflow_config, document), _bindings())
+    assert result["remote_operations"] is False
+
+
+@pytest.mark.parametrize(
+    ("document", "message"),
+    [
+        (
+            {"online_serving": _online_serving(enabled=True, exclusive_writer=True)},
+            "config/serving.yml: online_serving: ",
+        ),
+        (
+            {"online_serving": _online_serving(enabled=True)},
+            "config/serving.yml: online_serving: Serving job requires exclusive_writer=true",
+        ),
+        (
+            {"rollout": {"enabled": "false"}},
+            "config/serving.yml: rollout: Serving job requires an explicit enabled boolean.",
+        ),
+        (
+            {
+                "online_publication": {
+                    "enabled": True,
+                    "exclusive_writer": True,
+                    **_PUBLICATION,
+                    "source_table": "",
+                }
+            },
+            "config/serving.yml: online_publication: Unity Catalog names must be",
+        ),
+        (
+            {"online_publication": {"enabled": True, "exclusive_writer": True}},
+            "config/serving.yml: online_publication: missing required setting 'source_table'.",
+        ),
+        ([], "config/serving.yml: "),
+    ],
+)
+def test_smoke_rejects_enabled_serving_settings_the_jobs_reject(
+    tmp_path, workflow_config, document, message
+):
+    """Serving pins must fail in smoke, not first inside a scheduled serving job."""
+    root = _serving_project(tmp_path, workflow_config, document)
+    with pytest.raises(ValueError) as caught:
+        check_project(root, _bindings())
+    assert str(caught.value).startswith(message)
