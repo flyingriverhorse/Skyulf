@@ -82,20 +82,24 @@ The default scoring mode also reuses this recipe, but prediction requests do not
 contain the actual target. Project loading resolves the saved scoring policy,
 so this can fail during the **training preview**, before fitting or scoring.
 
-**Fix.** Decide the scoring policy in `src/features/scoring.py` before preview
+**Fix.** Decide the scoring policy in `config/scoring.yml` before preview
 and training. To reuse the feature checks while omitting target-dependent rules,
 set:
 
-```python
-SCORING_MODE = "pre_split"
-SKIP_TARGET_PRE_SPLIT_STEPS = True
+```yaml
+version: 1
+mode: pre_split
+skip_target_pre_split_steps: true
+eligibility: []
+outputs: []
+combined: []
 ```
 
 A filter reading both target and feature columns is skipped **as a whole**. Split
 it into separate target and feature checks if the feature check must still apply
 to scoring. Fixed edits can instead be projected onto the selected input columns.
 
-Alternatively, select `SCORING_MODE = "custom"` and define the required eligibility
+Alternatively, select `mode: custom` with `skip_target_pre_split_steps: false` and define the required eligibility
 and output rules in the same file. Custom mode does not reuse pre-split rules;
 the generated custom lists start empty. Do not select it expecting the commented
 examples to become active. The training pre-split recipe still runs in either

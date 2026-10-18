@@ -9,9 +9,9 @@ and the training or scoring job calls it at a fixed point in the flow.
 | Folder or file | What it holds | Selected from | Runs when | Learns from data | Saved in the model |
 | --- | --- | --- | --- | --- | --- |
 | `groups/*.py` | Spark functions that build shared feature tables | `config/features.yml` (`transform: src/features/groups/<file>.py:<function>`) | The separate `features` job, before any training | No | No; the merged Delta table is the input |
-| `pre_split.py` | Row filters: keep or drop a training row | `config/pre_split.yml` (`custom: pre_split.<factory>`) | Training job, before the train/holdout split | Never | Yes; `scoring.py` can replay them |
+| `pre_split.py` | Row filters: keep or drop a training row | `config/pre_split.yml` (`custom: pre_split.<factory>`) | Training job, before the train/holdout split | Never | Yes; `config/scoring.yml` can replay them |
 | `preprocessing.py` | Fitted steps: learn on training rows, replay later | `config/preprocessing.yml` (`custom: preprocessing.<factory>`) | Training job, after the split, inside every CV fold | Yes; the learned dict is saved | Yes; replayed at prediction time. Spark and endpoints require admission evidence for eligible recipes, as explained below |
-| `scoring.py` | Which rows get a prediction and which extra columns are published | `SCORING_MODE` and the three `build_*_rules()` lists in the file | Scoring; Spark and endpoints require the checks below | No | Yes; the rules travel with the model version |
+| `scoring.py` | Optional custom eligibility, output and cross-model callbacks | `config/scoring.yml` (`custom: scoring.<function>`) | Scoring; Spark and endpoints require the checks below | No | Yes; the rules travel with the model version |
 | Any other `<file>.py` | Your own factories, selected as `<file>.<factory>` | Same YAML files as above | Same as the factory kind | Depends on the factory | Yes |
 | `assets.json` + `assets/` | Small lookup files your code reads | Listed in `assets.json`, read with `read_project_asset` | Whenever a step reads them | No | Yes; edit means a new training run |
 | `requirements.txt` | Exact pins your code imports | Installed by `deployment/requirements.txt` | Job start | No | Pins are recorded |
@@ -219,13 +219,13 @@ reads the 1st and 99th percentile of `duration_min` on the training fold and
 returns `{"low": ..., "high": ...}`; `clip_values` clips every later batch with
 those two saved numbers. The two built-ins after it need no Python at all.
 
-**4. `src/features/scoring.py`** decides what happens at batch scoring time.
-This project sets `SCORING_MODE = "custom"`: the pre-split filters are not
-replayed; instead one eligibility rule (`scoring.require_value_range` on
+**4. `config/scoring.yml`** decides what happens at batch scoring time.
+This project sets `mode: custom`: the pre-split filters are not
+replayed; instead one eligibility rule (`check: value_range` on
 `trip_distance`) marks implausible rows with a reason and an empty prediction,
-and one output rule (`scoring.prediction_band` on `probability_1`) adds a
-`fare_band` column. Both functions are defined at the end of `scoring.py`, and
-the rule's `"function"` field names them the same way YAML names factories.
+and one output rule (`rule: prediction_band` on `probability_1`) adds a
+`fare_band` column. Both built-ins are selected directly from YAML; custom
+callbacks use `custom: scoring.<function>` instead.
 
 So `trip_rules.py` is used twice, by two different config files, and nowhere
 else: once as a filter before the split, once as a fitted step after it. The
@@ -234,8 +234,8 @@ module name only has to match the prefix in `custom:`.
 **Compare the other examples.** `taxi_fare` uses only built-ins (`spark_safe`
 recipe) because Spark scoring replays steps per partition and keeps no scoring
 rules. `taxi_trips` names a different pre-split and preprocessing recipe per
-model entry and uses `SCORING_MODE = "combined"` with
-`SKIP_TARGET_PRE_SPLIT_STEPS = True`, so the saved filters are replayed except the
+model entry and uses `mode: combined` with
+`skip_target_pre_split_steps: true`, so the saved filters are replayed except the
 one that reads the target, then a combined rule multiplies the two models'
 results. `taxi_fare_online` adds a `feature_lookup` in `training.yml` whose
 columns arrive from an online store at request time; its recipe uses built-in
@@ -249,12 +249,12 @@ each flow.
 features job (optional, Spark)      groups/*.py  ->  merged Delta table = training_table
 train job                           pre_split recipe -> split -> preprocessing recipe fitted
                                     per CV fold and on the final training rows -> model
-score job (batch, pandas/polars)    scoring.py eligibility -> saved preprocessing -> predict
-                                    -> scoring.py outputs -> prediction table
-score job (Spark inference)         built-in steps (+ opted-in probed row steps) per partition
-                                    -> predict; no other custom steps, no rules
-serving endpoint                    optional feature lookup -> built-in and opted-in steps
-                                    -> predict; same admission
+score job (batch, pandas/polars)    scoring.yml eligibility -> saved preprocessing -> predict
+                                    -> scoring.yml outputs -> prediction table
+score job (Spark inference)         admitted saved eligibility -> built-in/probed row steps
+                                    -> predict -> admitted saved outputs, per partition
+serving endpoint                    optional feature lookup -> admitted saved eligibility
+                                    -> saved steps -> predict -> saved outputs; same admission
 ```
 
 ## Adding your own module

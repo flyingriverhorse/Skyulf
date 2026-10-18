@@ -197,6 +197,7 @@ def _project(tmp_path, pre_split, preprocessing):
     shutil.copytree(TEMPLATE / "src/features", features)
     config = tmp_path / "config"
     config.mkdir()
+    shutil.copyfile(TEMPLATE / "config/scoring.yml", config / "scoring.yml")
     for filename, value in (("pre_split.yml", pre_split), ("preprocessing.yml", preprocessing)):
         (config / filename).write_text(yaml.safe_dump(value), encoding="utf-8")
     return features
@@ -206,7 +207,7 @@ def test_catalog_customer_example_loads_and_replays_saved_predictions(tmp_path):
     """The complete customer tutorial must resolve its target filter and unseen inputs."""
     page = GUIDES / "preprocessing_recipes.md"
     document = page.read_text(encoding="utf-8")
-    assert document.index("SKIP_TARGET_PRE_SPLIT_STEPS = True") < document.index(
+    assert document.index("skip_target_pre_split_steps: true") < document.index(
         "python src/tools/preview.py --action train"
     )
     blocks = [yaml.safe_load(block) for block in _blocks(page, "yaml")]
@@ -218,16 +219,8 @@ def test_catalog_customer_example_loads_and_replays_saved_predictions(tmp_path):
         item for item in blocks if isinstance(item, dict) and "customer" in item.get("recipes", {})
     )
     features = _project(tmp_path, pre_split, preprocessing)
-    scoring = features / "scoring.py"
-    switch = next(
-        block.strip()
-        for block in _blocks(page, "python")
-        if "SKIP_TARGET_PRE_SPLIT_STEPS = True" in block
-    )
-    scoring.write_text(
-        scoring.read_text(encoding="utf-8").replace("SKIP_TARGET_PRE_SPLIT_STEPS = False", switch),
-        encoding="utf-8",
-    )
+    scoring = next(item for item in blocks if "skip_target_pre_split_steps" in item)
+    (tmp_path / "config/scoring.yml").write_text(yaml.safe_dump(scoring), encoding="utf-8")
     defaults = training["defaults"]
     config = load_project_workflow(
         {
@@ -301,6 +294,51 @@ def test_walkthrough_sentinel_recipe_preserves_excluded_row_and_reason(tmp_path)
     assert pd.isna(result.prediction.iloc[0])
     assert result.exclusion_reason.iloc[0] == "pre_split:known_income"
     assert np.isfinite(result.prediction.iloc[1])
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_scoring_guide_yaml_fits_and_replays_its_saved_rules(tmp_path, engine):
+    """The published YAML must preserve exclusions and bands after editable files change."""
+    page = GUIDES / "databricks_scoring.md"
+    empty = {"version": 1, "recipes": {"default": []}}
+    features = _project(tmp_path, empty, empty)
+    (tmp_path / "config/scoring.yml").write_text(
+        _example(page, "customer-scoring", "yaml"), encoding="utf-8"
+    )
+    workflow = load_project_workflow(
+        {
+            "engine": engine,
+            "target_column": "churn",
+            "input_columns": ["age"],
+            "pipeline": {"preprocessing": [], "modeling": {"type": "logistic_regression"}},
+        },
+        features,
+    )
+    train = pd.DataFrame(
+        {"age": [20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0], "churn": [0] * 4 + [1] * 4}
+    )
+    native = pl.from_pandas(train) if engine == "polars" else train
+    artifact = fit_workflow(
+        workflow["pipeline"],
+        SplitDataset(train=native, test=native[:0]),
+        target_column="churn",
+        artifact_path=tmp_path / "artifact",
+        max_rows=100,
+        max_bytes=100_000,
+    )
+    query = pd.DataFrame({"age": [35.0, -1.0, np.nan, 60.0]})
+    result = score_pipeline(query, artifact)
+    assert result.scoring_status.tolist() == ["predicted", "excluded", "excluded", "predicted"]
+    assert result.exclusion_reason.iloc[1:3].tolist() == ["outside_range:age", "missing:age"]
+    assert result.prediction.isna().tolist() == [False, True, True, False]
+    probability = result.probability_1.take([0, 3]).astype(float)
+    expected_bands = np.asarray(["low", "medium", "high"])[
+        np.searchsorted([0.3, 0.7], probability, side="right")
+    ]
+    assert result.risk_band.take([0, 3]).tolist() == expected_bands.tolist()
+    assert result.risk_band.iloc[1:3].isna().all()
+    _replay_after_project_edit(tmp_path, features, query, result)
+    assert artifact.manifest.project_source_sha256
 
 
 def _example(page, name, language):
@@ -563,13 +601,8 @@ def test_custom_filter_examples_keep_survivors_and_freeze_scoring_policy(tmp_pat
         defaults["pre_split_recipe"] = "adult_labeled"
         with pytest.raises(ValueError, match="reads target 'claim_amount'"):
             _custom_workflow(features, defaults)
-        scoring = features / "scoring.py"
-        scoring.write_text(
-            scoring.read_text(encoding="utf-8").replace(
-                "SKIP_TARGET_PRE_SPLIT_STEPS = False",
-                _example(page, "custom-filter-target-skip", "python").strip(),
-            ),
-            encoding="utf-8",
+        (tmp_path / "config/scoring.yml").write_text(
+            _example(page, "custom-filter-target-skip", "yaml"), encoding="utf-8"
         )
     workflow = _custom_workflow(features, defaults)
     policy = workflow["pipeline"]["project_scoring"]["pre_split"]

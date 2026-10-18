@@ -23,7 +23,8 @@ compute. Training and preprocessing fit in one bounded Python process on this co
 | Fitted preprocessing | `config/preprocessing.yml` |
 | Saved model selection, score source/output and change policy | `config/inference.yml` |
 | Upstream feature groups and their checked merge | `config/features.yml`, `src/features/groups/` |
-| Custom features, scoring rules and packaged assets | `src/features/` |
+| Scoring eligibility, outputs and combined rules | `config/scoring.yml` |
+| Custom feature/scoring callbacks and packaged assets | `src/features/` |
 | Online publication, endpoint setup and rollout | `config/serving.yml`, when generated |
 | Host, namespaces, run identities, compute and schedules | `deployment/targets.yml`, `deployment/variables.yml` |
 | Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml` |

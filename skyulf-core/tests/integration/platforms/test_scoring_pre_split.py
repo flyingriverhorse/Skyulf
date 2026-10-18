@@ -1,6 +1,5 @@
 """Pre-split reuse must preserve recipe semantics and explicit prediction outcomes."""
 
-import re
 import shutil
 from pathlib import Path
 
@@ -26,16 +25,30 @@ def _project(tmp_path, *, skip=False, mode="pre_split", steps=None, engine="pand
     directory.mkdir()
     for phase in ("preprocessing", "pre_split"):
         shutil.copyfile(TEMPLATE.parents[1] / "config" / f"{phase}.yml", directory / f"{phase}.yml")
-    scoring = root / "scoring.py"
-    source = scoring.read_text(encoding="utf-8")
-    if skip:
-        source = source.replace(
-            "SKIP_TARGET_PRE_SPLIT_STEPS = False", "SKIP_TARGET_PRE_SPLIT_STEPS = True"
-        )
-    source = source.replace('SCORING_MODE = "pre_split"', f"SCORING_MODE = {mode!r}")
-    if examples:
-        source = re.sub(r'(?m)^(        )# (?=[{}" ])', r"\1", source)
-    scoring.write_text(source, encoding="utf-8")
+    declaration = yaml.safe_load((TEMPLATE.parents[1] / "config/scoring.yml").read_text())
+    declaration.update(mode=mode, skip_target_pre_split_steps=skip)
+    if examples and mode in ("custom", "combined"):
+        declaration["eligibility"] = [
+            {
+                "name": "observed_value",
+                "custom": "scoring.require_observed_values",
+                "params": {"columns": ["feature_value"]},
+            },
+            {
+                "name": "allowed_range",
+                "check": "value_range",
+                "params": {"column": "feature_value", "minimum": 0.0, "maximum": 120.0},
+            },
+        ]
+        declaration["outputs"] = [
+            {
+                "name": "prediction_band",
+                "rule": "prediction_band",
+                "params": {"thresholds": [10.0, 50.0], "labels": ["low", "medium", "high"]},
+                "columns": [{"name": "band", "dtype": "string"}],
+            },
+        ]
+    (directory / "scoring.yml").write_text(yaml.safe_dump(declaration), encoding="utf-8")
     if steps is not None:
         _write_pre_split(root, steps)
     config = {
@@ -463,5 +476,5 @@ def test_combined_requires_target_skip_when_needed(tmp_path):
 @pytest.mark.parametrize("mode", ["typo", "", None, True])
 def test_invalid_scoring_mode_fails_before_training(tmp_path, mode):
     """Typos must not silently select a different prediction policy."""
-    with pytest.raises(ValueError, match="SCORING_MODE"):
+    with pytest.raises(ValueError, match="mode"):
         _project(tmp_path, mode=mode)

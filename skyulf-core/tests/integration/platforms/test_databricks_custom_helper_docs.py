@@ -49,6 +49,7 @@ def _project(tmp_path, kind):
     declaration = yaml.safe_load(_example(f"{kind}-recipe", "yaml"))
     config = tmp_path / "config"
     config.mkdir()
+    shutil.copyfile(TEMPLATE / "config/scoring.yml", config / "scoring.yml")
     (config / "preprocessing.yml").write_text(yaml.safe_dump(declaration), encoding="utf-8")
     (config / "pre_split.yml").write_text("version: 1\nrecipes:\n  default: []\n", encoding="utf-8")
     selected = next(name for name in declaration["recipes"] if name != "default")

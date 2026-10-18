@@ -23,7 +23,8 @@ compute. Training and preprocessing fit in one bounded Python process on this co
 | Fitted preprocessing | `config/preprocessing.yml` |
 | Saved model selection, score source/output and change policy | `config/inference.yml` |
 | Upstream feature groups and their checked merge | `config/features.yml`, `src/features/groups/` |
-| Custom features, scoring rules and packaged assets | `src/features/` |
+| Legacy scoring policy and callbacks | `src/features/scoring.py` |
+| Custom feature/scoring callbacks and packaged assets | `src/features/` |
 | Online publication, endpoint setup and rollout | `config/serving.yml`, when generated |
 | Host, namespaces, run identities, compute and schedules | `deployment/targets.yml`, `deployment/variables.yml` |
 | Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml` |
@@ -80,3 +81,11 @@ upgrade notes before changing deployed jobs. Fitting saves preprocessing and
 model state, so editing a recipe afterwards needs a new trained version.
 Promotion, score selection and online traffic are separate decisions. All public
 guides are listed in the [topic index](https://www.skyulf.com/manual/user_guide/databricks_bundle.html).
+
+## Legacy Python-only scoring policy
+
+This example deliberately keeps its original Python scoring hooks and no
+config/scoring.yml. build_model_rules() returns None, preserving the endpoint's
+prediction schema without scoring-status columns. New template projects use
+scoring.yml; this example also verifies older Python-only projects still work.
+See SCORING.md before migrating its policy.

@@ -7,7 +7,7 @@ recipes:
     - custom: pre_split.sensors_online
       params: {columns: [pt08_s1_co, pt08_s2_nmhc, pt08_s3_nox, pt08_s4_no2, pt08_s5_o3, temperature]}
     # Target-only rule (built-in): training needs a measured NO2 value. Scoring skips it because
-    # scoring.py sets SKIP_TARGET_PRE_SPLIT_STEPS and requests carry no target.
+    # scoring.yml sets skip_target_pre_split_steps: true and requests carry no target.
     - name: measured_no2
       transformer: ManualBounds
       params: {bounds: {no2_gt: {lower: 0, upper: 1000}}}

@@ -83,7 +83,7 @@ with a changed model list is rejected before any model is trained.
 | `model_name` | `<project_name>_set` in the metadata schema | Registered set identity. Required. |
 | `prediction_table` | `<project_name>_set_scores` in the output schema | Physical result table. Required. |
 | `promotion_policy` | `manual_approval` | `manual_approval` or `automatic` set activation. |
-| `combined_rules_path` | `../features` | Package containing `build_combined_rules()`, captured with the next set. |
+| `combined_rules_path` | `../features` | Feature package; captures combined rules from adjacent config/scoring.yml or legacy Python hooks with the next set. |
 | `composition_config` | Absent | Declarative alternative to `combined_rules_path`; the two cannot coexist. |
 | `source_change_policy` | `reject` | `reject` or `rebuild_on_change` for source updates and deletes. |
 | `publication` | `mode: all` | Output mode and optional views. |
@@ -129,10 +129,26 @@ replaced.
 
 ### Write combined rules
 
-In `src/features/scoring.py`, `build_model_rules()` sets each component's
-eligibility and output rules. `build_combined_rules()` sets calculations across
-component results; its default empty list adds none. Both run during set
-scoring.
+In `config/scoring.yml`, eligibility and outputs configure each component;
+`combined` configures calculations across component results. The default lists
+are empty. Top-level `mode: combined` means pre-split plus model eligibility;
+it does not itself enable cross-model calculations.
+
+For example, add this entry to the combined list, keeping the other top-level
+scoring.yml fields:
+
+```yaml
+combined:
+  - name: profit
+    version: "1"
+    custom: scoring.profit
+    params: {}
+    columns: [{name: profit, dtype: float64}]
+    required_components: [revenue, cost]
+```
+
+The optional helper in src/features/scoring.py subtracts cost__prediction from
+revenue__prediction. Its declaration and source are captured with the set.
 
 A combined rule declares a function, rule version, parameters, output column
 types and `required_components`. The function receives
@@ -148,14 +164,14 @@ saved set includes them and rejects pins that conflict with a component.
 
 <span id="declarative-composition"></span>
 
-`composition_config` is the declarative alternative. It supports
+The same combined list supports declarative operations:
 `weighted_sum` and `weighted_mean` over named numeric component outputs, with
 finite weights and one `float64` output column. `weighted_mean` needs
-nonnegative weights with a positive sum. Put this mapping under
-`model_set.composition_config` and remove `combined_rules_path`:
+nonnegative weights with a positive sum. Keep `combined_rules_path: ../features`
+and put this in config/scoring.yml:
 
 ```yaml
-outputs:
+combined:
   - name: combined_score
     version: '1'
     operation: weighted_mean
@@ -167,6 +183,17 @@ outputs:
         dtype: float64
     required_components: [revenue, value]
 ```
+
+Older projects can still place an outputs mapping under
+`model_set.composition_config` instead when no config/scoring.yml exists, removing
+combined_rules_path as well. An existing scoring.yml, even with an empty combined
+list, conflicts with inline composition_config. Choose one owner.
+Python-only feature packages without scoring.yml retain build_combined_rules().
+
+With config/scoring.yml present, combined_rules_path must select a direct child
+package of src, normally ../features. A nested package would miss the canonical
+YAML and is rejected before import; move its helpers into the selected package.
+Older Python-only projects without scoring.yml can retain nested packages.
 
 Weights do not convert units. Check that the combination has a business meaning.
 
@@ -273,7 +300,7 @@ deletes. See [source changes](databricks_scoring.md#source-changes-are-separate-
 With `inference_mode: spark`, every component must pass Spark admission. Admission runs at
 activation (manual approval or automatic promotion) and again at scoring. Independent outputs and
 `composition_config` with `weighted_sum`/`weighted_mean` are admitted. Function rules from
-`build_combined_rules()` and component scoring rules from `build_model_rules()` are admitted when
+scoring.yml and legacy Python hooks are admitted when
 training linted and probed them: packaging probes each combined rule on up to 256 rows of the
 set's training source, changing one row's inputs and component predictions at a time, and seals
 the evidence in the set. A failing rule stops packaging with a message naming the rule and check.
@@ -346,7 +373,7 @@ results are in the score job's `score` task.
 
 | Symptom | Fix |
 | --- | --- |
-| `Scoring rule '...' raised KeyError` during approval or scoring | The shared `scoring.py` rules run for every component with only that component's input columns. Read only columns all components receive. |
+| `Scoring rule '...' raised KeyError` during approval or scoring | The shared scoring rules run for every component with only that component's input columns. Read only columns all components receive. |
 | Replacement stays challenger | No branch improved by its `min_improvement`; ties alone never promote. |
 | Replacement fails quality | A branch regressed or failed an absolute gate; read the failed components in the report. |
 | Changed branch names are rejected | A replacement needs the same branches and component names; create a new set for a new layout. |

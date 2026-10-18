@@ -699,16 +699,22 @@ these choices; scoring a prior version does not reload today's files.
 
 
 Generated projects separate `src/features/pre_split.py`, `preprocessing.py`
-and `scoring.py`. Preprocessing fits transformations inside each training fold.
+and optional `scoring.py` helpers. Scoring policy is in config/scoring.yml.
+Preprocessing fits transformations inside each training fold.
 Scoring has a three-way mode and an independent target-filter switch:
 
 <!-- skyulf-example: illustrative scoring-flags -->
-```python
-SCORING_MODE = "pre_split"           # "pre_split", "custom", or "combined"
-SKIP_TARGET_PRE_SPLIT_STEPS = False # fail if reuse requires the actual target
+```yaml
+# config/scoring.yml
+version: 1
+mode: pre_split
+skip_target_pre_split_steps: false
+eligibility: []
+outputs: []
+combined: []
 ```
 
-In `pre_split` or `combined`, set the second switch to `True` to skip target-reading filters while
+In `pre_split` or `combined`, set `skip_target_pre_split_steps: true` to skip target-reading filters while
 keeping other pre-split steps. This never changes the predicted target. For example, "price is
 present" is a training-label check; "floor_area is present" can also be useful when predicting an
 unknown price. A mixed target/feature filter is skipped whole, because deleting one field would
@@ -723,7 +729,7 @@ checks the current batch only. Empty recipes in pre_split mode preserve ordinary
 These choices are saved per model version; changing a local switch does not
 change the behavior of an already registered model.
 
-Use `SCORING_MODE="custom"` for custom rules alone, or `"combined"` to run
+Use `mode: custom` in scoring.yml for custom rules alone, or `mode: combined` to run
 pre-split first and custom eligibility only on its survivors. First pre-split
 exclusion reasons are retained. Custom callbacks receive original accepted inputs;
 fixed model transformations still run once. All-excluded batches skip custom
@@ -736,38 +742,17 @@ rules. Both modes expose the same separate custom sections:
 - `outputs`: rules **after prediction**. Add fields such as a prediction band.
   They do not change model predictions or select training data.
 
-`build_eligibility_rules()` and `build_output_rules()` configure the callable
-paths and parameters; the functions they name are defined at the end of
-`scoring.py`. Both lists start empty; the sample dictionaries in
-`scoring.py` are commented out. Uncomment and adapt a desired example explicitly.
-Selecting custom or combined mode alone does not activate sample rules.
-The complete dictionary form
-below is also supported (returning `None` explicitly disables all scoring rules):
+Declare built-in checks, bands and custom callback selections in
+`config/scoring.yml`; the [scoring guide](databricks_scoring.md#a-complete-yaml-rule-example)
+contains a complete example. Empty eligibility/output lists activate no rules.
+The model captures the YAML and selected source before fitting; saved versions
+keep their policy after editable files change.
 
-<!-- skyulf-example: illustrative scoring-function -->
-```python
-# src/features/scoring.py
-
-def build_model_rules():
-    return {
-        "eligibility": [{
-            "name": "observed_fields", "version": "1",
-            "function": "scoring.require_observed_values",
-            "params": {"columns": ["feature_value"]},
-        }],
-        "outputs": [{
-            "name": "risk_band", "version": "1",
-            "function": "scoring.prediction_band",
-            "params": {"column": "prediction", "thresholds": [10.0, 50.0],
-                       "labels": ["low", "medium", "high"], "output": "band"},
-            "columns": [{"name": "band", "dtype": "string"}],
-        }],
-    }
-```
-
-Export `build_model_rules` from `src/features/__init__.py`, as the template does.
-Older projects exporting only `build_scoring` remain supported. If both are
-defined, Skyulf uses `build_model_rules`; no forwarding alias is needed.
+Python-only projects without scoring.yml retain exported `build_model_rules()`
+and `build_combined_rules()` hooks. Legacy `build_scoring()` remains supported;
+when both model hook names exist, build_model_rules takes precedence. Returning
+None explicitly disables scoring rules. Do not define/export these builders
+alongside scoring.yml; keep only the helpers selected with `custom: scoring.fn`.
 
 For classification, the band rule can use `probability_0`, `probability_1`, etc.;
 class order comes from the saved artifact manifest. Callbacks are ordinary trusted

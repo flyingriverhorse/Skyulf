@@ -21,10 +21,10 @@ Rules:
   - Write normal top-level `def` functions (no lambda).
   - params={...} is passed to your function as its last argument.
 
-scoring.py reuses these filters by default (SCORING_MODE="pre_split"); "combined"
+config/scoring.yml reuses these filters by default (mode: pre_split); combined
 also adds custom scoring rules. At scoring, a failed filter retains the row with
 scoring_status="excluded", exclusion_reason="pre_split:<name>" and no prediction.
-Filters reading the target require SKIP_TARGET_PRE_SPLIT_STEPS=True to skip them
+Filters reading the target require skip_target_pre_split_steps: true to skip them
 when the target is unavailable. On Spark workers and endpoints, reused filters
 must depend only on their own row; Deduplicate is not admitted there because its
 result depends on other rows. Local scoring can reuse it with the full batch.

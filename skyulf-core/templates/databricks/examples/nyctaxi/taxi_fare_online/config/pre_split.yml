@@ -1,7 +1,7 @@
 # Fixed row eligibility before the training split; never learn statistics here.
 # Select with pre_split_recipe in config/training.yml (default: default).
 # These filters choose training rows only: serving endpoints accept no saved
-# scoring rules, so src/features/scoring.py does not reuse them.
+# scoring rules. Its legacy Python-only scoring.py deliberately does not reuse them.
 version: 1
 recipes:
   default:

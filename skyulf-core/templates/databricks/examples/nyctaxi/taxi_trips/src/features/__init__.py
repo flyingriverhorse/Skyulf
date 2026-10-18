@@ -1,12 +1,9 @@
-"""Export optional scoring hooks captured with each trained model.
+"""Package custom functions captured with each trained model.
 
-Ordered feature recipes live in config/pre_split.yml and config/preprocessing.yml.
-The loader captures those declarations and supplies their builders during replay.
-Keep custom calculations in pre_split.py and preprocessing.py; use relative imports
-for model helpers. The groups/ folder is reserved for upstream Spark table producers
-and excluded from model snapshots. Existing model versions use their saved source.
+Ordered recipes live in config/pre_split.yml and config/preprocessing.yml;
+scoring policy lives in config/scoring.yml. The loader captures these declarations
+and supplies their builders during replay. Keep optional custom calculations in
+pre_split.py, preprocessing.py and scoring.py, selected explicitly from YAML.
+Use relative imports for helpers. The groups/ folder contains upstream Spark
+producers and is excluded from model snapshots. Existing versions use saved code.
 """
-
-from .scoring import build_combined_rules, build_model_rules
-
-__all__ = ["build_model_rules", "build_combined_rules"]

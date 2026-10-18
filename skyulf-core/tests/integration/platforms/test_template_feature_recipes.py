@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from skyulf.inference.project_code import load_project_module
 from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
@@ -12,6 +13,24 @@ FEATURES = (
     Path(__file__).resolve().parents[3]
     / "templates/databricks/template/{{.project_name}}/src/features"
 )
+
+
+def test_scoring_defaults_are_declared_only_in_yaml():
+    """New projects must expose one inactive scoring policy without Python owners."""
+    policy = yaml.safe_load((FEATURES.parents[1] / "config/scoring.yml").read_text())
+    assert policy == {
+        "version": 1,
+        "mode": "pre_split",
+        "skip_target_pre_split_steps": False,
+        "eligibility": [],
+        "outputs": [],
+        "combined": [],
+    }
+    source = (FEATURES / "__init__.py").read_text() + (FEATURES / "scoring.py").read_text()
+    assert not any(
+        f"def {name}(" in source or f"import {name}" in source
+        for name in ("build_model_rules", "build_scoring", "build_combined_rules")
+    )
 
 
 @pytest.mark.parametrize(

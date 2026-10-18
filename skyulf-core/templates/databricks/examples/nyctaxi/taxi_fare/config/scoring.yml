@@ -1,0 +1,4 @@
+# Scoring policy, saved with the next trained model. Full reference: SCORING.md.
+# mode: pre_split (the default) reuses the training filters from config/pre_split.yml
+# at scoring time. No extra eligibility checks or output columns are needed here.
+version: 1

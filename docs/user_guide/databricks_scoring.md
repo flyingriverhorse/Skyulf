@@ -18,7 +18,8 @@ Keep these responsibilities separate:
 | --- | --- |
 | `config/training.yml` | Model identity, record keys, feature columns, training recipe and local row/byte limits. |
 | `config/inference.yml` | Scoring source, prediction destination, version selection and change/recovery policies. |
-| `src/features/scoring.py` | Rules captured with the next model version: reuse pre-split, custom eligibility, business outputs and their callback functions. |
+| `config/scoring.yml` | Rules captured with the next model version: reuse pre-split, eligibility, business outputs and combined rules. |
+| `src/features/scoring.py` | Optional custom callbacks selected with `custom: scoring.<function>`. |
 | `resources/score.job.yml`, `deployment/` | Deployed task graph, compute, schedule, identity, timeouts and retries. |
 
 For the
@@ -163,21 +164,54 @@ updates/deletes still follow the separate source-change policy.
 ## 2. Decide eligibility before training the version
 
 Scoring rules are saved with the model. Configure them **before training and
-packaging the version you will score**. Editing today's scoring.py does not
+packaging the version you will score**. Editing today's scoring.yml or scoring.py does not
 rewrite an already registered version.
 
-| `SCORING_MODE` | What runs |
+### The three scoring sections
+
+`config/scoring.yml` has three rule sections. Each runs at a different moment:
+
+| Section | Runs | Does | Example |
+| --- | --- | --- | --- |
+| `eligibility` | Before the model | Decides whether a row may get a prediction. | The hour is missing, so this record gets no prediction. |
+| `outputs` | After the model | Adds columns computed from the prediction and inputs. | Probability 0.85 adds `risk_band: high`. |
+| `combined` | After all models of a model set | Computes one result from several models. | Revenue prediction minus cost prediction gives profit. |
+
+A row rejected by eligibility is not deleted. It stays in the result with
+`scoring_status: excluded`, its `exclusion_reason` and an empty prediction.
+Outputs run only on predicted rows and keep the raw prediction unchanged.
+
+The [bike demand example](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/real_data/bike_demand_set)
+uses all three:
+
+1. Eligibility: a row without `hr` is excluded with the reason `missing_hour`.
+2. Outputs: each model adds `nonnegative_demand`. A raw prediction of -2 gives 0
+   in the new column; the raw prediction is kept.
+3. Combined: `total_demand` adds the `nonnegative_demand` columns of the `casual`
+   and `registered` models. If either model excluded the row, no total is
+   produced; a missing prediction is never counted as zero.
+
+Two settings with similar names do different things:
+
+- `mode: combined` applies the saved pre-split filters, then the eligibility
+  rules, then the outputs.
+- The `combined:` list defines cross-model rules. A single model does not use it.
+
+Choose `mode: custom` to use only your own eligibility and output rules, and
+`mode: pre_split` to reuse only the pre-split filters.
+
+| `mode` in scoring.yml | What runs |
 | --- | --- |
 | `pre_split` (default) | Saved pre-split eligibility; empty recipe leaves the ordinary prediction schema. |
 | `custom` | Custom eligibility, model prediction, then custom output rules. |
 | `combined` | Saved pre-split eligibility, custom eligibility on its survivors, model prediction, custom outputs. |
 
 With pre_split/combined, a filter reading the target needs an explicit decision:
-`SKIP_TARGET_PRE_SPLIT_STEPS = True` skips those filters because scoring has no
+`skip_target_pre_split_steps: true` skips those filters because scoring has no
 actual label. The default false rejects that recipe, including during training
 preview. It does not invent labels. A mixed filter reading both target and
 features is skipped as a whole, so split the rules when the feature check should
-remain. Custom mode ignores this switch.
+remain. Custom mode rejects a true skip flag because it does not reuse pre-split.
 
 Pre-split replay uses a copy to decide membership; the saved model applies its
 fixed feature normalization once to the original accepted inputs. Combined
@@ -193,70 +227,65 @@ normalization is projected onto features for saved inference. Preview lists the
 retained and skipped step names. Empty pre-split mode retains ordinary output
 columns when there is no active scoring policy.
 
-The shipped `scoring.py` eligibility/output lists are empty and its sample rules
-are commented out. Activating a mode alone does not enable them. The BEFORE
-examples require `feature_value` and a finite range from 0 to 120; the AFTER
-example bands predictions below 10, from 10 to below 50, and 50 or above as
-low/medium/high. Return `[]` to omit that section. Adapt names and limits, or
-use the complete churn example below. Function paths such as
-`scoring.require_value_range` name callbacks defined at the end of `scoring.py`;
-`params` supplies their inputs without a manual call. A callback receives only the
-model's saved input columns; in a model set the same rules run for every component,
-so read only columns that every component receives.
+The generated `config/scoring.yml` starts with `version: 1`, `mode: pre_split`,
+`skip_target_pre_split_steps: false` and empty `eligibility`, `outputs` and
+`combined` lists. Changing mode alone does not activate sample rules. Nonempty
+eligibility/output lists require custom or combined mode. `combined` is a
+separate cross-model list, described in the [model set guide](databricks_model_sets.md#write-combined-rules).
 
-### A complete custom-rule example
+### A complete YAML rule example
 
-This example deliberately selects `custom`, so the documented reasons come
-from the two custom rules rather than an earlier pre-split exclusion. In
-`src/features/scoring.py`, change SCORING_MODE and replace these two existing
-functions. Keep the generated `build_model_rules()` factory and other
-functions. The callback implementations already ship at the end of
-`scoring.py`.
+Replace `config/scoring.yml` with this document. It selects custom mode, so the
+reasons come from these eligibility rules. No Python edits are needed:
 
-Skyulf calls `build_model_rules()` when it is defined. Older projects that export
-only `build_scoring()` remain supported; if both names exist, `build_model_rules()`
-takes precedence. New projects do not need an alias between the two names.
-
-```python
-SCORING_MODE = "custom"
-SKIP_TARGET_PRE_SPLIT_STEPS = True  # Ignored in custom mode.
-
-
-def build_eligibility_rules():
-    """Require an observed age within the declared business range."""
-    return [
-        {
-            "name": "observed_age",
-            "version": "1",
-            "function": "scoring.require_observed_values",
-            "params": {"columns": ["age"]},
-        },
-        {
-            "name": "adult_age",
-            "version": "1",
-            "function": "scoring.require_value_range",
-            "params": {"column": "age", "minimum": 18.0, "maximum": 120.0},
-        },
-    ]
-
-
-def build_output_rules():
-    """Publish a business band using the saved churn probability column."""
-    return [
-        {
-            "name": "churn_risk_band",
-            "version": "1",
-            "function": "scoring.prediction_band",
-            "params": {
-                "column": "probability_1",
-                "thresholds": [0.3, 0.7],
-                "labels": ["low", "medium", "high"],
-                "output": "risk_band",
-            },
-            "columns": [{"name": "risk_band", "dtype": "string"}],
-        },
-    ]
+<!-- example:customer-scoring -->
+```yaml
+version: 1
+mode: custom
+skip_target_pre_split_steps: false
+eligibility:
+  - name: observed_age
+    check: required_values
+    params: {columns: [age]}
+  - name: adult_age
+    check: value_range
+    params: {column: age, minimum: 18.0, maximum: 120.0}
+outputs:
+  - name: churn_risk_band
+    version: "1"
+    rule: prediction_band
+    params:
+      column: probability_1
+      thresholds: [0.3, 0.7]
+      labels: [low, medium, high]
+      output: risk_band
+    columns: [{name: risk_band, dtype: string}]
+combined: []
 ```
+
+Each rule has a unique name and a string version (default `"1"`). Required-values
+checks take `params.columns`; range checks take a column and at least one finite
+inclusive minimum/maximum. Range checks reject missing, nonnumeric and infinite
+values; required-values checks report missing fields in the declared order.
+Bands require increasing finite thresholds and one more label than threshold.
+Their single declared column must match params.output (default band), dtype string.
+Unknown fields, duplicate YAML keys and invalid parameters fail during preparation.
+
+For project-specific logic, replace check/rule with `custom: scoring.<function>`
+and keep params and declared columns. Eligibility receives `(frame, params)`;
+outputs receive `(frame, predictions, params)`. Implement the named helper in
+`src/features/scoring.py`, with relative imports for adjacent project modules.
+Custom references select captured project code, not external import paths or YAML
+expressions. Per-component eligibility/output callbacks receive only that model's
+saved input columns; shared callbacks must read columns available to every
+component. Cross-model combined callbacks instead receive the set's union of
+component input columns and keys, plus the component prediction results.
+
+Older Python-only projects still use exported `build_model_rules()` or legacy
+`build_scoring()` (the former takes precedence), plus `build_combined_rules()`.
+A project containing scoring.yml must not also define/export those builders:
+remove them after moving declarations to YAML, retaining custom helper functions.
+Previously saved model versions continue to replay their saved policy and code.
 
 The probability rule assumes the saved class order is `[0, 1]` and the classifier
 exports probability_1 for churn. Check the saved output/class schema; the suffix
@@ -499,7 +528,7 @@ not a Run now parameter. To change it, edit inference.yml and the matching
 (train, score and monitoring), then redeploy. Changing inference.yml alone is
 rejected as a mismatch.
 The setup's scoring_mode chooses manual or scheduled **job execution**; it is
-separate from the Python SCORING_MODE that chooses eligibility.
+separate from `mode` in config/scoring.yml, which chooses eligibility.
 
 Inspect the handoff child score run before launching another score; a separate
 invocation is only needed for new rows or recovery.
@@ -543,7 +572,7 @@ can consume predictions without publishing a Delta prediction table.
 | --- | --- |
 | No champion / unknown version | Inspect the concrete registered model or set and its approval evidence; use the intended selector/override. |
 | Preview rejects a target-reading filter | Decide pre_split/combined skip behavior before training, or explicitly choose custom eligibility. |
-| Changing scoring.py has no effect | Train/package a new version; the selected model retains captured rules. |
+| Changing scoring.yml or scoring.py has no effect | Train/package a new version; the selected model retains captured rules. |
 | No scoring_status columns | Empty pre_split with no opted-in policy keeps ordinary outputs; select and package an actual policy. |
 | Expected scoring_report is missing | Default graph has none; open score. scoring_report belongs to the recovery-enabled graph. |
 | UPDATE/DELETE causes failure | Review source correction policy; model-set rebuild_on_change is not a single-model option. |

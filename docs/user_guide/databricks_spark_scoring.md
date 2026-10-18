@@ -73,8 +73,8 @@ choices than distributed scoring admits.
 | Other built-in preprocessing | Eligible row-preserving steps need sealed evidence for their actual saved state and recipe; see the table below. A successful probe cannot override a declared group/window/global context or row filtering. |
 | Skipped fitted row steps | `Deduplicate`, `DropMissingRows` and `RowFilterFunction` (`filter_step`) are skipped by the prediction chain to preserve request rows. They do not filter each worker batch. |
 | Tuning and thresholds | Reviewed fitted tuning wrappers are supported. Arbitrary tuned feature exclusions are rejected; recorded CV time/group metadata removal retains its existing contract. Tuned thresholds need a valid class-to-threshold mapping and a reviewed classifier or matching probed model evidence. SGD with hinge loss and SVC without probability support retain label-only outputs. |
-| Model sets | Every component must pass admission, including its saved scoring rules and reused pre-split recipe. Independent outputs, declared numeric `weighted_sum`/`weighted_mean` composition and combined function rules from `build_combined_rules()` are supported; function rules need sealed training probe evidence (see below). |
-| Saved project scoring rules | Eligibility and output rules are admitted when training linted and probed them (see below); Spark and online-feature projects do this automatically. The result columns (`scoring_status`, `exclusion_reason` and the declared outputs) travel through the Spark UDF and endpoints. Reused pre-split eligibility (`SCORING_MODE` `pre_split` or `combined`) is admitted when its steps are row-local and probed: fixed built-in edits, `DropMissingRows`, `ManualBounds` and `filter_step` functions. `Deduplicate` and custom filter classes in the reuse are rejected; `validate_model` rejects them before registration. `preview.py --action score` prints `Project scoring rules: disabled` when none are saved. |
+| Model sets | Every component must pass admission, including its saved scoring rules and reused pre-split recipe. Independent outputs, declared numeric `weighted_sum`/`weighted_mean` composition and combined function rules selected in scoring.yml (or legacy `build_combined_rules()`) are supported; function rules need sealed training probe evidence (see below). |
+| Saved project scoring rules | Eligibility and output rules are admitted when training linted and probed them (see below); Spark and online-feature projects do this automatically. The result columns (`scoring_status`, `exclusion_reason` and the declared outputs) travel through the Spark UDF and endpoints. Reused pre-split eligibility (`mode: pre_split` or `mode: combined` in scoring.yml) is admitted when its steps are row-local and probed: fixed built-in edits, `DropMissingRows`, `ManualBounds` and `filter_step` functions. `Deduplicate` and custom filter classes in the reuse are rejected; `validate_model` rejects them before registration. `preview.py --action score` prints `Project scoring rules: disabled` when none are saved. |
 | Custom/context-dependent code | `column_step`/`fitted_step` steps are admitted when training linted and probed them (see below). An `inference_context="row"` declaration is optional. `group`, `window` and `global` declarations, custom classes from `custom_step`, unreviewed fitted states and temporal carry history are rejected. A passing `preprocessing_probe` report alone grants no admission. |
 
 Models packaged with [feature lookup](databricks_features.md) require
@@ -269,8 +269,8 @@ declared `group`, `window` or `global` stay rejected, as do custom classes from
 the raw request, output rules on up to 256 eligible holdout rows plus
 predictions. A reused pre-split recipe is probed as one eligibility rule bound to
 its saved steps; target-reading steps stay skipped with
-`SKIP_TARGET_PRE_SPLIT_STEPS`. Model-set
-combined rules from `build_combined_rules()` read the same row's component
+`skip_target_pre_split_steps` in scoring.yml. Model-set
+combined rules from scoring.yml or legacy `build_combined_rules()` read the same row's component
 predictions; they are probed on up to 256 rows of the set's training source
 (`perturb` changes one row's inputs and component predictions) and their
 evidence is sealed in the set.
@@ -450,7 +450,7 @@ successful scoring retains the monitoring and dashboard-refresh handoff.
 
 Spark admits model-set composition as declarative `weighted_sum` or
 `weighted_mean` rules in `model_set.composition_config`, and as function rules
-from `build_combined_rules()` when training sealed their probe evidence in the
+selected in scoring.yml or legacy `build_combined_rules()` when training sealed their probe evidence in the
 set. The
 [model set guide](databricks_model_sets.md#declarative-composition) shows the
 rule format.

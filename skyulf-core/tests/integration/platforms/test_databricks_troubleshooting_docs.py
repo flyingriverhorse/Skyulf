@@ -52,8 +52,8 @@ def test_target_pre_split_error_and_skip_fix_are_documented():
     assert fixed["pre_split"]["skipped_target_steps"] == ["dropmissingrows"]
     entry = _diagnostic("target-pre-split")
     assert message in entry
-    assert "src/features/scoring.py" in entry
-    assert 'SCORING_MODE = "pre_split"\nSKIP_TARGET_PRE_SPLIT_STEPS = True' in entry
+    assert "config/scoring.yml" in entry
+    assert "mode: pre_split\nskip_target_pre_split_steps: true" in entry
 
 
 def test_lookup_table_error_and_qualified_name_fix_are_documented():

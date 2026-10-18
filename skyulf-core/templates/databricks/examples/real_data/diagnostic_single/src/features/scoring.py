@@ -1,31 +1,6 @@
-"""Row eligibility and an educational probability band, shared by Spark and REST."""
+"""Optional custom callbacks selected by config/scoring.yml."""
 
 import pandas as pd
-
-
-def build_model_rules():
-    """Reuse feature filters but skip the training target filter on unlabeled requests."""
-    return {
-        "reuse_pre_split": True,
-        "skip_target_steps": True,
-        "eligibility": [
-            {
-                "name": "required_shape",
-                "version": "1",
-                "function": "scoring.required_shape",
-                "params": {},
-            }
-        ],
-        "outputs": [
-            {
-                "name": "probability_band",
-                "version": "1",
-                "function": "scoring.probability_band",
-                "params": {},
-                "columns": [{"name": "probability_band", "dtype": "string"}],
-            }
-        ],
-    }
 
 
 def required_shape(frame, params):
@@ -40,8 +15,3 @@ def probability_band(frame, predictions, params):
     band = pd.Series("middle", index=predictions.index, dtype="string")
     band = band.mask(probability < 0.25, "low").mask(probability >= 0.75, "high")
     return band.mask(probability.isna()).to_frame("probability_band")
-
-
-def build_combined_rules():
-    """This project contains one model, so there is no composition."""
-    return []

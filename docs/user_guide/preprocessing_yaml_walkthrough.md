@@ -100,8 +100,8 @@ learned later. The fixed age rule removes row 32 before the training split.
 Bounds are inclusive. `ManualBounds` retains missing values; use an explicit
 missing-value rule if a missing age should be ineligible rather than imputed.
 
-Both rules read features only. The generated `SCORING_MODE="pre_split"` policy
-can reuse them without editing `scoring.py` or enabling a target-skip switch.
+Both rules read features only. The generated `mode: pre_split` policy in `config/scoring.yml`
+can reuse them without editing Python or enabling a target-skip switch.
 At scoring time an out-of-range age keeps its result row with
 `scoring_status=excluded`, an empty prediction and
 `exclusion_reason=pre_split:age_range`.

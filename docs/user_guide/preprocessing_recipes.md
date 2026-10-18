@@ -153,10 +153,15 @@ recipes:
       params: {columns: [segment], handle_unknown: ignore, max_categories: null}
 ```
 
-Before preview or training, open `src/features/scoring.py` and set:
+Before preview or training, set the complete policy in `config/scoring.yml`:
 
-```python
-SKIP_TARGET_PRE_SPLIT_STEPS = True
+```yaml
+version: 1
+mode: pre_split
+skip_target_pre_split_steps: true
+eligibility: []
+outputs: []
+combined: []
 ```
 
 This example deliberately removes missing training labels. The switch declares
@@ -211,7 +216,7 @@ is not added by this projection. Scoring uses saved declarations, not current
 editable YAML. In scoring mode `pre_split` (or the pre-split portion of
 `combined`), fixed feature edits and eligible row filters are replayed according
 to that contract. A target-reading filter cannot silently run without its input:
-`SKIP_TARGET_PRE_SPLIT_STEPS=True` explicitly skips such filters, changing the
+`skip_target_pre_split_steps: true` in scoring.yml explicitly skips such filters, changing the
 eligible scoring population. It does not fabricate labels. Do not rely on
 deduplication across separate scoring requests: its comparison population is the
 supplied batch. Ordinary Core prediction skips DropMissingRows, Deduplicate, RowFilterFunction

@@ -1,0 +1,20 @@
+# Scoring policy, saved with the next registered model set. Full reference: SCORING.md.
+version: 1
+
+# combined: config/pre_split.yml filters first, then the eligibility rules below.
+mode: combined
+# Scoring requests have no targets yet; skip target-reading pre-split filters.
+skip_target_pre_split_steps: true
+
+# Eligibility runs before the models; a failing row keeps its exclusion reason.
+eligibility:
+  - name: observed_zones
+    check: required_values      # built-in: reason lists the missing columns
+    params: {columns: [pickup_zip]}
+
+# Combined rules read the predictions of several models in the set.
+combined:
+  - name: long_trip_fare
+    custom: scoring.long_trip_fare   # function in src/features/scoring.py
+    required_components: [fare, long_trip]
+    columns: [{name: expected_long_trip_fare, dtype: float64}]

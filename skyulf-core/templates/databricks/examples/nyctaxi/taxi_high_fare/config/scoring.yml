@@ -1,0 +1,23 @@
+# Scoring policy, saved with the next trained model. Full reference: SCORING.md.
+version: 1
+
+# custom: ignore config/pre_split.yml and use only the rules below.
+mode: custom
+
+# Eligibility runs before the model. A row that fails is kept in the output with
+# its exclusion reason and no prediction.
+eligibility:
+  - name: plausible_distance
+    check: value_range          # built-in: inclusive bounds; missing values fail
+    params: {column: trip_distance, minimum: 0.01, maximum: 100.0}
+
+# Outputs add columns computed from each prediction.
+outputs:
+  - name: fare_risk_band
+    rule: prediction_band       # built-in: below 0.3 low, 0.3-0.7 medium, from 0.7 high
+    params:
+      column: probability_1
+      thresholds: [0.3, 0.7]
+      labels: [low, medium, high]
+      output: fare_band
+    columns: [{name: fare_band, dtype: string}]

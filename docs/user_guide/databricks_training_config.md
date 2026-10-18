@@ -484,9 +484,9 @@ two competition candidates or two target branches for the examples above.
 Use a real fit/save/predict check on representative rows before production.
 
 If a pre-split recipe reads the target, choose scoring behavior **before** preview:
-in src/features/scoring.py set `SKIP_TARGET_PRE_SPLIT_STEPS=True` to retain
+in config/scoring.yml set `skip_target_pre_split_steps: true` to retain
 feature-only reuse while skipping target-reading filters, or choose
-`SCORING_MODE="custom"` for separately defined scoring eligibility. Mixed
+`mode: custom` for separately defined scoring eligibility. Mixed
 target/feature filters are skipped whole. An imputer does not override a scoring
 eligibility exclusion; excluded outcomes retain their keys and null predictions.
 

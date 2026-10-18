@@ -11,7 +11,7 @@ selected source are saved with the model. Prediction does not reread edited file
 | `config/preprocessing.yml` | Transformations fitted on training rows inside each fold. |
 | `config/training.yml` | Select `pre_split_recipe`, `preprocessing_recipe`, inputs and target. |
 | `src/features/pre_split.py`, `preprocessing.py`, your own modules | Top-level factories selected by a recipe's `custom` path. |
-| `src/features/scoring.py` | Saved scoring eligibility and business outputs. |
+| `config/scoring.yml` | Saved scoring eligibility and business outputs; custom callbacks stay in `src/features/scoring.py`. |
 | `config/features.yml`, `src/features/groups/` | Separate optional upstream Spark feature production. |
 
 Both phase YAML files require `version: 1`, `recipes`, and a `default` recipe.
@@ -47,7 +47,7 @@ imports/factories. Preserve record keys and protected time/group/weight metadata
 Declare package assets and exact dependency pins; changing them needs a new fit.
 
 Scoring defaults to saved pre-split reuse. A target-reading filter requires an
-explicit `SKIP_TARGET_PRE_SPLIT_STEPS=True` or deliberate custom scoring mode
+explicit `skip_target_pre_split_steps: true` in `config/scoring.yml` or deliberate custom scoring mode
 before training. That skip removes the whole target-reading step; keep feature
 and target filters separate when feature checks must remain.
 

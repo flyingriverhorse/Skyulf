@@ -288,7 +288,7 @@ already selects `known_income`. It converts `-999` to missing income and exclude
 those observations. It learns no means, quantiles or category vocabularies.
 
 If another recipe filters missing `claim_amount`, set
-`SKIP_TARGET_PRE_SPLIT_STEPS = True` in `src/features/scoring.py` **before preview**
+`skip_target_pre_split_steps: true` in `config/scoring.yml` **before preview**
 when you intend scoring to skip that label-dependent filter. Preview checks the
 decision even for training. This tutorial's income-only filter needs no such
 switch; actual labels are not required for prediction.
@@ -312,7 +312,7 @@ recipes:
 
 Place this in `config/pre_split.yml` and select `pre_split_recipe: known_income`.
 Do not repeat the same normalization in preprocessing. With the generated
-`SCORING_MODE="pre_split"`, scoring normalizes the sentinel, then excludes that
+`mode: pre_split`, scoring normalizes the sentinel, then excludes that
 row under `known_income`. The response retains its key with a missing prediction,
 `scoring_status="excluded"` and `exclusion_reason="pre_split:known_income"`.
 The estimator receives only eligible rows. To predict for missing income, change

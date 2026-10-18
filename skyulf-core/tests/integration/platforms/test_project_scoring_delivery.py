@@ -1,7 +1,6 @@
 """Saved scoring policies must survive delivery without changing training evaluation."""
 
 import json
-import re
 from unittest.mock import patch
 
 import numpy as np
@@ -270,13 +269,13 @@ def test_template_scoring_rules_are_usable_from_saved_package():
 
     from skyulf.inference.project_code import load_project_module
     from skyulf.inference.project_scoring import run_project_scoring
-    from skyulf.integrations.databricks.projects._project_files import project_source
+    from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
 
     root = (
         Path(__file__).resolve().parents[3]
         / "templates/databricks/template/{{.project_name}}/src/features"
     )
-    source = project_source(root, exclude_feature_groups=True)
+    source = feature_project_source(root)
     module = load_project_module(source)
     assert module.build_model_rules() == {"reuse_pre_split": True, "skip_target_steps": False}
     config = {
@@ -314,31 +313,33 @@ def test_template_scoring_rules_are_usable_from_saved_package():
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_template_scoring_sections_reject_invalid_inputs_and_add_bands(engine, tmp_path):
     """Explicitly enabled examples must run with real exclusion and output values."""
-    import importlib
     import shutil
     from pathlib import Path
 
     from skyulf.inference.project_code import load_project_module
     from skyulf.inference.project_scoring import run_project_scoring
-    from skyulf.integrations.databricks.projects._project_files import project_source
+    from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
 
     root = (
         Path(__file__).resolve().parents[3]
         / "templates/databricks/template/{{.project_name}}/src/features"
     )
-    root = Path(shutil.copytree(root, tmp_path / "features"))
-    scoring_path = root / "scoring.py"
-    scoring_path.write_text(
-        re.sub(r'(?m)^(        )# (?=[{}" ])', r"\1", scoring_path.read_text(encoding="utf-8")),
+    root = Path(shutil.copytree(root, tmp_path / "src/features"))
+    config_path = tmp_path / "config"
+    config_path.mkdir()
+    (config_path / "scoring.yml").write_text(
+        "version: 1\nmode: custom\neligibility:\n"
+        "  - name: observed_value\n    check: required_values\n"
+        "    params: {columns: [feature_value]}\n"
+        "  - name: allowed_range\n    check: value_range\n"
+        "    params: {column: feature_value, minimum: 0.0, maximum: 120.0}\n"
+        "outputs:\n  - name: prediction_band\n    rule: prediction_band\n"
+        "    params: {thresholds: [10.0, 50.0], labels: [low, medium, high]}\n"
+        "    columns: [{name: band, dtype: string}]\n",
         encoding="utf-8",
     )
-    source = project_source(root, exclude_feature_groups=True)
-    module = load_project_module(source)
-    scoring = importlib.import_module(f"{module.__name__}.scoring")
-    config = {
-        "eligibility": scoring.build_eligibility_rules(),
-        "outputs": scoring.build_output_rules(),
-    }
+    source = feature_project_source(root)
+    config = load_project_module(source).build_model_rules()
     rows = pd.DataFrame({"feature_value": [None, -1.0, 10.0, 70.0, 121.0, float("inf")]})
     native = pl.from_pandas(rows) if engine == "polars" else rows
 

@@ -4,9 +4,9 @@ Every project splits feature work into three places, each with one job:
 
 | Place | Runs | Learns from data | Used at prediction time |
 |---|---|---|---|
-| `config/pre_split.yml` (+ `src/features/pre_split.py`) | Before the train/holdout split | Never | Only if `scoring.py` reuses it |
+| `config/pre_split.yml` (+ `src/features/pre_split.py`) | Before the train/holdout split | Never | Only if `scoring.yml` reuses it |
 | `config/preprocessing.yml` (+ `src/features/preprocessing.py`) | After the split, fitted on training rows | Yes; state is saved with the model | Always, replayed from the saved state |
-| `src/features/scoring.py` | When scoring | No | Saved rules also run on Spark and endpoints when training has linted and probed them |
+| `config/scoring.yml` (+ optional `src/features/scoring.py`) | When scoring | No | Saved rules also run on Spark and endpoints when training has linted and probed them |
 
 ```mermaid
 flowchart LR
@@ -14,10 +14,10 @@ flowchart LR
     B --> C["Train / holdout split"]
     C --> D["Fit preprocessing<br/>on training rows"]
     D --> E["Model"]
-    F["Rows to score"] --> G["scoring.py eligibility<br/>(optional)"]
+    F["Rows to score"] --> G["scoring.yml eligibility<br/>(optional)"]
     G --> H["Saved preprocessing"]
     H --> E
-    E --> I["Prediction + scoring.py outputs"]
+    E --> I["Prediction + scoring.yml outputs"]
 ```
 
 Custom steps are plain functions wrapped by a factory: `filter_step` for row
@@ -166,7 +166,7 @@ Two models score the same trips: `fare` (regression on `fare_amount`) and
 | `fare` | `valid_fare`: fare 0.01-300 (reads the target), distance 0.01-100 | `fare_inputs`: `log_trip_distance` column, median imputation, `pickup_zip` frequency, scaling |
 | `long_trip` | `known_zones`: both zones recorded | `zone_inputs`: zones under 1% become `Other`, then zone frequencies |
 
-- **Scoring `combined`** with `SKIP_TARGET_PRE_SPLIT_STEPS=True`: each model first
+- **Scoring `combined`** with `skip_target_pre_split_steps: true`: each model first
   reuses its pre-split filters except those reading its target (the fare filter
   is skipped, the distance filter kept), then the custom `observed_zones` check.
 - **Combined rule `long_trip_fare`:** `fare` prediction × `long_trip` probability.

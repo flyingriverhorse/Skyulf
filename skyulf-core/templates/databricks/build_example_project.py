@@ -44,6 +44,7 @@ SAMPLES = ("src/features/groups",)
 OWN_CODE = (
     "config/pre_split.yml",
     "config/preprocessing.yml",
+    "config/scoring.yml",
     "src/features/pre_split.py",
     "src/features/preprocessing.py",
     "src/features/scoring.py",
@@ -51,7 +52,12 @@ OWN_CODE = (
 )
 PROJECTS = {
     "taxi_fare": {
-        "sources": ("config/pre_split.yml", "config/preprocessing.yml", "src/features/scoring.py"),
+        "sources": (
+            "config/pre_split.yml",
+            "config/preprocessing.yml",
+            "config/scoring.yml",
+            "src/features/scoring.py",
+        ),
         # Built-in transformers only: no custom filter or step modules.
         "removed": (*SAMPLES, "src/features/pre_split.py", "src/features/preprocessing.py"),
         "training_edits": (
@@ -62,14 +68,24 @@ PROJECTS = {
         ),
     },
     "taxi_fare_online": {
+        "readme_note": (
+            "\n## Legacy Python-only scoring policy\n\n"
+            "This example deliberately keeps its original Python scoring hooks and no\n"
+            "config/scoring.yml. build_model_rules() returns None, preserving the endpoint's\n"
+            "prediction schema without scoring-status columns. New template projects use\n"
+            "scoring.yml; this example also verifies older Python-only projects still work.\n"
+            "See SCORING.md before migrating its policy.\n"
+        ),
         "sources": (
             "config/pre_split.yml",
             "config/preprocessing.yml",
             "src/features/pre_split.py",
             "src/features/scoring.py",
+            "src/features/__init__.py",
+            "SCORING.md",
         ),
-        # Built-in preprocessing only; pre_split.py keeps the value_range filter.
-        "removed": (*SAMPLES, "src/features/preprocessing.py"),
+        # Retain the legacy None policy and endpoint schema as a compatibility example.
+        "removed": (*SAMPLES, "src/features/preprocessing.py", "config/scoring.yml"),
         "training_edits": (LOOKUP_FILL,),
     },
     "taxi_fare_robust": {
@@ -86,6 +102,7 @@ PROJECTS = {
         "sources": (
             "config/pre_split.yml",
             "config/preprocessing.yml",
+            "config/scoring.yml",
             "config/serving.yml",
             "deployment/targets.yml",
             "src/features/pre_split.py",
@@ -103,6 +120,7 @@ PROJECTS = {
         "sources": (
             "config/pre_split.yml",
             "config/preprocessing.yml",
+            "config/scoring.yml",
             "src/features/pre_split.py",
             "src/features/preprocessing.py",
             "src/features/scoring.py",
@@ -121,6 +139,7 @@ PROJECTS = {
         "sources": (
             "config/pre_split.yml",
             "config/preprocessing.yml",
+            "config/scoring.yml",
             "src/features/pre_split.py",
             "src/features/preprocessing.py",
             "src/features/scoring.py",
@@ -134,6 +153,7 @@ PROJECTS = {
         "sources": (
             "config/pre_split.yml",
             "config/preprocessing.yml",
+            "config/scoring.yml",
             "deployment/targets.yml",
             "src/features/pre_split.py",
             "src/features/preprocessing.py",
@@ -244,7 +264,13 @@ def generate_example(directory, name):
     training_path.write_text(text, encoding="utf-8", newline="\n")
     if note := spec.get("readme_note"):
         readme = project / "README.md"
-        readme.write_text(readme.read_text(encoding="utf-8") + note, encoding="utf-8", newline="\n")
+        content = readme.read_text(encoding="utf-8")
+        if "config/scoring.yml" in spec["removed"]:
+            content = content.replace(
+                "| Scoring eligibility, outputs and combined rules | `config/scoring.yml` |",
+                "| Legacy scoring policy and callbacks | `src/features/scoring.py` |",
+            )
+        readme.write_text(content + note, encoding="utf-8", newline="\n")
     return project
 
 

@@ -3,16 +3,14 @@
 from pathlib import Path
 
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks.projects._project_files import project_source
+from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
 
 def test_shared_scoring_exports_both_rule_stages_without_active_business_examples():
     """Consolidation must preserve normal pre-split scoring and keep business rules opt-in."""
-    module = load_project_module(
-        project_source(TEMPLATE / "src/features", exclude_feature_groups=True)
-    )
+    module = load_project_module(feature_project_source(TEMPLATE / "src/features"))
     assert module.build_model_rules() == {"reuse_pre_split": True, "skip_target_steps": False}
     assert module.build_combined_rules() == []
     assert not hasattr(module, "build_scoring")
@@ -21,16 +19,17 @@ def test_shared_scoring_exports_both_rule_stages_without_active_business_example
 
 def test_profit_callback_preserves_negative_margins():
     """The sample business rule must subtract costs and retain loss-making results."""
+    import importlib
+
     import pandas as pd
 
-    module = load_project_module(
-        project_source(TEMPLATE / "src/features", exclude_feature_groups=True)
-    )
+    module = load_project_module(feature_project_source(TEMPLATE / "src/features"))
     inputs = pd.DataFrame({"id": [1, 2]}, index=[8, 3])
     predictions = pd.DataFrame(
         {"revenue__prediction": [100.0, 80.0], "cost__prediction": [60.0, 90.0]}, index=inputs.index
     )
-    result = module.scoring.profit(inputs, predictions, {})
+    scoring = importlib.import_module(f"{module.__name__}.scoring")
+    result = scoring.profit(inputs, predictions, {})
     assert result.profit.tolist() == [40.0, -10.0]
     assert result.index.tolist() == [8, 3]
 
@@ -40,6 +39,7 @@ def test_shared_feature_callback_replays_with_two_saved_models(tmp_path):
     import shutil
 
     import pytest
+    import yaml
     from tests.integration.platforms.test_model_set_batch import _saved_set
 
     from skyulf.inference.model_set import ComponentReference, save_model_set
@@ -54,13 +54,14 @@ def test_shared_feature_callback_replays_with_two_saved_models(tmp_path):
     rule = {
         "name": "profit",
         "version": "1",
-        "function": "scoring.profit",
+        "custom": "scoring.profit",
         "params": {},
         "columns": [{"name": "profit", "dtype": "float64"}],
         "required_components": ["revenue", "cost"],
     }
-    with (features / "scoring.py").open("a", encoding="utf-8") as stream:
-        stream.write(f"\ndef build_combined_rules():\n    return {[rule]!r}\n")
+    declaration = yaml.safe_load((TEMPLATE / "config/scoring.yml").read_text())
+    declaration["combined"] = [rule]
+    (project / "config/scoring.yml").write_text(yaml.safe_dump(declaration), encoding="utf-8")
     config, source = capture_set_rules(
         {"config_path": str(project / "config/workflow.json")},
         {"combined_rules_path": "../features"},
@@ -82,6 +83,7 @@ def test_shared_feature_callback_replays_with_two_saved_models(tmp_path):
         composition_config=config["composition_config"],
     )
     (features / "scoring.py").write_text("raise RuntimeError('changed source must not execute')")
+    (project / "config/scoring.yml").write_text("version: 999\n", encoding="utf-8")
     result = predict_model_set(query, saved)
     assert result.revenue__prediction.tolist() == pytest.approx([29, 18, 41])
     assert result.cost__prediction.tolist() == pytest.approx([29, 18, 41])

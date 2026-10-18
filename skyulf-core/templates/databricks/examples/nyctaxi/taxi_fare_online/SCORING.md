@@ -9,7 +9,7 @@ a new trained version.
 | File | Purpose |
 | --- | --- |
 | `config/inference.yml` | Source/destination, model selection, append/rebuild and recovery policies. |
-| `src/features/scoring.py` | Eligibility, business outputs and their callbacks, captured by the next fit. |
+| `src/features/scoring.py` | Legacy Python-only policy: build_model_rules returns None, preserving prediction outputs without status fields. |
 | `resources/score.job.yml` | Deployed score graph; recovery/handoff must match configuration. |
 | `deployment/variables.yml`, `deployment/targets.yml` | Schedule, compute, retries and notifications. |
 
@@ -35,9 +35,8 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 
 ## Critical rules
 
-- Default `SCORING_MODE="pre_split"` reuses saved eligibility. Target-reading
-  filters need an explicit `SKIP_TARGET_PRE_SPLIT_STEPS=True` before training,
-  or a deliberate custom mode. Commented sample rules are inactive.
+- This example deliberately saves no scoring policy. The caller validates inputs;
+  saved preprocessing and estimator validation still apply.
 - `model_change_mode` controls a changed model; model-set `source_change_policy`
   separately controls UPDATE/DELETE. Ordinary single-model insert scoring rejects them.
 - CDF-expiry recovery is opt-in and requires matching graph/notebooks/wheel.
@@ -60,3 +59,16 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 
 Public links show the latest manual; [README.md](README.md) explains how to match
 them to this project's pinned Core release.
+
+## Legacy policy compatibility
+
+This example intentionally has no config/scoring.yml. Its exported
+build_model_rules() returns None: training filters do not run during scoring,
+and endpoint outputs keep their original prediction schema. The caller validates
+request values. Existing saved models replay these captured Python hooks.
+
+New projects use config/scoring.yml. To migrate this example, remove the Python
+builder definitions and exports before adding YAML. An empty custom policy adds
+scoring_status and exclusion_reason, so review the endpoint schema before
+publishing a new version. For row eligibility with saved filters on Spark and
+endpoints, use the taxi_fare_robust example.

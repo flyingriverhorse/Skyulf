@@ -37,7 +37,7 @@ eligibility must not depend on future information.
 
 Custom pre-split steps remain declared fixed filters: they preserve survivor
 values and order and cannot learn statistics. The generated
-`src/features/scoring.py` defaults to `SCORING_MODE = "pre_split"`, which reuses
+`config/scoring.yml` defaults to `mode: pre_split`, which reuses
 the saved filters on unlabeled score input. Filters reading the target require
 an explicit skip choice, shown below.
 
@@ -162,7 +162,7 @@ record_id,age,income,claim_amount
 106,,60.0,6.0
 ```
 
-After training, the default `SCORING_MODE = "pre_split"` uses the saved filter
+After training, the default `mode: pre_split` uses the saved filter
 on unlabeled rows. For these model inputs (supply record keys separately when
 running the Bundle batch job):
 
@@ -193,11 +193,16 @@ Pre-split step 'known_claim_amount' reads target 'claim_amount'. Set SKIP_TARGET
 ```
 
 If the intended scoring population is adults regardless of label availability,
-change the existing assignment in `src/features/scoring.py` **before training**:
+replace `config/scoring.yml` **before training**:
 
 <!-- example:custom-filter-target-skip -->
-```python
-SKIP_TARGET_PRE_SPLIT_STEPS = True
+```yaml
+version: 1
+mode: pre_split
+skip_target_pre_split_steps: true
+eligibility: []
+outputs: []
+combined: []
 ```
 
 Rerun smoke and both previews. Training still applies both filters; scoring
@@ -207,7 +212,7 @@ version; editing the file does not change an already trained model.
 
 This switch skips an entire target-reading filter. Keep feature eligibility and
 target checks in separate steps if the feature rule must remain active.
-`SCORING_MODE = "custom"` instead uses only the separately configured scoring
+`mode: custom` instead uses only the separately configured scoring
 rules; merely switching modes does not activate any commented examples.
 See [scoring eligibility](databricks_scoring.md#2-decide-eligibility-before-training-the-version).
 
@@ -216,7 +221,7 @@ See [scoring eligibility](databricks_scoring.md#2-decide-eligibility-before-trai
 | Symptom | Fix |
 | --- | --- |
 | A custom factory cannot be resolved | Use a path relative to `src/features/`, ending in the factory name; retain `__init__.py` in subpackages. |
-| A target-reading filter prevents unlabeled scoring | Decide whether it is training-only and set `SKIP_TARGET_PRE_SPLIT_STEPS` explicitly before training. See [troubleshooting](databricks_troubleshooting.md#a-pre-split-step-reads-the-target). |
+| A target-reading filter prevents unlabeled scoring | Decide whether it is training-only and set `skip_target_pre_split_steps` in scoring.yml explicitly before training. See [troubleshooting](databricks_troubleshooting.md#a-pre-split-step-reads-the-target). |
 | `Filter function must return a boolean Series with one value per row.` | Return a pandas Series aligned to `df.index`, one value per row. |
 | `Filter function must return only True/False values, e.g. df['age'] >= 18.` | Fill missing comparisons explicitly, for example with `.fillna(False)`. |
 | A filter needs learned statistics | Move the rule to fitted preprocessing; pre-split filters stay fixed. |

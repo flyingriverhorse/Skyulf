@@ -20,6 +20,24 @@ LAYOUTS = ["single_model", "model_competition", "multi_target"]
 CLI_ONLY = pytest.mark.skipif(not (PROFILE or OFFLINE_CLI) or not CLI, reason="Opt into CLI")
 
 
+@pytest.mark.parametrize("name", PROJECTS)
+def test_example_scoring_has_one_owner_and_preserves_legacy_online_schema(name):
+    """The online compatibility example must not silently gain scoring-status columns."""
+    from skyulf.inference.project_code import load_project_module
+    from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
+
+    project = BUILDER["example_root"](name) / name
+    source = feature_project_source(project / "src/features")
+    policy = load_project_module(source).build_model_rules()
+    assert (project / "config/scoring.yml").exists() == (name != "taxi_fare_online")
+    if name == "taxi_fare_online":
+        assert policy is None
+        assert "| `config/scoring.yml` |" not in (project / "README.md").read_text()
+    else:
+        assert isinstance(policy, dict)
+        assert "def build_model_rules(" not in (project / "src/features/scoring.py").read_text()
+
+
 @CLI_ONLY
 @pytest.mark.parametrize("layout", LAYOUTS)
 def test_normal_generation_excludes_the_prepared_examples(tmp_path, layout):

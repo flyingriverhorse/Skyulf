@@ -44,7 +44,7 @@ def _copy_features(tmp_path):
     shutil.copytree(FEATURES, root, ignore=shutil.ignore_patterns("__pycache__"))
     config = tmp_path / "config"
     config.mkdir()
-    for phase in ("preprocessing", "pre_split"):
+    for phase in ("preprocessing", "pre_split", "scoring"):
         shutil.copyfile(FEATURES.parents[1] / "config" / f"{phase}.yml", config / f"{phase}.yml")
     return root
 
@@ -263,6 +263,11 @@ def _configure(root, *, pre_split, preprocessing):
     """Select the shipped custom factories through the generated YAML recipe files."""
     # These training-only quality fields are deliberately absent from prediction input.
     # Scoring-policy reuse and its required inputs have separate integration coverage.
+    # Keep this deliberate None policy Python-owned, with no competing YAML owner.
+    (root.parents[1] / "config/scoring.yml").unlink()
+    (root / "__init__.py").write_text(
+        "from .scoring import build_combined_rules, build_model_rules\n", encoding="utf-8"
+    )
     (root / "scoring.py").write_text(
         '"""Keep this fixture focused on fitted custom preprocessing."""\n\n'
         'def build_scoring():\n    """Opt out of prediction eligibility rules."""\n'

@@ -73,7 +73,7 @@ Each project has the same familiar files:
 | `config/preprocessing.yml` | Ordered built-in steps and custom factories. |
 | `src/features/preprocessing.py` | `column_step` and `fitted_step`. Learned statistics belong in `learn`, never in scoring callbacks. |
 | `src/features/numeric.py` | A second source module, deliberately included to exercise fresh worker imports. |
-| `src/features/scoring.py` | Eligibility reasons, extra outputs, and bike model-set composition. |
+| `config/scoring.yml` (+ optional `src/features/scoring.py`) | Eligibility reasons, extra outputs, and bike model-set composition. |
 | `config/training.yml` | Dataset, targets, temporal boundaries, search, holdout quality and SHAP budgets. |
 | `config/inference.yml` | Spark scoring, pinned version, source and destination. |
 
@@ -277,7 +277,7 @@ flowchart LR
 
 | Stage | Built-in | Custom |
 | --- | --- | --- |
-| Pre-split | `ManualBounds` keeps hours with a measured NO2 value. It reads the target, so scoring skips it (`SKIP_TARGET_PRE_SPLIT_STEPS = True`). | `sensors_online` removes hours with an offline sensor; scoring reuses it as `pre_split:sensors_online`. |
+| Pre-split | `ManualBounds` keeps hours with a measured NO2 value. It reads the target, so scoring skips it (`skip_target_pre_split_steps: true`). | `sensors_online` removes hours with an offline sensor; scoring reuses it as `pre_split:sensors_online`. |
 | Preprocessing | `IQR` (excluded rows get `outlier:nox_sensor_outliers`), `PowerTransformer` (Yeo-Johnson), `SimpleImputer` (median), `OneHotEncoder`, `StandardScaler`. | `missing_marker` turns `-200` into a real gap; `day_part` adds a category; `temperature_anomaly` learns each hour's mean temperature in training and subtracts it per row. |
 | Scoring (`combined`) | Pre-split reuse. | `plausible_humidity` excludes relative humidity outside 10-100 (`humidity_out_of_range`); `no2_band` publishes `low` (< 40), `moderate` and `high` (>= the EU 200 ug/m3 hourly limit). |
 

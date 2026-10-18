@@ -9,7 +9,8 @@ a new trained version.
 | File | Purpose |
 | --- | --- |
 | `config/inference.yml` | Source/destination, model selection, append/rebuild and recovery policies. |
-| `src/features/scoring.py` | Eligibility, business outputs and their callbacks, captured by the next fit. |
+| `config/scoring.yml` | Eligibility, output and combined rules, captured by the next fit. |
+| `src/features/scoring.py` | Optional custom callbacks selected from scoring.yml. |
 | `resources/score.job.yml` | Deployed score graph; recovery/handoff must match configuration. |
 | `deployment/variables.yml`, `deployment/targets.yml` | Schedule, compute, retries and notifications. |
 
@@ -35,8 +36,8 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 
 ## Critical rules
 
-- Default `SCORING_MODE="pre_split"` reuses saved eligibility. Target-reading
-  filters need an explicit `SKIP_TARGET_PRE_SPLIT_STEPS=True` before training,
+- Default `mode: pre_split` in scoring.yml reuses saved eligibility. Target-reading
+  filters need an explicit `skip_target_pre_split_steps: true` before training,
   or a deliberate custom mode. Commented sample rules are inactive.
 - `model_change_mode` controls a changed model; model-set `source_change_policy`
   separately controls UPDATE/DELETE. Ordinary single-model insert scoring rejects them.
@@ -60,3 +61,24 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 
 Public links show the latest manual; [README.md](README.md) explains how to match
 them to this project's pinned Core release.
+
+## Choose the saved scoring policy
+
+Edit `config/scoring.yml` before training a new version. `mode: pre_split`
+reuses saved pre-split eligibility; `custom` runs its eligibility and output
+lists; `combined` runs pre-split first and keeps its first exclusion reason.
+The lists start empty. Set `skip_target_pre_split_steps: true` only when
+pre_split/combined should omit filters reading the unavailable target.
+
+Built-in eligibility uses `check: required_values` or `check: value_range`;
+outputs use `rule: prediction_band`. Each rule has a name, optional string
+version (default `"1"`) and params. Outputs declare columns and dtypes.
+`combined` is the separate list of cross-model rules: select `operation: weighted_sum` or `operation: weighted_mean` or `custom: scoring.<function>` and declare
+required_components. The top-level `mode: combined` concerns eligibility,
+not cross-model arithmetic.
+
+Select optional Python helpers with `custom: scoring.<function>`; never add a
+Python scoring builder alongside scoring.yml. Older Python-only projects keep
+their builders when no scoring.yml exists. Saved versions replay their captured
+rules even after editable YAML or Python changes. Spark/endpoint lint, row and
+partition probes still apply to custom functions and reused pre-split filters.
