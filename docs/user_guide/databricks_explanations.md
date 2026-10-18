@@ -14,7 +14,7 @@ Detailed setup asks `shap_enabled`, default `false`.
 ```mermaid
 flowchart LR
     A["Enable explainability and dependencies"] --> B["Fit the model"]
-    B --> C["Apply saved preprocessing to training sample"]
+    B --> C["Apply saved preprocessing with required history"]
     C --> D["Compute bounded SHAP values"]
     D --> E["MLflow: explanations.json and explanations.html"]
     E --> F["shap_model or shap_name: display saved report"]
@@ -100,6 +100,15 @@ Budgets apply per fitted model: eight candidates can each compute an
 explanation. Samples are training inputs transformed with saved preprocessing;
 holdout labels, record keys and time/target metadata are not explanation features.
 
+Row-independent steps can preprocess only the sampled rows. Steps that need
+other rows, such as `LagFeatures` or `RollingAggregate`, first preprocess the
+complete training population supplied by the training job, then select the SHAP
+sample. For example, a sampled May record keeps April's lag even when April is
+not selected for explanation. An undeclared context also takes this conservative
+path. The job's training row/byte limits still bound that population;
+`max_samples` bounds SHAP computation, not context preprocessing. When more rows
+were preprocessed than the SHAP limit, `preprocessing_rows` records their count.
+
 For models with fitted exclusion steps, such as IQR or PowerTransformer, SHAP
 uses only sampled rows accepted by those saved steps. The report records
 `sampled_rows`, `explained_rows`, `excluded_rows` and `excluded_by_reason`;
@@ -165,7 +174,7 @@ choices affect attribution; SHAP is not causal evidence.
 | --- | --- |
 | No `shap_*` task | Quick/default setup omitted it. Add config, pinned dependencies, notebook and task, then validate/deploy; the YAML flag alone cannot create a task. |
 | No explanation artifact | Check whether explainability was off in the fitting run, or whether fit failed before saving it. Absence alone is not a successful explanation. |
-| `feature_limit_exceeded` | Transformed width exceeds the guard. Inspect encoded/generated columns; raise the guard only within 50, or train a deliberately smaller feature set. |
+| `feature_limit_exceeded` | Transformed width exceeds the guard. Inspect encoded/generated columns; raise the guard only within 100, or train a deliberately smaller feature set. |
 | `empty_training_frame`, `missing_input_columns` | No usable training sample or missing saved input columns. Repair the source/split/feature contract before retraining. |
 | `too_few_rows_after_exclusions` | Fewer than two sampled rows survived the fitted exclusion steps. Read the counts and reasons; check the data and fitted thresholds before changing the sample budget. |
 | `inference_transform_unavailable`, `row_count_changed`, `feature_schema_mismatch` | Saved preprocessing cannot produce the expected row-preserving feature frame. Inspect the transform and context requirements. |

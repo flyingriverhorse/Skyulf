@@ -2,6 +2,7 @@
 
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -245,6 +246,23 @@ def test_inference_row_change_is_visible(tmp_path, monkeypatch) -> None:
     assert result["reason"] == "row_count_changed"
 
 
+def test_context_row_change_stops_before_shap_even_above_sample_budget(tmp_path, monkeypatch):
+    """Returning a broken full-context frame must never bypass the bounded SHAP gate."""
+    artifact, frame = _artifact(tmp_path, "pandas", {"method": "shap", "max_samples": 3})
+    root = "skyulf.integrations.databricks.observability.reports.explanations"
+    monkeypatch.setattr(f"{root}._requires_context", lambda artifact: True)
+    monkeypatch.setattr(
+        artifact.pipeline.feature_engineer, "transform", lambda data, **kwargs: data.iloc[:-1]
+    )
+    monkeypatch.setattr(
+        f"{root}.compute_shap_explanation", lambda *a, **k: pytest.fail("SHAP budget bypassed")
+    )
+    result = explain_training_artifact(artifact, frame)
+    assert result is not None and result["status"] == "unavailable"
+    assert result["reason"] == "row_count_changed"
+    assert result["preprocessing_rows"] == len(frame)
+
+
 @pytest.mark.parametrize("empty", [True, False])
 def test_unusable_input_stops_before_sampling(tmp_path, monkeypatch, empty) -> None:
     """Empty or incomplete source rows must retain their explicit unavailable reason."""
@@ -308,3 +326,106 @@ def test_explanation_failures_preserve_evidence(tmp_path, monkeypatch, failure) 
 def test_wide_feature_budget_up_to_100_is_accepted() -> None:
     """Models with 51-100 transformed features (e.g. fixed one-hot sets) can be explained."""
     validate_explanation_config({"explainability": {"method": "shap", "max_features": 100}})
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("transformer", ["LagFeatures", "RollingAggregate"])
+@pytest.mark.parametrize("exclude", [False, True])
+def test_history_features_are_computed_before_shap_sampling(
+    tmp_path, monkeypatch, engine, transformer, exclude
+):
+    """Nonadjacent sampled rows must retain their original history after artifact reload."""
+    frame = pd.DataFrame({"x": np.arange(1.0, 41.0), "target": np.arange(1.0, 41.0) * 3})
+    params = {"columns": ["x"]}
+    derived = "x_lag_1" if transformer == "LagFeatures" else "x_roll_mean_3"
+    params.update({"lags": [1]} if transformer == "LagFeatures" else {"window": 3})
+    steps = [
+        {"name": "history", "transformer": transformer, "params": params},
+        {
+            "name": "fill",
+            "transformer": "SimpleImputer",
+            "params": {"columns": [derived], "strategy": "constant", "fill_value": 0.0},
+        },
+    ]
+    if exclude:
+        steps.append(
+            {
+                "name": "bounds",
+                "transformer": "ManualBounds",
+                "params": {"bounds": {"x": {"lower": 0.0, "upper": 35.0}}},
+            }
+        )
+    pipeline = SkyulfPipeline({"preprocessing": steps, "modeling": {"type": "ridge_regression"}})
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(native, target_column="target")
+    cast(dict[str, Any], pipeline.config)["explainability"] = {
+        "method": "shap",
+        "max_samples": 6,
+        "max_display_samples": 6,
+    }
+    save_pipeline(pipeline, tmp_path / "history")
+    artifact = load_pipeline(tmp_path / "history")
+    raw = native.select("x") if isinstance(native, pl.DataFrame) else native[["x"]]
+    if exclude:
+        expected, _, reasons = artifact.pipeline.feature_engineer.transform_with_exclusions(raw)
+        assert reasons.notna().sum() == 5
+    else:
+        expected = artifact.pipeline.feature_engineer.transform(raw, preserve_rows=True)
+    expected = expected.to_pandas() if isinstance(expected, pl.DataFrame) else expected
+    positions = np.sort(np.random.default_rng(42).choice(len(frame), 6, replace=False))
+    expected = expected[expected["x"].isin(frame.iloc[positions]["x"])].reset_index(drop=True)
+    observed = {}
+
+    def capture_features(model, values, **kwargs):
+        """Inspect the real fitted features at the SHAP boundary, not an internal helper."""
+        observed["features"] = values.reset_index(drop=True)
+        return {"feature_names": list(values.columns), "samples": []}
+
+    monkeypatch.setattr(
+        "skyulf.integrations.databricks.observability.reports.explanations.compute_shap_explanation",
+        capture_features,
+    )
+    result = explain_training_artifact(artifact, native)
+    assert result is not None and result["status"] == "completed"
+    pd.testing.assert_frame_equal(observed["features"], expected)
+    assert result["sample_count"] == len(expected)
+    if exclude:
+        assert result["sampled_rows"] == 6
+        assert result["explained_rows"] == 5
+        assert result["excluded_rows"] == 1
+        assert result["excluded_by_reason"] == {"outlier:bounds": 1}
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_real_shap_history_values_match_full_training_population(tmp_path, engine):
+    """The exported explanation must contain full-history values, not sampled-row lags."""
+    pytest.importorskip("shap")
+    frame = pd.DataFrame({"x": np.arange(1.0, 41.0), "target": np.arange(1.0, 41.0) * 3})
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "history",
+                    "transformer": "RollingAggregate",
+                    "params": {"columns": ["x"], "window": 3},
+                },
+            ],
+            "modeling": {"type": "ridge_regression"},
+        }
+    )
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(native, target_column="target")
+    cast(dict[str, Any], pipeline.config)["explainability"] = {
+        "method": "shap",
+        "max_samples": 6,
+        "max_display_samples": 6,
+    }
+    save_pipeline(pipeline, tmp_path / "real_history")
+    artifact = load_pipeline(tmp_path / "real_history")
+    result = explain_training_artifact(artifact, native)
+    assert result is not None and result["status"] == "completed"
+    samples = result["shap"]["samples"]
+    assert len(samples) == 6
+    for sample in samples:
+        values = sample["feature_values"]
+        assert values["x_roll_mean_3"] == pytest.approx(values["x"] - 1.0)
