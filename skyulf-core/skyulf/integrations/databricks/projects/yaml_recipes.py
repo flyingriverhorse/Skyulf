@@ -127,14 +127,16 @@ def feature_project_source(path: Path) -> str:
     exports the same builders used by existing training-plan restore consumers.
     Python-only projects and previously saved model packages keep their behavior.
     """
+    from .yaml_scoring import scoring_source  # noqa: PLC0415 - shared capture helpers
+
     declarations = _declarations(path) if path.is_dir() else {}
+    scoring = scoring_source(path)
     source = project_source(path, exclude_feature_groups=True)
-    if not declarations:
-        return source
-    source += (
-        "\nfrom functools import partial as _skyulf_yaml_partial\n"
-        "from skyulf.inference.recipe_config import build_recipe as _skyulf_yaml_recipe\n"
-    )
+    if declarations:
+        source += (
+            "\nfrom functools import partial as _skyulf_yaml_partial\n"
+            "from skyulf.inference.recipe_config import build_recipe as _skyulf_yaml_recipe\n"
+        )
     for phase, recipes in declarations.items():
         factory = _FACTORIES[phase]
         error = f"Recipes defined in both {phase}.yml and Python {factory}."
@@ -142,5 +144,6 @@ def feature_project_source(path: Path) -> str:
             f"if {factory!r} in globals():\n    raise ValueError({error!r})\n"
             f"{factory} = _skyulf_yaml_partial(_skyulf_yaml_recipe, __name__, {recipes!r})\n"
         )
+    source += scoring
     project_source_digest(source)
     return source

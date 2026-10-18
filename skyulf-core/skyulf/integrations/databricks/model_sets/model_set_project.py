@@ -55,6 +55,7 @@ from ..lifecycle.workflow import bind_target_name, probed_admission, resolve_tar
 from ..projects._project_files import project_source, read_source
 from ..projects.workflow_config import validate_workflow_config
 from ..projects.yaml_config import read_inference_config
+from ..projects.yaml_recipes import feature_project_source
 from ..scoring.incremental.incremental_batch import (
     bounded_frame,
     latest_source_version,
@@ -177,21 +178,57 @@ def capture_set_composition(values: dict[str, str]) -> str:
     return project_source(path) if path.exists() else ""
 
 
+def _combined_rules_path(values: dict[str, str], settings: dict) -> str | None:
+    """Choose one declaration owner, defaulting YAML to the generated feature package."""
+    if "combined_rules_path" in settings and not isinstance(settings["combined_rules_path"], str):
+        raise ValueError("combined_rules_path must name a feature package within src.")
+    yaml = Path(values["config_path"]).parent / "scoring.yml"
+    if not yaml.exists() and not yaml.is_symlink():
+        return settings.get("combined_rules_path")
+    if "composition_config" in settings:
+        raise ValueError("Combined rules defined in both scoring.yml and composition_config.")
+    return settings.get("combined_rules_path", "../features")
+
+
+def _combined_package(root: Path, relative: str) -> Path:
+    """Reject traversals and linked package roots before resolving captured files."""
+    if not isinstance(relative, str) or not relative:
+        raise ValueError("combined_rules_path must name a feature package within src.")
+    candidate = root / "modeling" / relative
+    path = candidate.resolve()
+    if not path.is_relative_to(root.resolve()):
+        raise ValueError("combined_rules_path must stay within src.")
+    _validate_yaml_package(root, path)
+    for parent in (candidate, *candidate.parents):
+        if parent.is_symlink() or parent.is_junction():
+            raise ValueError("combined_rules_path cannot use a symlink or junction.")
+        if parent == root:
+            break
+    return path
+
+
+def _validate_yaml_package(root: Path, path: Path) -> None:
+    """Keep canonical YAML visible instead of silently loading a nested or file-only hook."""
+    yaml = root.parent / "config/scoring.yml"
+    if (yaml.exists() or yaml.is_symlink()) and (
+        not path.is_dir() or path.parent != root.resolve()
+    ):
+        raise ValueError(
+            "YAML combined_rules_path must name a feature package directly within src."
+        )
+
+
 def capture_set_rules(values: dict[str, str], settings: dict) -> tuple[dict, str]:
     """Capture the shared scoring package without consulting it at inference time."""
-    if "combined_rules_path" not in settings:
+    relative = _combined_rules_path(values, settings)
+    if relative is None:
         return {
             **settings,
             "composition_config": settings.get("composition_config", {"outputs": []}),
         }, capture_set_composition(values)
     root = Path(values["config_path"]).parent.parent / "src"
-    relative = settings["combined_rules_path"]
-    if not isinstance(relative, str) or not relative:
-        raise ValueError("combined_rules_path must name a feature package within src.")
-    path = (root / "modeling" / relative).resolve()
-    if not path.is_relative_to(root.resolve()):
-        raise ValueError("combined_rules_path must stay within src.")
-    source = project_source(path, exclude_feature_groups=True)
+    path = _combined_package(root, relative)
+    source = feature_project_source(path)
     factory = getattr(load_project_module(source), "build_combined_rules", None)
     if not callable(factory):
         raise ValueError("The shared feature package must export build_combined_rules().")
