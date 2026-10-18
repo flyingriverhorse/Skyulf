@@ -102,6 +102,7 @@ nav:
     - Extending Skyulf-Core: user_guide/extending_custom_nodes.md
     - Troubleshooting: user_guide/troubleshooting.md
   - Integrations:
+    - Documentation Index: user_guide/integrations.md
     - Databricks:
       - Get Started:
         - End-to-End Project Guide: user_guide/databricks_bundle_walkthrough.md

@@ -1,5 +1,8 @@
 # Databricks Bundle guide index
 
+For all Databricks, MLflow, Spark and preprocessing guides with short page
+descriptions, open the [integrations documentation index](integrations.md).
+
 <span id="databricks-bundle-configuration-reference"></span>
 
 Start with the [end-to-end project guide](databricks_bundle_walkthrough.md) to
