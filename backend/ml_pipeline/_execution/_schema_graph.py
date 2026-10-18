@@ -20,6 +20,7 @@ import logging
 from typing import Any
 
 from skyulf.preprocessing import SkyulfSchema
+from skyulf.preprocessing.column_selection import resolve_column_selection
 from skyulf.registry import NodeRegistry
 
 from .graph_utils import topological_order
@@ -102,7 +103,8 @@ def _predict_for_node(
 
     try:
         calculator = calculator_cls()
-        return calculator.infer_output_schema(input_schema, node.params)
+        params = resolve_column_selection(input_schema, node.params, step)
+        return calculator.infer_output_schema(input_schema, params)
     except Exception:  # noqa: BLE001 - best-effort prediction
         logger.debug("infer_output_schema failed for node %s", node.node_id, exc_info=True)
         return None

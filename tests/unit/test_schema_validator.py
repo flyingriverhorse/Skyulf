@@ -1,6 +1,7 @@
 """Tests for the static column-reference validator (C7 Phase D)."""
 
 import pandas as pd
+import pytest
 
 from backend.ml_pipeline._execution._schema_graph import predict_schemas
 from backend.ml_pipeline._execution._schema_validator import find_broken_references
@@ -8,8 +9,140 @@ from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from skyulf.preprocessing import SkyulfSchema
 
 
+@pytest.mark.parametrize(
+    "step,params,field",
+    [
+        ("GroupImputer", {"group_by": ["a", "ghost"]}, "group_by"),
+        ("LagFeatures", {"sort_by": ["ghost"]}, "sort_by"),
+        ("DropDuplicates", {"subset": ["ghost"]}, "subset"),
+        ("H3Index", {"lat_col": "ghost"}, "lat_col"),
+        ("H3Index", {"lon_col": "ghost"}, "lon_col"),
+        ("Binning", {"custom_bins": {"ghost": [0, 1]}}, "custom_bins"),
+    ],
+)
+def test_additional_known_column_fields_are_checked(step, params, field):
+    """Supported grouping, ordering, geographic and bin mappings must not hide misspelled inputs."""
+    config = _config(NodeConfig("step", step, params=params, inputs=["loader"]))
+    assert find_broken_references(config, {"loader": _seed()}) == [
+        {"node_id": "step", "field": field, "column": "ghost", "upstream_node_id": "loader"}
+    ]
+
+
+@pytest.mark.parametrize("alias", ["FeatureMath", "FeatureGeneration", "FeatureGenerationNode"])
+def test_feature_math_validates_ordered_operands_without_flagging_generated_outputs(alias):
+    """Earlier generated columns are valid operands while later outputs and misspelled inputs are not."""
+    config = _config(
+        NodeConfig(
+            "math",
+            alias,
+            inputs=["loader"],
+            params={
+                "operations": [
+                    {
+                        "operation_type": "arithmetic",
+                        "method": "add",
+                        "input_columns": ["a"],
+                        "output_column": "total",
+                    },
+                    {
+                        "operation_type": "ratio",
+                        "input_columns": ["total"],
+                        "secondary_columns": ["b", "ghost"],
+                        "output_column": "future",
+                    },
+                    {
+                        "operation_type": "arithmetic",
+                        "method": "add",
+                        "input_columns": ["a", "next"],
+                    },
+                    {
+                        "operation_type": "arithmetic",
+                        "method": "add",
+                        "input_columns": ["arithmetic_2"],
+                        "output_column": "next",
+                    },
+                ]
+            },
+        )
+    )
+    broken = find_broken_references(config, {"loader": _seed()})
+    assert [(item["field"], item["column"]) for item in broken] == [
+        ("operations.1.secondary_columns", "ghost"),
+        ("operations.2.input_columns", "next"),
+    ]
+
+
+def test_feature_math_generated_calendar_names_and_collision_suffixes_are_valid_inputs():
+    """Reference checking must follow the same expanded calendar and collision names as execution."""
+    config = _config(
+        NodeConfig(
+            "math",
+            "FeatureMath",
+            inputs=["loader"],
+            params={
+                "operations": [
+                    {
+                        "operation_type": "datetime_extract",
+                        "input_columns": ["c"],
+                        "datetime_features": ["year", "month"],
+                        "output_column": "calendar",
+                    },
+                    {
+                        "operation_type": "arithmetic",
+                        "method": "add",
+                        "input_columns": ["calendar_year", "calendar_month"],
+                        "output_column": "a",
+                    },
+                    {
+                        "operation_type": "arithmetic",
+                        "method": "add",
+                        "input_columns": ["a_1"],
+                        "output_column": "result",
+                    },
+                ]
+            },
+        )
+    )
+    assert find_broken_references(config, {"loader": _seed()}) == []
+
+
 def _seed() -> SkyulfSchema:
     return SkyulfSchema.from_dataframe(pd.DataFrame({"a": [1.0], "b": [2.0], "c": ["x"]}))
+
+
+@pytest.mark.parametrize("operations", [None, 12, "invalid", {"operation_type": "arithmetic"}])
+def test_malformed_operation_container_does_not_crash_reference_preview(operations):
+    """Imported malformed operation containers must leave other nodes' preview diagnostics usable."""
+    config = _config(
+        NodeConfig(
+            node_id="math",
+            step_type="FeatureMath",
+            inputs=["loader"],
+            params={"operations": operations},
+        )
+    )
+    assert find_broken_references(config, {"loader": _seed()}) == []
+
+
+@pytest.mark.parametrize("field", ["input_columns", "datetime_features"])
+@pytest.mark.parametrize("value", [None, 12, "invalid", [None], [["invalid"]]])
+def test_malformed_calendar_options_do_not_crash_reference_preview(field, value):
+    """Best-effort input validation must not let invalid calendar shapes crash schema preview."""
+    operation = {
+        "operation_type": "datetime_extract",
+        "input_columns": ["c"],
+        "datetime_features": ["year"],
+        field: value,
+    }
+    config = _config(
+        NodeConfig(
+            node_id="math",
+            step_type="FeatureMath",
+            inputs=["loader"],
+            params={"operations": [operation]},
+        )
+    )
+    assert find_broken_references(config, {"loader": _seed()}) == []
 
 
 def _config(node: NodeConfig) -> PipelineConfig:

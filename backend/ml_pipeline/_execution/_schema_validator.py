@@ -19,6 +19,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from skyulf.preprocessing import SkyulfSchema
+from skyulf.preprocessing.feature_generation.generation import feature_operation_output_columns
 
 from .graph_utils import _discover_ancestors_bfs
 from .schemas import NodeConfig, PipelineConfig
@@ -33,7 +34,9 @@ _STRING_REF_KEYS = (
     "lon1_col",
     "lat2_col",
     "lon2_col",
-    # GroupImputer names one column; LagFeatures/RollingAggregate use a list, not checked here.
+    "lat_col",
+    "lon_col",
+    "sort_by",
     "group_by",
 )
 _LIST_REF_KEYS = (
@@ -41,9 +44,14 @@ _LIST_REF_KEYS = (
     "feature_columns",
     "numeric_columns",
     "categorical_columns",
+    "group_by",
+    "sort_by",
+    "subset",
+    "input_columns",
+    "secondary_columns",
 )
 # Param keys whose values are dicts keyed by column name.
-_DICT_KEY_REF_KEYS = ("column_types", "column_mapping", "rename_map", "bounds")
+_DICT_KEY_REF_KEYS = ("column_types", "column_mapping", "rename_map", "bounds", "custom_bins")
 
 # Some step types have column-ref params that are genuinely optional:
 # the pipeline runs fine even when the column is absent upstream.
@@ -121,6 +129,36 @@ def _iter_referenced_columns(params: dict[str, Any]) -> Iterable[tuple[str, str]
     yield from _iter_dict_key_refs(params)
 
 
+def _node_missing_references(
+    node: NodeConfig, upstream: SkyulfSchema, optional_keys: set[str]
+) -> Iterable[tuple[str, str]]:
+    """Check finite input fields and account for earlier FeatureMath outputs in operation order."""
+    for field, column in _iter_referenced_columns(node.params):
+        if field not in optional_keys and column not in upstream:
+            yield field, column
+    if node.step_type in {"FeatureMath", "FeatureGeneration", "FeatureGenerationNode"}:
+        yield from _operation_missing_references(node.params, upstream.column_list())
+
+
+def _operation_missing_references(params: dict, existing: list[str]) -> Iterable[tuple[str, str]]:
+    """Treat operation operands as inputs and generated names as subsequent available columns."""
+    operations = params.get("operations", [])
+    if not isinstance(operations, list):
+        return
+    available = list(existing)
+    for index, operation in enumerate(operations):
+        if not isinstance(operation, dict):
+            continue
+        for field, column in _iter_referenced_columns(operation):
+            if column not in available:
+                yield f"operations.{index}.{field}", column
+        available.extend(
+            feature_operation_output_columns(
+                operation, index, available, params.get("allow_overwrite", False)
+            )
+        )
+
+
 def _upstream_schema(
     node: NodeConfig,
     predicted: dict[str, SkyulfSchema | None],
@@ -175,18 +213,15 @@ def find_broken_references(
         upstream_id = node.inputs[0] if node.inputs else None
         step = node.step_type.value if hasattr(node.step_type, "value") else str(node.step_type)
         optional_keys: set[str] = _OPTIONAL_PARAM_KEYS.get(step, set())
-        for field_name, col in _iter_referenced_columns(node.params):
-            if field_name in optional_keys:
-                continue
-            if col not in upstream:
-                broken.append(
-                    {
-                        "node_id": node.node_id,
-                        "field": field_name,
-                        "column": col,
-                        "upstream_node_id": upstream_id,
-                    }
-                )
+        for field_name, col in _node_missing_references(node, upstream, optional_keys):
+            broken.append(
+                {
+                    "node_id": node.node_id,
+                    "field": field_name,
+                    "column": col,
+                    "upstream_node_id": upstream_id,
+                }
+            )
 
     return broken
 
