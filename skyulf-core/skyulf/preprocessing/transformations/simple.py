@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from numbers import Real
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -148,6 +148,11 @@ class SimpleTransformationCalculator(BaseCalculator):
         """Validate requested math methods and save the ordered rules without fitting."""
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
         transformations = config.get("transformations", [])
+        artifact: SimpleTransformationArtifact = {
+            "type": "simple_transformation",
+            "transformations": transformations,
+        }
+        SimpleTransformationApplier.validate_inference_state(cast(dict[str, Any], artifact))
         for item in transformations or []:
             method = item.get("method")
             if not isinstance(method, str) or method not in _PANDAS_OPS:
@@ -155,7 +160,4 @@ class SimpleTransformationCalculator(BaseCalculator):
                     f"Unknown SimpleTransformation method {method!r}. "
                     f"Supported methods: {', '.join(_PANDAS_OPS)}."
                 )
-        return {
-            "type": "simple_transformation",
-            "transformations": transformations,
-        }
+        return artifact
