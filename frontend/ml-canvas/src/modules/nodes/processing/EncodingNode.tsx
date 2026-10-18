@@ -10,6 +10,7 @@ import { useEncodingData } from './encoding/useEncodingData';
 import { EncodingMethodSelection } from './encoding/EncodingMethodSelection';
 import { EncodingMethodOptions } from './encoding/EncodingMethodOptions';
 import { EncodingFeedback } from './encoding/EncodingFeedback';
+import { fixedCategoriesValid } from './encoding/OnehotCategories';
 
 const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: EncodingConfig) => void; nodeId?: string }> = ({
   config,
@@ -45,7 +46,9 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
         <ColumnMultiSelect
           columns={categoricalColumns}
           selected={config.columns}
-          onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+          onChange={(newCols) => { onChange({ ...config, columns: newCols,
+            ...(config.categories === undefined ? {} : { categories: Object.fromEntries(newCols.map(column => [column, config.categories?.[column] ?? []])) }),
+          }); }}
           label="Columns to Encode"
           variant="panel"
           isLoading={isLoading}
@@ -85,6 +88,8 @@ export const EncodingNode: NodeDefinition<EncodingConfig> = {
       return { isValid: false, field: 'columns', message: 'Select at least one column' };
     if (config.method === 'woe' && !config.target_column)
       return { isValid: false, field: 'target_column', message: 'WOE encoding requires a binary target column' };
+    if (!fixedCategoriesValid(config))
+      return { isValid: false, field: 'categories', message: 'Enter unique categories for every selected column' };
     return { isValid: true };
   },
   getDefaultConfig: () => ({

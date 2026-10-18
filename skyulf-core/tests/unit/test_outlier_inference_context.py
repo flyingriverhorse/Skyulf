@@ -115,8 +115,8 @@ def test_winsorize_reuses_saved_quantiles_across_requests(engine, monkeypatch):
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_manual_bounds_reports_prediction_row_loss(engine, monkeypatch):
-    """A row-local filter must not silently drop inputs from an unkeyed prediction request."""
+def test_manual_bounds_probe_reports_exclusions_and_aligns_targets(engine, monkeypatch):
+    """Saved bounds must expose exclusion behavior while keeping survivor labels aligned."""
     record = _record("ManualBounds", engine)
     frame = _frame(engine, [-100, 2, None, 1000, 3])
 
@@ -136,10 +136,12 @@ def test_manual_bounds_reports_prediction_row_loss(engine, monkeypatch):
         project_sha=None,
     )
     assert detail["context"] == "row" and detail["row_effect"] == "filter"
-    assert detail["action"] == "apply" and detail["status"] == "failed"
-    assert detail["checks"][0]["reason"] == "apply_error"
-    assert detail["checks"][0]["error_type"] == "ValueError"
-    assert output is frame
+    assert detail["action"] == "exclude_outliers" and detail["status"] == "passed", detail
+    assert all(check["status"] == "passed" for check in detail["checks"]), detail
+    filtered, targets = record["applier"].apply((frame, np.arange(5)), record["artifact"])
+    assert targets.tolist() == [1, 2, 4]
+    assert output.equals(filtered)
+    np.testing.assert_allclose(output["x"].to_numpy(), [2, np.nan, 3], equal_nan=True)
 
 
 @pytest.mark.parametrize(

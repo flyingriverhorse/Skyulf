@@ -85,10 +85,10 @@ def test_power_contract_inspection_does_not_execute(node, engine, monkeypatch):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("method,bad", [("box-cox", -1.0), ("yeo-johnson", np.inf)])
 @pytest.mark.parametrize("standardize", [False, True])
-def test_power_bad_neighbor_changes_full_request_fallback(
+def test_power_bad_neighbor_rejects_request_without_raw_fallback(
     node, engine, method, bad, standardize, monkeypatch
 ):
-    """A bad neighbor leaves valid rows untransformed, so independent chunks are unsafe."""
+    """Invalid requests fail visibly while conservative global admission remains unchanged."""
     record = _record(node, engine, method, standardize)
     before = artifact_digest(record)
 
@@ -99,10 +99,10 @@ def test_power_bad_neighbor_changes_full_request_fallback(
     monkeypatch.setattr(NodeRegistry.get_calculator(node), "fit", forbidden)
     monkeypatch.setattr(SkPowerTransformer, "fit", forbidden)
     sample = _frame(engine, [2.0, bad])
-    full = record["applier"].apply(sample, record["artifact"])
+    with pytest.raises(ValueError, match=f"{method}.*column.*x"):
+        record["applier"].apply(sample, record["artifact"])
     single = record["applier"].apply(_frame(engine, [2.0]), record["artifact"])
-    assert full["x"].to_numpy()[0] == 2.0
-    assert single["x"].to_numpy()[0] != full["x"].to_numpy()[0]
+    assert single["x"].to_numpy()[0] != 2.0
     detail, output = _probe(record, sample, engine)
     assert detail["context"] == "global" and detail["status"] == "requires_context", detail
     assert output is sample

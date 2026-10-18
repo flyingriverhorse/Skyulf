@@ -47,6 +47,37 @@ beforeEach(() => {
 });
 
 describe('EncodingNode settings behavior', () => {
+  it('edits ordered fixed categories and disables conflicting one-hot options', () => {
+    // Unobserved levels must survive form editing without capping or missing-token substitution.
+    const { onChange } = renderSettings({ columns: ['city'] });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use fixed categories' }));
+    const categories = screen.getByRole('textbox', { name: 'Categories for city' });
+    fireEvent.change(categories, { target: { value: 'Øl\nÅben\nA, B' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Column names' }), { target: { value: 'slug' } });
+    expect(screen.getByRole('spinbutton', { name: 'Max Categories' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Include missing as category' })).toBeDisabled();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      categories: { city: ['Øl', 'Åben', 'A, B'] }, column_names: 'slug',
+      max_categories: null, include_missing: false,
+    }));
+  });
+
+  it('keeps fixed category keys aligned with selected columns and validates empty levels', () => {
+    // Removing a column must not send a stale vocabulary key to Core.
+    const { onChange } = renderSettings({ columns: ['city'], categories: { city: ['a'] }, max_categories: null });
+    fireEvent.click(within(screen.getByRole('group', { name: 'Columns to Encode' })).getByRole('checkbox', { name: 'city' }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ columns: [], categories: {} }));
+    expect(EncodingNode.validate!({ ...EncodingNode.getDefaultConfig(), columns: ['city'], categories: { city: [] }, max_categories: null }).isValid).toBe(false);
+  });
+
+  it('restores automatic categories when fixed vocabularies are disabled', () => {
+    // Returning to learned categories must submit no fixed vocabulary and restore a usable cap.
+    const { onChange } = renderSettings({ columns: ['city'], categories: { city: ['a'] }, max_categories: null });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use fixed categories' }));
+    expect(screen.queryByRole('textbox', { name: 'Categories for city' })).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ categories: undefined, max_categories: 20 }));
+  });
+
   it.each(['__proto__', 'constructor', 'toString', 'unknown-method'])(
     'leaves method-specific content empty for imported unsupported method %s', (method) => {
       // Imported configs may contain arbitrary strings, including inherited object keys.

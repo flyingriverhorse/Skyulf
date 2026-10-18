@@ -14,6 +14,8 @@ from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.inference.pipeline_scoring import scoring_output_schema
+from skyulf.inference.probed_rules import probe_rules
+from skyulf.inference.project_code import fresh_project_module
 from skyulf.integrations.databricks.projects.project import load_project_workflow
 from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 from skyulf.integrations.databricks.training.shared.preprocessing_checks import (
@@ -276,20 +278,42 @@ def build_scoring():
 
 @pytest.mark.parametrize(("limit", "admitted"), [(280.0, True), (297.0, False)])
 def test_output_rules_probe_eligible_rows_from_the_whole_holdout(tmp_path, limit, admitted):
-    """Output rules see the eligible rows of the whole holdout, not of its first 256 rows."""
-    holdout = pd.DataFrame({"x": np.arange(300.0), "target": 0.0})
+    """Output rules use all eligible rows after a representative raw probe clears its guard."""
+    order = np.r_[np.arange(280.0, 296.0), np.arange(280.0), np.arange(296.0, 300.0)]
+    holdout = pd.DataFrame({"x": order, "target": 0.0})
     artifact, path = _fit(
         tmp_path, OUTPUT_RULES.replace("__LIMIT__", str(limit)), extra=["build_scoring"]
     )
     if admitted:
         sealed = seal_partition_probe(artifact, holdout, path, enabled=True)
-        assert [r["name"] for r in _config(sealed)["partition_probe"]["rules"]] == [
-            "small",
-            "band",
-        ]
+        probe = _config(sealed)["partition_probe"]
+        assert [r["name"] for r in probe["rules"]] == ["small", "band"]
+        assert probe["pipeline"]["rows"] == 256
+        assert probe["pipeline"]["scored_rows"] == 16
     else:
         with pytest.raises(ValueError, match=r"Only 3 holdout rows reach this rule; widen"):
             seal_partition_probe(artifact, holdout, path, enabled=True)
+
+
+@pytest.mark.parametrize("leading_eligible", [0, 15])
+def test_raw_pipeline_probe_rejects_too_few_predictions_in_first_256(tmp_path, leading_eligible):
+    """Eligible rows later in the holdout cannot conceal an unrepresentative raw probe sample."""
+    eligible = np.arange(280.0, 300.0)
+    order = np.r_[eligible[:leading_eligible], np.arange(280.0), eligible[leading_eligible:]]
+    holdout = pd.DataFrame({"x": order, "target": 0.0})
+    artifact, path = _fit(
+        tmp_path, OUTPUT_RULES.replace("__LIMIT__", "280.0"), extra=["build_scoring"]
+    )
+    with fresh_project_module(_config(artifact)["project_python_source"]) as fresh:
+        details = probe_rules(
+            artifact, holdout.loc[:, list(artifact.manifest.input_columns)], fresh
+        )
+    assert {rule["name"]: rule["status"] for rule in details} == {
+        "small": "passed",
+        "band": "passed",
+    }
+    with pytest.raises(ValueError, match="Raw pipeline partition probe needs at least 16"):
+        seal_partition_probe(artifact, holdout, path, enabled=True)
 
 
 PACKAGE_INIT = """

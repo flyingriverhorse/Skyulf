@@ -30,9 +30,11 @@ and segment_B.
 | `handle_unknown` | string | ignore | ignore, error | Use all-zero indicators or fail for unseen categories. |
 | `drop_first` | boolean | false | true, false | Omit the first fitted category indicator. |
 | `max_categories` | integer/null | 20 | At least 2; null disables cap. | Limit fitted category width through infrequent grouping. |
-| `prefix_separator` | string | _ | String. | Separate source and category in output names. |
+| `prefix_separator` | string | _ | String. | Retained compatibility option; generated names use `_`. |
 | `drop_original` | boolean | true | true, false | Remove selected source columns. |
 | `include_missing` | boolean | false | true, false | Represent missing values using an escaped category sentinel. |
+| `categories` | mapping/null | null | Each selected column maps to an ordered, nonempty list of unique strings. | Fix the vocabulary, including levels absent from training. Requires explicit columns, `max_categories: null` and `include_missing: false`. |
+| `column_names` | string | sklearn | sklearn, slug | Keep original category text or produce lowercase ASCII category names. |
 
 **Minimal YAML:**
 
@@ -51,6 +53,35 @@ a constant column. Missing-category behavior depends on fitted categories and
 include_missing; enabling it uses an escaped sentinel so literal sentinel text
 and null do not collide. Target selection is excluded. Retained-name collisions
 raise. Context: row for the supported fitted configuration.
+
+**Fixed vocabulary:** Keys must match `columns` exactly. Category list order fixes
+output order; `drop_first: true` removes the first listed level. Inputs must be
+string or categorical columns; numeric values are not converted to strings.
+With `handle_unknown: ignore`, both unknown values and nulls produce zeros.
+With `error`, either raises, so impute missing values first when needed.
+
+```yaml
+- name: fixed_city
+  transformer: OneHotEncoder
+  params:
+    columns: [city]
+    categories:
+      city: ["Øl", "Åben", "Zürich"]
+    column_names: slug
+    max_categories: null
+    include_missing: false
+    handle_unknown: ignore
+```
+
+This emits `city_oel`, `city_aaben`, `city_zurich` even when training omits a
+listed city. `slug` also works with learned categories. It folds `æ/ø/å/ß` to
+`ae/oe/aa/ss`, removes accents, lowercases and replaces punctuation with `_`.
+Empty or duplicate generated names fail clearly. Existing artifacts without
+the new options keep their original names and encoding.
+
+In ML Canvas, select **Use fixed categories** and enter one category per line
+for each selected column. Spaces, commas and order are preserved. The form
+disables the category cap and missing-category option for fixed vocabularies.
 
 ## DummyEncoder
 

@@ -363,6 +363,16 @@ Config:
 - `handle_unknown`: `ignore` | `error` (default ignore)
 - `drop_original`: bool (default True)
 - `include_missing`: bool (default False)
+- `categories`: dict[str, list[str]] or None (default None); ordered unique
+  string levels for every explicit column. Requires `max_categories=None`
+  and `include_missing=False`; numeric inputs are rejected.
+- `column_names`: `sklearn` | `slug` (default sklearn). Slug folds Danish/German
+  letters and accents to lowercase ASCII; empty names and collisions raise.
+
+Fixed vocabularies retain categories absent from training. Unknown and null
+values encode as zeros with `handle_unknown=ignore`, or raise with `error`.
+`drop_first=True` drops the first configured level. Automatic vocabularies
+remain available with either naming mode.
 
 Learned params:
 
@@ -370,6 +380,9 @@ Learned params:
 - `encoder_object` (sklearn OneHotEncoder)
 - `feature_names`: list[str]
 - `drop_original`, `include_missing`
+- `fixed_categories`, `column_names` (optional in saved artifacts; absent means
+  automatic categories and sklearn names). State inspection binds fixed levels,
+  their order and naming mode to the recipe before worker admission.
 
 ### DummyEncoder
 

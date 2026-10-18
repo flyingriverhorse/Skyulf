@@ -296,10 +296,14 @@ class GroupImputerCalculator(BaseCalculator):
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
-    ) -> SkyulfSchema:
-        """Promote filled columns to ``float64`` for mean/median; keep the schema otherwise."""
+    ) -> SkyulfSchema | None:
+        """Describe explicit fills; automatic numeric selection depends on row values."""
         if config.get("strategy", "mean") not in _NUMERIC_STRATEGIES:
             return input_schema
+        if not config.get("columns"):
+            # Automatic selection excludes constant and binary-valued columns,
+            # which cannot be identified from dtypes alone.
+            return None
         return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method

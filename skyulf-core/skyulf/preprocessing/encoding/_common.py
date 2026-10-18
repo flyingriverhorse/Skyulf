@@ -1,6 +1,8 @@
 """Shared helpers and constants for all encoder modules."""
 
 import logging
+import re
+import unicodedata
 from typing import Any
 
 import polars as pl
@@ -8,6 +10,17 @@ import polars as pl
 from ...engines import EngineName, get_engine
 
 logger = logging.getLogger(__name__)
+
+
+def _category_slug(value: str) -> str:
+    """Fold category text to an ASCII name without losing Danish or German letters."""
+    folded = value.lower().translate(str.maketrans({"æ": "ae", "ø": "oe", "å": "aa", "ß": "ss"}))
+    ascii_text = unicodedata.normalize("NFKD", folded).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "_", ascii_text).strip("_")
+    if not slug:
+        raise ValueError(f"OneHotEncoder category {value!r} produces an empty slug.")
+    return slug
+
 
 # Encoders that destroy the original column structure (create N new columns).
 # These must NEVER be applied to a target column.

@@ -2,6 +2,7 @@ import { ValidationField } from '../../../../components/shared/ValidationField';
 import { parseIntSafe } from '../../../../core/utils/numberInput';
 import type { AnalysisProfile } from '../../../../core/api/client';
 import type { EncodingConfig, EncodingSettingsProps } from './types';
+import { OnehotCategories } from './OnehotCategories';
 
 interface EncodingMethodOptionsProps extends EncodingSettingsProps {
   schema: AnalysisProfile | undefined;
@@ -9,6 +10,7 @@ interface EncodingMethodOptionsProps extends EncodingSettingsProps {
 }
 
 function OnehotOptions({ config, onChange }: EncodingSettingsProps) {
+  const fixed = config.categories !== undefined;
   return (
     <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
       <label className="flex items-center gap-2 text-sm">
@@ -44,8 +46,9 @@ function OnehotOptions({ config, onChange }: EncodingSettingsProps) {
           min="2"
           max="200"
           className="w-full p-1 text-sm border rounded"
-          value={config.max_categories ?? 20}
-          onChange={(e) => onChange({ ...config, max_categories: parseIntSafe(e.target.value, config.max_categories) })}
+          value={config.max_categories === null ? '' : (config.max_categories ?? 20)}
+          disabled={fixed}
+          onChange={(e) => onChange({ ...config, max_categories: parseIntSafe(e.target.value, config.max_categories ?? undefined) })}
           title="Caps the number of one-hot columns per feature."
         />
         <p className="text-[10px] text-muted-foreground">Caps columns per feature (default 20).</p>
@@ -54,11 +57,13 @@ function OnehotOptions({ config, onChange }: EncodingSettingsProps) {
         <input
           type="checkbox"
           checked={config.include_missing || false}
+          disabled={fixed}
           onChange={(e) => onChange({ ...config, include_missing: e.target.checked })}
           className="rounded border-gray-300"
         />
         Include missing as category
       </label>
+      <OnehotCategories config={config} onChange={onChange} />
     </div>
   );
 }

@@ -6,8 +6,10 @@ export interface EncodingConfig {
   drop_original?: boolean | undefined;
   handle_unknown?: 'error' | 'ignore' | 'use_encoded_value' | undefined;
   // OneHot specific
-  max_categories?: number | undefined;
+  max_categories?: number | null | undefined;
   include_missing?: boolean | undefined;
+  categories?: Record<string, string[]> | undefined;
+  column_names?: 'sklearn' | 'slug' | undefined;
   // Hash specific
   n_features?: number | undefined;
   // Target specific

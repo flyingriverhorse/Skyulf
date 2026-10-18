@@ -162,9 +162,16 @@ const convertEncoding: NodeConverter = (node) => {
   else if (method === 'woe') stepType = 'WOEEncoder';
   else stepType = 'OneHotEncoder'; // Default
 
-  params = node.data;
+  params = stepType === 'OneHotEncoder' ? onehotParams(node.data) : node.data;
   return { stepType, params };
 };
+
+/** Keep hidden settings from other encoding methods out of the strict fitted contract. */
+function onehotParams(data: Record<string, unknown>): Record<string, unknown> {
+  const allowed = new Set(['columns', 'drop_first', 'max_categories', 'handle_unknown',
+    'prefix_separator', 'drop_original', 'include_missing', 'categories', 'column_names']);
+  return Object.fromEntries(Object.entries(data).filter(([key]) => allowed.has(key)));
+}
 
 const convertTrainTestSplitter: NodeConverter = (node) => {
   const keys = new Set(['test_size', 'validation_size', 'random_state', 'shuffle', 'stratify', 'target_column']);

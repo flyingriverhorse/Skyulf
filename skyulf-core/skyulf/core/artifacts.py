@@ -565,6 +565,8 @@ class OneHotArtifact(TypedDict, total=False):
     drop_original: bool
     include_missing: bool
     missing_encoding_version: int
+    fixed_categories: bool
+    column_names: str
 
 
 class OrdinalArtifact(TypedDict, total=False):
