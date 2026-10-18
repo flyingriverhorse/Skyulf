@@ -36,6 +36,7 @@ const BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES: readonly string[] = [
   'MinMaxScaler',
   'RobustScaler',
   'MaxAbsScaler',
+  'QuantileTransformer',
   // Encoding (category vocabulary / frequency / target statistics;
   // HashEncoder only when it auto-detects its columns — an explicit
   // column list makes it stateless, see isExplicitHashEncoding)
@@ -46,11 +47,15 @@ const BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES: readonly string[] = [
   'TargetEncoder',
   'WOEEncoder',
   'HashEncoder',
+  'FrequencyEncoder',
+  'RareCategoryGrouping',
   // Outlier detection
   'IQR',
   'ZScore',
   'Winsorize',
   'EllipticEnvelope',
+  'IsolationForest',
+  'LocalOutlierFactor',
   // Feature selection
   'VarianceThreshold',
   'CorrelationThreshold',

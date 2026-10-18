@@ -38,6 +38,7 @@ const routes: Record<string, CanvasRoute> = {
   FeatureGenerationNode: { definition: 'FeatureGenerationNode', emitted: 'FeatureMath' },
   FeatureInteraction: { definition: 'FeatureInteractionNode', emitted: 'FeatureInteraction' },
   FeatureMath: { definition: 'FeatureGenerationNode', emitted: 'FeatureMath' },
+  FrequencyEncoder: { definition: 'encoding', emitted: 'FrequencyEncoder', overrides: { method: 'frequency' } },
   GeneralBinning: { definition: 'BinningNode', emitted: 'GeneralBinning' },
   GeneralTransformation: { definition: 'TransformationNode', emitted: 'GeneralTransformation' },
   GeoDistance: { definition: 'GeoDistance', emitted: 'GeoDistance' },
@@ -46,18 +47,23 @@ const routes: Record<string, CanvasRoute> = {
   IQR: { definition: 'outlier', emitted: 'IQR', overrides: { method: 'iqr' } },
   InvalidValueReplacement: { definition: 'InvalidValueReplacement', emitted: 'InvalidValueReplacement' },
   IterativeImputer: { definition: 'imputation_node', emitted: 'IterativeImputer', overrides: { method: 'iterative' } },
+  IsolationForest: { definition: 'outlier', emitted: 'IsolationForest', overrides: { method: 'isolation_forest' } },
   KNNImputer: { definition: 'imputation_node', emitted: 'KNNImputer', overrides: { method: 'knn' } },
   LabelEncoder: { definition: 'encoding', emitted: 'LabelEncoder', overrides: { method: 'label' } },
   LagFeatures: { definition: 'TimeSeriesNode', emitted: 'LagFeatures', overrides: { method: 'lag' } },
+  LocalOutlierFactor: { definition: 'outlier', emitted: 'LocalOutlierFactor', overrides: { method: 'local_outlier_factor' } },
   ManualBounds: { definition: 'outlier', emitted: 'ManualBounds', overrides: { method: 'manual_bounds', columns: ['num_a'] } },
   MaxAbsScaler: { definition: 'scale_numeric_features', emitted: 'MaxAbsScaler', overrides: { method: 'maxabs' } },
   MinMaxScaler: { definition: 'scale_numeric_features', emitted: 'MinMaxScaler', overrides: { method: 'minmax' } },
   MissingIndicator: { definition: 'MissingIndicator', emitted: 'MissingIndicator' },
+  Normalizer: { definition: 'scale_numeric_features', emitted: 'Normalizer', overrides: { method: 'normalize' } },
   OneHotEncoder: { definition: 'encoding', emitted: 'OneHotEncoder', overrides: { method: 'onehot' } },
   OrdinalEncoder: { definition: 'encoding', emitted: 'OrdinalEncoder', overrides: { method: 'ordinal' } },
   Oversampling: { definition: 'ResamplingNode', emitted: 'Oversampling', overrides: { type: 'oversampling' } },
   PolynomialFeatures: { definition: 'PolynomialFeaturesNode', emitted: 'PolynomialFeatures' },
   PolynomialFeaturesNode: { definition: 'PolynomialFeaturesNode', emitted: 'PolynomialFeatures' },
+  QuantileTransformer: { definition: 'scale_numeric_features', emitted: 'QuantileTransformer', overrides: { method: 'quantile' } },
+  RareCategoryGrouping: { definition: 'encoding', emitted: 'RareCategoryGrouping', overrides: { method: 'rare' } },
   RobustScaler: { definition: 'scale_numeric_features', emitted: 'RobustScaler', overrides: { method: 'robust' } },
   RollingAggregate: { definition: 'TimeSeriesNode', emitted: 'RollingAggregate', overrides: { method: 'rolling' } },
   SimpleImputer: { definition: 'imputation_node', emitted: 'SimpleImputer', overrides: { method: 'simple' } },
@@ -126,8 +132,10 @@ describe.each(['bundled', 'registry'])('preprocessing serializer audit with %s m
   });
 
   /** The inventory must account for every registration without silently dropping core-only IDs. */
-  it('covers all 67 registered IDs', () => {
-    expect(new Set(registeredCases.map(testCase => testCase.id)).size).toBe(67);
+  it('covers all 73 registered IDs without duplicates', () => {
+    const ids = registeredCases.map(testCase => testCase.id);
+    expect(new Set(ids).size).toBe(73);
+    expect(ids).toHaveLength(73);
   });
 
   /** Inspect emitted steps and gate decisions, including unsupported canvas spellings explicitly. */
