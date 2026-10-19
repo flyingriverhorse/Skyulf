@@ -93,12 +93,20 @@ change; it does not invent a leaf if the graph has none.
 | Budget | Allowed value | Effect |
 | --- | --- | --- |
 | `max_samples` | 1–200; generated default 100 | Maximum training rows used for SHAP computation. Larger values can be expensive, especially for generic explainers. |
-| `max_features` | 1–100; default 30 | Guard on transformed input width. It does **not** select the top features or drop columns; exceeding it produces `unavailable`. |
+| `max_features` | Positive integer; default 30; no fixed upper bound | Guard on transformed input width. It does **not** select the top features or drop columns; exceeding your configured value produces `unavailable`. |
 | `max_display_samples` | 0–50, no greater than `max_samples`; generated default 3 | Number of saved sample waterfalls. Zero keeps global importance without sample waterfalls. |
 
 Budgets apply per fitted model: eight candidates can each compute an
 explanation. Samples are training inputs transformed with saved preprocessing;
 holdout labels, record keys and time/target metadata are not explanation features.
+
+Set `defaults.explainability.max_features` in `config/training.yml` to cover the
+features produced by preprocessing. For example, four numeric inputs plus 111
+one-hot columns produce 115 model features, so `max_features: 115` admits that
+model. A value such as `200` leaves room for a wider fitted model. The setting
+controls the allowed width, not the number of features displayed in a chart.
+Higher values can increase SHAP computation time and memory use; use
+`max_samples` to choose how many training rows to explain.
 
 Row-independent steps can preprocess only the sampled rows. Steps that need
 other rows, such as `LagFeatures` or `RollingAggregate`, first preprocess the
