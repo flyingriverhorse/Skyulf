@@ -76,18 +76,18 @@ the training rows of each fold, the returned dict is saved with the model, and
 `apply` receives exactly that dict on holdout rows and on batch scoring rows.
 Write `learn` so the dict is plain JSON: strings, numbers, lists, no NaN.
 
-Spark scoring (`inference_mode: spark`) and serving endpoints score independent
+Spark scoring (`batch_compute: spark`) and serving endpoints score independent
 batches. They admit reviewed built-ins and models, plus eligible built-in
 recipes, models, `column_step`/`fitted_step` functions and scoring rules that
 passed the training checks. Reused pre-split filters count as scoring rules;
 training-only filters do not run at prediction time.
 
 Spark and online-feature projects run admission checks automatically, including
-when `defaults.admit_probed_custom_steps` is `false`. Set it to `true` in
+when `defaults.allow_tested_custom_steps` is `false`. Set it to `true` in
 `config/training.yml` for an endpoint-only project. Training lints custom code
 and probes the fitted recipe on bounded holdout rows before sealing evidence
-with its saved code and state. A separate `preprocessing_probe` diagnostic
-report does not grant admission. An `inference_context="row"` declaration is
+with its saved code and state. The separate diagnostics report
+(`save_preprocessing_diagnostics`) does not grant admission. An `inference_context="row"` declaration is
 optional; `group`, `window` and `global` declarations remain unsupported here.
 
 Do not read `df.index` or keep mutable caches in module globals: each worker

@@ -136,7 +136,7 @@ def test_optional_inference_yaml_owns_only_its_fields(tmp_path):
 
     path, _ = _project(tmp_path)
     path.with_name("inference.yml").write_text(
-        "version: 1\ninference_mode: spark\nspark_udf_prediction_batch_rows: 1000\n",
+        "version: 1\nbatch_compute: spark\nspark_udf_prediction_batch_rows: 1000\n",
         encoding="utf-8",
     )
     config = read_workflow_config(path)

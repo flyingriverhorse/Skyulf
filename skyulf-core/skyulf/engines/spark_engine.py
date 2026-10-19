@@ -1,7 +1,10 @@
 """Optional Spark adapter with no session ownership or driver materialization."""
 
 import importlib
+from collections.abc import Iterable
 from typing import Any, NoReturn
+
+import pandas as pd
 
 from .registry import BaseEngine, EngineName, EngineRegistry
 
@@ -24,6 +27,44 @@ def is_spark_input(data: Any) -> bool:
     if isinstance(data, SkyulfSparkWrapper):
         return True
     return any(base.__module__.split(".", 1)[0] == "pyspark" for base in type(data).__mro__)
+
+
+def normalize_spark_decimals(
+    frame: Any, *, columns: Iterable[str] | None = None
+) -> tuple[Any, tuple[dict[str, str], ...]]:
+    """Project actual Spark Decimal model columns to double before pandas transport.
+
+    Callers exclude identity, grouping and time controls. Precision beyond
+    float64's approximately 15–17 significant digits can be lost. No rows are read.
+    """
+    names = None if columns is None else set(columns)
+    fields = getattr(getattr(frame, "schema", None), "fields", ())
+    conversions = tuple(
+        {
+            "column": field.name,
+            "source_dtype": field.dataType.simpleString(),
+            "target_dtype": "float64",
+        }
+        for field in fields
+        if field.dataType.typeName() == "decimal" and (names is None or field.name in names)
+    )
+    if not conversions:
+        return frame, conversions
+    converted = {item["column"] for item in conversions}
+    expressions = []
+    for name in frame.columns:
+        quoted = "`" + name.replace("`", "``") + "`"
+        expressions.append(f"CAST({quoted} AS DOUBLE) AS {quoted}" if name in converted else quoted)
+    return frame.selectExpr(*expressions), conversions
+
+
+def restore_spark_decimal_dtypes(
+    frame: pd.DataFrame, conversions: tuple[dict[str, str], ...]
+) -> pd.DataFrame:
+    """Retain float64 for empty/all-null converted columns and original schema evidence."""
+    result = frame.astype({item["column"]: item["target_dtype"] for item in conversions})
+    result.attrs["source_column_conversions"] = tuple(dict(item) for item in conversions)
+    return result
 
 
 class SkyulfSparkWrapper:

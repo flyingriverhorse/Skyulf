@@ -28,7 +28,7 @@ def test_spark_inference_requires_pandas_training(workflow_config, action):
     """Contradictory training and inference modes fail before any job side effects."""
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
-    with pytest.raises(ValueError, match="inference_mode=spark requires engine=pandas"):
+    with pytest.raises(ValueError, match="batch_compute: spark requires engine: pandas"):
         validate_workflow_config({**workflow_config, "inference_mode": "spark"}, action=action)
     settings = {**workflow_config, "engine": "pandas", "inference_mode": "spark"}
     assert validate_workflow_config(settings, action=action) == settings

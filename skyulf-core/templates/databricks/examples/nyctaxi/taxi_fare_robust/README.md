@@ -1,7 +1,7 @@
 # taxi_fare_robust
 
 New here? Read [START_HERE.md](START_HERE.md) first: it lists what to edit, the
-first train and score, and which guide answers which question. This page maps
+first training and prediction delivery, and which guide answers which question. This page maps
 each setting to the file that owns it.
 
 If your source tables already exist, start with the read-only source check in
@@ -10,8 +10,9 @@ and column contract. If tables do not exist yet, choose `include_source_sql: "tr
 during setup to include an editable `config/sources.sql` starter. The default is
 `"false"`; initialization and deployment never create your source tables.
 
-Skyulf 0.9.4 Bundle: **regression** with **pandas** training and **spark** inference, using **serverless**
-compute. Training and preprocessing fit in one bounded Python process on this compute. Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.
+Skyulf 0.9.4 Bundle: **regression** with **pandas** training and **batch** prediction delivery, using **serverless**
+compute. Training and preprocessing fit in one bounded Python process on this compute.
+Batch scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.
 
 ## Where to make a change
 
@@ -47,7 +48,7 @@ Training defaults to at most **10,000 rows and 64 MiB per Python input read**.
 For a larger source, set `training_sample_rows` in `config/training.yml` to
 sample eligible rows before splitting, or raise `max_rows` and `max_input_mb`
 within your compute's memory budget. Sampling never samples scoring rows.
-Detailed setup asks for the sample limit and optional `preprocessing_probe`.
+Detailed setup asks for the sample limit and optional `save_preprocessing_diagnostics`.
 The probe records diagnostics on at most 256 holdout rows and 8 MiB; Spark and
 endpoint admission checks are a separate requirement.
 
@@ -59,7 +60,8 @@ checkpoint and score only later inserts. Rebuilds preserve that boundary using
 saved prediction keys and recent CDF. CDF-expiry recovery additionally needs the
 original starting snapshot to remain readable.
 The choice cannot be changed on an existing prediction target.
-`python src/tools/preview.py` explains the choice. Scheduled training with a
+`python src/tools/preview.py` explains the choice.
+Scheduled training with a
 `fixed_window` repeatedly reads the same date interval; use `rolling_days` or
 `rolling_calendar` when the interval should advance. Preview also warns about
 this combination; intentional repeated experiments are still allowed.

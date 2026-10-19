@@ -199,7 +199,7 @@ def workflow_lookup_json(config: dict[str, Any]) -> str | None:
     if config.get("engine") != "pandas" or (
         config.get("inference_mode") != "spark" and config.get("online_features") is None
     ):
-        raise ValueError("feature_lookup requires engine=pandas and inference_mode=spark.")
+        raise ValueError("feature_lookup requires engine: pandas and batch_compute: spark.")
     spec = parse_lookup_config(
         value, label=config["target_column"], input_columns=tuple(config["input_columns"])
     )

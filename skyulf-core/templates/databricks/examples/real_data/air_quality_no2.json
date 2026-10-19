@@ -2,7 +2,7 @@
   "project_name": "air_quality_no2",
   "training_layout": "single_model",
   "setup_mode": "detailed",
-  "inference_mode": "spark",
+  "batch_compute": "spark",
   "engine": "pandas",
   "task": "regression",
   "catalog": "workspace",
@@ -33,12 +33,12 @@
   "quality_threshold": "60.0",
   "promotion_policy": "automatic",
   "score_model_selection": "champion",
-  "score_handoff": "after_alias_change",
+  "score_follow_champion": "true",
   "monitoring_catalog": "workspace",
   "monitoring_schema": "skyulf_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
   "shap_max_samples": "64",
   "shap_max_display_samples": "3",
-  "preprocessing_probe": "true"
+  "save_preprocessing_diagnostics": "true"
 }

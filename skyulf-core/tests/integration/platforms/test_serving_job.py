@@ -285,6 +285,7 @@ def test_notebook_entrypoints_return_mappings_for_generated_summary(api, tmp_pat
     )
     dbutils = Mock()
     dbutils.widgets.get.return_value = str(path)
+    dbutils.widgets.getAll.return_value = {}
     result = getattr(api, entrypoint)(None, dbutils)
     assert result == {"status": "DISABLED"}
 

@@ -288,6 +288,25 @@ def _named_inputs(frame: Any, inputs: list) -> Any:
     return functions.struct(*selected)
 
 
+def _normalize_model_values(frame: Any, inputs: list, keys: tuple, binding: dict | None) -> Any:
+    """Normalize numeric model inputs without rounding record or native lookup identities."""
+    from skyulf.engines.spark_engine import normalize_spark_decimals  # noqa: PLC0415
+
+    columns = {name for name, _ in inputs}.difference(keys)
+    if binding is not None:
+        from ...databricks.feature_store.lifecycle_config import (  # noqa: PLC0415
+            deserialize_feature_spec,
+        )
+
+        lookup = deserialize_feature_spec(binding["lookup_spec"])
+        controls = {
+            name for item in lookup.lookups for name in (*item.lookup_key, *item.timestamp_columns)
+        }
+        columns.difference_update(controls)
+    normalized, _ = normalize_spark_decimals(frame, columns=columns)
+    return normalized
+
+
 def predict_spark_pyfunc(
     spark: Any,
     frame: Any,
@@ -319,6 +338,7 @@ def predict_spark_pyfunc(
     _validate_columns(frame, source_inputs, keys, outputs)
     validate_feature_source(frame, artifact)
     _validate_model_keys(artifact, keys, inputs, outputs)
+    frame = _normalize_model_values(frame, inputs, keys, binding)
     package_path, package = _download_package(model_uri, tracking_uri, registry_uri)
     scoring = _scoring_package(artifact, package_path, package)
     _validate_package(scoring, certificate, inputs, outputs)

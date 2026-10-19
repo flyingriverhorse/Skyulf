@@ -18,9 +18,10 @@ import pandas as pd
 
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
-from ....inference.model_set import ModelSetArtifact
-from ....inference.model_set_scoring import model_set_output_schema, predict_model_set
-from ..models.model_set import load_registered_model_set
+from ....inference.fitted_pipeline import ArtifactRuntimeMismatchError
+from ....inference.model_set import ModelSetArtifact, ModelSetManifest
+from ....inference.model_set_scoring import model_set_schema, predict_model_set
+from ..models.model_set import load_registered_model_set, read_registered_model_set_manifest
 from ..registration.registry import ResolvedModel, resolve_model
 from .model_set_challenger import verify_model_set_challenger
 from .promotion import (
@@ -54,6 +55,7 @@ def approve_model_set(
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
     quality_validator: Callable[[ModelSetArtifact], dict[str, Any]] | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> AliasChangeReceipt:
     """Validate a bounded representative frame and explicitly activate one complete set.
 
@@ -80,13 +82,22 @@ def approve_model_set(
             client, resolved, required=artifact.manifest.quality_evidence is not None
         )
         quality = _quality_validation(artifact, expected_champion_version, quality_validator)
+        if allow_unloadable_champion:
+            _require_unloadable_quality(quality, current)
         if quality is not None:
             evidence["quality"] = quality
         if current == resolved.version:
             raise AliasConflictError("Model set is already the current champion.")
         _validate_set_roles(client, resolved.name, current)
         if current is not None:
-            _validated_version(client, resolved.name, current, tracking_uri, registry_uri)
+            _validated_version(
+                client,
+                resolved.name,
+                current,
+                tracking_uri,
+                registry_uri,
+                allow_unloadable_champion=allow_unloadable_champion,
+            )
         digest = _persist_evidence(client, resolved, evidence, tracking_uri)
         receipt, updates = _release_change(client, resolved, current, digest)
         commit_change(
@@ -111,13 +122,13 @@ def _quality_validation(
     if validator is None:
         return None
     result = validator(artifact)
-    _validate_quality_result(result, artifact, expected)
+    _validate_quality_result(result, artifact.manifest, expected)
     return result
 
 
-def _validate_quality_result(result: Any, artifact: ModelSetArtifact, expected: str | None) -> None:
+def _validate_quality_result(result: Any, manifest: ModelSetManifest, expected: str | None) -> None:
     """Reject incomplete or contradictory aggregate decisions."""
-    branches = {c.branch for c in artifact.manifest.components}
+    branches = {c.branch for c in manifest.components}
     if not isinstance(result, dict) or result.get("passed") is not True:
         raise ValueError("Model set quality validation failed.")
     if (
@@ -127,6 +138,16 @@ def _validate_quality_result(result: Any, artifact: ModelSetArtifact, expected: 
         raise ValueError("Model set quality validation differs from baseline or components.")
     if any(value.get("passed") is not True for value in result["components"].values()):
         raise ValueError("Model set component quality validation failed.")
+
+
+def _require_unloadable_quality(quality: dict | None, current: str | None) -> None:
+    """Require explicit candidate quality evidence before admitting old-version metadata."""
+    if current is None:
+        raise ValueError("allow_unloadable_champion needs an existing champion version.")
+    if not quality or quality.get("allow_unloadable_champion") is not True:
+        raise ValueError("allow_unloadable_champion requires explicit passing quality evidence.")
+    if quality.get("reason") != "unloadable_champion_approved":
+        raise ValueError("allow_unloadable_champion requires an unavailable champion comparison.")
 
 
 def _validate_set_roles(client: Any, name: str, current: str | None) -> None:
@@ -180,27 +201,28 @@ def _bounded_frame(frame: pd.DataFrame, max_rows: int, max_bytes: int) -> None:
         raise ValueError("Model set validation frame exceeds its explicit bounds.")
 
 
-def _artifact_identity(resolved: ResolvedModel, artifact: ModelSetArtifact) -> dict[str, Any]:
+def _artifact_identity(resolved: ResolvedModel, manifest: ModelSetManifest) -> dict[str, Any]:
     """Describe the exact executable set without storing producer paths or source data."""
-    source = artifact.directory / "composition.py"
     identity = {
         "kind": "model_set_functional_validation_v1",
         "model_name": resolved.name,
         "model_version": resolved.version,
-        "set_sha256": artifact.manifest.set_sha256,
+        "set_sha256": manifest.set_sha256,
         "components": [
-            {"branch": c.branch, "reference": c.reference.model_dump()}
-            for c in artifact.manifest.components
+            {"branch": c.branch, "reference": c.reference.model_dump()} for c in manifest.components
         ],
-        "input_schema": [c.model_dump() for c in artifact.manifest.input_schema],
-        "output_schema": [c.model_dump() for c in model_set_output_schema(artifact)],
-        "composition_config": artifact.manifest.composition_config,
-        "composition_source_sha256": hashlib.sha256(
-            source.read_bytes() if source.is_file() else b""
-        ).hexdigest(),
+        "input_schema": [c.model_dump() for c in manifest.input_schema],
+        "output_schema": [
+            c.model_dump()
+            for c in model_set_schema(
+                manifest.components, manifest.record_key_schema, manifest.composition_config
+            )
+        ],
+        "composition_config": manifest.composition_config,
+        "composition_source_sha256": manifest.composition_source_sha256,
     }
-    if artifact.manifest.quality_evidence is not None:
-        identity["quality_evidence"] = artifact.manifest.quality_evidence
+    if manifest.quality_evidence is not None:
+        identity["quality_evidence"] = manifest.quality_evidence
     return identity
 
 
@@ -220,7 +242,7 @@ def _validation_evidence(
             raise ValueError(f"Validation data did not exercise model set output {name}.")
         exercised[name] = count
     return {
-        **_artifact_identity(resolved, artifact),
+        **_artifact_identity(resolved, artifact.manifest),
         "row_count": len(frame),
         "dataset_sha256": _frame_digest(frame),
         "output_sha256": _frame_digest(result),
@@ -279,21 +301,21 @@ def _download_evidence(uri: str, digest: str, tracking_uri: str | None) -> dict[
 
 
 def _verify_set_evidence(
-    client: Any, resolved: ResolvedModel, artifact: ModelSetArtifact, tracking_uri: str | None
+    client: Any, resolved: ResolvedModel, manifest: ModelSetManifest, tracking_uri: str | None
 ) -> None:
     """Require durable successful validation bound to this complete package identity."""
     tags = client.get_model_version(resolved.name, resolved.version).tags or {}
     if not tags.get(_PROOF_TAG) or not tags.get(_PATH_TAG):
         raise ValueError("Model set version has no durable validation evidence.")
     evidence = _download_evidence(tags[_PATH_TAG], tags[_PROOF_TAG], tracking_uri)
-    expected = _artifact_identity(resolved, artifact)
+    expected = _artifact_identity(resolved, manifest)
     if any(evidence.get(key) != value for key, value in expected.items()):
         raise ValueError("Model set validation evidence differs from current package identity.")
-    if artifact.manifest.quality_evidence is not None:
+    if manifest.quality_evidence is not None:
         _validate_quality_result(
             evidence.get("quality"),
-            artifact,
-            artifact.manifest.quality_evidence["expected_champion_version"],
+            manifest,
+            manifest.quality_evidence["expected_champion_version"],
         )
     _verify_exercised_predictions(evidence)
 
@@ -306,16 +328,35 @@ def _verify_exercised_predictions(evidence: dict[str, Any]) -> None:
 
 
 def _validated_version(
-    client: Any, name: str, version: str, tracking_uri: str | None, registry_uri: str | None
+    client: Any,
+    name: str,
+    version: str,
+    tracking_uri: str | None,
+    registry_uri: str | None,
+    *,
+    allow_unloadable_champion: bool = False,
 ) -> None:
     """Verify the set kind, complete bytes and functional evidence for a pinned version."""
     resolved = resolve_model(
         name, version=version, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
-    artifact = load_registered_model_set(
-        resolved, tracking_uri=tracking_uri, registry_uri=registry_uri
-    )
-    _verify_set_evidence(client, resolved, artifact, tracking_uri)
+    try:
+        artifact = load_registered_model_set(
+            resolved, tracking_uri=tracking_uri, registry_uri=registry_uri
+        )
+    except ArtifactRuntimeMismatchError:
+        if not allow_unloadable_champion:
+            raise
+        manifest = read_registered_model_set_manifest(
+            resolved, tracking_uri=tracking_uri, registry_uri=registry_uri
+        )
+    else:
+        if allow_unloadable_champion:
+            raise ValueError(
+                "allow_unloadable_champion applies only when the champion cannot be loaded."
+            )
+        manifest = artifact.manifest
+    _verify_set_evidence(client, resolved, manifest, tracking_uri)
 
 
 class _ValidationAdmission:

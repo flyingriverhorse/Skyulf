@@ -4,8 +4,9 @@ Read this page first. It takes **taxi_fare_online** from setup to a trained
 model and a scored table; the other Markdown files answer later questions.
 
 This project trains one model for one target and registers it as a candidate.
-Training runs **pandas** in one bounded Python process; scoring uses
-**local** inference. Run every command beside `databricks.yml`.
+Training runs **pandas** in one bounded Python process.
+Batch scoring uses **single_node** batch compute.
+Run every command beside `databricks.yml`.
 
 ## Before the first run
 

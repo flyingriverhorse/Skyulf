@@ -230,7 +230,7 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
         tmp_path,
         training_layout=layout,
         compute_mode=compute,
-        auto_rebuild_on_cdf_expiry=enabled,
+        rescore_when_history_expires=enabled,
     )
     config = _read_validated_config(project)
     assert config["auto_rebuild_on_cdf_expiry"] is (enabled == "true")
@@ -506,7 +506,7 @@ def test_multi_target_output_selection_renders_custom_destinations(tmp_path, mod
         tmp_path,
         training_layout="multi_target",
         model_set_name="business_models",
-        source_change_policy="rebuild_on_change",
+        on_source_change="rescore_all",
         model_set_output_mode=mode,
         model_set_table_name="business_predictions",
         model_view_prefix="estimates",
@@ -1177,7 +1177,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
         tmp_path,
         score_model_selection=selection,
         promotion_policy=policy,
-        score_handoff=handoff,
+        score_follow_champion=str(handoff == "after_alias_change").lower(),
         compute_mode=compute,
         engine="polars" if policy == "automatic" else "pandas",
         quality_threshold="100.0",

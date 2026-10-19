@@ -40,7 +40,17 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.train_permissions}
 {{end}}
-        score:
+{{if ne .prediction_delivery "batch"}}        serving_endpoint:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+          permissions: ${var.serving_permissions}
+{{end}}{{if ne .prediction_delivery "endpoint"}}        score:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
             service_principal_name: ${var.shared_service_principal}
@@ -52,7 +62,7 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.score_permissions}
 {{end}}
-        monitoring:
+{{end}}        monitoring:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
             service_principal_name: ${var.shared_service_principal}
@@ -95,9 +105,9 @@ targets:
       jobs:
         train:
           name: train
-        score:
+{{if ne .prediction_delivery "endpoint"}}        score:
           name: score
-        monitoring:
+{{end}}        monitoring:
           name: monitoring
 {{if .monitoring_catalog}}
         monitoring_cleanup:
@@ -121,7 +131,7 @@ targets:
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}
-{{if eq .scoring_mode "scheduled"}}
+{{if and (ne .prediction_delivery "endpoint") (eq .scoring_mode "scheduled")}}
       scoring_pause_status: PAUSED
 {{end}}
 {{end}}
@@ -162,7 +172,17 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.train_permissions}
 {{end}}
-        score:
+{{if ne .prediction_delivery "batch"}}        serving_endpoint:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+          permissions: ${var.serving_permissions}
+{{end}}{{if ne .prediction_delivery "endpoint"}}        score:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
             service_principal_name: ${var.shared_service_principal}
@@ -174,7 +194,7 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.score_permissions}
 {{end}}
-        monitoring:
+{{end}}        monitoring:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
             service_principal_name: ${var.shared_service_principal}
@@ -217,9 +237,9 @@ targets:
       jobs:
         train:
           name: train
-        score:
+{{if ne .prediction_delivery "endpoint"}}        score:
           name: score
-        monitoring:
+{{end}}        monitoring:
           name: monitoring
 {{if .monitoring_catalog}}
         monitoring_cleanup:
@@ -243,7 +263,7 @@ targets:
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}
-{{if eq .scoring_mode "scheduled"}}
+{{if and (ne .prediction_delivery "endpoint") (eq .scoring_mode "scheduled")}}
       scoring_pause_status: PAUSED
 {{end}}
 {{end}}
@@ -284,7 +304,17 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.train_permissions}
 {{end}}
-        score:
+{{if ne .prediction_delivery "batch"}}        serving_endpoint:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+          permissions: ${var.serving_permissions}
+{{end}}{{if ne .prediction_delivery "endpoint"}}        score:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
             service_principal_name: ${var.shared_service_principal}
@@ -296,7 +326,7 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.score_permissions}
 {{end}}
-        monitoring:
+{{end}}        monitoring:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
             service_principal_name: ${var.shared_service_principal}
@@ -339,9 +369,9 @@ targets:
       jobs:
         train:
           name: train
-        score:
+{{if ne .prediction_delivery "endpoint"}}        score:
           name: score
-        monitoring:
+{{end}}        monitoring:
           name: monitoring
 {{if .monitoring_catalog}}
         monitoring_cleanup:
@@ -365,7 +395,7 @@ targets:
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}
-{{if eq .scoring_mode "scheduled"}}
+{{if and (ne .prediction_delivery "endpoint") (eq .scoring_mode "scheduled")}}
       scoring_pause_status: PAUSED
 {{end}}
 {{end}}

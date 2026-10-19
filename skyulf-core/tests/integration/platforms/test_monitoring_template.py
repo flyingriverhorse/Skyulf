@@ -55,7 +55,7 @@ def test_generated_projects_bind_independent_monitoring_destination(
     project = _generate_project(
         tmp_path,
         training_layout=layout,
-        auto_rebuild_on_cdf_expiry=recovery,
+        rescore_when_history_expires=recovery,
         compute_mode=compute,
         monitoring_catalog=catalog,
         monitoring_schema=schema,

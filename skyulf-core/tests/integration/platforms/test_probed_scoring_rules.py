@@ -253,7 +253,7 @@ def test_changed_rule_params_invalidate_evidence(tmp_path):
 def test_rules_without_evidence_are_rejected(tmp_path):
     """A local project's rules were never probed, so Spark and endpoints reject them."""
     artifact = _sealed(tmp_path, enabled=False)
-    with pytest.raises(UnsupportedExecutionError, match="admit_probed_custom_steps: true"):
+    with pytest.raises(UnsupportedExecutionError, match="allow_tested_custom_steps: true"):
         require_partition_safe_pipeline(artifact)
 
 

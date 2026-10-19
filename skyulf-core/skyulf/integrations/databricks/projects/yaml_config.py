@@ -10,18 +10,42 @@ from typing import Any
 from ._project_files import modeling_hook, read_source
 from .workflow_config import WORKFLOW_FIELDS
 
+# Public YAML option -> (internal workflow key, public value -> internal value; None = boolean).
+# Only YAML uses the public names; runtime code and persisted values keep the internal spelling.
+INFERENCE_OPTIONS = {
+    "follow_champion": ("score_handoff", {True: "after_alias_change", False: "disabled"}),
+    "on_model_change": (
+        "model_change_mode",
+        {"score_new_rows": "incremental_append", "rescore_all": "full_rebuild"},
+    ),
+    "rescore_when_history_expires": ("auto_rebuild_on_cdf_expiry", None),
+    "batch_compute": ("inference_mode", {"single_node": "local", "spark": "spark"}),
+}
+TRAINING_OPTIONS = {
+    "save_preprocessing_diagnostics": ("preprocessing_probe", None),
+    "allow_tested_custom_steps": ("admit_probed_custom_steps", None),
+}
+MODEL_SET_OPTIONS = {
+    "on_source_change": (
+        "source_change_policy",
+        {"stop": "reject", "rescore_all": "rebuild_on_change"},
+    )
+}
+_INTERNAL_OPTIONS = {
+    internal
+    for options in (INFERENCE_OPTIONS, TRAINING_OPTIONS)
+    for internal, _ in options.values()
+}
 INFERENCE_FIELDS = {
+    "prediction_delivery",
     "initial_scoring",
-    "inference_mode",
     "spark_udf_env_manager",
     "spark_udf_prediction_batch_rows",
     "score_source_table",
     "prediction_table",
     "model_version",
-    "model_change_mode",
-    "auto_rebuild_on_cdf_expiry",
     "score_model_selection",
-    "score_handoff",
+    *INFERENCE_OPTIONS,
 }
 MODEL_FIELDS = {
     "model",
@@ -35,6 +59,7 @@ MODEL_FIELDS = {
 TRAINING_FIELDS = (
     WORKFLOW_FIELDS
     - INFERENCE_FIELDS
+    - _INTERNAL_OPTIONS
     - {
         "pipeline",
         "competition",
@@ -43,7 +68,7 @@ TRAINING_FIELDS = (
         "reserved_weight_columns",
         "pre_split_steps",
     }
-)
+) | set(TRAINING_OPTIONS)
 TUNING_FIELDS = {
     "strategy",
     "metric",
@@ -159,6 +184,27 @@ def _fields(value: Any, allowed: set[str], label: str) -> dict[str, Any]:
     return value
 
 
+def _internal_options(value: dict[str, Any], options: dict, label: str) -> dict[str, Any]:
+    """Replace validated public option names and values with their internal workflow form."""
+    result = dict(value)
+    for public, (internal, choices) in options.items():
+        if public not in result:
+            continue
+        option = result.pop(public)
+        if choices is None:
+            if type(option) is not bool:
+                raise ValueError(f"{label} {public} must be true or false.")
+            result[internal] = option
+            continue
+        # type() check keeps YAML true/false and 1/0 distinct from each other.
+        match = [key for key in choices if type(key) is type(option) and key == option]
+        if not match:
+            allowed = ", ".join(json.dumps(key) for key in choices)
+            raise ValueError(f"{label} {public} must be one of: {allowed}.")
+        result[internal] = choices[match[0]]
+    return result
+
+
 def _version(document: dict[str, Any], label: str) -> None:
     """Version YAML independently from the existing workflow runtime contract."""
     if type(document.get("version")) is not int or document["version"] != 1:
@@ -189,15 +235,18 @@ def read_training_config(directory: str | Path) -> dict[str, Any] | None:
     )
     _version(document, path.name)
     defaults = _model_entry(document.get("defaults", {}), "training defaults")
+    defaults = _internal_options(defaults, TRAINING_OPTIONS, "training defaults")
     models = document.get("models")
     if type(models) is not dict or not models:
         raise ValueError("training.yml models must be a nonempty named mapping.")
+    models = dict(models)
     for name, value in models.items():
         if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", name) is None:
             raise ValueError("YAML model names need a letter and safe ASCII characters.")
         entry = _model_entry(value, f"model {name}")
         if "model" not in defaults and "model" not in entry:
             raise ValueError(f"model {name} requires model.type or a shared default model.")
+        models[name] = _internal_options(entry, TRAINING_OPTIONS, f"model {name}")
     pipeline = _training_pipeline(document, [defaults, *models.values()])
     return {"version": 1, "defaults": defaults, "models": models, "pipeline": pipeline}
 
@@ -235,10 +284,26 @@ def read_inference_config(directory: str | Path) -> dict[str, Any] | None:
         read_yaml_mapping(path), INFERENCE_FIELDS | {"version", "model_set"}, path.name
     )
     _version(document, path.name)
+    if document.get("prediction_delivery") == "endpoint":
+        _fields(
+            document,
+            {"version", "prediction_delivery", "score_source_table", "model_set"},
+            path.name,
+        )
+    document = _internal_options(document, INFERENCE_OPTIONS, path.name)
     if "model_set" in document:
         from ..model_sets.model_set_project import validate_model_set_settings  # noqa: PLC0415
 
-        validate_model_set_settings(document["model_set"])
+        if type(document["model_set"]) is dict:
+            # Unknown keys, including the internal source_change_policy, still fail validation.
+            if "source_change_policy" in document["model_set"]:
+                raise ValueError("Unknown model-set setting: source_change_policy.")
+            document["model_set"] = _internal_options(
+                document["model_set"], MODEL_SET_OPTIONS, "inference.yml model_set"
+            )
+        validate_model_set_settings(
+            document["model_set"], prediction_delivery=document.get("prediction_delivery", "batch")
+        )
     return document
 
 
@@ -366,4 +431,11 @@ def read_workflow_config(path: str | Path) -> dict[str, Any]:
         )
         if "model_set" in inference:
             _check_python_owners(path.parent.parent, ("model_set.py",), "inference.yml")
+    if config.get("prediction_delivery") == "endpoint":
+        for key, value in {
+            "score_handoff": "disabled",
+            "score_model_selection": "champion",
+            "model_change_mode": "incremental_append",
+        }.items():
+            config.setdefault(key, value)
     return config

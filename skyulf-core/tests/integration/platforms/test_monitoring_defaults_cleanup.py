@@ -65,7 +65,7 @@ def test_cleanup_job_has_independent_clock_and_existing_monitoring_identity(tmp_
         deployment_identity=identity,
         manage_job_permissions="true",
         personal_development_targets="true",
-        auto_rebuild_on_cdf_expiry="true",
+        rescore_when_history_expires="true",
     )
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
     assert variables["monitoring_cleanup_cron"]["default"] == "0 0 4 ? * SUN"

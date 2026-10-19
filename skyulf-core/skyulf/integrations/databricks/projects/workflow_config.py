@@ -17,6 +17,7 @@ from ..lifecycle.workflow import (
     training_settings,
     training_spec,
     training_window_mode,
+    workflow_table_fields,
 )
 from ..observability.charts.evaluation_chart_data import chart_settings
 from ..observability.reports.explanations import validate_explanation_config
@@ -30,7 +31,10 @@ from ..training.tuning.search import base_model_config, prepare_search_pipeline
 from ..training.weights.weight_config import WEIGHT_FIELDS, validate_weight_roles
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
+# Preview shows the public inference.yml spelling (see yaml_config.INFERENCE_OPTIONS).
+_PUBLIC_MODEL_CHANGE = {"incremental_append": "score_new_rows", "full_rebuild": "rescore_all"}
 WORKFLOW_FIELDS = {
+    "prediction_delivery",
     "initial_scoring",
     "preprocessing_probe",
     "admit_probed_custom_steps",
@@ -206,7 +210,7 @@ def _validate_inference_settings(config: dict[str, Any]) -> None:
         else "local"
     )
     if mode == "spark" and config["engine"] != "pandas":
-        raise ValueError("inference_mode=spark requires engine=pandas.")
+        raise ValueError("batch_compute: spark requires engine: pandas.")
     if "spark_udf_env_manager" in config:
         _choice(config, "spark_udf_env_manager", {"local", "virtualenv"})
     batch = config.get("spark_udf_prediction_batch_rows", 10000)
@@ -216,11 +220,11 @@ def _validate_inference_settings(config: dict[str, Any]) -> None:
 
 def _validate_workflow_sources(config: dict[str, Any]) -> None:
     """Validate source names, input limits and column roles before any reader opens."""
-    for key in ("training_table", "score_source_table", "prediction_table", "model_name"):
+    for key in workflow_table_fields(config):
         value = config.get(key)
         if not isinstance(value, str) or not TABLE_NAME_PATTERN.fullmatch(value):
             raise ValueError(f"{key} must be a resolved three-part Unity Catalog name.")
-    if config["prediction_table"].casefold() in {
+    if config.get("prediction_table", "").casefold() in {
         config[key].casefold() for key in ("training_table", "score_source_table")
     }:
         raise ValueError("prediction_table must not overwrite a training/scoring source.")
@@ -325,6 +329,7 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     actions use their own pinned data.
     """
     _validate_workflow_fields(config, action)
+    _validate_delivery(config, action)
     chart_settings(config.get("evaluation_charts"))
     _validate_layout(config, action)
     task = _choice(config, "task", {"regression", "classification"})
@@ -365,10 +370,30 @@ def validate_project_settings(config: dict[str, Any]) -> dict[str, Any]:
     Python recipe is loaded. Shared training dates and CV holdout rules still
     need their actual configured values checked during static smoke validation.
     """
-    checked = validate_workflow_config(config, action="score")
+    action = "approve" if config.get("prediction_delivery") == "endpoint" else "score"
+    checked = validate_workflow_config(config, action=action)
     _training_contract(checked, "train")
     _validate_bundle_cv_holdout(checked, CVSpec.from_workflow(checked))
     return checked
+
+
+def _validate_delivery(config: dict[str, Any], action: str) -> None:
+    """Keep endpoint-only projects free of batch writes and contradictory handoff settings."""
+    delivery = (
+        _choice(config, "prediction_delivery", {"batch", "endpoint", "both"})
+        if "prediction_delivery" in config
+        else "batch"
+    )
+    if delivery != "batch" and config.get("engine") != "pandas":
+        raise ValueError("Endpoint delivery requires engine=pandas.")
+    if delivery != "endpoint":
+        return
+    if action == "score":
+        raise ValueError("prediction_delivery=endpoint does not allow batch scoring.")
+    if "prediction_table" in config or config.get("score_handoff", "disabled") != "disabled":
+        raise ValueError(
+            "Endpoint-only delivery cannot configure a prediction_table or follow_champion."
+        )
 
 
 def _validate_layout(config: dict[str, Any], action: str) -> None:
@@ -445,6 +470,10 @@ def _preview_training_source(checked: dict[str, Any], training_status: str) -> l
         f"Training source: {checked['training_table']} @ {version}",
         f"Record keys: {', '.join(checked['record_key_columns'])}",
         f"Features: {', '.join(checked['input_columns'])} | Target: {checked['target_column']}",
+        "Spark DECIMAL model inputs are converted to float64. "
+        "Converted columns: unknown until the source schema is read. "
+        "The completed training report and model manifest record the actual list.",
+        "Converting DECIMAL to float64 may lose precision beyond roughly 15-17 significant digits.",
         f"Source selection: {window} | Event column: {checked.get('event_column')}",
         f"Window: {observation_window}",
         f"Calendar: {checked.get('monthly_lookback_months')} months, "
@@ -509,10 +538,25 @@ def _preview_model_and_scoring(checked: dict[str, Any], cv: CVSpec) -> list[str]
         f"Minimum scored fraction: {checked.get('min_scored_fraction', 0.90)}",
         f"Maximum coverage drop (fraction): {checked.get('max_coverage_drop', 0.05)}",
         f"Additional quality gates: {json.dumps(checked.get('quality_gates') or {}, sort_keys=True)}",
-        f"Scoring source: {checked['score_source_table']}",
-        f"Score model: {checked['model_name']} | {checked['score_model_selection']} | "
-        f"pin={checked.get('model_version')} | handoff={checked['score_handoff']}",
-        f"Prediction output: {checked['prediction_table']} | {checked['model_change_mode']}",
+        *_preview_delivery(checked),
+    ]
+
+
+def _preview_delivery(config: dict[str, Any]) -> list[str]:
+    """Describe only the generated delivery routes and their actual destinations."""
+    if config.get("prediction_delivery") == "endpoint":
+        return [
+            "Prediction delivery: endpoint only; no batch score job or Delta prediction table.",
+            f"Endpoint smoke source: {config['score_source_table']}",
+            "Endpoint model/version, payload logging and handoff: config/serving.yml.",
+        ]
+    return [
+        f"Scoring source: {config['score_source_table']}",
+        f"Score model: {config['model_name']} | {config['score_model_selection']} | "
+        f"pin={config.get('model_version')} | "
+        f"follow_champion={str(config['score_handoff'] == 'after_alias_change').lower()}",
+        f"Prediction output: {config['prediction_table']} | on_model_change="
+        f"{_PUBLIC_MODEL_CHANGE[config['model_change_mode']]}",
         "Scoring is never sampled. Validate source values and worker dependencies separately.",
     ]
 
@@ -635,7 +679,10 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
             "later runs score only new inserts. Rebuilds retain the original boundary "
             "using saved keys and recent CDF. CDF-expiry recovery needs the original snapshot."
         )
-    elif checked["score_source_table"].casefold() == checked["training_table"].casefold():
+    elif (
+        checked.get("prediction_delivery") != "endpoint"
+        and checked["score_source_table"].casefold() == checked["training_table"].casefold()
+    ):
         lines.append(
             "Warning: training and scoring use the same source; initial scoring includes training history. "
             "Its performance is not an independent production measurement."

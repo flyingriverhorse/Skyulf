@@ -78,7 +78,9 @@ def load_project_model_set(
     settings = declared if declared is not None else _python_set_settings(path)
     if settings is None:
         return None
-    validate_model_set_settings(settings)
+    validate_model_set_settings(
+        settings, prediction_delivery=base.get("prediction_delivery", "batch")
+    )
     bindings = {
         key: values[key]
         for key in (
@@ -117,9 +119,11 @@ def _python_set_settings(path: Path) -> dict[str, Any] | None:
     return factory()
 
 
-def validate_model_set_settings(settings: Any) -> None:
+def validate_model_set_settings(settings: Any, *, prediction_delivery: str = "batch") -> None:
     """Separate editable destinations from rules captured only during training."""
     required = {"model_name", "prediction_table"}
+    if prediction_delivery == "endpoint":
+        required.remove("prediction_table")
     optional = {
         "composition_config",
         "combined_rules_path",
@@ -167,8 +171,8 @@ def _set_policy(bound: dict[str, Any]) -> None:
         "score_handoff"
     ] not in {"disabled", "after_alias_change"}:
         raise ValueError(
-            "Model sets require manual_approval or automatic and score_handoff "
-            "disabled or after_alias_change."
+            "Model sets require promotion_policy manual_approval or automatic "
+            "and a boolean follow_champion."
         )
 
 
@@ -448,10 +452,17 @@ def package_training_model_set(
 
 def _composition_sample(source: Any, manifest: Any) -> Any:
     """Collect up to 256 source rows with the set's keys and inputs for the probe."""
+    from skyulf.engines.spark_engine import (  # noqa: PLC0415
+        normalize_spark_decimals,
+        restore_spark_decimal_dtypes,
+    )
+
     names = list(dict.fromkeys(column.name for column in manifest.input_schema))
     keys = list(manifest.record_key_columns)
     # Ordered by record keys so retrying the same training run probes the same rows.
-    return source.select(*names).orderBy(*keys).limit(256).toPandas()
+    selected = source.select(*names).orderBy(*keys).limit(256)
+    selected, conversions = normalize_spark_decimals(selected, columns=set(names).difference(keys))
+    return restore_spark_decimal_dtypes(selected.toPandas(), conversions)
 
 
 def _log_training_set_package(
@@ -546,11 +557,8 @@ def run_model_set_operator(
     from ...mlflow.lifecycle.model_set_lifecycle import rollback_model_set  # noqa: PLC0415
 
     action = values["lifecycle_action"]
-    if options.get("allow_unloadable_champion"):
-        raise ValueError(
-            "allow_unloadable_champion is not supported for model sets; approve the set with "
-            "the Core release that produced its champion."
-        )
+    if options.get("allow_unloadable_champion") and action != "approve":
+        raise ValueError("allow_unloadable_champion is supported only for approve.")
     config = validate_workflow_config(
         read_notebook_config(values) if config is None else config, action=action
     )
@@ -598,6 +606,7 @@ def run_model_set_operator(
             config,
             expected_champion_version=options["expected_champion_version"],
             policy="manual_approval",
+            allow_unloadable_champion=options.get("allow_unloadable_champion", False),
         )
     else:
         raise ValueError("Model sets support train, approve, reject and rollback.")
@@ -608,9 +617,10 @@ def _set_decision_actions(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
     """Offer approval only for a passing pending set; rejection needs no passing gates."""
     candidate = payload.get("model_set_candidate")
     quality = payload.get("quality") or {}
+    recovery = quality.get("unloadable_champion_approval_allowed", False)
     if (
         not candidate
-        or payload.get("promotion_policy") != "manual_approval"
+        or (payload.get("promotion_policy") != "manual_approval" and not recovery)
         or payload.get("alias_change") is not None
         or "passed" not in quality
     ):
@@ -619,8 +629,18 @@ def _set_decision_actions(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
         "candidate_version": str(candidate["version"]),
         "expected_champion_version": quality.get("expected_champion_version") or "none",
     }
-    actions = {"approve": {"lifecycle_action": "approve", **evidence}} if quality["passed"] else {}
+    actions = _set_approval_action(evidence, quality["passed"], recovery)
     return {**actions, "reject": {"lifecycle_action": "reject", **evidence}}
+
+
+def _set_approval_action(evidence: dict, passed: bool, recovery: bool) -> dict:
+    """Add explicit recovery consent only when the saved decision permits that action."""
+    if not passed and not recovery:
+        return {}
+    parameters = {"lifecycle_action": "approve", **evidence}
+    if recovery:
+        parameters["allow_unloadable_champion"] = "true"
+    return {"approve": parameters}
 
 
 def set_operator_actions(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
@@ -643,9 +663,11 @@ def render_model_set_result(payload: dict[str, Any]) -> str:
     raw = html.escape(json.dumps(payload, indent=2, default=str, allow_nan=False))
     if "noop" not in payload:
         receipt = payload.get("alias_change") or payload.get("receipt") or {}
+        actions = set_operator_actions(payload)
         return (
             "<h2>Model set result</h2>"
-            + render_operator_options(set_operator_actions(payload), receipt)
+            + render_operator_options(actions, receipt)
+            + _recovery_command(actions)
             + "<h3>Decision details (JSON)</h3><pre>"
             + raw
             + "</pre>"
@@ -663,6 +685,22 @@ def render_model_set_result(payload: dict[str, Any]) -> str:
         + "<details><summary>Technical details (JSON)</summary><pre>"
         + raw
         + "</pre></details>"
+    )
+
+
+def _recovery_command(actions: dict[str, dict[str, str]]) -> str:
+    """Print the pinned recovery parameters using the Bundle CLI job parameter syntax."""
+    parameters = actions.get("approve", {})
+    if parameters.get("allow_unloadable_champion") != "true":
+        return ""
+    command = "databricks bundle run train -t <target> --params " + ",".join(
+        f"{key}={value}" for key, value in parameters.items()
+    )
+    return (
+        "<p>Replace &lt;target&gt; with the target that produced this candidate. "
+        "Run only after reviewing every component's absolute quality gates.</p><pre>"
+        + html.escape(command)
+        + "</pre>"
     )
 
 

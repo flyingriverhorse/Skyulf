@@ -1,4 +1,39 @@
 {
+  "prediction_delivery": {
+    "order": 3.1,
+    "type": "string",
+    "default": "batch",
+    "enum": ["batch", "endpoint", "both"],
+    "description": "1. Data | Prediction delivery: batch writes predictions to Delta tables; endpoint provides SQL ai_query, REST and Python calls; both includes both jobs. Endpoint delivery requires pandas and supports single models, competitions and model sets. Endpoint compute is billed separately; payload logging is optional.",
+    "skip_prompt_if": {"properties": {"engine": {"const": "polars"}}}
+  },
+  "serving_follow_champion": {
+    "order": 903.5,
+    "type": "string",
+    "default": "true",
+    "enum": ["true", "false"],
+    "description": "Model serving | Update the endpoint automatically when a new champion is approved? true submits updates in production Bundle mode; false leaves manual bundle run serving_endpoint. Batch scoring remains independent.",
+    "skip_prompt_if": {"properties": {"prediction_delivery": {"const": "batch"}}}
+  },
+  "serving_endpoint_logging_mode": {
+    "order": 903.6,
+    "type": "string",
+    "default": "disabled",
+    "enum": ["disabled", "telemetry", "ai_gateway"],
+    "description": "Model serving | Capture request/response payloads? disabled creates no inference table; SQL, REST and SDK still work. telemetry captures requests for monitoring; ai_gateway requires workspace support. Existing endpoints cannot silently switch logging mode.",
+    "skip_prompt_if": {"properties": {"prediction_delivery": {"const": "batch"}}}
+  },
+  "serving_endpoint_logging_table_prefix": {
+    "order": 903.7,
+    "type": "string",
+    "default": "",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "description": "Model serving | Inference table prefix; blank uses <project_name>_serving plus the development suffix. Keep distinct from online-feature endpoint logging.",
+    "skip_prompt_if": {"anyOf": [
+      {"properties": {"prediction_delivery": {"const": "batch"}}},
+      {"properties": {"serving_endpoint_logging_mode": {"const": "disabled"}}}
+    ]}
+  },
   "include_daily_rollout": {
     "order": 904,
     "type": "string",

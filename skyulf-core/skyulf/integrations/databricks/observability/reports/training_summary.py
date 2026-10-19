@@ -101,6 +101,7 @@ def _data_cell(documents: dict, origin: str, run_path: str) -> str:
         ("Pre-split removed", filters.get("excluded_rows")),
     ):
         lines.append(escape(f"{label}: {value if value is not None else 'Unavailable'}"))
+    lines.append(_conversion_cell(data))
     lines.extend(
         _artifact_link(origin, run_path, path)
         for path in (
@@ -111,6 +112,28 @@ def _data_cell(documents: dict, origin: str, run_path: str) -> str:
         if documents.get(path) is not None
     )
     return "<br>".join(lines)
+
+
+def _conversion_cell(data: dict) -> str:
+    """Show performed casts from saved evidence without inferring missing source types."""
+    conversions = data.get("source_column_conversions")
+    if not isinstance(conversions, list):
+        return "Decimal conversions: not recorded"
+    if not conversions:
+        return "Decimal conversions: none"
+    try:
+        lines = [
+            escape(f"{str(item['column'])[:120]}: {item['source_dtype']} -> {item['target_dtype']}")
+            for item in conversions[:10]
+        ]
+    except (KeyError, TypeError):
+        return "Decimal conversions: not recorded"
+    if len(conversions) > 10:
+        lines.append("See training_data.json for additional conversions")
+    return (
+        "Decimal conversions:<br>" + "<br>".join(lines) + "<br>"
+        "Converting DECIMAL to float64 may lose precision beyond roughly 15-17 significant digits."
+    )
 
 
 def _optional_cell(

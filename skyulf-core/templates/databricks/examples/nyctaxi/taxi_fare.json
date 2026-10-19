@@ -2,7 +2,7 @@
   "project_name": "taxi_fare",
   "training_layout": "single_model",
   "setup_mode": "detailed",
-  "inference_mode": "spark",
+  "batch_compute": "spark",
   "engine": "pandas",
   "task": "regression",
   "catalog": "workspace",
@@ -23,12 +23,12 @@
   "regression_search_metric": "rmse",
   "score_model_selection": "champion",
   "promotion_policy": "automatic",
-  "score_handoff": "after_alias_change",
+  "score_follow_champion": "true",
   "regression_metric": "heldout_rmse",
   "quality_threshold": "6.0",
   "monitoring_catalog": "workspace",
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
-  "preprocessing_probe": "true"
+  "save_preprocessing_diagnostics": "true"
 }

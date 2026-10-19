@@ -22,11 +22,11 @@ defaults:
       - column: zone_updated_at
         max_age_seconds: 604800.0 # Refresh zone_features at least weekly.
 
-  preprocessing_probe: true # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
+  save_preprocessing_diagnostics: true # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
   # Spark and online-feature projects check admission automatically, even when false below.
   # Set true for endpoint-only projects to seal the same lint + probe evidence during training.
   # Details: https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html
-  admit_probed_custom_steps: false
+  allow_tested_custom_steps: false
   training_table: "{catalog}.{input_schema}.trips_train"
   record_key_columns: ["trip_id"]
   model_name: "{catalog}.{metadata_schema}.taxi_fare_online_model{resource_suffix}"

@@ -57,7 +57,7 @@ def _project_preview(config, path, bindings, action):
                 "config_path": str(path),
                 "workflow_contract": "3",
                 "deployed_score_handoff": config["score_handoff"],
-                "deployed_auto_rebuild_on_cdf_expiry": "{{.auto_rebuild_on_cdf_expiry}}",
+                "deployed_auto_rebuild_on_cdf_expiry": "{{.rescore_when_history_expires}}",
                 **bindings,
             }
         )
@@ -83,7 +83,7 @@ def _source_preview(config, path, bindings, args):
                 "config_path": str(path),
                 "workflow_contract": "3",
                 "deployed_score_handoff": config["score_handoff"],
-                "deployed_auto_rebuild_on_cdf_expiry": "{{.auto_rebuild_on_cdf_expiry}}",
+                "deployed_auto_rebuild_on_cdf_expiry": "{{.rescore_when_history_expires}}",
                 **bindings,
             }
         )

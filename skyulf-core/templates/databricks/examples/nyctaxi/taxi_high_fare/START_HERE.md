@@ -5,8 +5,9 @@ model and a scored table; the other Markdown files answer later questions.
 
 This project trains several candidate models for one target; cross-validation
 picks one winner, which becomes the registered candidate.
-Training runs **polars** in one bounded Python process; scoring uses
-**local** inference. Run every command beside `databricks.yml`.
+Training runs **polars** in one bounded Python process.
+Batch scoring uses **single_node** batch compute.
+Run every command beside `databricks.yml`.
 
 ## Before the first run
 

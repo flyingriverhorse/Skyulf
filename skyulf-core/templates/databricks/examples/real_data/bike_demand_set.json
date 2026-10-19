@@ -2,7 +2,7 @@
   "project_name": "bike_demand_set",
   "training_layout": "multi_target",
   "setup_mode": "detailed",
-  "inference_mode": "spark",
+  "batch_compute": "spark",
   "engine": "pandas",
   "catalog": "workspace",
   "schema": "bike_demand_set",
@@ -64,12 +64,12 @@
   "model_set_table_name": "predictions",
   "model_set_promotion_policy": "manual_approval",
   "score_model_selection": "pinned_version",
-  "score_handoff": "disabled",
+  "score_follow_champion": "false",
   "monitoring_catalog": "workspace",
   "monitoring_schema": "bike_demand_set",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
   "shap_max_samples": "32",
   "shap_max_display_samples": "2",
-  "preprocessing_probe": "true"
+  "save_preprocessing_diagnostics": "true"
 }

@@ -113,6 +113,7 @@ def test_source_materialization_preserves_group_identifiers():
         group_column="entity",
     )
     selected = Mock()
+    selected.schema.fields = []
     selected.toLocalIterator.return_value = iter(
         [{"id": 1, "x": 2.0, "target": 4.0, "entity": "customer-a"}]
     )

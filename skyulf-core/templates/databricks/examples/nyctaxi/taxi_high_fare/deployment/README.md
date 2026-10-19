@@ -5,7 +5,7 @@ workflow or company adapter is generated. Keep credentials outside these files.
 
 ## Selected layout
 
-- Training engine: `polars`; inference mode: `local`.
+- Training engine: `polars`; batch compute: `single_node`.
 - Personal development targets: `false`.
 - Shared execution identity: `deployer`.
 - Managed per-job permissions: `false`.

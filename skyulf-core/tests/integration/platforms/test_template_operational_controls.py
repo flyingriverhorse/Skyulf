@@ -59,16 +59,16 @@ def test_detailed_setup_exposes_sampling_and_probe(layout):
     sampling = (
         "branch_1_training_sample_rows" if layout == "multi_target" else "training_sample_rows"
     )
-    for name in (sampling, "preprocessing_probe"):
+    for name in (sampling, "save_preprocessing_diagnostics"):
         assert not Draft7Validator(properties[name].get("skip_prompt_if", False)).is_valid(values)
 
 
 @pytest.mark.parametrize("enabled", ["false", "true"])
 def test_probe_answer_reaches_training_without_builder_patch(tmp_path, enabled):
     """Normal wizard output must support the same diagnostics as prepared examples."""
-    project = _generate_project(tmp_path, preprocessing_probe=enabled)
+    project = _generate_project(tmp_path, save_preprocessing_diagnostics=enabled)
     training = yaml.safe_load((project / "config/training.yml").read_text())
-    assert training["defaults"]["preprocessing_probe"] is (enabled == "true")
+    assert training["defaults"]["save_preprocessing_diagnostics"] is (enabled == "true")
 
 
 def test_preview_warns_about_repeated_fixed_training_and_initial_scoring(tmp_path):

@@ -172,6 +172,9 @@ def build_pinned_endpoint(
         tuple(name for name, _ in inputs),
         tuple(inputs),
         tuple((column.name, column.dtype) for column in outputs),
+        record_key_columns=(
+            artifact.manifest.record_key_columns if isinstance(artifact, ModelSetArtifact) else ()
+        ),
     )
 
 
@@ -240,10 +243,21 @@ def _require_config(endpoint: Any, plan: PinnedEndpointPlan) -> None:
     for key, wanted in expected["config"]["served_entities"][0].items():
         if _value(_field(entities[0], key)) != wanted:
             raise ValueError("Serving endpoint config differs from the pinned plan.")
+    require_pinned_endpoint_logging(endpoint, plan)
+
+
+def require_pinned_endpoint_logging(endpoint: Any, plan: PinnedEndpointPlan) -> None:
+    """Reject logging changes before updating an explicitly owned endpoint."""
+    if _field(_field(_field(endpoint, "config"), "auto_capture_config"), "enabled") is True:
+        raise ValueError("Serving endpoint has conflicting legacy payload logging.")
     if plan.spec.logging_mode == "telemetry":
+        if _field(_field(endpoint, "ai_gateway"), "inference_table_config") is not None:
+            raise ValueError("Serving endpoint has conflicting AI Gateway payload logging.")
         _require_telemetry(endpoint, plan.spec)
     elif plan.spec.logging_mode == "ai_gateway":
-        _require_gateway(endpoint, expected["ai_gateway"])
+        if _field(_field(endpoint, "telemetry_config"), "inference_table_config") is not None:
+            raise ValueError("Serving endpoint has conflicting native payload logging.")
+        _require_gateway(endpoint, plan.config["ai_gateway"])
     else:
         _require_no_payload_logging(endpoint)
 
@@ -297,7 +311,7 @@ def endpoint_ready(endpoint: Any, plan: PinnedEndpointPlan) -> bool:
     return True
 
 
-def _read_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
+def read_pinned_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
     """Read native telemetry fields without losing them through older SDK models."""
     if plan.spec.logging_mode == "telemetry":
         return _telemetry_request(
@@ -308,7 +322,7 @@ def _read_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
 
 def require_pinned_endpoint_ready(client: Any, plan: PinnedEndpointPlan) -> Any:
     """Read and admit only an exact, fully settled endpoint through an injected SDK client."""
-    endpoint = _read_endpoint(client, plan)
+    endpoint = read_pinned_endpoint(client, plan)
     if not endpoint_ready(endpoint, plan):
         raise RuntimeError("Serving endpoint is not ready or its config update is pending.")
     return endpoint
@@ -322,7 +336,7 @@ def wait_for_pinned_endpoint_ready(client: Any, plan: PinnedEndpointPlan) -> Any
     """
     deadline = monotonic() + plan.spec.ready_timeout_s
     while True:
-        endpoint = _read_endpoint(client, plan)
+        endpoint = read_pinned_endpoint(client, plan)
         if endpoint_ready(endpoint, plan):
             return endpoint
         remaining = deadline - monotonic()
@@ -370,6 +384,8 @@ def create_pinned_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
         }
         if "ai_gateway" in plan.config:
             kwargs["ai_gateway"] = serving.AiGatewayConfig.from_dict(plan.config["ai_gateway"])
+        if "tags" in plan.config:
+            kwargs["tags"] = [serving.EndpointTag.from_dict(tag) for tag in plan.config["tags"]]
         client.serving_endpoints.create(**kwargs)
     return wait_for_pinned_endpoint_ready(client, plan)
 
@@ -425,7 +441,9 @@ def validate_json_rows(rows: list[dict[str, Any]]) -> None:
     """Require finite JSON scalars before the SDK sees an inference request."""
     try:
         json.dumps(rows, allow_nan=False)
-    except (TypeError, ValueError) as exc:
+    except TypeError as exc:
+        raise ValueError("Serving dataframe_records contain non-JSON scalar types.") from exc
+    except ValueError as exc:
         raise ValueError("Serving dataframe_records require finite JSON scalar values.") from exc
     if any(any(isinstance(value, (dict, list)) for value in row.values()) for row in rows):
         raise ValueError("Serving dataframe_records require scalar values.")

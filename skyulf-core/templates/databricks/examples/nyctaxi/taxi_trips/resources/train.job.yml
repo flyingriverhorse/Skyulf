@@ -182,6 +182,7 @@ resources:
               decision_result_state: '{{tasks.model_decision.result_state}}'
               workspace_host: ${workspace.host}
 
+
         - task_key: monitoring_allowed
           description: Register shared deployments only; skip ephemeral development models
           max_retries: 0
@@ -224,6 +225,7 @@ resources:
             job_id: ${resources.jobs.score.id}
             job_parameters:
               score_model_version: ""
+
 
       environments:
         - environment_key: skyulf

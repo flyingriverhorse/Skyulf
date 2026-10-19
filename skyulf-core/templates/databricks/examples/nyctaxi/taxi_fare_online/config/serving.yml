@@ -1,4 +1,5 @@
-# Optional jobs remain paused until these pins are configured and verified.
+# Stable endpoint setup is ready to run when selected at initialization.
+# Rollout and online-feature jobs remain opt-in until their pins are configured.
 # The rollout must already be initialized; the daily job never creates endpoints.
 online_serving:
   enabled: false

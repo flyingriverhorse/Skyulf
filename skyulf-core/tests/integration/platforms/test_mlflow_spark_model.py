@@ -307,7 +307,18 @@ def test_missing_inputs_rejected_before_udf(artifact, monkeypatch):
 
 def test_feature_package_routes_missing_features_to_native_lookup(artifact, monkeypatch):
     """Feature packages require lookup keys before prediction rather than fetched columns."""
-    binding = {"version": 1}
+    binding = {
+        "version": 1,
+        "lookup_spec": {
+            "lookups": [
+                {
+                    "table_name": "main.data.features",
+                    "lookup_key": ["entity"],
+                    "feature_names": ["x"],
+                }
+            ]
+        },
+    }
     monkeypatch.setattr(spark_model, "feature_binding", lambda artifact: binding, raising=False)
     monkeypatch.setattr(
         spark_model, "feature_source_columns", lambda *args: ("entity",), raising=False

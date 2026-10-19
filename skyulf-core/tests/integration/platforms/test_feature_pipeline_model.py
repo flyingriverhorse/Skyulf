@@ -169,6 +169,35 @@ def training_set_for(spec, inputs):
     )
 
 
+@pytest.mark.parametrize("saved", [False, True])
+def test_native_decimal_lookup_explains_required_storage_migration(tmp_path, saved):
+    """SDK-owned lookup cannot replay the bounded training reader's Decimal cast."""
+    from skyulf.integrations.mlflow.models._feature_package_spec import (
+        validate_native_training_set,
+        validate_saved_feature_spec,
+    )
+
+    spec = FeatureTrainingSpec(
+        lookups=(
+            FeatureLookupSpec(
+                table_name="main.features.values", lookup_key=("id",), feature_names=("x",)
+            ),
+        ),
+        label="target",
+        exclude_columns=("id",),
+    )
+    training_set = training_set_for(spec, ("x",))
+    training_set.feature_spec.column_infos[0].data_type = "decimal(17,6)"
+    training_set.saved_spec["input_columns"][0]["x"]["data_type"] = "decimal(17,6)"
+    path = tmp_path / "feature_spec.yaml"
+    path.write_text(yaml.safe_dump(training_set.saved_spec), encoding="utf-8")
+    with pytest.raises(ValueError, match="'x'.*DECIMAL.*DOUBLE.*retrain"):
+        if saved:
+            validate_saved_feature_spec(path, spec, {"x": "double"})
+        else:
+            validate_native_training_set(training_set, spec, {"x": "double"})
+
+
 @pytest.fixture
 def package_inputs(tmp_path, monkeypatch):
     """Fit a real pandas pipeline and create an explicit isolated tracking run."""

@@ -37,6 +37,7 @@ from ..serving.rollout_promotion import approval_config_digest, promote_complete
 from ..serving.rollout_store import MLflowRolloutStore
 from ..shared.json_contracts import finite_json_digest
 from ..training.shared.training_evidence import load_candidate_evidence
+from .serving_handoff import publish_serving_handoff
 from .shared.reference_mutations import notebook_reference_holder, reference_mutation_scope
 
 
@@ -335,7 +336,9 @@ def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:
 def run_daily_rollout_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
     """Run the configured daily job and return its result for notebook presentation."""
     settings = _notebook_settings(dbutils, "rollout")
+    values = dbutils.widgets.getAll()
     if not settings["enabled"]:
+        publish_serving_handoff(dbutils, None, values)
         return {"status": "DISABLED"}
     from databricks.sdk import WorkspaceClient  # noqa: PLC0415
     from mlflow.tracking import MlflowClient  # noqa: PLC0415
@@ -344,10 +347,11 @@ def run_daily_rollout_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         tracking_uri=settings.get("tracking_uri", "databricks"),
         registry_uri=settings.get("registry_uri", "databricks-uc"),
     )
-    values = dbutils.widgets.getAll()
     settings = _bind_rollout_target(settings, values.get("bundle_target", ""))
     settings = {**settings, "reference_holder": notebook_reference_holder(values)}
-    return run_daily_rollout(spark, settings, client=WorkspaceClient(), registry_client=registry)
+    output = run_daily_rollout(spark, settings, client=WorkspaceClient(), registry_client=registry)
+    publish_serving_handoff(dbutils, output.get("promotion"), values)
+    return output
 
 
 def _bind_rollout_target(settings: dict[str, Any], target: str) -> dict[str, Any]:

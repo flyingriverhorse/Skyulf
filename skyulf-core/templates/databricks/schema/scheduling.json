@@ -64,11 +64,10 @@
     "description": "4. Lifecycle | Start scoring yourself, or schedule it independently of training?",
     "order": 719,
     "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "multi_target"
-        }
-      }
+      "anyOf": [
+        {"properties": {"prediction_delivery": {"const": "endpoint"}}},
+        {"properties": {"training_layout": {"const": "multi_target"}}}
+      ]
     }
   },
   "scoring_cron_expression": {
@@ -78,6 +77,7 @@
     "pattern": "^[A-Za-z0-9*?/,# +\\-]+$",
     "skip_prompt_if": {
       "anyOf": [
+        {"properties": {"prediction_delivery": {"const": "endpoint"}}},
         {
           "properties": {
             "training_layout": {
@@ -103,6 +103,7 @@
     "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
     "skip_prompt_if": {
       "anyOf": [
+        {"properties": {"prediction_delivery": {"const": "endpoint"}}},
         {
           "properties": {
             "training_layout": {
@@ -131,6 +132,7 @@
     "description": "4. Lifecycle | Enable the scoring clock after deployment (UNPAUSED), or keep it paused (PAUSED)?",
     "skip_prompt_if": {
       "anyOf": [
+        {"properties": {"prediction_delivery": {"const": "endpoint"}}},
         {
           "properties": {
             "training_layout": {

@@ -5,8 +5,9 @@ model and a scored table; the other Markdown files answer later questions.
 
 This project trains one model per target and packages them as one model set that is
 approved and scored together.
-Training runs **pandas** in one bounded Python process; scoring uses
-**spark** inference. Run every command beside `databricks.yml`.
+Training runs **pandas** in one bounded Python process.
+Batch scoring uses **spark** batch compute.
+Run every command beside `databricks.yml`.
 
 ## Before the first run
 

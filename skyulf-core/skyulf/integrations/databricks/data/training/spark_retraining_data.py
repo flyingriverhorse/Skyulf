@@ -10,6 +10,8 @@ from typing import Any, cast
 
 import pandas as pd
 
+from skyulf.engines.spark_engine import normalize_spark_decimals
+
 from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
 from ...lifecycle.workflow import resolve_training_spec
 from ...observability.monitoring.spark.spark_monitoring_reference import (
@@ -22,6 +24,7 @@ from ...training.fitting.candidate import (
     eligible_training_source,
     partition_training_rows,
     sample_training_source,
+    training_numeric_columns,
     training_spec_payload,
 )
 from ...training.weights.weights import extract_training_weights
@@ -296,6 +299,7 @@ def _read_source(spark: Any, spec: TrainingSpec) -> Any:
     if (count := source.limit(spec.max_rows + 1).count()) > spec.max_rows:
         raise spec.row_limit_error(count, lower_bound=True)
     require_unique_keys(source, spec.record_key_columns, "training")
+    source, _ = normalize_spark_decimals(source, columns=training_numeric_columns(spec))
     size = functions.udf(lambda row: _source_size(row, spec), "long")
     total = source.agg(
         functions.sum(size(functions.struct(*source.columns))).alias("bytes")

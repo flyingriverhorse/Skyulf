@@ -32,6 +32,7 @@ def test_new_bundles_are_yaml_only_without_migration(tmp_path, layout, compute):
         "preprocessing.yml",
         "training.yml",
         "inference.yml",
+        "scoring.yml",
     }
     assert not (project / "src/modeling").exists()
     assert not (project / "src/tools/migrate_config.py").exists()
@@ -116,7 +117,7 @@ def test_yaml_generation_preserves_selected_scoring_environment(tmp_path, infere
 
     project = _generate_project(
         tmp_path,
-        inference_mode=inference,
+        batch_compute={"local": "single_node"}.get(inference, inference),
         compute_mode=compute,
         risk_category="High",
         record_key_columns="customer_id",

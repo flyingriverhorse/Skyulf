@@ -45,8 +45,8 @@ A report can finalize a failed invocation: inspect its reported outcome.
 
 This project has `promotion_policy={{.promotion_policy}}`,
 `score_model_selection={{.score_model_selection}}`,
-`score_handoff={{.score_handoff}}`, and
-`auto_rebuild_on_cdf_expiry={{.auto_rebuild_on_cdf_expiry}}`.
+`follow_champion: {{.score_follow_champion}}`, and
+`rescore_when_history_expires: {{.rescore_when_history_expires}}`.
 For model sets, inspect their separate saved promotion policy in inference.yml.
 Use the serialized train job's Run now parameters for approve/reject/rollback,
 copying the exact **Available action** values from `training_report` > Output;

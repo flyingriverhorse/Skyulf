@@ -52,7 +52,7 @@ a reconstruction of the original observation instants. `result_available_at`
 records when the example loads known outcomes for monitoring.
 
 All three projects train with pandas in one bounded Python process. Scoring uses
-`inference_mode: spark`, which applies the saved model through a Spark UDF.
+`batch_compute: spark`, which applies the saved model through a Spark UDF.
 This does not distribute estimator fitting across Spark workers. Each project's
 monitoring store is configured independently: diagnostic and bike keep their
 own schemas; air quality uses the shared `workspace.skyulf_monitoring` schema.

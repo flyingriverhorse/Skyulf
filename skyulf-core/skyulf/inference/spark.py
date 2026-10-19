@@ -8,6 +8,7 @@ import pandas as pd
 
 from ..core.capabilities import UnsupportedExecutionError
 from ..core.execution import ExecutionOptions, FrameSpec
+from ..engines.spark_engine import normalize_spark_decimals
 from ..preprocessing._spark import (
     _case_sensitive,
     _column,
@@ -86,6 +87,7 @@ def _validate_execution(frame_spec: FrameSpec, options: ExecutionOptions, mode: 
 def _select_input(native: Any, manifest: BundleManifest, frame_spec: FrameSpec, mode: str) -> Any:
     """Validate model input positions before projecting worker keys and raw features."""
     input_names = {column.name for column in manifest.input_schema}
+    native, _ = normalize_spark_decimals(native, columns=input_names)
     raw = native.select(*[_column(native, name) for name in native.columns if name in input_names])
     _validate_frame(raw, manifest.input_schema, "bundle input")
     selected_names = (

@@ -144,11 +144,18 @@ def bounded_frame(
     defer that check until future revisions are excluded; null keys and transfer
     limits remain invalid in either mode.
     """
+    from skyulf.engines.spark_engine import (  # noqa: PLC0415
+        normalize_spark_decimals,
+        restore_spark_decimal_dtypes,
+    )
+
+    selected = selected.select(*columns).orderBy(*record_key_columns).limit(max_rows + 1)
+    selected, conversions = normalize_spark_decimals(
+        selected, columns=set(columns).difference(record_key_columns)
+    )
     records: list[dict[str, Any]] = []
     decoded_bytes = 0
-    for row in (
-        selected.select(*columns).orderBy(*record_key_columns).limit(max_rows + 1).toLocalIterator()
-    ):
+    for row in selected.toLocalIterator():
         if len(records) == max_rows:
             raise ValueError("Source increment exceeds max_rows.")
         record = row.asDict(recursive=True)
@@ -156,7 +163,9 @@ def bounded_frame(
         if decoded_bytes > max_bytes:
             raise ValueError("Source increment exceeds max_bytes.")
         records.append(record)
-    frame = pd.DataFrame.from_records(records, columns=columns)
+    frame = restore_spark_decimal_dtypes(
+        pd.DataFrame.from_records(records, columns=columns), conversions
+    )
     if frame_bytes(frame) > max_bytes:
         raise ValueError("Source local frame exceeds max_bytes.")
     if frame.loc[:, list(record_key_columns)].isna().any().any():

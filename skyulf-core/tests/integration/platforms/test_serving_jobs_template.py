@@ -135,22 +135,17 @@ def test_real_cli_publication_mode_controls_schedule_and_preserves_independent_s
     assert not (project / "resources/daily_rollout.job.yml").exists()
 
 
+@CLI
 @pytest.mark.parametrize("job", list(OPTIONAL))
-def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(job):
+def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(tmp_path, job):
     """Native job serialization must retain the guard against automatic retries."""
     jobs = pytest.importorskip("databricks.sdk.service.jobs")
-    path = TEMPLATE / (OPTIONAL[job][0] + ".tmpl")
+    from test_databricks_bundle_generation import _generate_project
+
+    project = _generate_project(tmp_path, **{"include_" + job: "true"})
+    path = project / OPTIONAL[job][0]
     assert path.is_file(), "Optional serving job resource is not implemented"
     text = path.read_text(encoding="utf-8")
-    if job == "online_publication":
-        text = text.replace('{{if eq .online_publication_mode "TRIGGERED"}}', "").replace(
-            "{{end}}", ""
-        )
-        text = text.replace(
-            "{{`{{job.parameters.publication_action}}`}}", "{{job.parameters.publication_action}}"
-        )
-    if job == "daily_rollout":
-        text = text.replace('{{"{{job.run_id}}"}}', "{{job.run_id}}")
     resource = yaml.safe_load(text)["resources"]["jobs"][job]
     assert resource["max_concurrent_runs"] == 1
     assert resource["schedule"]["pause_status"] == "PAUSED"

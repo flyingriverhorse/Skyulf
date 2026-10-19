@@ -347,7 +347,7 @@ def test_quality_proof_cannot_omit_or_contradict_a_component(result):
         manifest=SimpleNamespace(components=[SimpleNamespace(branch="risk")])
     )
     with pytest.raises(ValueError, match="quality validation"):
-        _validate_quality_result(result, cast(Any, artifact), None)
+        _validate_quality_result(result, cast(Any, artifact.manifest), None)
 
 
 def test_failed_release_next_actions_require_new_training():

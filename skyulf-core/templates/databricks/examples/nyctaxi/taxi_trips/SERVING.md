@@ -1,60 +1,73 @@
 # Serve a registered model
 
-Use REST or a SQL function to query a concrete registered version. Optional
-online lookup, feature publication and daily rollout are independent selections.
-Training and endpoint-only use do not require a batch prediction table.
-
-## Files to edit
-
-| File | Purpose |
-| --- | --- |
-| `deployment/requirements.txt` | Core runtime matching the saved model producer |
-| `deployment/serving-requirements.txt` (when generated) | Optional serving dependencies |
-| `config/serving.yml` (when generated) | Endpoint/publication identities and rollout settings |
-| Your notebook | Concrete `PinnedEndpointSpec` and new SQL function name |
+Choose `prediction_delivery: endpoint` or `both` in detailed setup for a certified
+pandas single model, competition winner or model set. `endpoint` generates no batch
+score job or prediction table; `both` generates both jobs. Quick setup defaults to
+`batch`. The monitoring job is available in every mode. Edit `serving_endpoint` in
+`config/serving.yml` and set the target's `cost_tag_value` before the first run.
 
 ## Commands
 
-Run from the project root after completing the optional job configuration:
-
-Replace `test` with your target (`test_development` for personal targets) and `YOUR_PROFILE`
-with that target's authenticated profile.
+From the project root, replace `test` with your target (`test_development` for a
+personal target) and `YOUR_PROFILE` with its authenticated profile:
 
 ```bash
 databricks bundle validate --strict -t test --profile YOUR_PROFILE
 databricks bundle deploy -t test --profile YOUR_PROFILE
-# Only if include_online_serving was selected:
+# Resolve champion once, or override with one numeric version:
+databricks bundle run serving_endpoint -t test --profile YOUR_PROFILE
+databricks bundle run serving_endpoint -t test --profile YOUR_PROFILE --params model_version=7
+```
+
+Automatic updates run after completed champion changes in production Bundle
+mode. Inspect the child serving run: training only waits for submission. See the
+[job settings and operational rules](https://www.skyulf.com/manual/user_guide/databricks_serving.html#configuration-reference)
+for permissions, logging, costs, smoke checks, recovery and cleanup.
+
+Set `serving_endpoint.follow_champion` to `true` for automatic updates or `false` for manual runs in
+YAML and deploy the updated file. The dispatch tasks already exist; no project
+regeneration is needed for this toggle. Personal development targets stay manual.
+
+## Monitor endpoint requests
+
+Set `serving_endpoint.logging_mode` to `telemetry` or `ai_gateway` before creating
+the endpoint, and configure `monitoring_catalog` and `monitoring_schema` in
+`deployment/variables.yml`. After reference, REST and SQL parity passes, the job
+automatically enrolls the served concrete version in that store. A model set gets
+one entry per component, retaining its parent set/version. Repeated runs reuse
+the registration; a replaced version's entries are disabled, preserving history.
+
+Send requests, enable the monitoring schedule for the target, and run `monitoring`
+to collect observations. The dashboard's Online serving page shows the saved
+observations after logging has delivered the requests; enrollment alone creates
+no traffic measurements. Performance additionally needs matched outcome labels.
+`logging_mode: disabled` explicitly skips enrollment; serving still works but has
+no automatic request monitoring. An enabled logger without a monitoring namespace
+fails before endpoint changes. `config/inference.yml` retains `score_source_table`
+only as the source for the endpoint's bounded smoke sample in endpoint-only mode.
+
+## Choose a caller
+
+- [SQL with ai_query](https://www.skyulf.com/manual/user_guide/databricks_serving.html#sql-with-ai_query): SQL function, group access and a named-argument query.
+- [REST applications](https://www.skyulf.com/manual/user_guide/databricks_serving.html#rest-for-applications): application service principal and JSON request.
+- [Python notebooks/jobs](https://www.skyulf.com/manual/user_guide/databricks_serving.html#python-sdk-for-notebooks-and-jobs): caller group and SDK request.
+
+## Other optional jobs
+
+Run only the jobs selected and configured in your project:
+
+```bash
 databricks bundle run online_serving_setup -t test --profile YOUR_PROFILE
-# Only if include_online_publication was selected:
 databricks bundle run online_publication -t test --profile YOUR_PROFILE --params publication_action=start
 databricks bundle run online_publication -t test --profile YOUR_PROFILE --params publication_action=status
-# Only after explicit rollout initialization, if include_daily_rollout was selected:
+# Requires an already initialized rollout:
 databricks bundle run daily_rollout -t test --profile YOUR_PROFILE
 ```
 
-REST/SQL endpoint creation is a separate notebook operation. Follow the
-[endpoint and SQL commands](https://www.skyulf.com/manual/user_guide/databricks_serving.html#the-command),
-then inspect readiness before querying. The endpoint setup job reports its real
-`input_schema` and typed `request_example`; use every required field.
+- [Explicit create-only notebook API](https://www.skyulf.com/manual/user_guide/databricks_serving.html#the-command)
+- [Online feature setup and publication](https://www.skyulf.com/manual/user_guide/databricks_online_features.html)
+- [Gradual traffic rollout](https://www.skyulf.com/manual/user_guide/databricks_serving_rollout.html)
+- [Serving monitoring](https://www.skyulf.com/manual/user_guide/databricks_serving_monitoring.html)
 
-## Rules to keep
-
-- Pin a numeric model version and matching producer runtime. Admission is for
-  certified packages; updating requirements does not upgrade an old saved model.
-- Set `enabled` and `exclusive_writer` only after completing identities and
-  serializing the resource's writers. A submission is not readiness or feature freshness.
-- Keep a daily A/B endpoint separate from one used by a pinned SQL function.
-  Publication defaults to `TRIGGERED` with its hourly schedule paused;
-  `CONTINUOUS` uses explicit controls without a periodic schedule.
-
-## Detailed instructions
-
-- [Endpoint setup, REST, SQL and permissions](https://www.skyulf.com/manual/user_guide/databricks_serving.html)
-- [Feature lookup, freshness and publication controls](https://www.skyulf.com/manual/user_guide/databricks_online_features.html)
-- [Daily traffic increases, holds and rollback](https://www.skyulf.com/manual/user_guide/databricks_serving_rollout.html)
-- [Serving observations and labels](https://www.skyulf.com/manual/user_guide/databricks_serving_monitoring.html)
-
-Version: `deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.4`.
-Public links show the latest documentation; compare them with that pin before
-using newer settings. Rollout latency checks p99 model execution time when it is
-recorded and falls back to the maximum latency otherwise.
+`deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.4`. Public links show
+the latest guide; check it against your installed version.

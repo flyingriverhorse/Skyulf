@@ -1,5 +1,5 @@
-{{- if and (eq .inference_mode "spark") (eq .engine "polars") -}}
-{{- template "ERROR_inference_mode_spark_requires_engine_pandas" . -}}
+{{- if and (eq .batch_compute "spark") (eq .engine "polars") -}}
+{{- template "ERROR_batch_compute_spark_requires_engine_pandas" . -}}
 {{- end -}}
 {{- $source := .source_table_name -}}{{- if not $source -}}{{- $source = printf "%s_source" .project_name -}}{{- end -}}
 {{- $sourcePattern := printf "(?i)^(%s|%s\\.%s\\.%s)$" $source .catalog .schema $source -}}
@@ -18,6 +18,9 @@
 {{- end -}}
 {{- if and (eq .include_online_serving "true") (or (eq .training_layout "multi_target") (ne .engine "pandas")) -}}
 {{- template "ERROR_online_serving_requires_engine_pandas_and_single_model_or_competition" . -}}
+{{- end -}}
+{{- if and (ne .prediction_delivery "batch") (ne .engine "pandas") -}}
+{{- template "ERROR_serving_endpoint_requires_engine_pandas" . -}}
 {{- end -}}
 {{- /* Core competition admission rejects these; test_databricks_wizard_guards.py checks Core. */ -}}
 {{- $unsupported_competition_metrics := "^heldout_(mape|precision_weighted|recall_weighted)$" -}}
@@ -48,11 +51,11 @@ defaults:
       - column: ""
         max_age_seconds: null
 {{end}}
-  preprocessing_probe: {{.preprocessing_probe}} # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
+  save_preprocessing_diagnostics: {{.save_preprocessing_diagnostics}} # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
   # Spark and online-feature projects check admission automatically, even when false below.
   # Set true for endpoint-only projects to seal the same lint + probe evidence during training.
   # Details: https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html
-  admit_probed_custom_steps: false
+  allow_tested_custom_steps: {{if ne .prediction_delivery "batch"}}true{{else}}false{{end}}
   training_table: "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}"
 {{if eq .source_layout "separate_outcomes"}}  training_label_table: "{{if not ((regexp "\\.").MatchString .label_table_name)}}{catalog}.{input_schema}.{{end}}{{.label_table_name}}"
   # Pin the latest outcome snapshot once at invocation; an integer pins a manual replay.

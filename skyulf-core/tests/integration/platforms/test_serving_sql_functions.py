@@ -38,7 +38,7 @@ def test_function_has_named_inputs_exact_outputs_and_nullable_transport(endpoint
         "  `amount` DOUBLE,\n  `count` BIGINT,\n  `active` BOOLEAN,\n  `segment` STRING\n)\n"
         "RETURNS STRUCT<`prediction`: DOUBLE, `eligible`: BOOLEAN, `reason`: STRING>\n"
         "LANGUAGE SQL\nNOT DETERMINISTIC\n"
-        "COMMENT 'Skyulf model models:/main.ml.risk/7; endpoint risk-v7'\n"
+        "COMMENT 'Model models:/main.ml.risk/7; endpoint risk-v7'\n"
         "RETURN ai_query(\n  endpoint => 'risk-v7',\n  request => named_struct(\n"
         "    'amount', COALESCE(`amount`, CAST('NaN' AS DOUBLE)),\n"
         "    'count', CAST(`count` AS STRING),\n"

@@ -52,8 +52,17 @@ resources:
               workspace_host: ${workspace.host}
               repair_count: '{{"{{job.repair_count}}"}}'
               execution_count: '{{"{{task.execution_count}}"}}'
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .prediction_delivery "endpoint"}}disabled{{else}}{{if eq .score_follow_champion "true"}}after_alias_change{{else}}disabled{{end}}{{end}}"
+{{- if ne .prediction_delivery "batch"}}
+              deployed_serving_endpoint: "true"
+              serving_config_path: ${workspace.file_path}/config/serving.yml
+              cost_tag_key: {{printf "%q" .cost_tag_key}}
+              cost_tag_value: ${var.cost_tag_value}
+              bundle_project: ${bundle.name}
+              bundle_target: ${bundle.target}
+              bundle_mode: ${bundle.mode}
+{{end}}
+              deployed_auto_rebuild_on_cdf_expiry: "{{if eq .prediction_delivery "endpoint"}}false{{else}}{{.rescore_when_history_expires}}{{end}}"
               lifecycle_action: '{{"{{job.parameters.lifecycle_action}}"}}'
               candidate_version: '{{"{{job.parameters.candidate_version}}"}}'
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
@@ -205,8 +214,17 @@ resources:
               workspace_host: ${workspace.host}
               repair_count: '{{"{{job.repair_count}}"}}'
               execution_count: '{{"{{task.execution_count}}"}}'
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .prediction_delivery "endpoint"}}disabled{{else}}{{if eq .score_follow_champion "true"}}after_alias_change{{else}}disabled{{end}}{{end}}"
+{{- if ne .prediction_delivery "batch"}}
+              deployed_serving_endpoint: "true"
+              serving_config_path: ${workspace.file_path}/config/serving.yml
+              cost_tag_key: {{printf "%q" .cost_tag_key}}
+              cost_tag_value: ${var.cost_tag_value}
+              bundle_project: ${bundle.name}
+              bundle_target: ${bundle.target}
+              bundle_mode: ${bundle.mode}
+{{end}}
+              deployed_auto_rebuild_on_cdf_expiry: "{{if eq .prediction_delivery "endpoint"}}false{{else}}{{.rescore_when_history_expires}}{{end}}"
               lifecycle_action: '{{"{{job.parameters.lifecycle_action}}"}}'
               candidate_version: '{{"{{job.parameters.candidate_version}}"}}'
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
@@ -406,6 +424,47 @@ resources:
               decision_result_state: '{{"{{tasks.model_decision.result_state}}"}}'
               workspace_host: ${workspace.host}
 {{end}}
+{{- if ne .prediction_delivery "batch"}}
+        - task_key: serving_allowed
+          description: Automatically follow champion changes in shared production targets only
+          depends_on:
+            - task_key: training_report
+          condition_task:
+            op: EQUAL_TO
+            left: ${bundle.mode}
+            right: production
+        - task_key: serving_requested
+          depends_on:
+            - task_key: serving_allowed
+              outcome: "true"
+          condition_task:
+            op: EQUAL_TO
+            left: '{{"{{tasks.training_report.values.serving_requested}}"}}'
+            right: "true"
+        - task_key: run_serving_endpoint
+          description: Submit the serving child run; its readiness does not block training
+          timeout_seconds: 300
+          max_retries: 0
+          retry_on_timeout: false
+          depends_on:
+            - task_key: serving_requested
+              outcome: "true"
+          notebook_task:
+            notebook_path: ../src/jobs/dispatch_serving.py
+            base_parameters:
+              serving_job_id: ${resources.jobs.serving_endpoint.id}
+              job_run_id: '{{"{{job.run_id}}"}}'
+              model_version: '{{"{{tasks.training_report.values.serving_model_version}}"}}'
+{{if eq .compute_mode "serverless"}}
+          environment_key: skyulf
+          disable_auto_optimization: true
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - requirements: ${workspace.file_path}/deployment/train-requirements.txt
+{{end}}
+{{end}}
+{{if ne .prediction_delivery "endpoint"}}
         - task_key: monitoring_allowed
           description: Register shared deployments only; skip ephemeral development models
           max_retries: 0
@@ -460,6 +519,7 @@ resources:
             job_id: ${resources.jobs.score.id}
             job_parameters:
               score_model_version: ""
+{{end}}
 {{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf

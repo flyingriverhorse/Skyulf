@@ -106,6 +106,7 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
         expected_champion_version="1",
         max_rows=100,
         max_bytes=4 * 1024 * 1024,
+        allow_unloadable_champion=False,
         **endpoints,
     )
     assert quality["passed"]

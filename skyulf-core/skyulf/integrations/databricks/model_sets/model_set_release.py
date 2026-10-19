@@ -8,14 +8,14 @@ from typing import Any
 
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
-from ....inference.model_set import ModelSetArtifact
+from ....inference.model_set import ModelSetArtifact, ModelSetManifest
 from ...mlflow.lifecycle.model_set_challenger import nominate_model_set
 from ...mlflow.lifecycle.model_set_lifecycle import approve_model_set
 from ...mlflow.lifecycle.promotion import ExclusiveAliasWriterAdmission, controlled_champion_version
-from ...mlflow.models.model_set import load_registered_model_set
+from ...mlflow.models.model_set import load_registered_model_set, read_registered_model_set_manifest
 from ...mlflow.registration.registry import ResolvedModel, resolve_model
 from ..shared._contracts import input_budget_bytes
-from .model_set_quality import evaluate_model_set_quality
+from .model_set_quality import champion_components, evaluate_model_set_quality
 
 
 class ModelSetQualityError(ValueError):
@@ -29,22 +29,19 @@ class ModelSetQualityError(ValueError):
         )
 
 
-def champion_artifact(name: str, version: str | None, endpoints: dict) -> ModelSetArtifact | None:
-    """Load the one captured set version instead of resolving component champion aliases."""
+def champion_artifact(
+    name: str, version: str | None, endpoints: dict
+) -> ModelSetArtifact | ModelSetManifest | None:
+    """Load the pinned set, retaining only verified metadata after a runtime mismatch."""
     if version is None:
         return None
     from ....inference.fitted_pipeline import ArtifactRuntimeMismatchError  # noqa: PLC0415
 
+    resolved = resolve_model(name, version=version, **endpoints)
     try:
-        return load_registered_model_set(
-            resolve_model(name, version=version, **endpoints), **endpoints
-        )
-    except ArtifactRuntimeMismatchError as exc:
-        raise ValueError(
-            f"Champion model set {name} v{version} was produced by another Core release and "
-            f"cannot be compared ({exc}). Train and approve replacement sets with that release; "
-            "the unloadable-champion override is available for single and competition models only."
-        ) from exc
+        return load_registered_model_set(resolved, **endpoints)
+    except ArtifactRuntimeMismatchError:
+        return read_registered_model_set_manifest(resolved, **endpoints)
 
 
 def pin_model_set_baseline(
@@ -54,7 +51,7 @@ def pin_model_set_baseline(
     _automatic_thresholds(settings, configs)
     version = controlled_champion_version(settings["model_name"], **endpoints)
     champion = champion_artifact(settings["model_name"], version, endpoints)
-    previous = {c.branch: c.reference for c in champion.manifest.components} if champion else {}
+    previous = {c.branch: c.reference for c in champion_components(champion)}
     if champion and set(previous) != set(configs):
         raise ValueError(
             "Model set replacement requires the same branch names; use a new set for a new layout."
@@ -114,6 +111,7 @@ def approve_project_model_set(
     *,
     expected_champion_version: str | None,
     policy: str,
+    allow_unloadable_champion: bool = False,
 ) -> Any:
     """Run functional and saved holdout checks inside the common alias admission."""
     from .model_set_project import (  # noqa: PLC0415 - lazy dependency  # noqa: PLC0415 - lazy dependency
@@ -134,6 +132,7 @@ def approve_project_model_set(
             expected_champion_version=expected_champion_version,
             max_rows=config["max_rows"],
             max_bytes=input_budget_bytes(config.get("max_input_mb")),
+            allow_unloadable_champion=allow_unloadable_champion,
             **endpoints,
         )
         persist_decision(resolved, decision, policy, endpoints)
@@ -149,6 +148,7 @@ def approve_project_model_set(
         max_rows=config["max_rows"],
         max_bytes=input_budget_bytes(config.get("max_input_mb")),
         quality_validator=validate,
+        allow_unloadable_champion=allow_unloadable_champion,
         **endpoints,
     )
 

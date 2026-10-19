@@ -38,7 +38,14 @@ def _validate_job_binding(config: MonitorConfig, namespace: str, values: dict) -
         )
 
 
-def enroll_serving_configs(spark: Any, namespace: str, values: dict) -> dict:
+def enroll_serving_configs(
+    spark: Any,
+    namespace: str,
+    values: dict,
+    *,
+    tracking_uri: str | None = "databricks",
+    registry_uri: str | None = "databricks-uc",
+) -> dict:
     """Prepare verified references first, then publish each online enrollment."""
     configs = parse_serving_enrollments(
         values.get("monitoring_serving_enrollments", "[]"), namespace, values
@@ -46,7 +53,9 @@ def enroll_serving_configs(spark: Any, namespace: str, values: dict) -> dict:
     ensure_monitoring_store(spark, *namespace.split("."))
     for config in configs:
         if config.enabled:
-            prepare_spark_monitoring_reference(spark, config)
+            prepare_spark_monitoring_reference(
+                spark, config, tracking_uri=tracking_uri, registry_uri=registry_uri
+            )
     for config in configs:
         enroll_monitor(spark, namespace, config, preserve_activation=True)
     return {

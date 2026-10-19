@@ -1,5 +1,12 @@
 # Score saved models in this project
 
+{{if eq .prediction_delivery "endpoint"}}This project uses endpoint-only delivery. It has no batch score job, schedule,
+watermark or Delta prediction destination. Use [SERVING.md](SERVING.md) to deploy
+the saved model and make SQL, REST or SDK requests. `config/inference.yml` keeps
+the source for the endpoint's bounded smoke sample. The eligibility, output and
+combined rules below apply to the saved model's endpoint predictions as well.
+
+{{else}}
 The score job loads saved preprocessing/rules and publishes keyed outcomes. It
 runs independently from [training](TRAINING.md); changing saved-model rules needs
 a new trained version.
@@ -32,7 +39,7 @@ databricks bundle run score -t {{if eq .personal_development_targets "true"}}tes
 ```
 
 Preview checks declarations; it does not load cloud models or prove permissions.
-Open {{if eq .auto_rebuild_on_cdf_expiry "true"}}**scoring_report > Output** for the final ordinary/recovery result{{else}}**score > Output**; this graph has no `scoring_report` task{{end}}.
+Open {{if eq .rescore_when_history_expires "true"}}**scoring_report > Output** for the final ordinary/recovery result{{else}}**score > Output**; this graph has no `scoring_report` task{{end}}.
 Check concrete model/set and source versions, input/output counts, destination
 and Delta receipt. Excluded rows retain keys, null predictions and reasons.
 Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
@@ -42,14 +49,14 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 - Default `mode: pre_split` in scoring.yml reuses saved eligibility. Target-reading
   filters need an explicit `skip_target_pre_split_steps: true` before training,
   or a deliberate custom mode. Commented sample rules are inactive.
-- `model_change_mode` controls a changed model; model-set `source_change_policy`
+- `on_model_change` controls a changed model; model-set `on_source_change`
   separately controls UPDATE/DELETE. Ordinary single-model insert scoring rejects them.
 - CDF-expiry recovery is opt-in and requires matching graph/notebooks/wheel.
   It does not recover arbitrary permissions, schema or source-identity failures.
 - Keep `workflow_contract: "3"` and deployed handoff/recovery parameters aligned.
   Retry scoring independently after promotion; do not repair lifecycle actions.
-- This project uses `inference_mode={{.inference_mode}}`.
-{{if eq .inference_mode "spark"}}  Spark requires admitted pandas-fitted artifacts and exact worker dependencies.
+- This project uses `batch_compute: {{.batch_compute}}`.
+{{if eq .batch_compute "spark"}}  Spark requires admitted pandas-fitted artifacts and exact worker dependencies.
   The generated environment manager is `{{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}`; prediction batches default
   to 10000 rows. Arbitrary callbacks and temporal carry are not admitted.
   Training lints and probes saved eligibility/output rules; check them first with
@@ -70,7 +77,7 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 Public links show the latest manual; [README.md](README.md) explains how to match
 them to this project's pinned Core release.
 
-## Choose the saved scoring policy
+{{end}}## Choose the saved scoring policy
 
 Edit `config/scoring.yml` before training a new version. `mode: pre_split`
 reuses saved pre-split eligibility; `custom` runs its eligibility and output

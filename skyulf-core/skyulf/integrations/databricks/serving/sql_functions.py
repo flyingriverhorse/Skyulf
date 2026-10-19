@@ -111,15 +111,24 @@ class ServingSQLFunctionPlan:
     @property
     def create_sql(self) -> str:
         """Render DDL which fails if a function already exists; never replace or reuse it."""
+        spec = self.endpoint.spec
+        return self.render_create_sql(
+            comment=f"Model {spec.model_uri}; endpoint {spec.endpoint_name}"
+        )
+
+    def render_create_sql(self, *, comment: str, replace: bool = False) -> str:
+        """Render the same typed wrapper with an explicit management comment and mode."""
         parameters = ",\n".join(
             f"  {name} {dtype}" for name, dtype in _sql_schema(self.endpoint.input_schema)
         )
         spec = self.endpoint.spec
         error_mode = str(self.fail_on_error).lower()
+        command = "CREATE OR REPLACE" if replace else "CREATE"
+        escaped_comment = comment.replace("'", "''")
         return (
-            f"CREATE FUNCTION {_function_name(self.function_name)}(\n{parameters}\n)\n"
+            f"{command} FUNCTION {_function_name(self.function_name)}(\n{parameters}\n)\n"
             f"RETURNS {self.return_type}\nLANGUAGE SQL\nNOT DETERMINISTIC\n"
-            f"COMMENT 'Skyulf model {spec.model_uri}; endpoint {spec.endpoint_name}'\n"
+            f"COMMENT '{escaped_comment}'\n"
             f"RETURN ai_query(\n  endpoint => '{spec.endpoint_name}',\n"
             f"  request => named_struct(\n{_request_fields(self.endpoint)}\n  ),\n"
             f"  returnType => '{self.response_type}',\n  failOnError => {error_mode}\n)"
@@ -136,6 +145,21 @@ class ServingSQLFunctionPlan:
             f"`{name}` => {prefix}`{name}`" for name in self.endpoint.input_columns
         )
         return f"{_function_name(self.function_name)}({arguments})"
+
+    @property
+    def quoted_name(self) -> str:
+        """Return the validated fully qualified name for DDL and additive grants."""
+        return _function_name(self.function_name)
+
+    @property
+    def schema_contract(self) -> dict[str, Any]:
+        """Describe SQL declarations and the distinct nullable wire encoding."""
+        return {
+            "inputs": _sql_schema(self.endpoint.input_schema),
+            "outputs": _sql_schema(self.endpoint.output_schema),
+            "transport": transport_spec(self.endpoint.input_schema),
+            "fail_on_error": self.fail_on_error,
+        }
 
 
 def build_serving_sql_function(

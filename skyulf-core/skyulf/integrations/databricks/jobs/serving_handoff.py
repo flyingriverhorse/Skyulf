@@ -1,0 +1,70 @@
+"""Publish a separate serving request only from a completed champion transition."""
+
+import hashlib
+import re
+from typing import Any
+
+
+def serving_transition(receipt: dict[str, Any] | None, *, model_name: str) -> str:
+    """Return the concrete changed champion version, or no request for other outcomes."""
+    if not receipt or receipt.get("kind") not in {"initial", "promotion", "rollback"}:
+        return ""
+    if receipt.get("alias") != "champion":
+        return ""
+    if receipt.get("model_name") != model_name:
+        raise ValueError("Serving handoff requires the configured model's champion transition.")
+    version = receipt.get("new_version")
+    if not isinstance(version, str) or not re.fullmatch(r"[1-9][0-9]*", version):
+        raise ValueError("Serving handoff requires a concrete model version.")
+    return "" if receipt.get("prior_version") == version else version
+
+
+def publish_serving_handoff(
+    dbutils: Any, receipt: dict[str, Any] | None, values: dict[str, str]
+) -> None:
+    """Set child-job values without making cloud calls or changing the score policy.
+
+    Old projects have no serving deployment contract and remain inert. Manual
+    endpoint runs are independent; automatic handoff requires production mode.
+    """
+    from .serving_endpoint_job import read_serving_endpoint_settings  # noqa: PLC0415
+
+    version = ""
+    if values.get("deployed_serving_endpoint") != "true":
+        return
+    settings = read_serving_endpoint_settings(values)
+    if (
+        settings["enabled"]
+        and settings.get("follow_champion", True)
+        and values.get("bundle_mode") == "production"
+    ):
+        version = serving_transition(receipt, model_name=settings["model_name"])
+    dbutils.jobs.taskValues.set(key="serving_requested", value=bool(version))
+    dbutils.jobs.taskValues.set(key="serving_model_version", value=version)
+
+
+def submit_serving_run(client: Any, values: dict[str, str]) -> dict[str, Any]:
+    """Submit a concrete version once per parent run without waiting for endpoint readiness."""
+    for key in ("serving_job_id", "job_run_id", "model_version"):
+        value = values.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[1-9][0-9]*", value):
+            raise ValueError(f"{key} must be a resolved positive integer.")
+    identity = ":".join(values[key] for key in ("serving_job_id", "job_run_id", "model_version"))
+    submitted = client.jobs.run_now(
+        job_id=int(values["serving_job_id"]),
+        job_parameters={"model_version": values["model_version"]},
+        idempotency_token=hashlib.sha256(identity.encode()).hexdigest(),
+    )
+    run_id = submitted.response.run_id
+    if type(run_id) is not int or run_id <= 0:
+        raise ValueError("Serving submission did not return a concrete run_id.")
+    return {"status": "SUBMITTED", "run_id": run_id, "model_version": values["model_version"]}
+
+
+def run_serving_dispatch_notebook(dbutils: Any) -> dict[str, Any]:
+    """Publish the child run identity, explicitly separating submission from serving success."""
+    from databricks.sdk import WorkspaceClient  # noqa: PLC0415
+
+    result = submit_serving_run(WorkspaceClient(), dbutils.widgets.getAll())
+    dbutils.jobs.taskValues.set(key="serving_run_id", value=result["run_id"])
+    return result

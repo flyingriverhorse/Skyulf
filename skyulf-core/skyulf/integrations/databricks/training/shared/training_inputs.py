@@ -46,6 +46,11 @@ def log_training_inputs(
         "training_selection": attrs.get("training_selection"),
         "feature_lookup": attrs.get("feature_lookup"),
         **({"training_labels": attrs["training_labels"]} if "training_labels" in attrs else {}),
+        **(
+            {"source_column_conversions": attrs["source_column_conversions"]}
+            if "source_column_conversions" in attrs
+            else {}
+        ),
     }
     serialized = json.dumps(
         provenance, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False

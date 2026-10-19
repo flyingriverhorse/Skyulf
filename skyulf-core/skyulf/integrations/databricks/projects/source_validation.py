@@ -1,6 +1,7 @@
 """Read-only source checks for a resolved training and scoring configuration."""
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -10,7 +11,7 @@ from ..shared._contracts import column_name, table_name
 Query = Callable[[str], list[dict[str, Any]]]
 
 
-def _raw_inputs(config: dict[str, Any]) -> tuple[list[str], list[str]]:
+def _raw_inputs(config: dict[str, Any]) -> tuple[list[str], list[str], set[str]]:
     """Separate raw input requirements from features fetched by the native lookup runtime."""
     from ..feature_store.lifecycle_config import parse_lookup_config  # noqa: PLC0415
 
@@ -19,12 +20,18 @@ def _raw_inputs(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         config.get("feature_lookup"), label=config["target_column"], input_columns=tuple(inputs)
     )
     if lookup is None:
-        return inputs, []
+        return inputs, [], set()
     raw = [name for name in inputs if name not in lookup.feature_names]
-    raw += [name for item in lookup.lookups for name in (*item.lookup_key, *item.timestamp_columns)]
-    return list(dict.fromkeys(raw)), [
-        "Feature lookup tables, point-in-time joins and fetched feature types are checked by training, not this raw-source preflight."
+    controls = [
+        name for item in lookup.lookups for name in (*item.lookup_key, *item.timestamp_columns)
     ]
+    return (
+        list(dict.fromkeys([*raw, *controls])),
+        [
+            "Feature lookup tables, point-in-time joins and fetched feature types are checked by training, not this raw-source preflight."
+        ],
+        set(controls),
+    )
 
 
 def _training_columns(config: dict[str, Any], external: bool) -> list[str]:
@@ -114,6 +121,45 @@ def _compatible(left: dict[str, str], right: dict[str, str], names: list[str]) -
         raise ValueError(f"Source column types differ: {changed}.")
 
 
+def _planned_input_conversions(schema: dict[str, str], inputs: list[str]) -> list[dict[str, str]]:
+    """Describe known Decimal model inputs from this explicit metadata inspection."""
+    return [
+        {"column": name, "source_dtype": schema[name], "target_dtype": "float64"}
+        for name in inputs
+        if re.fullmatch(r"decimal\(\d+,\d+\)", schema.get(name, ""))
+    ]
+
+
+def _conversion_preview(
+    tables: dict,
+    names: tuple[str, str],
+    inputs: list[str],
+    config: dict[str, Any],
+    lookup_controls: set[str],
+) -> list[str]:
+    """Label schema-derived candidates as planned casts rather than completed training."""
+    protected = {
+        *config["record_key_columns"],
+        *lookup_controls,
+        config.get("cv_group_column"),
+        config.get("event_column"),
+        config.get("result_available_at_column"),
+    }
+    converted_inputs = [name for name in inputs if name not in protected]
+    for name in names:
+        table = tables[name]
+        table["planned_input_conversions"] = _planned_input_conversions(
+            table["columns"], converted_inputs
+        )
+    if any(tables[name]["planned_input_conversions"] for name in names):
+        return [
+            "Planned DECIMAL input conversions reflect the inspected source schema; "
+            "the completed training report records performed casts. Converting DECIMAL "
+            "to float64 may lose precision beyond roughly 15-17 significant digits."
+        ]
+    return []
+
+
 def validate_project_sources(
     config: dict[str, Any],
     query: Query,
@@ -133,7 +179,7 @@ def validate_project_sources(
     for name in names:
         table_name(name)
     keys = list(config["record_key_columns"])
-    inputs, warnings = _raw_inputs(config)
+    inputs, warnings, lookup_controls = _raw_inputs(config)
     tables: dict[str, Any] = {}
     for name in names:
         schema, cdf = _table_schema(query, name)
@@ -145,6 +191,7 @@ def validate_project_sources(
     _require_columns(train_schema, keys + inputs, training)
     _require_columns(score_schema, keys + inputs, scoring)
     _compatible(train_schema, score_schema, keys + inputs)
+    warnings += _conversion_preview(tables, (training, scoring), inputs, config, lookup_controls)
     warnings += _check_outcome_columns(
         config, tables, training, outcome, label_table, label_available_at_column
     )

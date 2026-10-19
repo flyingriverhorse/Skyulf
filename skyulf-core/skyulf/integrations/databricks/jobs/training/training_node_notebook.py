@@ -11,6 +11,7 @@ from ...model_sets.model_set_project import (
 )
 from ...observability.reports.training_node_output import render_training_node
 from ...observability.reports.training_summary import render_final_training_report
+from ..serving_handoff import publish_serving_handoff
 from ..shared.job_output import render_lifecycle_output
 from ..shared.job_runtime import (
     lifecycle_widget_context,
@@ -132,6 +133,7 @@ def run_models_report_notebook(dbutils: Any, *, display_html: Any = None) -> str
     output = dict(store.receipt(phase)["output"])
     output["score_requested"] = _set_score_requested(store.request, output)
     dbutils.jobs.taskValues.set(key="score_requested", value=output["score_requested"])
+    publish_serving_handoff(dbutils, output.get("alias_change", output.get("receipt")), values)
     render = render_model_set_result
     if store.request["action"] == "train":
         render = lambda payload: render_final_training_report(

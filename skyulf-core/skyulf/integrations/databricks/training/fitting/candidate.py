@@ -1068,6 +1068,22 @@ def _candidate_training_frame(
     return frame.loc[:, columns]
 
 
+def _fit_data_config(
+    config: dict[str, Any], frame: pd.DataFrame, holdout: pd.DataFrame, spec: TrainingSpec
+) -> dict[str, Any]:
+    """Bind observed source conversions and training weights to the fitted payload."""
+    evidence = {}
+    if "training_weights" in holdout.attrs:
+        evidence["training_weights"] = holdout.attrs["training_weights"]
+    if "source_column_conversions" in frame.attrs:
+        evidence["source_column_conversions"] = [
+            dict(item)
+            for item in frame.attrs["source_column_conversions"]
+            if item["column"] in spec.input_columns
+        ]
+    return {**config, **evidence} if evidence else config
+
+
 def fit_candidate(
     spark: Any,
     spec: TrainingSpec,
@@ -1102,8 +1118,7 @@ def fit_candidate(
     )
     train_frame, sample_weight = extract_training_weights(train_frame, spec.weight_column)
     train_frame = _candidate_training_frame(train_frame, spec, temporal_cv)
-    if "training_weights" in holdout.attrs:
-        pipeline_config = {**pipeline_config, "training_weights": holdout.attrs["training_weights"]}
+    pipeline_config = _fit_data_config(pipeline_config, frame, holdout, spec)
     native_train = pl.from_pandas(train_frame) if engine == "polars" else train_frame
     native_holdout = pl.from_pandas(holdout) if engine == "polars" else holdout
     search = pipeline_config["modeling"]["type"] == "hyperparameter_tuner"
@@ -1177,6 +1192,17 @@ def read_training_partitions(
         frame, spec, keep_training_event=temporal_cv, engine=engine
     )
     return frame, train, holdout, unavailable
+
+
+def _source_conversion_evidence(frame: pd.DataFrame) -> dict[str, Any]:
+    """Detach observed source conversion metadata while preserving legacy absence."""
+    if "source_column_conversions" not in frame.attrs:
+        return {}
+    return {
+        "source_column_conversions": [
+            dict(item) for item in frame.attrs["source_column_conversions"]
+        ]
+    }
 
 
 def log_fitted_candidate(
@@ -1255,7 +1281,11 @@ def log_fitted_candidate(
     if risk_category:
         tags["risk_category"] = risk_category
     run.set_tags(tags)
-    run.client.log_dict(run.run_id, {"dataset_id": spec.dataset_id, **tags}, "training_data.json")
+    run.client.log_dict(
+        run.run_id,
+        {"dataset_id": spec.dataset_id, **tags, **_source_conversion_evidence(frame)},
+        "training_data.json",
+    )
     run.client.log_dict(
         run.run_id,
         {
@@ -1607,10 +1637,30 @@ def _pre_split_step_identity(step: Any, index: int) -> tuple[str, dict[str, Any]
     return step_type, params
 
 
+def training_numeric_columns(spec: TrainingSpec) -> tuple[str, ...]:
+    """Select model values while preserving record, grouping and time identities."""
+    protected = {
+        *spec.record_key_columns,
+        spec.group_column,
+        spec.event_column,
+        spec.result_available_at_column,
+        *lookup_controls(spec),
+    }
+    return tuple(name for name in spec.source_columns if name not in protected)
+
+
 def _materialize_training_rows(
     selected: Any, spec: TrainingSpec, names: tuple[str, ...]
 ) -> pd.DataFrame:
     """Decode bounded rows and dates while enforcing serialized and local frame budgets."""
+    from skyulf.engines.spark_engine import (  # noqa: PLC0415
+        normalize_spark_decimals,
+        restore_spark_decimal_dtypes,
+    )
+
+    selected, conversions = normalize_spark_decimals(
+        selected, columns=training_numeric_columns(spec)
+    )
     records: list[dict[str, Any]] = []
     serialized_bytes = 0
     for row in selected.toLocalIterator():
@@ -1624,7 +1674,9 @@ def _materialize_training_rows(
         if serialized_bytes > spec.max_bytes:
             raise spec.byte_limit_error(serialized_bytes)
         records.append(record)
-    frame = pd.DataFrame.from_records(records, columns=names)
+    frame = restore_spark_decimal_dtypes(
+        pd.DataFrame.from_records(records, columns=names), conversions
+    )
     if frame_bytes(frame) > spec.max_bytes:
         raise spec.byte_limit_error(frame_bytes(frame))
     return frame

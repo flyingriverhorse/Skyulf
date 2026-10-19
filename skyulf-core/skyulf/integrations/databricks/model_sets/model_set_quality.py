@@ -8,7 +8,7 @@ import polars as pl
 
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
-from ....inference.model_set import ModelSetArtifact
+from ....inference.model_set import ModelSetArtifact, ModelSetManifest
 from ...mlflow.lifecycle.validation import (
     ModelComparisonReport,
     compare_registered_pipeline_models,
@@ -31,11 +31,34 @@ def _non_regressing(report: ModelComparisonReport) -> bool:
     return gain is not None and isfinite(gain) and gain >= 0
 
 
-def component_quality(report: ModelComparisonReport) -> dict[str, Any]:
+def component_quality(
+    report: ModelComparisonReport, *, allow_unloadable_champion: bool = False
+) -> dict[str, Any]:
     """Require absolute gates and no regression; track meaningful gains separately."""
     absolute = report.quality_threshold is not None and quality_gates_pass(report)
     non_regressing = _non_regressing(report)
-    passed = absolute and (report.champion_version is None or non_regressing)
+    unavailable = report.reason == "champion_runtime_unavailable" and bool(
+        report.champion_unavailable
+    )
+    passed = absolute and (
+        report.champion_version is None
+        or non_regressing
+        or (allow_unloadable_champion and unavailable)
+    )
+    result = {
+        "passed": passed,
+        "improved": passed and report.eligible,
+        "reason": _component_reason(report, absolute, non_regressing),
+        "gates": quality_gate_results(report),
+        "comparison": comparison_payload(report),
+    }
+    if unavailable:
+        result["unloadable_champion_approval_allowed"] = absolute
+    return result
+
+
+def _component_reason(report: ModelComparisonReport, absolute: bool, non_regressing: bool) -> str:
+    """Retain existing per-component explanations for failed and comparable candidates."""
     reason = report.reason
     if report.quality_threshold is None:
         reason = "missing_quality_threshold"
@@ -45,13 +68,7 @@ def component_quality(report: ModelComparisonReport) -> dict[str, Any]:
         reason = "initial_quality_passed"
     elif non_regressing and not report.eligible:
         reason = "non_regressing"
-    return {
-        "passed": passed,
-        "improved": passed and report.eligible,
-        "reason": reason,
-        "gates": quality_gate_results(report),
-        "comparison": comparison_payload(report),
-    }
+    return reason
 
 
 def _heldout(spark: Any, spec: Any, engine: str, evidence: Any, limits: dict) -> Any:
@@ -89,6 +106,7 @@ def _evaluate_component(
     *,
     max_rows: int,
     max_bytes: int,
+    allow_unloadable_champion: bool = False,
     **endpoints: Any,
 ) -> dict:
     """Compare one candidate against its counterpart from the pinned champion set."""
@@ -126,19 +144,20 @@ def _evaluate_component(
         max_bytes=min(max_bytes, spec.max_bytes),
         **endpoints,
     )
-    return component_quality(fresh)
+    return component_quality(fresh, allow_unloadable_champion=allow_unloadable_champion)
 
 
 def evaluate_model_set_quality(
     spark: Any,
     artifact: ModelSetArtifact,
-    champion: ModelSetArtifact | None,
+    champion: ModelSetArtifact | ModelSetManifest | None,
     *,
     expected_champion_version: str | None,
     max_rows: int,
     max_bytes: int,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> dict:
     """Require complete immutable evidence and collect every branch's quality decision."""
     saved = artifact.manifest.quality_evidence
@@ -160,12 +179,28 @@ def evaluate_model_set_quality(
                 max_bytes=max_bytes,
                 tracking_uri=tracking_uri,
                 registry_uri=registry_uri,
+                allow_unloadable_champion=allow_unloadable_champion,
             )
-    return _set_decision(results, expected_champion_version)
+    return _set_decision(results, expected_champion_version, allow_unloadable_champion)
 
 
-def _set_decision(results: dict, expected_champion_version: str | None) -> dict:
+def _set_decision(
+    results: dict, expected_champion_version: str | None, allow_unloadable_champion: bool = False
+) -> dict:
     """Allow tied peers only when another branch earns replacement of the whole set."""
+    if any(result.get("comparison", {}).get("champion_unavailable") for result in results.values()):
+        return _unloadable_set_decision(
+            results, expected_champion_version, allow_unloadable_champion
+        )
+    if allow_unloadable_champion:
+        raise ValueError(
+            "allow_unloadable_champion applies only when the champion cannot be loaded."
+        )
+    return _comparable_set_decision(results, expected_champion_version)
+
+
+def _comparable_set_decision(results: dict, expected_champion_version: str | None) -> dict:
+    """Preserve normal set decisions and their serialized evidence without recovery fields."""
     initial = expected_champion_version is None
     failed = [name for name, result in results.items() if not result["passed"]]
     improved = [name for name, result in results.items() if result["improved"]]
@@ -184,9 +219,36 @@ def _set_decision(results: dict, expected_champion_version: str | None) -> dict:
     }
 
 
-def _counterparts(components: Any, champion: ModelSetArtifact | None) -> dict:
+def _unloadable_set_decision(results: dict, expected: str | None, approved: bool) -> dict:
+    """Expose explicit recovery only when every candidate passes its saved absolute gates."""
+    allowed = all(
+        result["passed"] or result.get("unloadable_champion_approval_allowed", False)
+        for result in results.values()
+    )
+    reason = "unloadable_champion_approved" if approved else "champion_runtime_unavailable"
+    return {
+        "passed": approved and allowed,
+        "reason": reason if allowed else "component_quality_failed",
+        "failed_components": [name for name, result in results.items() if not result["passed"]],
+        "improved_components": [name for name, result in results.items() if result["improved"]],
+        "components": results,
+        "expected_champion_version": expected,
+        "unloadable_champion_approval_allowed": allowed,
+        "allow_unloadable_champion": approved,
+    }
+
+
+def champion_components(champion: ModelSetArtifact | ModelSetManifest | None) -> tuple:
+    """Read component pins from a loaded set or its independently verified manifest."""
+    if champion is None:
+        return ()
+    manifest = champion if isinstance(champion, ModelSetManifest) else champion.manifest
+    return manifest.components
+
+
+def _counterparts(components: Any, champion: ModelSetArtifact | ModelSetManifest | None) -> dict:
     """Reject missing or added branches before comparing any model."""
-    previous = {c.branch: c for c in champion.manifest.components} if champion else {}
+    previous = {c.branch: c for c in champion_components(champion)}
     if champion and set(previous) != {c.branch for c in components}:
         raise ValueError("Model set quality requires the same champion branch names.")
     return previous

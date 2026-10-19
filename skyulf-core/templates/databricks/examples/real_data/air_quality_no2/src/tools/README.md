@@ -35,7 +35,7 @@ locally installed packages and selected options.
 
 Preview resolves trusted custom factories, so keep I/O out of imports and
 builders. It starts no cloud job, reads no Delta rows, fits no model and does
-not run `preprocessing_probe`. A preview-resolution failure prints
+not run `save_preprocessing_diagnostics`. A preview-resolution failure prints
 `Configuration error:` and exits with code 2. Fix the stated configuration
 before deployment; passing preview does not verify data or cloud permissions.
 

@@ -37,8 +37,8 @@ resources:
 {{end}}
             base_parameters:
               workflow_contract: "3"
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .score_follow_champion "true"}}after_alias_change{{else}}disabled{{end}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.rescore_when_history_expires}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
               job_run_id: '{{"{{job.run_id}}"}}'
               task_key: score
@@ -69,7 +69,7 @@ resources:
           libraries:
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
-{{if eq .auto_rebuild_on_cdf_expiry "true"}}
+{{if eq .rescore_when_history_expires "true"}}
         - task_key: recovery_needed
           depends_on:
             - task_key: score
@@ -92,8 +92,8 @@ resources:
               job_run_id: '{{"{{job.run_id}}"}}'
               task_key: recover_predictions
               workspace_host: ${workspace.host}
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .score_follow_champion "true"}}after_alias_change{{else}}disabled{{end}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.rescore_when_history_expires}}"
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
@@ -134,8 +134,8 @@ resources:
             notebook_path: ../src/jobs/scoring_report.py
             base_parameters:
               workflow_contract: "3"
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .score_follow_champion "true"}}after_alias_change{{else}}disabled{{end}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.rescore_when_history_expires}}"
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
@@ -166,7 +166,7 @@ resources:
         - task_key: monitoring_allowed
           description: Monitor shared deployments only; skip ephemeral development models
           depends_on:
-            - task_key: {{if eq .auto_rebuild_on_cdf_expiry "true"}}scoring_report{{else}}score{{end}}
+            - task_key: {{if eq .rescore_when_history_expires "true"}}scoring_report{{else}}score{{end}}
           condition_task:
             op: EQUAL_TO
             left: ${bundle.mode}
@@ -187,8 +187,8 @@ resources:
               task_key: prepare_monitoring
               workspace_host: ${workspace.host}
               workflow_contract: "3"
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .score_follow_champion "true"}}after_alias_change{{else}}disabled{{end}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.rescore_when_history_expires}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}

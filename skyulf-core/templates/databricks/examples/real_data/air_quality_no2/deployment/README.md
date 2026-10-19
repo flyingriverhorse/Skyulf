@@ -5,7 +5,7 @@ workflow or company adapter is generated. Keep credentials outside these files.
 
 ## Selected layout
 
-- Training engine: `pandas`; inference mode: `spark`.
+- Training engine: `pandas`; batch compute: `spark`.
 - Personal development targets: `false`.
 - Shared execution identity: `deployer`.
 - Managed per-job permissions: `false`.

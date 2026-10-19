@@ -7,6 +7,26 @@
 {{- template "ERROR_performance_policy_requires_outcomes_and_monitoring_store" . -}}
 {{- end}}
 variables:
+{{- if ne .prediction_delivery "batch"}}
+  serving_timeout_seconds:
+    description: Serving child job limit; keep at least 300 seconds above serving.yml ready_timeout_s
+    default: 7200
+{{if eq .compute_mode "serverless"}}
+  cost_tag_value:
+    description: Endpoint cost allocation tag value; set before the first serving run
+    default: {{printf "%q" .cost_tag_value}}
+{{end}}
+  serving_permissions:
+    description: Serving child ACL; retain the automatic train caller when overriding this list
+    type: complex
+{{if eq .deployment_identity "deployer"}}
+    default: []
+{{else}}
+    default:
+      - level: CAN_MANAGE_RUN
+        service_principal_name: ${var.{{if eq .deployment_identity "shared_service_principal"}}shared_service_principal{{else}}train_service_principal{{end}}}
+{{end}}
+{{end}}
   pipeline_owner:
     description: User with CAN_MANAGE on every target besides the deployer; CI may pass --var pipeline_owner
     default: "{{if .pipeline_owner}}{{.pipeline_owner}}{{else}}${workspace.current_user.userName}{{end}}"

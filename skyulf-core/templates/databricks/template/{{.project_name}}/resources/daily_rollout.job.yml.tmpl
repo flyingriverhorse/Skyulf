@@ -27,6 +27,50 @@ resources:
               job_run_id: '{{"{{job.run_id}}"}}'
               task_key: daily_rollout
               workspace_host: ${workspace.host}
+{{if ne .prediction_delivery "batch"}}
+              deployed_serving_endpoint: "true"
+              cost_tag_key: {{printf "%q" .cost_tag_key}}
+              cost_tag_value: ${var.cost_tag_value}
+              bundle_project: ${bundle.name}
+              bundle_mode: ${bundle.mode}
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+{{end}}
+{{if ne .prediction_delivery "batch"}}
+        - task_key: serving_allowed
+          depends_on:
+            - task_key: daily_rollout
+          condition_task:
+            op: EQUAL_TO
+            left: ${bundle.mode}
+            right: production
+        - task_key: serving_requested
+          depends_on:
+            - task_key: serving_allowed
+              outcome: "true"
+          condition_task:
+            op: EQUAL_TO
+            left: '{{"{{tasks.daily_rollout.values.serving_requested}}"}}'
+            right: "true"
+        - task_key: run_serving_endpoint
+          timeout_seconds: 300
+          environment_key: serving
+          disable_auto_optimization: true
+          max_retries: 0
+          retry_on_timeout: false
+          depends_on:
+            - task_key: serving_requested
+              outcome: "true"
+          notebook_task:
+            notebook_path: ../src/jobs/dispatch_serving.py
+            base_parameters:
+              serving_job_id: ${resources.jobs.serving_endpoint.id}
+              job_run_id: '{{"{{job.run_id}}"}}'
+              model_version: '{{"{{tasks.daily_rollout.values.serving_model_version}}"}}'
+{{end}}
       environments:
         - environment_key: serving
           spec:

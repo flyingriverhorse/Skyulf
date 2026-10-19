@@ -17,6 +17,7 @@ from ...lifecycle.workflow import (
     resolve_target_config,
     run_action,
     workflow_policies,
+    workflow_table_fields,
 )
 from ...observability.monitoring.monitoring_registration import (
     monitoring_destination,
@@ -25,6 +26,7 @@ from ...observability.monitoring.monitoring_registration import (
     validate_monitoring_settings,
 )
 from ...projects.workflow_config import validate_deployed_contract, validate_workflow_config
+from ..serving_handoff import publish_serving_handoff
 from .job_output import render_bundle_output, render_lifecycle_output
 from .notebook_diagnostics import result_summary
 
@@ -231,7 +233,7 @@ def read_notebook_config(values: dict[str, str]) -> dict[str, Any]:
     from ...projects.yaml_config import read_workflow_config  # noqa: PLC0415
 
     config = read_workflow_config(values["config_path"])
-    required = {"training_table", "score_source_table", "prediction_table", "model_name"}
+    required = workflow_table_fields(config)
     if not isinstance(config, dict) or any(
         not isinstance(config.get(key), str) for key in required
     ):
@@ -465,6 +467,8 @@ def run_lifecycle_notebook(
         )
     if phase in {"result", "complete"}:
         dbutils.jobs.taskValues.set(key="score_requested", value=outcome.output["score_requested"])
+        completed = outcome.output["result"]
+        publish_serving_handoff(dbutils, completed.get("alias_change", completed), values)
     render = _lifecycle_notebook_renderer(
         phase,
         outcome,

@@ -140,7 +140,7 @@ def test_branch_loader_rejects_unsupported_policies(tmp_path, workflow_config, c
     path = Path(values["config_path"])
     path.write_text(json.dumps({**json.loads(path.read_text()), **change}))
     values["deployed_score_handoff"] = change.get("score_handoff", "disabled")
-    with pytest.raises(ValueError, match="manual_approval|disabled"):
+    with pytest.raises(ValueError, match="manual_approval|follow_champion"):
         load_training_branch_configs(values)
 
 
@@ -179,7 +179,7 @@ def test_multi_target_cli_graph_has_same_three_jobs(tmp_path, compute, policy, h
         training_layout="multi_target",
         compute_mode=compute,
         model_set_promotion_policy=policy,
-        score_handoff=handoff,
+        score_follow_champion=str(handoff == "after_alias_change").lower(),
     )
     jobs = _read_jobs(project)
     assert set(jobs) == {"train", "score", "monitoring"}
