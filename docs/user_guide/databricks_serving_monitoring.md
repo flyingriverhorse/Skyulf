@@ -6,7 +6,17 @@ For REST deployment and typed SQL function/`ai_query` calls, follow
 [Deploy and call a model](databricks_serving.md). The optional helper uses one concrete registered
 model version and derives SQL input/output types from its inspected package.
 
-First [prepare and create a pinned endpoint](databricks_serving.md#the-command)
+The generated `serving_endpoint` job automatically enrolls its concrete version
+after successful verification when payload logging is enabled. Configure the
+shared monitoring catalog/schema first. For a model set it enrolls every branch;
+updating the endpoint disables its prior registrations while retaining history.
+No separate `enroll_serving` run is needed for this job. Send requests and run
+the monitoring job to create observations; enrollment itself does not populate
+traffic charts. `prediction_delivery: endpoint` keeps monitoring without a batch
+score job. With logging disabled, automatic serving enrollment is skipped.
+
+For an endpoint created outside that job, first
+[prepare and create a pinned endpoint](databricks_serving.md#the-command)
 with full payload capture. Keep its concrete model version, endpoint name and
 payload view together; a registry alias can move independently of requests
 already logged. Endpoint creation, runtime admission and logging-mode selection
@@ -24,7 +34,7 @@ artifact certificates require the original packaged source.
 ```mermaid
 flowchart LR
     A["Pinned endpoint with payload logging"] --> B["Payload view"]
-    B --> C["monitoring job: enroll_serving"]
+    B --> C["Serving job enrollment or manual enroll_serving"]
     C --> D["Scheduled monitoring job: observe"]
     D --> E["Saved serving report"]
     E --> F["Dashboard: Online serving"]
@@ -55,8 +65,8 @@ not observe, publish an observation reference, or request training in that run.
 Later scheduled `monitoring_action=observe` runs select active batch and online
 enrollments together and use the existing report, policy and dashboard.
 
-For two served versions, add a separate entry for each concrete version and
-endpoint. A model-set branch needs its own entry with `model_set_name`,
+For manually enrolled endpoints with two served versions, add a separate entry
+for each concrete version and endpoint. A model-set branch needs its own entry with `model_set_name`,
 `model_set_version` and `model_set_branch` identifying the parent release and
 output. Labels are provided independently in a Delta table keyed by
 `databricks_request_id` and zero-based `request_row_index`, with the actual target
@@ -67,8 +77,9 @@ an explicit later decision.
 
 Keep performance in `report` mode initially. The inline online policy determines its measured
 verdict; automatic requests also require the deployment gate described in
-[guarded retraining](databricks_retraining.md#what-to-edit). Retraining does not update the
-endpoint.
+[guarded retraining](databricks_retraining.md#what-to-edit). Retraining alone does
+not update an endpoint. After a completed champion change, the independently
+configured serving handoff can submit its update job in production mode.
 
 To retire or pause one online enrollment, resubmit its complete JSON entry with
 `enabled: false` using `monitoring_action=enroll_serving`. Keep the endpoint,

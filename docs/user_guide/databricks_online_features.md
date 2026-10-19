@@ -90,7 +90,7 @@ your own before generating:
   "include_online_serving": "true",
   "include_online_publication": "false",
   "include_daily_rollout": "false",
-  "score_handoff": "disabled",
+  "score_follow_champion": "false",
   "scoring_mode": "manual",
   "promotion_policy": "manual_approval"
 }

@@ -81,7 +81,7 @@ paths and configuration fields.
 | Guide | What it covers |
 | --- | --- |
 | [Scoring and publication](databricks_scoring.md) | Input and output tables, model selection, incremental startup, saved eligibility/output rules and prediction receipts. |
-| [Score on Spark workers](databricks_spark_scoring.md) | `inference_mode: spark`, supported saved models and recipes, worker environments, admission checks and model-set scoring. |
+| [Score on Spark workers](databricks_spark_scoring.md) | `batch_compute: spark`, supported saved models and recipes, worker environments, admission checks and model-set scoring. |
 | [Databricks Python SDK](databricks_sdk.md) | Python entry points for fitting, inspecting and scoring, followed by links to individual cloud workflows. |
 | [Monthly batch publication](databricks_batch.md) | Score a pinned source snapshot, replace one calendar period atomically and retry without duplicating a committed write. |
 

@@ -217,7 +217,7 @@ defaults:
   target_column: claim_amount
   pre_split_recipe: known_income
   preprocessing_recipe: claim_inputs
-  preprocessing_probe: true
+  save_preprocessing_diagnostics: true
 ```
 
 The defaults use linear regression with a bounded search. Keep them for this run,
@@ -257,7 +257,7 @@ A rolling window changes at invocation, while a fixed window keeps its boundarie
 | --- | --- | --- |
 | `promotion_policy` | Training policy, or inference `model_set` policy | `manual_approval` waits for an operator; `automatic` applies saved quality gates |
 | `score_model_selection` | `config/inference.yml` | Resolve the controlled champion or use a pinned `model_version` |
-| `score_handoff` | `config/inference.yml` | `after_alias_change` starts scoring after a successful champion transition; `disabled` leaves scoring to its own trigger |
+| `follow_champion` | `config/inference.yml` | `true` starts scoring after a successful champion transition; `false` leaves scoring to its own trigger |
 
 Manual approval does not imply manual scoring. A pinned scorer keeps using its
 pinned version even after champion changes. Rejection and training without a
@@ -464,7 +464,7 @@ databricks bundle run train -t test --profile YOUR_PROFILE
 Open **Workflows > train run > training_report > Output**. The
 [training reports guide](databricks_training_reports.md) explains the task
 graph, the notebook output and the saved input evidence. Chapter 4 turned on
-`preprocessing_probe`; [preprocessing diagnostics](preprocessing_context.md#how-to-read-the-report)
+`save_preprocessing_diagnostics`; [preprocessing diagnostics](preprocessing_context.md#how-to-read-the-report)
 explains where its report is and how to read it.
 
 The report lists the next actions with their exact parameters. Run them on the

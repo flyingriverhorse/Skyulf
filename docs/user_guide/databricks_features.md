@@ -363,7 +363,7 @@ feature_lookup:
       lookback_seconds: 2678400
 ```
 
-Set `inference_mode: spark` in `config/inference.yml` for this offline batch
+Set `batch_compute: spark` in `config/inference.yml` for this offline batch
 route and score from the corresponding observation table. The example's
 lookback is 31 days. For a non-temporal exact lookup, omit timestamp and lookback
 fields. Any direct model inputs not fetched must be present in the base table.

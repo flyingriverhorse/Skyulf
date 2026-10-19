@@ -33,6 +33,47 @@ SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
 For a worked example table, see the
 [end-to-end guide](databricks_bundle_walkthrough.md).
 
+### Spark DECIMAL model values
+
+At the Spark-to-model boundary, Skyulf converts selected `DECIMAL(p,s)` model inputs,
+numeric targets and weights to `DOUBLE` / `float64`. Bounded training, batch prediction,
+Spark worker inputs and the serving job's smoke sample use the same rule. Nulls remain
+missing values for the fitted preprocessing. Record keys, grouping identities and
+time controls retain their declared types.
+Use supported `STRING` or `BIGINT` record keys. Serving refuses a DECIMAL key that
+cannot be represented by its saved JSON contract; it does not round the key to float.
+
+For example, an `amount DECIMAL(17,6)` input becomes `float64` in the fitted pipeline,
+`double` in its MLflow signature and `DOUBLE` in the generated SQL scoring function.
+REST callers send JSON numbers or null, rather than Python `decimal.Decimal` objects.
+Converting DECIMAL to float64 may lose precision beyond roughly 15–17 significant digits.
+
+The completed training report and `training_data.json` list the observed conversions:
+
+```json
+{
+  "source_column_conversions": [
+    {"column": "amount", "source_dtype": "decimal(17,6)", "target_dtype": "float64"}
+  ]
+}
+```
+
+The saved model's `manifest.json` records conversions for its fitted inputs; a model
+set retains these in each component manifest. The default offline preview cannot
+inspect a table's physical types. Use its source-validation action for planned casts
+on the current schema, and the training report for casts actually performed on the
+pinned snapshot. Older artifacts without this field have no recorded conversion evidence.
+
+Native Feature Engineering lookup reads its own source/feature tables after Skyulf's
+projection. Its model-value columns must already use `DOUBLE`; persist the converted
+column and retrain before logging or serving that native lookup model. Its existing
+admission check rejects DECIMAL storage with an actionable message.
+
+If an older champion learned a DECIMAL input as `object` or string, the new float64
+candidate has a different input contract. Follow the
+[schema migration steps](databricks_model_sets.md#upgrading-core-with-model-sets)
+before switching consumers; a runtime-recovery flag does not override schema validation.
+
 ### Choose a table layout
 
 A project reads data in three roles. A layout only decides how many physical
@@ -149,7 +190,7 @@ Three behaviours decide which layout works:
 - **Incremental scoring accepts inserts only.** For a single model or a
   competition, an UPDATE or DELETE in the scoring source fails the score job
   with *Source updates and deletes require an explicit rescore policy*. Model
-  sets alone can opt into `source_change_policy: rebuild_on_change`; see
+  sets alone can opt into `on_source_change: rescore_all`; see
   [source changes](databricks_scoring.md#source-changes-are-separate-from-model-changes).
   Writing an outcome into an existing scoring row is an update, so use a
   separate outcomes table instead.

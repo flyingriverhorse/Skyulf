@@ -1,7 +1,7 @@
 # Score on Spark workers
 
 This page covers distributed scoring for a generated Databricks Bundle:
-`inference_mode: spark` worker configuration and admission, the table of what
+`batch_compute: spark` worker configuration and admission, the table of what
 Spark scoring supports, worker capacity and environment settings, and how to
 read results and model-set composition. Read it when a saved model should score
 a Delta source in pandas batches on Spark workers instead of as one whole frame.
@@ -17,7 +17,7 @@ the estimator's fit or tuning trials into distributed training.
 
 ```mermaid
 flowchart LR
-    A["Pinned Delta source"] --> B{"inference_mode"}
+    A["Pinned Delta source"] --> B{"batch_compute"}
     B --> C["local: whole pandas/Polars frame"]
     B --> D["spark: admitted pandas worker batches"]
     C --> E["Saved preprocessing and model"]
@@ -26,7 +26,7 @@ flowchart LR
     F --> G["Guarded Delta publication"]
 ```
 
-Here `inference_mode: local` means whole-frame scoring, including on Databricks
+Here `batch_compute: single_node` means whole-frame scoring, including on Databricks
 compute. It is separate from SDK `runtime="standalone"` versus
 `runtime="databricks"`, which chooses the integration environment.
 UC Delta publication requires `runtime="databricks"`. SDK `runtime` accepts
@@ -46,7 +46,7 @@ defaults:
 
 ```yaml
 # config/inference.yml
-inference_mode: spark
+batch_compute: spark
 spark_udf_env_manager: local
 spark_udf_prediction_batch_rows: 10000
 ```
@@ -54,7 +54,7 @@ spark_udf_prediction_batch_rows: 10000
 The Bundle uses `mlflow.pyfunc.spark_udf`; workers receive pandas batches and
 apply saved preprocessing without refitting. Explicit Spark with Polars is
 rejected. The library's `predict_spark`/`mapInPandas` API is a separate route.
-Without `inference_mode`, scoring is whole-frame (`local`).
+Without `batch_compute`, scoring is whole-frame (`single_node`).
 
 ### What Spark scoring supports
 
@@ -75,10 +75,10 @@ choices than distributed scoring admits.
 | Tuning and thresholds | Reviewed fitted tuning wrappers are supported. Arbitrary tuned feature exclusions are rejected; recorded CV time/group metadata removal retains its existing contract. Tuned thresholds need a valid class-to-threshold mapping and a reviewed classifier or matching probed model evidence. SGD with hinge loss and SVC without probability support retain label-only outputs. |
 | Model sets | Every component must pass admission, including its saved scoring rules and reused pre-split recipe. Independent outputs, declared numeric `weighted_sum`/`weighted_mean` composition and combined function rules selected in scoring.yml (or legacy `build_combined_rules()`) are supported; function rules need sealed training probe evidence (see below). |
 | Saved project scoring rules | Eligibility and output rules are admitted when training linted and probed them (see below); Spark and online-feature projects do this automatically. The result columns (`scoring_status`, `exclusion_reason` and the declared outputs) travel through the Spark UDF and endpoints. Reused pre-split eligibility (`mode: pre_split` or `mode: combined` in scoring.yml) is admitted when its steps are row-local and probed: fixed built-in edits, `DropMissingRows`, `ManualBounds` and `filter_step` functions. `Deduplicate` and custom filter classes in the reuse are rejected; `validate_model` rejects them before registration. `preview.py --action score` prints `Project scoring rules: disabled` when none are saved. |
-| Custom/context-dependent code | `column_step`/`fitted_step` steps are admitted when training linted and probed them (see below). An `inference_context="row"` declaration is optional. `group`, `window` and `global` declarations, custom classes from `custom_step`, unreviewed fitted states and temporal carry history are rejected. A passing `preprocessing_probe` report alone grants no admission. |
+| Custom/context-dependent code | `column_step`/`fitted_step` steps are admitted when training linted and probed them (see below). An `inference_context="row"` declaration is optional. `group`, `window` and `global` declarations, custom classes from `custom_step`, unreviewed fitted states and temporal carry history are rejected. A passing preprocessing diagnostics report (`save_preprocessing_diagnostics`) alone grants no admission. |
 
 Models packaged with [feature lookup](databricks_features.md) require
-`inference_mode: spark`; whole-frame mode rejects them, including feature-backed
+`batch_compute: spark`; whole-frame mode rejects them, including feature-backed
 model-set components. They score through the Feature Engineering `score_batch`
 route. Lookup does not relax the model/preprocessing checks.
 
@@ -164,7 +164,7 @@ instead of registering a model that would score inconsistently. Typical cases:
 
 Spark and online-feature projects run the checks automatically. Endpoint-only
 projects enable the same training check with
-`defaults.admit_probed_custom_steps: true` in `config/training.yml`; despite its
+`defaults.allow_tested_custom_steps: true` in `config/training.yml`; despite its
 historical name, this setting also seals built-in and model evidence. Train and
 register a new version after enabling it. Editing an old artifact's flag does
 not create evidence.
@@ -212,7 +212,7 @@ as `df["x"].mean()`, would give different answers on each Spark worker batch.
 Training therefore checks your own code before it can run on Spark workers or
 endpoints:
 
-- In a project with `inference_mode: spark` or `online_features`, the check runs
+- In a project with `batch_compute: spark` or `online_features`, the check runs
   automatically whenever the model has a `column_step`, a `fitted_step` or
   saved scoring rules. No setting is needed.
 - Other projects, for example one that only serves an endpoint from
@@ -221,7 +221,7 @@ endpoints:
 ```yaml
 # config/training.yml
 defaults:
-  admit_probed_custom_steps: true
+  allow_tested_custom_steps: true
 ```
 
 ```python
@@ -331,7 +331,7 @@ Pick one of three fixes:
    `groups/` Spark producer that writes a feature column, or into a pre-split
    step if it only concerns training rows. Otherwise declare
    `inference_context="group"` or `"window"` and keep the project on
-   `inference_mode: local`.
+   `batch_compute: single_node`.
 3. **Lint false alarm on a per-row call.** Write the row axis explicitly, for
    example `df[["a", "b"]].sum(axis=1)`. There is no switch to turn the lint
    off, by design.

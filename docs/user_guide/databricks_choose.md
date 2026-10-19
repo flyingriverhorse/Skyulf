@@ -22,15 +22,15 @@ The layout shapes the generated train job, so choose it at `bundle init`; see
 
 | Who reads the predictions | Choose | Closest example | Details |
 | --- | --- | --- | --- |
-| A scheduled job writing a Delta table within `max_rows`/`max_input_mb` | `score` job, `inference_mode: local` (default) | `taxi_high_fare` | [Scoring](databricks_scoring.md) |
-| A scheduled job on a table too large for one Python process | `score` job, `inference_mode: spark` | `taxi_fare` | [Spark scoring](databricks_spark_scoring.md) |
+| A scheduled job writing a Delta table within `max_rows`/`max_input_mb` | `score` job, `batch_compute: single_node` (default) | `taxi_high_fare` | [Scoring](databricks_scoring.md) |
+| A scheduled job on a table too large for one Python process | `score` job, `batch_compute: spark` | `taxi_fare` | [Spark scoring](databricks_spark_scoring.md) |
 | An application sending raw feature values | REST serving endpoint | `taxi_fare_robust` | [Serving](databricks_serving.md) |
 | SQL users, SQL jobs and dashboards | SQL function calling the endpoint with `ai_query` | `taxi_fare_robust` | [SQL function](databricks_serving.md#3-create-the-sql-function) |
 | Requests that send only an entity key | Endpoint with online feature lookup | `taxi_fare_online` | [Online features](databricks_online_features.md) |
 
 The batch job never calls an endpoint, and an endpoint never writes the
 prediction table. Models packaged with feature lookup score in batch only with
-`inference_mode: spark`. Runtime and cost per path are compared in
+`batch_compute: spark`. Runtime and cost per path are compared in
 [how predictions are produced](databricks_serving.md#choose-how-predictions-are-produced).
 
 For rows excluded by preprocessing at scoring, start with `taxi_fare_robust`.
@@ -48,7 +48,7 @@ independent batches, so the same admission applies to both.
 | Built-in models | Reviewed linear/logistic/tree models and `XGBRegressor`; additional models and voting/stacking with matching training probe evidence | [Support table](databricks_spark_scoring.md#what-spark-scoring-supports) |
 | Built-in preprocessing steps | Reviewed steps (including median imputers), plus eligible row-preserving recipes with matching training probe evidence | [Recipe boundaries](databricks_spark_scoring.md#built-in-recipes-and-model-evidence) |
 | Your `column_step` and `fitted_step` functions, saved scoring rules | Admitted when training lints and probes them | [When the probe fails](databricks_spark_scoring.md#when-the-probe-fails) |
-| Steps that need other rows (`group`, `window`, `global`), `custom_step` classes | Rejected; keep `inference_mode: local` | [Custom steps](databricks_custom_steps.md) |
+| Steps that need other rows (`group`, `window`, `global`), `custom_step` classes | Rejected; keep `batch_compute: single_node` | [Custom steps](databricks_custom_steps.md) |
 
 A single-model or competition Spark project rejects an unsupported model or step
 before registration, so the failure appears in the train job, not in the first

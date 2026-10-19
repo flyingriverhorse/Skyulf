@@ -40,7 +40,7 @@ continues scoring with v2 after a successful promotion of v4. Selecting
 champion fails before output preparation; there is no fallback to latest.
 
 Set both fields together; a partial configuration fails before training or
-scoring. Generated projects also require `score_handoff`. Automatic promotion
+scoring. Generated projects also require `follow_champion`. Automatic promotion
 requires `quality_threshold`, including when scoring is pinned. Scoring never
 updates the caller's configured version. Moving from the single
 `model_selection_mode` field is covered in
@@ -247,11 +247,11 @@ with a message naming the release that produced the champion set.
 Rolling back to a champion from the older release restores its alias, but the
 current score job cannot load it; keep that release's runtime if you need it.
 
-`score_handoff` is a deploy-time setting in `config/inference.yml`, not a Run now parameter.
+`follow_champion` is a deploy-time setting in `config/inference.yml`, not a Run now parameter.
 Changing it needs the matching deployed job parameters and a redeploy; see
 [schedules and handoff](databricks_scoring.md#schedules-handoff-and-execution-engines).
-`after_alias_change` requests the existing score job after a successful initialization, promotion or
-rollback. `disabled` leaves scoring to an explicit score run or its schedule. Rejection and training
+`true` requests the existing score job after a successful initialization, promotion or
+rollback. `false` leaves scoring to an explicit score run or its schedule. Rejection and training
 without a champion transition never trigger score. Handoff preserves the score selector: a pinned
 scorer still uses its configured version even after champion changes.
 

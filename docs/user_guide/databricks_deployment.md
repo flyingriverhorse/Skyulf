@@ -288,9 +288,9 @@ independent Spark/serverless path in every layout.
 
 | Generated choice | Score execution | Environment manager |
 | --- | --- | --- |
-| `inference_mode: local` | Local pandas/Polars under row and byte bounds | Project task environment |
-| `inference_mode: spark`, serverless | `mlflow.pyfunc.spark_udf` | `local`, using the declared environment |
-| `inference_mode: spark`, policy cluster | `mlflow.pyfunc.spark_udf` | `virtualenv`, installing the recorded wheel and pins |
+| `batch_compute: single_node` | Local pandas/Polars under row and byte bounds | Project task environment |
+| `batch_compute: spark`, serverless | `mlflow.pyfunc.spark_udf` | `local`, using the declared environment |
+| `batch_compute: spark`, policy cluster | `mlflow.pyfunc.spark_udf` | `virtualenv`, installing the recorded wheel and pins |
 
 The Spark default prediction batch size is 10000. A manager failure stops
 scoring without silently changing managers. For certificates, admitted fitted
@@ -459,7 +459,7 @@ candidate version. Inspect run evidence and registry state before rerunning;
 these guards do not promise exactly-once training. See
 [Databricks serverless retry behavior](https://docs.databricks.com/aws/en/jobs/run-serverless-jobs).
 
-When `auto_rebuild_on_cdf_expiry=true` was selected during initialization, the
+When `rescore_when_history_expires: true` was selected during initialization, the
 same notebook timeout and retry settings also apply to `recover_predictions`
 and `scoring_report`. These tasks use the existing score job's identity,
 single-run queue, compute and notifications. The `recovery_needed` condition

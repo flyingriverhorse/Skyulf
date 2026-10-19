@@ -147,7 +147,7 @@ version: 1
 defaults:
   training_layout: single_model
   engine: pandas
-  preprocessing_probe: false
+  save_preprocessing_diagnostics: false
 models:
   main:
     model:
@@ -284,7 +284,7 @@ apply to the chosen layout and earlier answers:
 | `cv_enabled`, then `cv_folds`, `cv_type`, `cv_shuffle`, `cv_random_state` | CV off; `5`, `k_fold`, `true`, `42` |
 | `max_rows`, `max_input_mb` | `10000`, `64` |
 | `training_sample_rows` (per branch for model sets) | `null`: read all rows within the limits; this never samples predictions |
-| `preprocessing_probe` | `false`: enable to check fitted preprocessing on a bounded holdout sample |
+| `save_preprocessing_diagnostics` | `false`: enable to check fitted preprocessing on a bounded holdout sample |
 | `performance_policy_mode`, task-specific metric, tolerance and baseline version | `off`; when enabled, require outcomes and a monitoring store. See [performance policy](databricks_performance.md). |
 
 Most answer-file values are strings, including `"true"`, `"42"` and `"null"`;
@@ -448,7 +448,7 @@ shows the actual pipeline, input selection, final holdout, CV and
 score/promotion policies. Competition prints a `Candidate:` section for each
 candidate; model sets print a `Branch:` section for each branch. The same training
 rules apply to manual and scheduled runs. Preview starts no cloud job, reads no
-Delta rows, fits no model and does not execute `preprocessing_probe`. A
+Delta rows, fits no model and does not execute `save_preprocessing_diagnostics`. A
 preview-resolution `ValueError` prints `Configuration error:` and exits with
 code 2; fix the reported setting before deployment. File/parsing failures that
 happen before resolution may raise directly.

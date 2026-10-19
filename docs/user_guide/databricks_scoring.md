@@ -77,15 +77,15 @@ version you inspected in training evidence:
 
 ```yaml
 version: 1
-inference_mode: local
+batch_compute: single_node
 initial_scoring: full_snapshot
 score_source_table: workspace.demo.customer_score
 prediction_table: "{catalog}.{output_schema}.customer_scores{resource_suffix}"
 score_model_selection: pinned_version
 model_version: "1"
-model_change_mode: incremental_append
-auto_rebuild_on_cdf_expiry: false
-score_handoff: disabled
+on_model_change: score_new_rows
+rescore_when_history_expires: false
+follow_champion: false
 ```
 
 `local` means bounded whole-frame prediction, including on Databricks compute.
@@ -132,7 +132,7 @@ For example, suppose the source has 50,000 rows at Delta version 12:
 | First score | Version 12, 50,000 old rows | Records version 12 in the prediction receipt; writes zero predictions. |
 | Repeat without changes | Still version 12 | No-op; the checkpoint stays unchanged. |
 | Next score | Version 13 inserts 100 new keys | Scores those 100 rows. The 50,000 old rows remain excluded. |
-| Model changes with `full_rebuild` | Current source snapshot | Recomputes eligible rows added after version 12; keeps the original exclusion boundary. |
+| Model changes with `rescore_all` | Current source snapshot | Recomputes eligible rows added after version 12; keeps the original exclusion boundary. |
 
 The first score succeeds and can complete a training-to-scoring handoff even
 with zero predictions. Monitoring has no production predictions to evaluate
@@ -401,14 +401,14 @@ projects.
 | Field | Type / generated default | Allowed values and effect |
 | --- | --- | --- |
 | `version` | Integer `1` | Companion-file format; distinct from deployed workflow_contract. |
-| `inference_mode` | String `local` | local or spark; selects whole-frame or admitted distributed batch inference. |
+| `batch_compute` | String `single_node` | single_node or spark; selects whole-frame or admitted distributed batch scoring. |
 | `score_source_table` | Three-part name; training source by default | Delta input; deployment table placeholders are expanded. |
 | `prediction_table` | Three-part name; project predictions name | Single-model/competition output, with the generated resource suffix. |
 | `score_model_selection` | String `pinned_version` | pinned_version or champion for single-model/competition scoring. |
 | `model_version` | Positive version string; generated `"1"` when pinned | Required concrete pin for pinned single-model selection; replace with an inspected version. |
-| `model_change_mode` | String `incremental_append` | incremental_append or full_rebuild; controls behavior when model/set selection changes. |
-| `auto_rebuild_on_cdf_expiry` | Boolean `false` | Opt into the matching deployed recovery graph for recognized expiry only. |
-| `score_handoff` | String `disabled` | disabled or after_alias_change; must match deployed graph parameters. |
+| `on_model_change` | String `score_new_rows` | score_new_rows or rescore_all; controls behavior when model/set selection changes. |
+| `rescore_when_history_expires` | Boolean `false` | Opt into the matching deployed recovery graph for recognized expiry only. |
+| `follow_champion` | Boolean `false` | true or false; must match deployed graph parameters. |
 | `spark_udf_env_manager` | String; generated only for Spark | local on serverless or virtualenv on the generated job-cluster route; must match supported compute/dependencies. |
 | `spark_udf_prediction_batch_rows` | Integer `10000` for Spark | 1 to 100000 rows per model prediction call, not a whole-source limit. |
 | `model_set` | Mapping; multi_target only | Set identity, destination, rules, publication and promotion policy. See the [model set fields](databricks_model_sets.md#set-the-model_set-block). |
@@ -439,15 +439,15 @@ receipt. The workflow rejects those changes rather than guessing a watermark.
 | Event | Default behavior | Explicit alternative |
 | --- | --- | --- |
 | New source INSERT | Score and append that observation. | No special setting required. |
-| Selected model version changes | `incremental_append` leaves old predictions intact and uses the selected version for new inserts. | `model_change_mode: full_rebuild` starts a versioned generation, preserving the initial scoring boundary. |
-| Readable source UPDATE/DELETE | Ordinary single-model/competition insert scorer rejects it; model sets also default to reject. | Model sets alone support `model_set.source_change_policy: rebuild_on_change`. |
+| Selected model version changes | `score_new_rows` leaves old predictions intact and uses the selected version for new inserts. | `on_model_change: rescore_all` starts a versioned generation, preserving the initial scoring boundary. |
+| Readable source UPDATE/DELETE | Ordinary single-model/competition insert scorer rejects it; model sets also default to reject. | Model sets alone support `model_set.on_source_change: rescore_all`. |
 | Required CDF history expired | Fail with history-loss evidence. | Deploy the optional recognized-expiry recovery graph described below. |
 
-In incremental_append, one target can contain predictions from several model
+With score_new_rows, one target can contain predictions from several model
 versions. Use stored provenance when comparing rows. Merely choosing a different
 version with no new source rows does not rescore the old population.
 
-In full_rebuild, the logical prediction name is a managed view over a physical
+With rescore_all, the logical prediction name is a managed view over a physical
 `<prediction_table>_v<version>` generation. A new version scores the eligible
 snapshot and switches the view after successful publication; older generation
 tables remain. Repeated runs for that generation can continue incrementally.
@@ -468,7 +468,7 @@ mapping, keeping its registered set and destination settings:
 
 ```yaml
 model_set:
-  source_change_policy: rebuild_on_change
+  on_source_change: rescore_all
 ```
 
 When CDF contains UPDATE/DELETE, that policy rebuilds the eligible current source
@@ -476,7 +476,7 @@ with the selected set, preserving any `from_now` boundary. Deleted observations 
 business outputs and temporal history are recomputed. Even if append mode had
 mixed earlier versions, the source-triggered rebuild uses the selected set for
 all eligible rows. It does not retrain. The selected local snapshot must fit row/byte
-limits. Do not add source_change_policy at the top level or to a single-model
+limits. Do not add on_source_change at the top level or to a single-model
 project expecting the same behavior.
 
 ## Model-set outputs and business views
@@ -489,7 +489,7 @@ combined rules.
 
 ## Recover recognized CDF expiry
 
-`auto_rebuild_on_cdf_expiry: true` is opt-in and changes the generated task graph.
+`rescore_when_history_expires: true` is opt-in and changes the generated task graph.
 Generate/deploy a matching project with recovery enabled; changing inference.yml
 alone is rejected because deployed_auto_rebuild_on_cdf_expiry in the job must
 agree in both job definitions. Leave recovery disabled until those tasks are
@@ -520,7 +520,7 @@ do not rerun a lifecycle action whose alias effects may already have committed.
 
 ## Schedules, handoff and execution engines
 
-`score_handoff: disabled` is the default. after_alias_change starts the score
+`follow_champion: false` is the default. `true` starts the score
 job after successful champion initialization/promotion/rollback. Pending review,
 failed quality gates and rejection do not trigger it. It is a deploy-time setting,
 not a Run now parameter. To change it, edit inference.yml and the matching
@@ -546,8 +546,8 @@ job serialization is not a lock against unrelated external writers.
 <span id="certified-estimators-and-model-set-composition"></span>
 <span id="results-and-model-set-composition"></span>
 
-Without `inference_mode`, scoring is whole-frame (`local`). With
-`inference_mode: spark`, the Bundle uses `mlflow.pyfunc.spark_udf` to apply the
+Without `batch_compute`, scoring is whole-frame (`single_node`). With
+`batch_compute: spark`, the Bundle uses `mlflow.pyfunc.spark_udf` to apply the
 saved preprocessing and model to pandas batches on Spark workers; it does not
 turn fitting or tuning into distributed training. Admission checks the exact
 fitted artifact, and a package logged without a certificate cannot use Spark.
@@ -556,7 +556,7 @@ configuration, the support table, capacity and results.
 
 ## Training without publishing a prediction table
 
-The generated `train` and `score` jobs are separate. Set `score_handoff: disabled`
+The generated `train` and `score` jobs are separate. Set `follow_champion: false`
 in `config/inference.yml` to prevent automatic scoring after an alias change.
 Choose `scoring_mode: manual` during initialization to omit a score schedule.
 For an existing project, also update matching `deployed_score_handoff` parameters
@@ -575,7 +575,7 @@ can consume predictions without publishing a Delta prediction table.
 | Changing scoring.yml or scoring.py has no effect | Train/package a new version; the selected model retains captured rules. |
 | No scoring_status columns | Empty pre_split with no opted-in policy keeps ordinary outputs; select and package an actual policy. |
 | Expected scoring_report is missing | Default graph has none; open score. scoring_report belongs to the recovery-enabled graph. |
-| UPDATE/DELETE causes failure | Review source correction policy; model-set rebuild_on_change is not a single-model option. |
+| UPDATE/DELETE causes failure | Review source correction policy; model-set `on_source_change: rescore_all` is not a single-model option. |
 | Source is unchanged but a different model was selected | Incremental append does not rewrite old rows; inspect selected model versus previous write provenance. |
 | Existing output schema differs | Use a fresh compatible destination when adding policy/business fields or changing publication shape. |
 | Row/byte budget exceeded | Size the first/rebuild population, not only daily inserts; adjust validated capacity or use an admitted distributed route. |
