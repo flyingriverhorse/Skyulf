@@ -1,6 +1,7 @@
 """Inference-table payloads retain the actual served version and row identity."""
 
 import json
+import math
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -646,6 +647,33 @@ def test_scalar_envelope_validator_preserves_json_primitives(value):
     """Strict shape checking must retain nulls, exact large integers and ordinary strings."""
     raw = json.dumps({"dataframe_records": [{"x": value}]})
     assert serving_payloads._scalar_envelope(raw, "dataframe_records")
+
+
+def test_sql_missing_float_remains_missing_in_native_monitoring(spark):
+    """The generated ai_query NaN transport must preserve missing features in successful logs."""
+    rows = [_row("sql-null", [{"x": float("nan"), "name": "a"}], [{"out_prediction": 3.0}])]
+    current, predictions, summary, _ = _parse(spark, rows)
+    assert math.isnan(current.first().x)
+    assert predictions.first().prediction == 3.0
+    assert summary["request_count"] == summary["prediction_row_count"] == 1
+
+
+@pytest.mark.parametrize(
+    "field,record,expected",
+    [
+        ("dataframe_records", {"x": float("nan")}, True),
+        ("dataframe_records", {"x": None}, True),
+        ("dataframe_records", {"x": float("inf")}, False),
+        ("dataframe_records", {"x": float("-inf")}, False),
+        ("dataframe_records", {"name": float("nan")}, False),
+        ("dataframe_records", {"x": [float("nan")]}, False),
+        ("predictions", {"x": float("nan")}, False),
+    ],
+)
+def test_scalar_envelope_missing_float_is_request_and_schema_scoped(field, record, expected):
+    """Accept SQL missing floats without weakening response or unrelated input validation."""
+    raw = json.dumps({field: [record]})
+    assert serving_payloads._scalar_envelope(raw, field, ("x",)) is expected
 
 
 def test_latency_distribution_query_keeps_only_valid_scoped_samples(spark):
