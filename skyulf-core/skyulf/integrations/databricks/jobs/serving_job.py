@@ -33,6 +33,7 @@ from ..serving.rollout_evidence import (
     observe_bootstrap_rollout,
     observe_live_rollout,
 )
+from ..serving.rollout_policy import DailyRolloutPolicy
 from ..serving.rollout_promotion import approval_config_digest, promote_completed_rollout
 from ..serving.rollout_store import MLflowRolloutStore
 from ..shared.json_contracts import finite_json_digest
@@ -171,8 +172,14 @@ def run_daily_rollout(
     """
     if not _enabled(settings):
         return {"status": "DISABLED"}
+    policy = DailyRolloutPolicy.from_config(settings)
     store = MLflowRolloutStore(registry_client, settings["run_id"])
     before = store.load()
+    if policy != DailyRolloutPolicy(**before["policy"]):
+        raise ValueError(
+            "Daily rollout policy differs from the initialized policy. "
+            "Match the saved settings or initialize a new rollout."
+        )
     result = reconcile_rollout(client, store=store, admission=SingleWriterAdmission())
     record = store.load()
     approval = _approval(settings, record)
@@ -301,8 +308,10 @@ def validate_serving_section(section: str, settings: Any) -> None:
 
     Every section needs the explicit ``enabled`` switch. Enabled online serving
     and online publication sections must also build the contracts their jobs
-    build before any workspace call. Nothing here reads Spark, MLflow or the
-    network, so a passing check does not prove the pinned resources exist.
+    build before any workspace call. Enabled rollouts validate timing and traffic
+    steps; the job additionally compares these with the saved policy. Nothing
+    here reads Spark, MLflow or the network, so a passing check does not prove
+    the pinned resources exist.
 
     Args:
         section: ``online_feature_lookup``, ``rollout`` or ``online_publication``.
@@ -318,6 +327,8 @@ def validate_serving_section(section: str, settings: Any) -> None:
         _online_setup_contract(settings)
     elif section == "online_publication":
         _publication_spec(settings)
+    elif section == "rollout":
+        DailyRolloutPolicy.from_config(settings)
 
 
 def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:

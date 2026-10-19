@@ -252,6 +252,9 @@ def test_real_cli_renders_only_requested_serving_jobs(tmp_path, daily, online):
         for section in config.values()
     )
     assert config["rollout"]["run_id"] == ""
+    assert config["rollout"]["traffic_step_percent"] == 10
+    assert config["rollout"]["stage_minimum_hours"] == 24.0
+    assert config["rollout"]["evidence_max_age_hours"] == 24.0
     assert config["rollout"]["smoke_records"] == []
     assert config["online_publication"]["source_table_id"] == ""
     assert "verdict" not in json.dumps(config) and "PASS" not in json.dumps(config)

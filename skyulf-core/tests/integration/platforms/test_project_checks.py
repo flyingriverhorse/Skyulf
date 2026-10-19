@@ -360,6 +360,10 @@ def test_smoke_accepts_complete_enabled_online_feature_lookup_offline(tmp_path, 
             "config/serving.yml: rollout: Serving job requires an explicit enabled boolean.",
         ),
         (
+            {"rollout": {"enabled": True, "exclusive_writer": True, "stage_minimum_hours": -1}},
+            "config/serving.yml: rollout: Duration hours must be positive and finite.",
+        ),
+        (
             {
                 "online_publication": {
                     "enabled": True,

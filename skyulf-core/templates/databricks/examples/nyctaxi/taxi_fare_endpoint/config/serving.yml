@@ -31,6 +31,10 @@ rollout:
   # Set true only when no other job or person changes this endpoint or its champion assignment.
   exclusive_writer: false
   run_id: ""
+  # Use these same values when initializing the rollout; changing them needs a new run.
+  traffic_step_percent: 10
+  stage_minimum_hours: 24.0
+  evidence_max_age_hours: 24.0
   tracking_uri: databricks
   registry_uri: databricks-uc
   comparison_sha256: ""

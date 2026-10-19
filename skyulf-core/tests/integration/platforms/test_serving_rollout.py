@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from importlib import import_module
 from importlib.util import find_spec
 from pathlib import Path
@@ -212,6 +213,75 @@ def evidence(state, now, verdict="PASS"):
         kind="BOOTSTRAP" if state.challenger_percentage == 0 else "LIVE",
         reason="verified quality",
     )
+
+
+def test_job_uses_yaml_policy_through_durable_controller(api, plan, monkeypatch):
+    """Short YAML stages must drive real receipts and routes across independent job calls."""
+    import yaml
+
+    from skyulf.integrations.databricks.jobs import serving_job
+    from skyulf.integrations.databricks.serving.rollout_evidence import RolloutEvidenceResult
+
+    settings = yaml.safe_load(
+        "enabled: true\nexclusive_writer: true\nrun_id: short-rollout\n"
+        "traffic_step_percent: 20\nstage_minimum_hours: 0.08333333333333333\n"
+        "evidence_max_age_hours: 0.03333333333333333\n"
+    )
+    approval = {
+        "model_name": plan.champion.spec.model_name,
+        "metric": "heldout_rmse",
+        "quality_threshold": 5.0,
+        "tracking_uri": "databricks",
+        "registry_uri": "databricks-uc",
+    }
+    settings.update(approval=approval, comparison_sha256="a" * 64)
+    tracking, client = Tracking(), Endpoint(plan)
+    store = api.MLflowRolloutStore(tracking, settings["run_id"])
+    clock = [datetime(2026, 10, 10, tzinfo=UTC)]
+    start = clock[0]
+    api.initialize_rollout(
+        client,
+        plan,
+        store=store,
+        admission=SingleWriterAdmission(),
+        policy=DailyRolloutPolicy.from_config(settings),
+        rollout_id=settings["run_id"],
+        clock=lambda: clock[0],
+        promotion={
+            "auto_promote": True,
+            "comparison_sha256": settings["comparison_sha256"],
+            "config_sha256": serving_job.approval_config_digest(approval),
+        },
+    )
+    monkeypatch.setattr(
+        serving_job, "reconcile_rollout", partial(api.reconcile_rollout, clock=lambda: clock[0])
+    )
+    monkeypatch.setattr(
+        serving_job, "advance_rollout", partial(api.advance_rollout, clock=lambda: clock[0])
+    )
+    monkeypatch.setattr(
+        serving_job,
+        "_observe",
+        lambda spark, client, registry, settings, record, result, approval: RolloutEvidenceResult(
+            evidence(result.state, clock[0]), {"observed_at": clock[0].isoformat()}
+        ),
+    )
+    for minute, action, percentage in [
+        (4, "HOLD", 0),
+        (5, "ADVANCE", 20),
+        (9, "HOLD", 20),
+        (10, "ADVANCE", 40),
+    ]:
+        clock[0] = start + timedelta(minutes=minute)
+        result = serving_job.run_daily_rollout(
+            None, settings, client=client, registry_client=tracking
+        )
+        assert result["decision"]["action"] == action
+        assert result["state"]["challenger_percentage"] == percentage
+    assert store.load()["policy"] == asdict(DailyRolloutPolicy(20, 5 / 60, 2 / 60))
+    assert [
+        request["traffic_config"]["routes"][1]["traffic_percentage"] for request in client.puts
+    ] == [20, 40]
 
 
 def advance(s, verdict="PASS"):

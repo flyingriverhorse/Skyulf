@@ -25,7 +25,10 @@ def api():
 def job(api, monkeypatch):
     """Preserve job orchestration while stubbing SDK and proven controller boundaries."""
     from skyulf.integrations.databricks.serving.rollout import RolloutResult
-    from skyulf.integrations.databricks.serving.rollout_policy import RolloutState
+    from skyulf.integrations.databricks.serving.rollout_policy import (
+        DailyRolloutPolicy,
+        RolloutState,
+    )
 
     now = datetime(2026, 10, 10, tzinfo=UTC).isoformat()
     state = RolloutState(
@@ -55,6 +58,7 @@ def job(api, monkeypatch):
         "state": asdict(state),
         "promotion": pin,
         "plan": {},
+        "policy": asdict(DailyRolloutPolicy()),
     }
     store = Mock()
     store.run_id = "run"
@@ -102,6 +106,32 @@ def test_bootstrap_evidence_is_persisted_before_traffic_mutation(api, job):
     assert output["state"]["challenger_percentage"] == 0
     producer.assert_called_once()
     promote.assert_not_called()
+
+
+def test_changed_yaml_policy_rejected_before_reconciliation(api, job):
+    """Editing YAML must not silently shorten an already admitted rollout."""
+    from skyulf.integrations.databricks.serving.rollout_policy import DailyRolloutPolicy
+
+    settings, store, result, producer, advance, promote, persist = job
+    store.load.return_value["policy"] = asdict(DailyRolloutPolicy())
+    settings["stage_minimum_hours"] = 5 / 60
+    with pytest.raises(ValueError, match="policy differs"):
+        api.run_daily_rollout(None, settings, client=Mock(), registry_client=Mock())
+    api.reconcile_rollout.assert_not_called()
+    producer.assert_not_called()
+    advance.assert_not_called()
+
+
+def test_invalid_rollout_yaml_rejected_by_preflight_and_job_before_io(api, job):
+    """Offline checks and scheduled execution must reject the same invalid policy."""
+    settings, store, result, producer, advance, promote, persist = job
+    settings["traffic_step_percent"] = 0
+    with pytest.raises(ValueError):
+        api.validate_serving_section("rollout", settings)
+    with pytest.raises(ValueError):
+        api.run_daily_rollout(None, settings, client=Mock(), registry_client=Mock())
+    store.load.assert_not_called()
+    api.reconcile_rollout.assert_not_called()
 
 
 def test_failed_observation_storage_prevents_traffic_write(api, job):

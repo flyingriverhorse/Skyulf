@@ -128,7 +128,31 @@ quality settings from the challenger's saved training result. The approval
 settings below are examples; their metric, threshold and improvement must match
 that saved comparison.
 
+Set the traffic step and timing in your generated project's `config/serving.yml`
+**before initialization**, then read that same file in the initialization cell:
+
+```yaml
+rollout:
+  # Keep the other generated rollout fields.
+  traffic_step_percent: 10
+  stage_minimum_hours: 24.0
+  evidence_max_age_hours: 24.0
+```
+
+`traffic_step_percent` is an integer from 1 to 100; both hour values must be
+positive and finite. `stage_minimum_hours` applies to every stage, including
+the final 100% stage. `evidence_max_age_hours` limits how old the observation
+and its window end may be; it is independent of the stage's length. For an
+isolated test, `stage_minimum_hours: 0.1` means six minutes; keep the 24-hour
+default for normal use. Shorter stages still require enough requests and
+request-keyed labels under `health`. They do not change the daily job schedule:
+invoke the job manually after each test interval or adjust its schedule while
+preserving one writer. Each invocation advances at most one step.
+
 ```python
+from pathlib import Path
+
+import yaml
 from mlflow.tracking import MlflowClient
 from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
 from skyulf.integrations.databricks.serving import (
@@ -156,15 +180,14 @@ promotion = build_rollout_promotion(
 experiment_id = "REPLACE_WITH_EXISTING_EXPERIMENT_ID"
 run = registry.create_run(experiment_id)
 store = MLflowRolloutStore(registry, run.info.run_id)
+# Use the deployed file's absolute /Workspace/.../config/serving.yml path.
+serving_config_path = "/Workspace/REPLACE_WITH_PROJECT_PATH/config/serving.yml"
+rollout_settings = yaml.safe_load(Path(serving_config_path).read_text())["rollout"]
 result = initialize_rollout(
     workspace,
     plan,
     store=store,
-    policy=DailyRolloutPolicy(
-        increment_percentage=10,
-        minimum_stage_hours=24.0,
-        evidence_max_age_hours=24.0,
-    ),
+    policy=DailyRolloutPolicy.from_config(rollout_settings),
     admission=SingleWriterAdmission(),
     rollout_id=run.info.run_id,
     promotion=promotion,
@@ -172,6 +195,12 @@ result = initialize_rollout(
 print(result)
 print("rollout run_id:", run.info.run_id)
 ```
+
+The job checks these YAML values against the saved policy before reconciling
+the endpoint. To change a policy, initialize a new rollout on a settled 100/0
+endpoint and configure its new `run_id`; editing YAML alone cannot shorten an
+active rollout. Missing timing fields use the 10-point/24-hour defaults. For an
+older run initialized with custom SDK values, add matching fields to its YAML.
 
 `SingleWriterAdmission` is an explicit ownership contract, not a distributed
 lock. Restrict endpoint and alias mutation permissions to the controller's
@@ -216,6 +245,9 @@ rollout:
   enabled: true
   exclusive_writer: true
   run_id: "COPY_THE_INITIALIZED_ROLLOUT_RUN_ID"
+  traffic_step_percent: 10
+  stage_minimum_hours: 24.0
+  evidence_max_age_hours: 24.0
   comparison_sha256: "COPY_THE_SAVED_COMPARISON_DIGEST"
   smoke_records:
     - income: 42000.0
@@ -229,9 +261,9 @@ rollout:
 ```
 
 Replace the smoke fields with the actual request schema; an online feature
-model may require keys and additional source fields instead. Stage size and
-duration belong to the saved `DailyRolloutPolicy` initialized above, while these
-health thresholds configure the job's observation. Preserve both deliberately.
+model may require keys and additional source fields instead. The three policy
+fields must match initialization; the health thresholds configure the job's
+observation. Preserve both deliberately.
 
 From the configured generated project:
 
