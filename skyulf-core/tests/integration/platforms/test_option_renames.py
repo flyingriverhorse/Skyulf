@@ -68,6 +68,69 @@ def test_public_inference_defaults_map_to_existing_internal_defaults(tmp_path):
     assert config["inference_mode"] == "local"
 
 
+@pytest.mark.parametrize("delivery", ["batch", "both", "endpoint"])
+def test_omitted_optional_inference_policies_validate_and_preview(
+    tmp_path, workflow_config, delivery
+):
+    """Deleting optional YAML controls must retain safe defaults through the real project preflight."""
+    from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
+    from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
+    path = _project(tmp_path)
+    base = {**workflow_config, "engine": "pandas"}
+    for name in ("score_handoff", "model_change_mode"):
+        base.pop(name)
+    if delivery == "endpoint":
+        base.pop("prediction_table")
+        base.pop("score_model_selection")
+    path.write_text(json.dumps(base), encoding="utf-8")
+    _inference(path, f"prediction_delivery: {delivery}\n")
+    config = read_workflow_config(path)
+    preview = preview_workflow_config(config, action="train")
+    assert config["score_handoff"] == "disabled"
+    assert config["model_change_mode"] == "incremental_append"
+    assert config["score_model_selection"] == "champion"
+    assert ("endpoint only" in preview) == (delivery == "endpoint")
+
+
+@pytest.mark.parametrize("delivery", ["batch", "both"])
+def test_yaml_batch_requires_explicit_model_selection(tmp_path, workflow_config, delivery):
+    """Deleting model selection must not silently change which model batch scoring uses."""
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
+    path = _project(tmp_path)
+    base = {**workflow_config, "engine": "pandas"}
+    base.pop("score_model_selection")
+    path.write_text(json.dumps(base), encoding="utf-8")
+    _inference(path, f"prediction_delivery: {delivery}\n")
+    with pytest.raises(ValueError, match="score_model_selection"):
+        validate_workflow_config(read_workflow_config(path), action="train")
+
+
+@pytest.mark.parametrize(
+    "legacy,selection", [("pinned_version", "pinned_version"), ("auto_champion", "champion")]
+)
+def test_legacy_json_read_preserves_explicit_migration(
+    tmp_path, workflow_config, legacy, selection
+):
+    """Reading old JSON must not inject new policy fields that break its supported migration."""
+    from skyulf.integrations.databricks.projects.workflow_config import migrate_workflow_config
+    from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
+    path = _project(tmp_path)
+    base = dict(workflow_config)
+    for key in ("score_model_selection", "promotion_policy", "score_handoff", "model_change_mode"):
+        base.pop(key)
+    base["model_selection_mode"] = legacy
+    path.write_text(json.dumps(base), encoding="utf-8")
+    config = read_workflow_config(path)
+    assert config == base
+    migrated = migrate_workflow_config(config, task="regression", score_handoff="disabled")
+    assert migrated["score_model_selection"] == selection
+    assert "model_selection_mode" not in migrated
+
+
 @pytest.mark.parametrize(
     "line",
     [

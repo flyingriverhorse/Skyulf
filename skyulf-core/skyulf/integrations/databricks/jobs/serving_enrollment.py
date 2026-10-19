@@ -17,9 +17,17 @@ from ..serving.contracts import PinnedEndpointSpec
 from .shared import reference_mutations
 
 
+def _monitoring_enabled(values: dict[str, str]) -> bool:
+    """Require an explicit target opt-in without accepting truthy or malformed flags."""
+    enabled = values.get("monitoring_enabled", "false")
+    if enabled not in ("true", "false"):
+        raise ValueError("monitoring_enabled must be true or false.")
+    return enabled == "true"
+
+
 def serving_monitoring_namespace(logging_mode: str, values: dict[str, str]) -> str | None:
     """Require an explicitly configured shared store before changing a logged endpoint."""
-    if logging_mode == "disabled":
+    if not _monitoring_enabled(values) or logging_mode == "disabled":
         return None
     catalog, schema = values.get("monitoring_catalog", ""), values.get("monitoring_schema", "")
     if not catalog or not schema:
@@ -39,7 +47,7 @@ def build_serving_monitoring_configs(
     metadata: dict,
 ) -> list[MonitorConfig]:
     """Preflight immutable package identities and existing monitoring policies before writes."""
-    if namespace is None:
+    if not _monitoring_enabled(values) or namespace is None:
         return []
     identities = _served_identities(spec, settings, metadata)
     policies = parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
@@ -107,6 +115,8 @@ def enroll_verified_serving(
     registry_uri: str | None = "databricks-uc",
 ) -> dict:
     """Publish new monitors first, then disable superseded entries under the shared guard."""
+    if not _monitoring_enabled(values):
+        return {"status": "skipped", "reason": "monitoring_disabled"}
     if namespace is None:
         return {"status": "skipped", "reason": "logging_disabled"}
     request = _enrollment_request(configs)

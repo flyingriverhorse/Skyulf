@@ -127,18 +127,21 @@ require regenerating the graph and does not compare against a frozen job value.
 
 ### Automatic monitoring enrollment
 
-With `logging_mode: telemetry` or `ai_gateway`, configure `monitoring_catalog`
-and `monitoring_schema` before running the job. The job validates these settings
-before changing an endpoint. After reference, REST and optional SQL parity passes,
+To enroll automatically, set the target's `monitoring_enabled: "true"` and use
+`logging_mode: telemetry` or `ai_gateway`. Configure `monitoring_catalog` and
+`monitoring_schema` before running the job; these are validated before endpoint
+changes when enrollment is enabled. After reference, REST and optional SQL parity passes,
 it enrolls the served concrete version in that existing monitoring store. A
 model set gets one registration per branch, with parent name/version/branch
 attribution. Reruns reuse the same identities; prior registrations for this
 endpoint and project/target are disabled after the new enrollment succeeds.
 Their history, unrelated endpoints and batch registrations are preserved.
 
-The result reports enrollment status. `logging_mode: disabled` explicitly skips
-it. Enabling payload logging requires an explicit monitoring namespace, even on
-a personal target; the target's paused monitoring schedule still remains paused.
+The result reports enrollment status. With `monitoring_enabled: "false"` or an
+absent flag, it reports `monitoring_disabled` and skips all monitoring work,
+preserving existing registrations. Endpoint logging and verification still run.
+When monitoring is enabled, `logging_mode: disabled` reports `logging_disabled`.
+The target's paused monitoring schedule still remains paused.
 Enrollment alone does not create observations: send requests, wait for payload
 delivery, then run the monitoring job. The Online serving dashboard reads those
 saved observations. Performance needs matching outcome labels. See

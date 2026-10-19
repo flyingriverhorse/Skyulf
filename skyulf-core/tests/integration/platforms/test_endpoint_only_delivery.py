@@ -89,6 +89,14 @@ def test_generated_delivery_has_only_selected_jobs(tmp_path, layout, delivery):
     assert (project / "resources/score.job.yml").exists() == batch
     assert (project / "resources/serving_endpoint.job.yml").exists() == endpoint
     assert (project / "resources/monitoring.job.yml").is_file()
+    training_guide = (project / "TRAINING.md").read_text(encoding="utf-8")
+    assert "promotion_policy=" in training_guide
+    for setting in (
+        "score_model_selection=",
+        "follow_champion:",
+        "rescore_when_history_expires:",
+    ):
+        assert (setting in training_guide) == batch
     train = (project / "resources/train.job.yml").read_text()
     assert ("run_batch_scoring" in train) == batch
     assert ("run_serving_endpoint" in train) == endpoint

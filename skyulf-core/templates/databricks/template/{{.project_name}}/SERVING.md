@@ -30,9 +30,10 @@ regeneration is needed for this toggle. Personal development targets stay manual
 
 ## Monitor endpoint requests
 
-Set `serving_endpoint.logging_mode` to `telemetry` or `ai_gateway` before creating
-the endpoint, and configure `monitoring_catalog` and `monitoring_schema` in
-`deployment/variables.yml`. After reference, REST and SQL parity passes, the job
+Set the target's `monitoring_enabled` to `"true"` and
+`serving_endpoint.logging_mode` to `telemetry` or `ai_gateway` before creating
+the endpoint. Configure `monitoring_catalog` and `monitoring_schema` in
+`deployment/variables.yml`. After reference, REST and optional SQL parity passes, the job
 automatically enrolls the served concrete version in that store. A model set gets
 one entry per component, retaining its parent set/version. Repeated runs reuse
 the registration; a replaced version's entries are disabled, preserving history.
@@ -41,9 +42,11 @@ Send requests, enable the monitoring schedule for the target, and run `monitorin
 to collect observations. The dashboard's Online serving page shows the saved
 observations after logging has delivered the requests; enrollment alone creates
 no traffic measurements. Performance additionally needs matched outcome labels.
-`logging_mode: disabled` explicitly skips enrollment; serving still works but has
-no automatic request monitoring. An enabled logger without a monitoring namespace
-fails before endpoint changes. `config/inference.yml` retains `score_source_table`
+With `monitoring_enabled: "false"` or an absent flag, the result reports
+`monitoring_disabled` and skips all monitoring work, preserving existing registrations.
+Endpoint logging and verification still run. When monitoring is enabled,
+`logging_mode: disabled` reports `logging_disabled`; enabled logging requires a
+monitoring namespace before endpoint changes. `config/inference.yml` retains `score_source_table`
 only as the source for the endpoint's bounded smoke sample in endpoint-only mode.
 
 ## Choose a caller

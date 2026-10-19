@@ -397,7 +397,7 @@ def require_probed_step(
         raise ValueError(
             f"This step declares inference_context={context!r}, so it needs other rows and "
             "cannot run on independent Spark batches; keep the project on "
-            "inference_mode: local."
+            "batch_compute: single_node."
         )
     entry = evidence_entry(
         config.get(PROBE_KEY), project_sha, "steps", {"name": name, "node_type": node}

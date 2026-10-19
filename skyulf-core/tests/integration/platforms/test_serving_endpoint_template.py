@@ -76,6 +76,16 @@ def test_unselected_endpoint_generates_no_optional_artifacts(tmp_path):
     assert "serving_requested" not in (project / "resources/train.job.yml").read_text()
 
 
+def test_serving_job_passes_target_monitoring_flag(tmp_path):
+    """Serving enrollment must receive the same monitoring switch as the deployed target."""
+    project = _generate_project(tmp_path, prediction_delivery="both")
+    job = yaml.safe_load((project / "resources/serving_endpoint.job.yml").read_text())["resources"][
+        "jobs"
+    ]["serving_endpoint"]
+    params = job["tasks"][0]["notebook_task"]["base_parameters"]
+    assert params["monitoring_enabled"] == "${var.monitoring_enabled}"
+
+
 @pytest.mark.parametrize("compute_mode", ["serverless", "policy_cluster"])
 def test_serving_job_respects_compute_and_cost_attribution(tmp_path, compute_mode):
     """Endpoint maintenance must run with the project's permitted compute and cost identity."""

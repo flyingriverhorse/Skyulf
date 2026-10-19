@@ -4,6 +4,25 @@ import hashlib
 import re
 from typing import Any
 
+from ..projects.yaml_config import read_yaml_mapping
+
+
+def _automatic_serving_enabled(values: dict[str, str]) -> bool:
+    """Read dispatch gates before requiring endpoint deployment bindings."""
+    if values.get("bundle_mode") != "production":
+        return False
+    document = read_yaml_mapping(values["serving_config_path"])
+    settings = document.get("serving_endpoint")
+    if not isinstance(settings, dict):
+        raise ValueError("serving_endpoint must be a mapping.")
+    for key, default in (("enabled", None), ("follow_champion", True)):
+        value = settings.get(key, default)
+        if type(value) is not bool:
+            raise ValueError(f"serving_endpoint.{key} must be a boolean.")
+        if not value:
+            return False
+    return True
+
 
 def serving_transition(receipt: dict[str, Any] | None, *, model_name: str) -> str:
     """Return the concrete changed champion version, or no request for other outcomes."""
@@ -32,12 +51,8 @@ def publish_serving_handoff(
     version = ""
     if values.get("deployed_serving_endpoint") != "true":
         return
-    settings = read_serving_endpoint_settings(values)
-    if (
-        settings["enabled"]
-        and settings.get("follow_champion", True)
-        and values.get("bundle_mode") == "production"
-    ):
+    if _automatic_serving_enabled(values):
+        settings = read_serving_endpoint_settings(values)
         version = serving_transition(receipt, model_name=settings["model_name"])
     dbutils.jobs.taskValues.set(key="serving_requested", value=bool(version))
     dbutils.jobs.taskValues.set(key="serving_model_version", value=version)

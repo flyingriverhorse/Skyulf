@@ -305,8 +305,10 @@ def test_steps_declared_with_other_rows_are_rejected(tmp_path, context):
     """A declared group/window/global step needs other rows; evidence never admits it."""
     artifact, _ = _sealed(tmp_path, context=context)
     assert artifact.pipeline.config["partition_probe"]["steps"] == []
-    with pytest.raises(UnsupportedExecutionError, match=f"inference_context='{context}'"):
+    with pytest.raises(UnsupportedExecutionError, match=f"inference_context='{context}'") as err:
         require_partition_safe_pipeline(artifact)
+    assert "batch_compute: single_node" in str(err.value)
+    assert "inference_mode:" not in str(err.value)
 
 
 @pytest.mark.parametrize("kind", ["fitted", "column"])

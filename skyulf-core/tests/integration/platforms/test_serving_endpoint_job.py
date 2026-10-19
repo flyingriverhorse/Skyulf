@@ -227,6 +227,61 @@ def test_handoff_uses_production_gate_and_keeps_score_independent(
     assert saved == {"serving_requested": enabled, "serving_model_version": "2" if enabled else ""}
 
 
+@pytest.mark.parametrize(
+    "mode,enabled,follow",
+    [("development", True, True), ("production", True, False), ("production", False, True)],
+)
+@pytest.mark.parametrize("bad_binding", ["cost_tag_value", "catalog"])
+def test_inactive_handoff_ignores_unused_endpoint_bindings(
+    endpoint_project, handoff, mode, enabled, follow, bad_binding
+):
+    """Training must finish when serving is inactive even if its target setup is incomplete."""
+    document, path, values = endpoint_project
+    document["serving_endpoint"].update(enabled=enabled, follow_champion=follow)
+    path.write_text(yaml.safe_dump(document))
+    values.update(bundle_mode=mode)
+    values[bad_binding] = (
+        "REPLACE_WITH_COST_TAG" if bad_binding == "cost_tag_value" else "${var.catalog}"
+    )
+    receipt = {
+        "kind": "initial",
+        "alias": "champion",
+        "model_name": "main.ml.sample_model_alice",
+        "new_version": "2",
+        "prior_version": None,
+    }
+    saved = {}
+    dbutils = SimpleNamespace(
+        jobs=SimpleNamespace(
+            taskValues=SimpleNamespace(set=lambda key, value: saved.update({key: value}))
+        )
+    )
+    handoff.publish_serving_handoff(dbutils, receipt, values)
+    assert saved == {"serving_requested": False, "serving_model_version": ""}
+
+
+def test_active_handoff_still_requires_valid_endpoint_bindings(endpoint_project, handoff):
+    """Moving the optional gate must not dispatch a production endpoint with invalid ownership."""
+    _, _, values = endpoint_project
+    values.update(bundle_mode="production", cost_tag_value="REPLACE_WITH_COST_TAG")
+    dbutils = Mock()
+    with pytest.raises(ValueError, match="cost_tag_value"):
+        handoff.publish_serving_handoff(dbutils, None, values)
+    dbutils.jobs.taskValues.set.assert_not_called()
+
+
+@pytest.mark.parametrize("flag", ["enabled", "follow_champion"])
+@pytest.mark.parametrize("value", ["false", 0, None])
+def test_handoff_rejects_malformed_yaml_gate(endpoint_project, handoff, flag, value):
+    """A string or integer must not silently turn an automatic serving policy on or off."""
+    document, path, values = endpoint_project
+    document["serving_endpoint"][flag] = value
+    path.write_text(yaml.safe_dump(document))
+    values["bundle_mode"] = "production"
+    with pytest.raises(ValueError, match=f"{flag} must be a boolean"):
+        handoff.publish_serving_handoff(Mock(), None, values)
+
+
 def test_logging_sinks_cannot_be_shared_with_online_setup(endpoint_project):
     """Different endpoint names still require distinct request payload tables."""
     api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")

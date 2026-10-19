@@ -96,8 +96,8 @@ Bundle mode, `serving_endpoint.follow_champion: true` submits a separate
 serving run when champion changes. Inspect that child run's verification result;
 training success only confirms submission. See [SERVING.md](SERVING.md) for the
 command, caller permissions, SQL/REST examples, costs and logging choices.
-With payload logging enabled and a monitoring store configured, successful
-verification automatically enrolls the endpoint. Run the monitoring job after
+With target `monitoring_enabled: "true"`, payload logging enabled and a monitoring
+store configured, successful verification automatically enrolls the endpoint. Run the monitoring job after
 requests arrive to populate the dashboard; no batch score run is needed.
 
 {{end}}## When you need it

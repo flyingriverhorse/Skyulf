@@ -7,13 +7,22 @@ For REST deployment and typed SQL function/`ai_query` calls, follow
 model version and derives SQL input/output types from its inspected package.
 
 The generated `serving_endpoint` job automatically enrolls its concrete version
-after successful verification when payload logging is enabled. Configure the
-shared monitoring catalog/schema first. For a model set it enrolls every branch;
+after successful verification when payload logging is enabled and the target's
+`monitoring_enabled` variable is `"true"`. Configure the shared monitoring
+catalog/schema first. For a model set it enrolls every branch;
 updating the endpoint disables its prior registrations while retaining history.
 No separate `enroll_serving` run is needed for this job. Send requests and run
 the monitoring job to create observations; enrollment itself does not populate
 traffic charts. `prediction_delivery: endpoint` keeps monitoring without a batch
-score job. With logging disabled, automatic serving enrollment is skipped.
+score job.
+
+Set `monitoring_enabled: "false"` in the target variables to skip automatic
+enrollment while keeping endpoint logging and REST/SQL verification enabled.
+An absent flag also disables enrollment. The serving result reports
+`monitoring_disabled`; no monitoring namespace, reference or inventory work
+runs, and existing registrations remain unchanged. Only exact `"true"` and
+`"false"` values are accepted. When monitoring is enabled but payload logging
+is disabled, the result instead reports `logging_disabled`.
 
 For an endpoint created outside that job, first
 [prepare and create a pinned endpoint](databricks_serving.md#the-command)

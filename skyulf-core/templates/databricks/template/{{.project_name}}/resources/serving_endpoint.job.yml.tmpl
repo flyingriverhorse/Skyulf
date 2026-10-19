@@ -47,6 +47,7 @@ resources:
               job_run_id: '{{"{{job.run_id}}"}}'
               task_key: serving_endpoint
               workspace_host: ${workspace.host}
+              monitoring_enabled: ${var.monitoring_enabled}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}

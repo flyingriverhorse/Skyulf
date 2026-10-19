@@ -431,11 +431,9 @@ def read_workflow_config(path: str | Path) -> dict[str, Any]:
         )
         if "model_set" in inference:
             _check_python_owners(path.parent.parent, ("model_set.py",), "inference.yml")
+    if inference is not None or config.get("prediction_delivery") == "endpoint":
+        config.setdefault("score_handoff", "disabled")
+        config.setdefault("model_change_mode", "incremental_append")
     if config.get("prediction_delivery") == "endpoint":
-        for key, value in {
-            "score_handoff": "disabled",
-            "score_model_selection": "champion",
-            "model_change_mode": "incremental_append",
-        }.items():
-            config.setdefault(key, value)
+        config.setdefault("score_model_selection", "champion")
     return config

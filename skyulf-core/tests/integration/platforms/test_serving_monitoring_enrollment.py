@@ -12,6 +12,7 @@ import pytest
 pytest.importorskip("mlflow")
 
 from skyulf.integrations.databricks.jobs import serving_endpoint_job as job  # noqa: E402
+from skyulf.integrations.databricks.jobs import serving_enrollment as enrollment  # noqa: E402
 from skyulf.integrations.databricks.jobs.shared import reference_mutations  # noqa: E402
 from skyulf.integrations.databricks.observability.monitoring import (  # noqa: E402
     monitoring_store,
@@ -42,7 +43,11 @@ def delivery(monkeypatch):
         "ownership": {"project": "risk", "target": "prod"},
         "tags": {"team": "risk"},
     }
-    values = {"monitoring_catalog": "ops", "monitoring_schema": "monitoring"}
+    values = {
+        "monitoring_enabled": "true",
+        "monitoring_catalog": "ops",
+        "monitoring_schema": "monitoring",
+    }
     events, inventory = [], {}
 
     def prepare(spec, **kwargs):
@@ -124,7 +129,7 @@ def _run(delivery, **kwargs):
 def test_logging_requires_monitoring_store_before_endpoint_write(delivery):
     """Paid endpoint changes must not succeed with unconfigured automatic enrollment."""
     with pytest.raises(ValueError, match="monitoring_catalog.*monitoring_schema"):
-        _run(delivery)
+        _run(delivery, monitoring_values={"monitoring_enabled": "true"})
     delivery.endpoint.assert_not_called()
     assert delivery.inventory == {}
 
@@ -132,10 +137,64 @@ def test_logging_requires_monitoring_store_before_endpoint_write(delivery):
 def test_disabled_logging_reports_skipped_enrollment_without_inventory_access(delivery):
     """Serving without payload logging remains independent of the monitoring store."""
     delivery.settings["logging_mode"] = "disabled"
-    result = _run(delivery)
+    result = _run(delivery, monitoring_values={"monitoring_enabled": "true"})
     assert result["monitoring"] == {"status": "skipped", "reason": "logging_disabled"}
     assert delivery.events == ["endpoint", "rest", "sql"]
     assert delivery.inventory == {}
+
+
+@pytest.mark.parametrize("mode", ["disabled", "telemetry", "ai_gateway"])
+@pytest.mark.parametrize("enabled", [None, "false"])
+def test_target_monitoring_disabled_skips_all_monitor_work(delivery, monkeypatch, mode, enabled):
+    """Disabled target monitoring cannot block serving or touch an existing monitor inventory."""
+    delivery.settings["logging_mode"] = mode
+    values = {
+        "monitoring_catalog": "${var.unresolved}",
+        "monitoring_schema": "",
+        "monitoring_drift_thresholds": "invalid",
+        "job_run_id": "invalid",
+    }
+    if enabled is not None:
+        values["monitoring_enabled"] = enabled
+    delivery.model.metadata = None
+    delivery.inventory["prior"] = {"enabled": True}
+    blocked = Mock(side_effect=AssertionError("Disabled monitoring performed work"))
+    for module, name in (
+        (enrollment, "store_namespace"),
+        (enrollment, "_served_identities"),
+        (reference_mutations, "notebook_reference_holder"),
+        (reference_mutations, "prepare_reference_mutations"),
+        (serving_registration, "enroll_serving_configs"),
+        (monitoring_store, "load_enrolled_models"),
+    ):
+        monkeypatch.setattr(module, name, blocked)
+    result = _run(delivery, monitoring_values=values)
+    assert result["status"] == "READY"
+    assert result["logging_mode"] == mode
+    assert result["monitoring"] == {"status": "skipped", "reason": "monitoring_disabled"}
+    assert delivery.events == ["endpoint", "rest", "sql"]
+    assert delivery.inventory == {"prior": {"enabled": True}}
+    delivery.reference.assert_not_called()
+    blocked.assert_not_called()
+
+
+@pytest.mark.parametrize("value", ["", "TRUE", "False", "yes", True, None])
+def test_target_monitoring_flag_rejects_invalid_values_before_endpoint_write(delivery, value):
+    """Malformed target flags must fail before any paid endpoint mutation."""
+    delivery.values["monitoring_enabled"] = value
+    with pytest.raises(ValueError, match="monitoring_enabled must be true or false"):
+        _run(delivery, monitoring_values=delivery.values)
+    delivery.endpoint.assert_not_called()
+    assert delivery.inventory == {}
+
+
+def test_target_monitoring_disabled_ignores_a_supplied_namespace(delivery):
+    """Direct helper callers cannot bypass the target switch with a precomputed namespace."""
+    result = enrollment.enroll_verified_serving(
+        object(), "ops.monitoring", [], {"monitoring_enabled": "false"}
+    )
+    assert result == {"status": "skipped", "reason": "monitoring_disabled"}
+    assert delivery.events == []
 
 
 @pytest.mark.parametrize("mode", ["telemetry", "ai_gateway"])

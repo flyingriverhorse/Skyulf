@@ -43,11 +43,12 @@ keep its shape. Preview runs trusted factories but does not read cloud data or f
 Open **training_report > Output** for metrics, decisions and `next_actions`.
 A report can finalize a failed invocation: inspect its reported outcome.
 
-This project has `promotion_policy={{.promotion_policy}}`,
+This project has `promotion_policy={{.promotion_policy}}`{{if eq .prediction_delivery "endpoint"}}.
+{{else}},
 `score_model_selection={{.score_model_selection}}`,
 `follow_champion: {{.score_follow_champion}}`, and
 `rescore_when_history_expires: {{.rescore_when_history_expires}}`.
-For model sets, inspect their separate saved promotion policy in inference.yml.
+{{end}}For model sets, inspect their separate saved promotion policy in inference.yml.
 Use the serialized train job's Run now parameters for approve/reject/rollback,
 copying the exact **Available action** values from `training_report` > Output;
 first approval uses expected champion `none`. Do not repair/retry an old lifecycle invocation or edit aliases directly.
