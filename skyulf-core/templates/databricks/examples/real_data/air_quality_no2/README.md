@@ -10,7 +10,7 @@ and column contract. If tables do not exist yet, choose `include_source_sql: "tr
 during setup to include an editable `config/sources.sql` starter. The default is
 `"false"`; initialization and deployment never create your source tables.
 
-Skyulf 0.9.4 Bundle: **regression** with **pandas** training and **batch** prediction delivery, using **serverless**
+Skyulf 0.9.5 Bundle: **regression** with **pandas** training and **batch** prediction delivery, using **serverless**
 compute. Training and preprocessing fit in one bounded Python process on this compute.
 Batch scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.
 
@@ -31,7 +31,7 @@ Batch scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps key
 | Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml` |
 | Installed Core and optional dependencies | `deployment/*requirements.txt` |
 
-The shared runtime pin is `skyulf-core[mlflow]==0.9.4` in
+The shared runtime pin is `skyulf-core[mlflow]==0.9.5` in
 `deployment/requirements.txt`. Use the Core release matching this template
 ([runtime packaging](https://www.skyulf.com/manual/user_guide/databricks_deployment.html#runtime-packaging)). Changing the pin
 does not migrate saved models or rewrite already generated project files.

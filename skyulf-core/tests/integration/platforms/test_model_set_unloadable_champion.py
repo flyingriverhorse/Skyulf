@@ -152,7 +152,10 @@ def test_cross_release_retraining_requires_gated_explicit_approval(release_case,
         comparison = result["comparison"]
         assert comparison["champion_version"] == "1"
         assert comparison["champion_metrics"] is None
-        assert "0.9.4" in comparison["champion_unavailable"]
+        assert (
+            f"requires {case.original_version('skyulf-core')}, found"
+            in comparison["champion_unavailable"]
+        )
     payload = {
         **pending,
         "model_set_candidate": {"name": candidate.name, "version": candidate.version},
@@ -246,10 +249,15 @@ def _assert_approved_handoffs(case, output, monkeypatch):
     from skyulf.integrations.databricks.jobs import serving_endpoint_job
     from skyulf.integrations.databricks.jobs.training import training_node_notebook as notebook
 
+    serving_config = case.directory / "serving.yml"
+    serving_config.write_text(
+        "serving_endpoint:\n  enabled: true\n  follow_champion: true\n", encoding="utf-8"
+    )
     values = {
         "decision_result_state": "success",
         "deployed_serving_endpoint": "true",
         "bundle_mode": "production",
+        "serving_config_path": str(serving_config),
     }
     store = SimpleNamespace(
         request={
