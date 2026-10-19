@@ -3,6 +3,15 @@
 {{- if or (and .label_table_name (not .label_available_at_column)) (and .label_available_at_column (not .label_table_name))}}
 {{- template "ERROR_label_table_name_and_label_available_at_column_must_be_set_together" . -}}
 {{- end}}
+{{- if and (ne .monitoring_dashboard "none") (not .monitoring_catalog)}}
+{{- template "ERROR_monitoring_dashboard_requires_monitoring_store" . -}}
+{{- end}}
+{{- if and (eq .monitoring_dashboard "create") (not .monitoring_dashboard_warehouse_id)}}
+{{- template "ERROR_monitoring_dashboard_create_requires_warehouse_id" . -}}
+{{- end}}
+{{- if and (eq .monitoring_dashboard "connect") (not .monitoring_dashboard_url)}}
+{{- template "ERROR_monitoring_dashboard_connect_requires_published_url" . -}}
+{{- end}}
 {{- if and (ne .performance_policy_mode "off") (or (not .label_table_name) (not .monitoring_catalog))}}
 {{- template "ERROR_performance_policy_requires_outcomes_and_monitoring_store" . -}}
 {{- end}}

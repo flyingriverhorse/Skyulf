@@ -31,11 +31,9 @@ databricks bundle run monitoring -t test --profile YOUR_PROFILE --params monitor
 databricks bundle run monitoring -t test --profile YOUR_PROFILE
 ```
 
-For an existing dashboard, configure its refresh before validating and deploying:
-
-```powershell
-python src/tools/configure_monitoring_dashboard.py --target test --dashboard-url "https://<workspace-host>/dashboardsv3/<dashboard-id>/published" --warehouse-id <warehouse-id>
-```
+To create or connect a dashboard, edit the target's block in
+`deployment/dashboards.yml` before validating and deploying; the file explains
+both choices and where to find the warehouse ID.
 
 ## Rules that matter
 

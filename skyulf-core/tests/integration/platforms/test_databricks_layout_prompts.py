@@ -36,6 +36,7 @@ SHARED_FIELDS = {
     "personal_development_targets",
     "monitoring_catalog",
     "monitoring_schema",
+    "monitoring_dashboard",
     "rescore_when_history_expires",
     "evaluation_charts_enabled",
     "save_preprocessing_diagnostics",

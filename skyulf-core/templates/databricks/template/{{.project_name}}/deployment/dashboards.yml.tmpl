@@ -1,0 +1,156 @@
+{{- $id := "" -}}
+{{- if and (eq .monitoring_dashboard "connect") .monitoring_dashboard_url -}}
+{{- $id = index ((regexp "dashboardsv3/([0-9a-fA-F-]+)").FindStringSubmatch .monitoring_dashboard_url) 1 -}}
+{{- end -}}
+# Monitoring dashboard for each shared target (optional).
+#
+# One dashboard per workspace shows every model saved in the monitoring store
+# (monitoring_catalog / monitoring_schema in deployment/variables.yml). The
+# monitoring job measures and saves results with or without a dashboard; a
+# configured target also refreshes its dashboard after each monitoring run.
+#
+# For each target (test, syst, prod) choose one, then deploy that target:
+#   create  - only in the FIRST project that uses this target's monitoring store.
+#             Deploy creates the dashboard. Every other project connects to it.
+#   connect - paste the dashboard's published URL and its ID (the 32 characters
+#             after /dashboardsv3/ in that URL).
+#   nothing - leave the target out of this file.
+#
+# warehouse_id is the SQL warehouse that runs the dashboard queries:
+# SQL Warehouses > your warehouse > Connection details (16 hexadecimal
+# characters); it is also in the warehouse page URL, .../sql/warehouses/<id>.
+# Each workspace has its own warehouses, so syst and prod need their own ID.
+# Development targets never refresh a dashboard.
+#
+# How the refresh task reaches the monitoring job:
+# resources/monitoring.job.yml defines the `monitoring` job for every target:
+#   monitor_model -> monitoring_report -> evaluate_retraining
+# A target block below repeats the same job name, `monitoring`, so Bundle does not
+# create a second job. On `bundle deploy -t <target>` it merges all files and adds
+# each task_key it does not know yet to that job. dashboard_refresh_enabled and
+# refresh_monitoring_dashboard then run after evaluate_retraining, but only in the
+# targets configured here (and only while monitoring_enabled is "true"); every
+# other target keeps the three tasks. targets.yml uses the same merge to add
+# run_as and permissions to jobs defined in resources/.
+#
+# Copy a commented example below under `targets:` and replace the target name.
+{{- if eq .monitoring_dashboard "none"}}
+targets: {}
+{{- else}}
+targets:
+  test:
+    variables:
+{{- if eq .monitoring_dashboard "create"}}
+      monitoring_dashboard_url: ${workspace.host}/dashboardsv3/${resources.dashboards.monitoring_dashboard.id}/published
+    resources:
+      dashboards:
+        monitoring_dashboard:
+          display_name: "${bundle.name} monitoring"
+          file_path: ../src/monitoring/monitoring.lvdash.json
+          warehouse_id: {{printf "%q" .monitoring_dashboard_warehouse_id}}
+          dataset_catalog: ${var.monitoring_catalog}
+          dataset_schema: ${var.monitoring_schema}
+          embed_credentials: false
+      jobs:
+        # Same job name as resources/monitoring.job.yml: this task is added to it.
+        monitoring:
+          tasks:
+            - task_key: dashboard_refresh_enabled
+              description: Refresh only when monitoring is enabled
+              depends_on:
+                - task_key: evaluate_retraining
+              condition_task:
+                op: EQUAL_TO
+                left: "${var.monitoring_enabled}"
+                right: "true"
+            - task_key: refresh_monitoring_dashboard
+              depends_on:
+                - task_key: dashboard_refresh_enabled
+                  outcome: "true"
+              timeout_seconds: ${var.monitoring_task_timeout_seconds}
+              dashboard_task:
+                dashboard_id: ${resources.dashboards.monitoring_dashboard.id}
+{{- else}}
+      monitoring_dashboard_url: {{printf "%q" .monitoring_dashboard_url}}
+    resources:
+      jobs:
+        # Same job name as resources/monitoring.job.yml: this task is added to it.
+        monitoring:
+          tasks:
+            - task_key: dashboard_refresh_enabled
+              description: Refresh only when monitoring is enabled
+              depends_on:
+                - task_key: evaluate_retraining
+              condition_task:
+                op: EQUAL_TO
+                left: "${var.monitoring_enabled}"
+                right: "true"
+            - task_key: refresh_monitoring_dashboard
+              depends_on:
+                - task_key: dashboard_refresh_enabled
+                  outcome: "true"
+              timeout_seconds: ${var.monitoring_task_timeout_seconds}
+              dashboard_task:
+                dashboard_id: {{printf "%q" $id}}
+{{- if .monitoring_dashboard_warehouse_id}}
+                warehouse_id: {{printf "%q" .monitoring_dashboard_warehouse_id}}
+{{- end}}
+{{- end}}
+{{- end}}
+
+# Example: create (first project for this target's monitoring store)
+#  prod:
+#    variables:
+#      monitoring_dashboard_url: ${workspace.host}/dashboardsv3/${resources.dashboards.monitoring_dashboard.id}/published
+#    resources:
+#      dashboards:
+#        monitoring_dashboard:
+#          display_name: "${bundle.name} monitoring"
+#          file_path: ../src/monitoring/monitoring.lvdash.json
+#          warehouse_id: "REPLACE_WITH_WAREHOUSE_ID"
+#          dataset_catalog: ${var.monitoring_catalog}
+#          dataset_schema: ${var.monitoring_schema}
+#          embed_credentials: false
+#      jobs:
+#        monitoring:
+#          tasks:
+#            - task_key: dashboard_refresh_enabled
+#              description: Refresh only when monitoring is enabled
+#              depends_on:
+#                - task_key: evaluate_retraining
+#              condition_task:
+#                op: EQUAL_TO
+#                left: "${var.monitoring_enabled}"
+#                right: "true"
+#            - task_key: refresh_monitoring_dashboard
+#              depends_on:
+#                - task_key: dashboard_refresh_enabled
+#                  outcome: "true"
+#              timeout_seconds: ${var.monitoring_task_timeout_seconds}
+#              dashboard_task:
+#                dashboard_id: ${resources.dashboards.monitoring_dashboard.id}
+#
+# Example: connect (every other project)
+#  prod:
+#    variables:
+#      monitoring_dashboard_url: "https://REPLACE_WORKSPACE/dashboardsv3/REPLACE_DASHBOARD_ID/published"
+#    resources:
+#      jobs:
+#        monitoring:
+#          tasks:
+#            - task_key: dashboard_refresh_enabled
+#              description: Refresh only when monitoring is enabled
+#              depends_on:
+#                - task_key: evaluate_retraining
+#              condition_task:
+#                op: EQUAL_TO
+#                left: "${var.monitoring_enabled}"
+#                right: "true"
+#            - task_key: refresh_monitoring_dashboard
+#              depends_on:
+#                - task_key: dashboard_refresh_enabled
+#                  outcome: "true"
+#              timeout_seconds: ${var.monitoring_task_timeout_seconds}
+#              dashboard_task:
+#                dashboard_id: "REPLACE_DASHBOARD_ID"
+#                # Optional: warehouse_id: "REPLACE_WITH_WAREHOUSE_ID" (default: the dashboard's own)

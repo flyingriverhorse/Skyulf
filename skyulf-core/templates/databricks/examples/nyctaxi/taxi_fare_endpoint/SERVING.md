@@ -61,19 +61,18 @@ and redeploy to collect observations automatically.
 
 ## 3. Open Online serving
 
-Reuse the dashboard for `workspace.taxi_monitoring` if one exists. To connect its
-published URL and refresh it after monitoring:
+Reuse the dashboard for `workspace.taxi_monitoring` if one exists: copy the
+commented `connect` example in `deployment/dashboards.yml` under `test` and paste
+its published URL and ID. If this is the first project owning that store's
+dashboard, copy the `create` example instead and set your SQL warehouse ID; the file
+explains where to find it. Then deploy and run monitoring:
 
 ```bash
-python src/tools/configure_monitoring_dashboard.py --dashboard-url YOUR_PUBLISHED_DASHBOARD_URL --target test
 databricks bundle deploy -t test --profile YOUR_PROFILE
 databricks bundle run monitoring -t test --profile YOUR_PROFILE
 ```
 
-If this is the first project owning that store's dashboard, use
-`--create-dashboard --warehouse-id YOUR_WAREHOUSE_ID --target test` instead of
-`--dashboard-url`. The helper writes local configuration; deployment creates the
-dashboard. Use the published link from the monitoring run and choose **Online
+Use the published link from the monitoring run and choose **Online
 serving**, model `workspace.taxi_fare_endpoint.taxi_fare_endpoint_model`, then the
 served version/context. Training charts and SHAP are available in the MLflow run.
 

@@ -473,9 +473,8 @@ update the preview script's defaults.
 | `smoke.py` | Check YAML, Python syntax and package snapshots without running editable hooks: `python src/tools/smoke.py`. It accepts preview's five binding flags; see [smoke result](#smoke-result) for status and exit codes. |
 | `refresh_feature_graph.py` | After editing feature groups or merges: `python src/tools/refresh_feature_graph.py`. |
 | `refresh_training_graph.py` | After editing competition candidates or model-set branch names/count: `python src/tools/refresh_training_graph.py`. Single-model projects remain unchanged. |
-| `configure_monitoring_dashboard.py` | Configure an existing dashboard's target refresh: `python src/tools/configure_monitoring_dashboard.py --dashboard-id YOUR_DASHBOARD_ID --target test`. See [dashboard configuration](databricks_monitoring_dashboard.md) for ownership, warehouse and disable options. |
 
-Graph/dashboard tools change local resource YAML. Validate and redeploy before
+Graph tools change local resource YAML. Validate and redeploy before
 running the updated job. They do not start a cloud job by themselves.
 
 The answer-file examples include `guided-classification-init.example.json`

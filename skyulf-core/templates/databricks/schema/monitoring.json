@@ -27,6 +27,29 @@
     "description": "6. Deployment | Shared monitoring store schema; omitted or blank uses skyulf_monitoring when a catalog is set. Choose another existing store if needed. Ignored when the catalog is blank. Created on first use when the run-as identity may create schemas",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
   },
+  "monitoring_dashboard": {
+    "order": 750.1,
+    "type": "string",
+    "default": "none",
+    "enum": ["none", "create", "connect"],
+    "description": "6. Deployment | Monitoring dashboard: one dashboard shows every model in this monitoring store. create makes it in this project (choose create only in the first project using this store); connect links a dashboard another project created; none adds no dashboard. Requires a monitoring store. This answer sets up the test target only; set syst and prod by hand in deployment/dashboards.yml, which explains both choices"
+  },
+  "monitoring_dashboard_warehouse_id": {
+    "order": 750.2,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | SQL warehouse ID (16 hexadecimal characters; SQL Warehouses > your warehouse > Connection details, or the warehouse page URL) that runs the dashboard queries. Required for create; for connect, blank keeps the published dashboard's warehouse",
+    "pattern": "^(?:[0-9a-fA-F]{16})?$",
+    "skip_prompt_if": {"properties": {"monitoring_dashboard": {"const": "none"}}}
+  },
+  "monitoring_dashboard_url": {
+    "order": 750.3,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | Published dashboard URL from the project that created it, for example https://<workspace>/dashboardsv3/<id>/published",
+    "pattern": "^(?:https://[A-Za-z0-9.-]+(?::[0-9]+)?/(?:sql/)?dashboardsv3/(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})(?:/published(?:/pages/[A-Za-z0-9_-]+)?)?/?(?:\\?[A-Za-z0-9=&%_.~-]*)?)?$",
+    "skip_prompt_if": {"properties": {"monitoring_dashboard": {"enum": ["none", "create"]}}}
+  },
   "performance_policy_mode": {
     "order": 760,
     "type": "string",

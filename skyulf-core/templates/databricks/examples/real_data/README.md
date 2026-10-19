@@ -216,11 +216,11 @@ already ships in each project; publish one dashboard per isolated monitoring
 schema, or deliberately choose one shared monitoring store for a production
 installation.
 
-To let each example own its dashboard, run this from that project's directory
-with an existing SQL warehouse ID, then validate and deploy the Bundle again:
+To let each example own its dashboard, copy the commented `create` example in
+that project's `deployment/dashboards.yml` under `test`, set an existing SQL
+warehouse ID, then validate and deploy the Bundle again:
 
 ```powershell
-python src/tools/configure_monitoring_dashboard.py --create-dashboard --target test --warehouse-id YOUR_WAREHOUSE_ID
 databricks bundle validate --strict -t test --profile YOUR_PROFILE
 databricks bundle deploy -t test --profile YOUR_PROFILE
 ```
