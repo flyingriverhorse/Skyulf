@@ -177,6 +177,44 @@ def test_reference_reuses_lifecycle_bytes_and_preserves_context(saved_reference)
     assert actual.attrs == frame.attrs
 
 
+@pytest.mark.parametrize("prepared", [False, True])
+@pytest.mark.parametrize(
+    "conversions",
+    [(), ({"column": "x", "source_dtype": "decimal(10,2)", "target_dtype": "float64"},)],
+)
+def test_spark_conversion_context_roundtrips_as_json(saved_reference, prepared, conversions):
+    """Fresh Spark tuples and saved Parquet lists must bind the same conversion evidence."""
+    client, run, report, spec, frame, path = saved_reference
+    frame.attrs["source_column_conversions"] = conversions
+    original = deepcopy(frame.attrs)
+    path.unlink()
+    if prepared:
+        saved.save_frame_artifact(client, run.run_id, "holdout", frame)
+    uploads = client.log_artifact.call_count
+    report.holdout_reference = saved.save_holdout_reference(run, frame, spec, report)
+    actual = saved.load_saved_holdout(client, None, report, spec)
+    pd.testing.assert_frame_equal(actual, frame)
+    assert actual.attrs == json.loads(json.dumps(original))
+    assert report.holdout_reference["frame"]["attrs"] == actual.attrs
+    assert frame.attrs == original
+    assert client.log_artifact.call_count == uploads + (not prepared)
+
+
+def test_changed_spark_conversion_context_still_rejects_existing_holdout(saved_reference):
+    """JSON normalization must not accept a conversion that the prepared rows never used."""
+    client, run, report, spec, frame, path = saved_reference
+    frame.attrs["source_column_conversions"] = ()
+    path.unlink()
+    saved.save_frame_artifact(client, run.run_id, "holdout", frame)
+    frame.attrs["source_column_conversions"] = (
+        {"column": "x", "source_dtype": "decimal(10,2)", "target_dtype": "float64"},
+    )
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="schema or split context"):
+        saved.save_holdout_reference(run, frame, spec, report)
+    assert path.read_bytes() == before
+
+
 @pytest.mark.parametrize(
     "change",
     ["run", "path", "split", "dataset", "model", "bytes", "rows", "schema", "attrs", "hash"],

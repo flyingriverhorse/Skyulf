@@ -17,6 +17,7 @@ from tests.integration.platforms.test_serving_rollout_endpoints import (  # noqa
 
 from skyulf.integrations.databricks.serving.rollout_endpoints import build_rollout_endpoint
 from skyulf.integrations.databricks.serving.rollout_policy import RolloutState
+from skyulf.integrations.databricks.training.fitting.candidate import TrainingSpec
 from skyulf.integrations.mlflow.lifecycle.validation import ModelComparisonReport, comparison_digest
 
 NOW = datetime(2026, 10, 11, tzinfo=UTC)
@@ -307,7 +308,15 @@ def live(plans, monkeypatch, tmp_path):
         minimum_label_coverage=0.5,
     )
     spark = SimpleNamespace(table=lambda name: object())
-    spec = SimpleNamespace(record_key_columns=("x",), target_column="target")
+    spec = TrainingSpec(
+        table="main.data.source",
+        version=1,
+        record_key_columns=("id",),
+        input_columns=("x",),
+        target_column="target",
+        max_rows=20,
+        max_bytes=1024 * 1024,
+    )
     return api, spark, plan, config, artifact, spec, health, context
 
 
@@ -341,6 +350,15 @@ def test_live_exact_stage_metrics_and_physical_evidence(live):
     assert len(result.details_digest) == 64
     assert live[-1]["calls"][0]["start"] == START
     assert live[-1]["calls"][0]["end"] == NOW
+
+
+def test_live_rollout_accepts_disjoint_training_keys_and_model_inputs(live):
+    """Serving labels join native request IDs, not training keys excluded from model inputs."""
+    assert set(live[5].record_key_columns).isdisjoint(live[2].challenger.input_columns)
+    result = _observe(live)
+    assert result.evidence.verdict == "PASS"
+    assert result.details["performance"]["values"]["rmse"] == 0.0
+    assert live[-1]["calls"][0]["input_columns"] == (("x", "double"),)
 
 
 @pytest.mark.parametrize(
@@ -482,7 +500,6 @@ def test_key_only_native_requests_use_admitted_source_schema(live):
         for pinned in (plan.champion, plan.challenger)
     ]
     plan = build_rollout_endpoint(*plans)
-    spec.record_key_columns = ("id",)
     result = api.observe_live_rollout(
         spark,
         plan,
@@ -582,24 +599,16 @@ def test_labels_arriving_after_cutoff_hold(live):
     assert _observe(live).evidence.verdict == "HOLD"
 
 
-def test_missing_source_keys_reject_before_native_reads(live):
-    """Missing source key transport cannot be hidden by request-index monitoring keys."""
-    api, spark, plan, config, artifact, spec, health, context = live
-    spec.record_key_columns = ("missing_key",)
-    with pytest.raises(ValueError, match="record keys"):
-        api.observe_live_rollout(
-            spark,
-            plan,
-            _state(),
-            config,
-            artifact,
-            spec,
-            health,
-            metric="heldout_rmse",
-            quality_threshold=1.0,
-            now=NOW,
-        )
-    assert context["calls"] == []
+@pytest.mark.parametrize(
+    "column,values",
+    [("databricks_request_id", ["other-a", "other-b"]), ("request_row_index", [1, 1])],
+)
+def test_unmatched_request_keys_hold(live, column, values):
+    """Labels for another request or row cannot certify this rollout's predictions."""
+    live[-1]["labels"][column] = values
+    result = _observe(live)
+    assert result.evidence.verdict == "HOLD"
+    assert result.details["performance"]["labeled_rows"] == 0
 
 
 def test_output_schema_mismatch_reject_before_native_reads(live):

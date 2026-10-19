@@ -252,7 +252,7 @@ def observe_bootstrap_rollout(
 
 
 def _validate_live_binding(
-    plan: RolloutEndpointPlan, state: RolloutState, config: MonitorConfig, artifact: Any, spec: Any
+    plan: RolloutEndpointPlan, state: RolloutState, config: MonitorConfig, artifact: Any
 ) -> None:
     """Reject unsupported model sets and wrong endpoint/source/version before native reads."""
     from ....inference.fitted_pipeline import FittedPipelineArtifact  # noqa: PLC0415
@@ -270,8 +270,6 @@ def _validate_live_binding(
         selected.spec.inference_table,
     ):
         raise ValueError("Serving monitoring identity differs from the admitted rollout stage.")
-    if not set(spec.record_key_columns).issubset(selected.input_columns):
-        raise ValueError("Serving request schema must retain the declared source record keys.")
     actual = tuple((column.name, column.dtype) for column in scoring_output_schema(artifact))
     if selected.output_schema != actual:
         raise ValueError("Serving output schema differs from the loaded fitted artifact.")
@@ -394,7 +392,7 @@ def observe_live_rollout(
     start = _validate_stage(plan, state, now)
     if state.challenger_percentage == 0:
         raise ValueError("Live observation requires a nonzero challenger stage.")
-    _validate_live_binding(plan, state, config, artifact, training_spec)
+    _validate_live_binding(plan, state, config, artifact)
     validate_quality_policy(metric, quality_threshold, quality_gates, task=artifact.manifest.task)
     if quality_threshold is None:
         raise ValueError("Live rollout requires an explicit absolute quality threshold.")
