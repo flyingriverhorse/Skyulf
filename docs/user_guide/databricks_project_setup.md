@@ -9,11 +9,12 @@ not inspect your tables.
 ### Start from the closest example
 
 Copying a finished project is usually faster than answering the setup wizard.
-Five NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
+Six NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
 
 | Your project | Copy | Notes |
 | --- | --- | --- |
 | One model, scored on Spark workers | `taxi_fare` | Promotes automatically and scores after promotion |
+| REST/SQL serving and monitoring without batch output | [taxi_fare_endpoint](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint) | Automatic endpoint after promotion, `ai_query` and captured-request monitoring; no score job or prediction table |
 | Preprocessing exclusions with Spark and raw-input serving | `taxi_fare_robust` | Reuses pre-split preparation; IQR, PowerTransformer and imputer handling; REST/`ai_query` examples and labels for monitoring |
 | One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; no batch scoring |
 | One target, several candidate algorithms | `taxi_high_fare` | Competition with custom steps and manual approval |

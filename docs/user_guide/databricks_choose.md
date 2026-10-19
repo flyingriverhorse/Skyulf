@@ -24,8 +24,8 @@ The layout shapes the generated train job, so choose it at `bundle init`; see
 | --- | --- | --- | --- |
 | A scheduled job writing a Delta table within `max_rows`/`max_input_mb` | `score` job, `batch_compute: single_node` (default) | `taxi_high_fare` | [Scoring](databricks_scoring.md) |
 | A scheduled job on a table too large for one Python process | `score` job, `batch_compute: spark` | `taxi_fare` | [Spark scoring](databricks_spark_scoring.md) |
-| An application sending raw feature values | REST serving endpoint | `taxi_fare_robust` | [Serving](databricks_serving.md) |
-| SQL users, SQL jobs and dashboards | SQL function calling the endpoint with `ai_query` | `taxi_fare_robust` | [SQL function](databricks_serving.md#3-create-the-sql-function) |
+| An application sending raw feature values | REST serving endpoint | `taxi_fare_endpoint` | [Serving](databricks_serving.md) |
+| SQL users, SQL jobs and dashboards | SQL function calling the endpoint with `ai_query` | `taxi_fare_endpoint` | [SQL function](databricks_serving.md#sql-with-ai_query) |
 | Requests that send only an entity key | Endpoint with online feature lookup | `taxi_fare_online` | [Online features](databricks_online_features.md) |
 
 The batch job never calls an endpoint, and an endpoint never writes the
@@ -36,6 +36,11 @@ prediction table. Models packaged with feature lookup score in batch only with
 For rows excluded by preprocessing at scoring, start with `taxi_fare_robust`.
 Its Spark and raw-input endpoint examples retain row identity and explain
 `excluded` status, null predictions and the resulting monitoring coverage.
+
+For endpoint delivery without a batch prediction table, copy
+[taxi_fare_endpoint](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint).
+Its serving job follows champion and enrolls the endpoint's telemetry logs for
+monitoring. Its guide includes a SQL request and the **Online serving** dashboard.
 
 ## Which steps run on Spark workers and endpoints?
 

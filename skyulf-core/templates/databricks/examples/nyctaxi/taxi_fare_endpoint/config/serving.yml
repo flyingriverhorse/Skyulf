@@ -1,0 +1,82 @@
+# Stable endpoint setup is ready to run when selected at initialization.
+# Enable rollout and online-feature jobs only after completing their settings.
+# The rollout must already be initialized; the daily job never creates endpoints.
+
+serving_endpoint:
+  enabled: true
+  follow_champion: true  # false = manual runs only
+  # Target substitutions are resolved by the job; development gets a per-user suffix.
+  endpoint_name: "taxi-fare-endpoint-{bundle_target}-endpoint{resource_suffix}"
+  model_name: "{catalog}.{metadata_schema}.taxi_fare_endpoint_model{resource_suffix}"
+  tracking_uri: databricks
+  registry_uri: databricks-uc
+  workload_type: CPU
+  workload_size: Small
+  scale_to_zero_enabled: true
+  ready_timeout_s: 3600
+  logging_mode: telemetry
+  logging_catalog: "{catalog}"
+  logging_schema: "{metadata_schema}"
+  logging_table_prefix: "taxi_fare_endpoint_serving{resource_suffix}"
+  sql_function:
+    enabled: true
+    name: "{catalog}.{metadata_schema}.taxi_fare_endpoint_score{resource_suffix}"
+  # Additive grants only. Removing an entry does not revoke access.
+  permissions: [] # e.g. [{group_name: data_products, level: CAN_QUERY}]
+  verification:
+    sample_rows: 20 # Bounded sample from config/inference.yml score_source_table; zero rows fails.
+
+rollout:
+  enabled: false
+  # Set true only when no other job or person changes this endpoint or its champion assignment.
+  exclusive_writer: false
+  run_id: ""
+  tracking_uri: databricks
+  registry_uri: databricks-uc
+  comparison_sha256: ""
+  approval:
+    model_name: ""
+    metric: heldout_rmse
+    min_improvement: 0.0
+    min_scored_fraction: 0.90
+    max_coverage_drop: 0.05
+    quality_threshold: null
+    quality_gates: null
+    max_rows: 10000
+    max_input_mb: 64
+    tracking_uri: databricks
+    registry_uri: databricks-uc
+  # Example requests with the saved model input columns; both model versions are checked.
+  smoke_records: []
+  health:
+    minimum_requests: 100
+    maximum_error_rate: 0.01
+    # Bounds p99 model execution time; absent/null p99 falls back to the maximum.
+    maximum_latency_ms: 1000.0
+    minimum_labeled_rows: 30
+    minimum_label_coverage: 0.8
+  monitoring:
+    environment: syst # Fallback label; the daily_rollout job records its Bundle target instead.
+    project: taxi_fare_endpoint
+    model_name: ""
+    model_version: ""
+    serving_endpoint: ""
+    # Both names select the same pinned endpoint inference payload table.
+    source_table: ""
+    prediction_table: ""
+    # Labels retain databricks_request_id and request_row_index for request attribution.
+    label_table: ""
+    result_available_at_column: ""
+    execution_engine: spark
+    reference_namespace: ""
+
+online_publication:
+  enabled: false
+  publish_mode: TRIGGERED
+  # Set true only when other writers cannot change this source or publication while this job runs.
+  exclusive_writer: false
+  # Existing Delta feature table with one current row per key, change data feed enabled, and no null keys.
+  source_table: ""
+  source_table_id: ""
+  online_table: ""
+  online_store: ""

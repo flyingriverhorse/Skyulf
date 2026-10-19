@@ -20,6 +20,33 @@ LAYOUTS = ["single_model", "model_competition", "multi_target"]
 CLI_ONLY = pytest.mark.skipif(not (PROFILE or OFFLINE_CLI) or not CLI, reason="Opt into CLI")
 
 
+def test_endpoint_example_serves_and_monitors_without_a_batch_sink():
+    """The ready-to-run endpoint example must not deploy a score job or enroll business-key labels."""
+    from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
+    assert "taxi_fare_endpoint" in PROJECTS
+    project = EXAMPLES / "taxi_fare_endpoint"
+    config = read_workflow_config(project / "config/training.yml")
+    assert config["prediction_delivery"] == "endpoint" and config["engine"] == "pandas"
+    assert config["promotion_policy"] == "automatic" and config["score_handoff"] == "disabled"
+    assert "prediction_table" not in config
+    assert not (project / "resources/score.job.yml").exists()
+    assert not (project / "src/jobs/score.py").exists()
+    assert (project / "resources/monitoring.job.yml").is_file()
+    assert (project / "resources/serving_endpoint.job.yml").is_file()
+    serving = yaml.safe_load((project / "config/serving.yml").read_text())["serving_endpoint"]
+    assert serving["enabled"] is True and serving["follow_champion"] is True
+    assert serving["sql_function"]["enabled"] is True
+    assert serving["logging_mode"] == "telemetry"
+    variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
+    assert variables["monitoring_enabled"]["default"] == "true"
+    assert variables["monitoring_catalog"]["default"] == "workspace"
+    assert variables["monitoring_schema"]["default"] == "taxi_monitoring"
+    assert variables["cost_tag_value"]["default"] == "taxi-fare-endpoint-demo"
+    assert variables["monitoring_label_table"]["default"] == ""
+    assert variables["monitoring_performance_policies"]["default"] == "{}"
+
+
 @pytest.mark.parametrize("name", PROJECTS)
 def test_example_scoring_has_one_owner_and_preserves_legacy_online_schema(name):
     """The online compatibility example must not silently gain scoring-status columns."""
@@ -78,6 +105,7 @@ def test_prepared_example_matches_regeneration_and_previews(tmp_path, name):
     assert yaml.safe_load((regenerated / "config/training.yml").read_text())["defaults"][
         "save_preprocessing_diagnostics"
     ]
+    inference = yaml.safe_load((regenerated / "config/inference.yml").read_text())
     for arguments in (
         ["smoke.py"],
         ["preview.py", "--action", "train"],
@@ -89,7 +117,11 @@ def test_prepared_example_matches_regeneration_and_previews(tmp_path, name):
             text=True,
             timeout=90,
         )
-        assert result.returncode == 0, result.stdout + result.stderr
+        if arguments[-1] == "score" and inference.get("prediction_delivery") == "endpoint":
+            assert result.returncode == 2
+            assert "does not allow batch scoring" in result.stderr
+        else:
+            assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("name", PROJECTS)

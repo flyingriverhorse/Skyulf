@@ -1,6 +1,6 @@
 # NYC taxi example projects
 
-Five projects generated from this template with `databricks bundle init` on the
+Six projects generated from this template with `databricks bundle init` on the
 `samples.nyctaxi.trips` dataset. Each folder is ordinary template output for its
 answer file, without the template's teaching samples it does not use, plus the
 files an author writes: recipes, scoring rules and custom steps.
@@ -9,13 +9,14 @@ files an author writes: recipes, scoring rules and custom steps.
 | Project | Layout | What it shows |
 |---|---|---|
 | `taxi_fare/` | single model, regression on `fare_amount` | Spark inference with a partition-safe recipe (`spark_safe`), Optuna tuning, 3-fold CV, automatic promotion behind an RMSE bound, score after promotion, evaluation charts, SHAP, monitoring |
+| [taxi_fare_endpoint/](taxi_fare_endpoint/README.md) | single model, endpoint-only regression | Automatic champion-following endpoint, typed SQL `ai_query`, telemetry and serving monitoring; no batch score job, prediction table or online store |
 | `taxi_fare_online/` | single model, regression on `fare_amount` | An online serving endpoint whose model looks up pickup-zone features (`zone_features`) from an online feature store at request time; manual approval, feature publication and endpoint setup jobs |
 | `taxi_fare_robust/` | single model, regression on `fare_amount` | Reused distance eligibility, learned IQR exclusions, Yeo-Johnson, imputation, zone encoding and scaling; Spark UDF, raw-input REST endpoint and typed SQL `ai_query`; configurable endpoint compute and readiness |
 | `taxi_high_fare/` | model competition, classification on `high_fare` | Polars engine, four candidates (logistic regression, XGBoost, soft voting, stacking), nested stratified CV, random search with threshold tuning, manual approval, custom pre-split and preprocessing steps in `src/features/trip_rules.py`, `custom` scoring with an input rule and a `fare_band` output |
 | `taxi_trips/` | model set: `fare` regression and `long_trip` classification | Per-model pre-split and preprocessing recipes, grid and halving search, manual set approval, `combined` scoring with an `expected_long_trip_fare` rule that uses both models |
 
-Pick the closest one: Spark scoring, `taxi_fare`; online endpoint,
-`taxi_fare_online`; excluded/missing rows through Spark, REST and SQL,
+Pick the closest one: Spark scoring, `taxi_fare`; endpoint without batch scoring,
+`taxi_fare_endpoint`; online feature lookup, `taxi_fare_online`; excluded/missing rows through Spark, REST and SQL,
 `taxi_fare_robust`; several candidate algorithms, `taxi_high_fare`; several
 targets approved together, `taxi_trips`. Copying one is the fastest start; the
 [project setup guide](https://www.skyulf.com/manual/user_guide/databricks_project_setup.html#start-from-the-closest-example)
@@ -56,13 +57,23 @@ built-ins require the 0.9.4 development wheel until that release is published.
    ```
 
 5. `taxi_fare` and `taxi_fare_robust` promote and score when their quality and
-   coverage gates pass. For the other projects, copy the
+   coverage gates pass. `taxi_fare_endpoint` instead submits its serving job after
+   a successful promotion; wait for that child run before calling the endpoint.
+   For the other projects, copy the
    approve parameters from the final training report and run the train job with
    them; scoring follows the approval (`taxi_fare_online` has no batch scoring).
 
 To try retraining, uncomment the February block at the end of `load_nyctaxi.sql`,
 run it, and train again. The new candidate is compared with the current
 champion on the new holdout.
+
+## Serve `taxi_fare_endpoint` without batch scoring
+
+Follow [its README](taxi_fare_endpoint/README.md) to deploy and train, then
+[SERVING.md](taxi_fare_endpoint/SERVING.md) for a bounded SQL query and monitoring.
+The endpoint accepts raw trip features and runs the saved pipeline. Its telemetry
+payload view is a request log, not a batch prediction table. Monitoring reads that
+log and saves observations for the **Online serving** dashboard page.
 
 ## Serve `taxi_fare_online`
 

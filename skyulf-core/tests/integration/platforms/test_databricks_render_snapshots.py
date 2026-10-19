@@ -28,7 +28,9 @@ pytestmark = pytest.mark.skipif(
     not CLI or not (PROFILE or OFFLINE_CLI), reason="Requires opt-in installed CLI."
 )
 
-EXAMPLES = sorted(path.name for path in (TEMPLATE_ROOT / "examples").glob("*.example.json"))
+EXAMPLES = sorted(path.name for path in (TEMPLATE_ROOT / "examples").glob("*.example.json")) + [
+    "nyctaxi/taxi_fare_endpoint.json"
+]
 
 
 def _digests(project: Path) -> dict[str, str]:
