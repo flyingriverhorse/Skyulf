@@ -202,6 +202,8 @@ def test_logged_delivery_enrolls_only_after_both_parity_checks(delivery, mode):
     """The automatic entry must use the served version and payload table after verified smoke."""
     delivery.settings["logging_mode"] = mode
     result = _run(delivery, monitoring_values=delivery.values)
+    assert result["verification"] == {"sampled": 1, "rest_compared": 1, "sql_compared": 1}
+    assert "smoke" not in result
     assert result["monitoring"]["status"] == "enrolled"
     assert result["monitoring"]["models"] == 1
     assert delivery.events == [

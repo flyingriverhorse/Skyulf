@@ -89,7 +89,7 @@ DataFrame write or `CREATE TABLE ... AS SELECT`.
 | `config/inference.yml` → `score_source_table` | Existing table containing every raw input in the saved model signature |
 | `deployment/requirements.txt` | Runtime matching the registered model's producer |
 | `deployment/variables.yml` / target overrides | Serving job timeout, compute policy, cost attribution and job permissions |
-| `config/serving.yml` → `online_serving` | Separate online-lookup setup, only when selected |
+| `config/serving.yml` → `online_feature_lookup` | Separate online-lookup setup, only when selected |
 
 Use
 [deployment identities and access](databricks_deployment.md#deployment-identity-and-run-identity)
@@ -230,7 +230,6 @@ All keys below belong to `config/serving.yml` → `serving_endpoint`.
 | `follow_champion` | `true` | Automatically update after a completed champion change in production; `false` means manual runs only |
 | `endpoint_name` | Project + target + suffix | Stable endpoint; personal suffixes use hyphens |
 | `model_name` | Target's model or model-set name | Concrete UC registered model identity |
-| `selection` | `champion` | Resolved once; run parameter `model_version` overrides it |
 | `tracking_uri` / `registry_uri` | `databricks` / `databricks-uc` | Package lookup |
 | `workload_type` / `workload_size` | `CPU` / `Small` | Endpoint compute, independent of job compute |
 | `scale_to_zero_enabled` | `true` | Reduce idle compute; cold starts remain possible |
@@ -239,7 +238,11 @@ All keys below belong to `config/serving.yml` → `serving_endpoint`.
 | `logging_catalog` / `logging_schema` / `logging_table_prefix` | Empty when disabled | Separate payload sink, required for logged modes |
 | `sql_function.enabled` / `sql_function.name` | `true` / target's score function | Create and smoke-test SQL; `false` leaves REST/SDK only |
 | `permissions` | `[]` | Additive caller grants; one user, group or service principal per entry |
-| `smoke.rows` | `20` | Collected sample size, from 1 to 1000 |
+| `verification.sample_rows` | `20` | Collected sample size, from 1 to 1000 |
+
+Use `verification: {sample_rows: 20}` to set how many source rows the job checks.
+Older `smoke.rows` and `selection` keys are rejected. The job uses the current
+champion unless you pass `--params model_version=<version>` for that run.
 
 To change automatic updates, edit `serving_endpoint.follow_champion` in YAML and deploy the updated
 file. The endpoint job's existing dispatch tasks remain in place in either mode.
@@ -254,7 +257,7 @@ file. The endpoint job's existing dispatch tasks remain in place in either mode.
   values match exactly; floats allow `rtol=1e-10`, `atol=1e-12` for rounding.
   Null transport follows the saved package. No batch scoring or Delta write occurs.
 - **Result:** action, concrete model URI, logging destination, SQL action,
-  comparison counts and runnable examples. Output includes one sampled input
+  comparison counts under `verification` and runnable examples. Output includes one sampled input
   record. This smoke check does not replace holdout evaluation or monitoring.
 - **Ownership:** one entity at 100% traffic; foreign names, pending updates,
   conflicting logging/runtime settings and rollout/online endpoints are refused.
@@ -357,7 +360,7 @@ and
 Logging belongs to the endpoint, not to the caller: every request that reaches it
 is logged the same way, whether it comes from REST or from an `ai_query` SQL call.
 Choose it with `logging_mode` on `PinnedEndpointSpec`, or with
-`online_serving.endpoint.logging_mode` in `config/serving.yml`; setup does not ask.
+`online_feature_lookup.endpoint.logging_mode` in `config/serving.yml`; setup does not ask.
 
 | `logging_mode` | What Databricks creates in `<logging_catalog>.<logging_schema>` | When to choose it | Rollout and serving monitoring |
 | --- | --- | --- | --- |
@@ -532,13 +535,13 @@ the same SQL API; the saved output schema determines the returned fields.
 First complete
 [online Bundle training](databricks_online_features.md#generate-train-and-set-up-an-online-bundle)
 and publication. This endpoint setup job exists only when initialization selected
-`include_online_serving: "true"`. It is unscheduled and never creates a publication.
+`include_online_feature_lookup: "true"`. It is unscheduled and never creates a publication.
 
 Take the **concrete registered version** from the training result and complete
-`online_serving` in `config/serving.yml`:
+`online_feature_lookup` in `config/serving.yml`:
 
 ```yaml
-online_serving:
+online_feature_lookup:
   enabled: true
   exclusive_writer: true
   tracking_uri: databricks
@@ -576,7 +579,7 @@ validation error while the first sync is incomplete; it does not poll or republi
 
 ```bash
 databricks bundle deploy -t test
-databricks bundle run online_serving_setup -t test
+databricks bundle run online_feature_lookup_setup -t test
 ```
 
 The setup result reports `READY`, `model_uri`, `input_schema` and a typed
@@ -604,7 +607,7 @@ checks the received values and does not attest their source.
 
 #### Endpoint compute and setup timeout
 
-These settings belong to `online_serving.endpoint`. They are also keyword
+These settings belong to `online_feature_lookup.endpoint`. They are also keyword
 arguments of `PinnedEndpointSpec` for a regular endpoint without online lookup.
 
 | Setting | Default | Supported values and effect |
@@ -623,7 +626,7 @@ scale_to_zero_enabled: false
 ready_timeout_s: 1800
 ```
 
-Place those four lines under `online_serving.endpoint`. A changed YAML file
+Place those four lines under `online_feature_lookup.endpoint`. A changed YAML file
 does not update an existing endpoint. Setup is create-only: use a new endpoint
 name and explicitly move your callers after verifying it. A daily rollout must
 use the same workload type, size and scale-to-zero setting for champion and
@@ -644,7 +647,7 @@ for the platform's compute and readiness behavior.
 
 ### Admit and query the registered package
 
-The following SDK route is an alternative to the Bundle's `online_serving_setup`
+The following SDK route is an alternative to the Bundle's `online_feature_lookup_setup`
 job. Register the native outer package, then inspect a concrete version:
 
 ```python

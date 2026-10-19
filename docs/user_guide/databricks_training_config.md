@@ -73,9 +73,9 @@ answers use the same question name with a `branch_N_` prefix.
 | `task` | String | `regression` | `regression`, `classification`; must match estimator | Chooses label/metric semantics. Multi-target entries can differ. | `task` |
 | `engine` | String | `pandas` | `pandas`, `polars`; distributed fitted scoring requires pandas | Chooses local training and fitted preprocessing engine, not compute size. | `engine` |
 | `training_table` | String | Required | Three-part Delta name after target binding | Source of labeled rows; generation/deployment does not create it. | `source_table_name` plus catalog/input schema |
-| `training_version` | Integer or null | Omitted/null | Nonnegative Delta version, including `0` | Null resolves latest once per invocation; an integer pins that snapshot. | `training_version` |
+| `training_table_version` | Integer or null | Omitted/null | Nonnegative Delta version, including `0` | Null resolves latest once per invocation; an integer pins that snapshot. | `training_table_version` |
 | `training_label_table` | String or null | Omitted/null | Separate three-part Delta table; requires availability filtering and exact record-key types | Left-joins actual targets and availability into the training snapshot. External values replace embedded targets. See [separate outcomes](databricks_training_data.md#train-from-separate-outcomes). | `source_layout=separate_outcomes`, or YAML |
-| `training_label_version` | Integer or null | Omitted/null | Nonnegative Delta version; requires `training_label_table` | Null pins latest once per invocation; saved evidence also retains the immutable table identity. New labels can make an unchanged feature snapshot eligible for retraining. | YAML |
+| `training_label_table_version` | Integer or null | Omitted/null | Nonnegative Delta version; requires `training_label_table` | Null pins latest once per invocation; saved evidence also retains the immutable table identity. New labels can make an unchanged feature snapshot eligible for retraining. | YAML |
 | `record_key_columns` | String list | Required | Nonempty, nonnull, unique source identities; distinct roles | Stable row membership, split evidence and output alignment. Generated publication uses string/BIGINT keys. | `record_key_columns` |
 | `input_columns` | String list | Required | Ordered raw model inputs; excludes keys, targets, weights and time/group control roles | Selects features before saved preprocessing. | `input_columns` |
 | `target_column` | String | Required | One source label, distinct from other roles | Chooses the prediction target; omit it from future scoring input. | `target_column` |
@@ -153,7 +153,7 @@ answers use the same question name with a `branch_N_` prefix.
 | `competition_max_candidates` | Integer | `8` | 2..32 in loader; init wizard offers up to 8 | Bounds distinct candidate declarations in a one-target competition. | Generated; YAML for explicit validated limits |
 | `competition_max_trials` | Integer | Generated `1000`; loader fallback `100` | 1..10000; competition only | Aggregate search-work bound including nested/halving work, not wall-clock seconds. | `competition_max_trials` |
 | `feature_lookup` | Mapping or null | Omitted/null | Native lookup declaration; pandas and admitted Spark/online path | Adds explicit offline feature binding and source evidence; not an arbitrary join. | Online opt-in creates placeholders; complete YAML |
-| `online_features` | Mapping or null | Omitted/null | Requires feature_lookup, pandas, non-temporal supported request shape | Saves required-feature and freshness guards with the model; does not create a store or endpoint. | `include_online_serving` creates placeholders; complete YAML |
+| `online_features` | Mapping or null | Omitted/null | Requires feature_lookup, pandas, non-temporal supported request shape | Saves required-feature and freshness guards with the model; does not create a store or endpoint. | `include_online_feature_lookup` creates placeholders; complete YAML |
 
 <!-- training-fields:end -->
 
@@ -315,7 +315,7 @@ defaults:
   engine: pandas
   task: regression
   training_table: "{catalog}.{input_schema}.customer_training"
-  training_version: null             # Resolve latest once when invoked.
+  training_table_version: null             # Resolve latest once when invoked.
   record_key_columns: [customer_id]
   input_columns: [income, age]        # Keys and labels are not features.
   target_column: revenue
@@ -361,7 +361,7 @@ defaults:
   engine: pandas
   task: regression
   training_table: "{catalog}.{input_schema}.customer_training"
-  training_version: null
+  training_table_version: null
   record_key_columns: [customer_id]
   input_columns: [income, age]
   target_column: revenue
@@ -416,7 +416,7 @@ defaults:
   engine: pandas
   task: regression
   training_table: "{catalog}.{input_schema}.customer_training"
-  training_version: null
+  training_table_version: null
   record_key_columns: [customer_id]
   input_columns: [income, age]
   split_strategy: random

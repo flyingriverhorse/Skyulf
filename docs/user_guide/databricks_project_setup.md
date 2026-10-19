@@ -279,7 +279,7 @@ apply to the chosen layout and earlier answers:
 
 | Asked only in detailed setup | Quick default |
 | --- | --- |
-| `training_version` (not asked for `single_model`) | `null`: pin the latest snapshot at run start |
+| `training_table_version` (not asked for `single_model`) | `null`: pin the latest snapshot at run start |
 | `training_window_mode` | `auto`: full snapshot for random, rolling calendar for temporal |
 | `cv_enabled`, then `cv_folds`, `cv_type`, `cv_shuffle`, `cv_random_state` | CV off; `5`, `k_fold`, `true`, `42` |
 | `max_rows`, `max_input_mb` | `10000`, `64` |

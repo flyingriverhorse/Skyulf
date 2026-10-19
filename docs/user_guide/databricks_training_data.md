@@ -233,9 +233,9 @@ it explicitly to `defaults` or a model entry in `config/training.yml`:
 
 ```yaml
 training_table: "{catalog}.{input_schema}.measurements"
-training_version: null
+training_table_version: null
 training_label_table: "{catalog}.{input_schema}.outcomes"
-training_label_version: null
+training_label_table_version: null
 record_key_columns: [record_id]
 input_columns: [temperature, humidity]
 target_column: demand
@@ -258,7 +258,7 @@ At invocation, both Delta versions and the outcome table's immutable identity
 are pinned. Saved training specifications, dataset identity and MLflow input
 provenance include that binding. Replaying the saved model uses those versions,
 even if outcomes have since arrived. A replaced same-name outcome table fails
-the identity check. `training_label_version: 12` explicitly selects version 12;
+the identity check. `training_label_table_version: 12` explicitly selects version 12;
 leave it null for new training runs to see later outcomes. No source rows are
 written or merged back into Delta.
 
@@ -353,7 +353,7 @@ throughout the library and saved training settings.
 ### Choose the evaluation split and result availability
 
 The default `split_strategy: "random"` needs only existing keys, features and a
-nonnull target. `training_version` pins the source Delta snapshot; it is unrelated
+nonnull target. `training_table_version` pins the source Delta snapshot; it is unrelated
 to dates. Leave it null to resolve latest once at run start, or set a nonnegative
 integer to pin that version. This example shows the training-related
 part of the generated `config/training.yml` defaults. Generation omits keys
@@ -361,7 +361,7 @@ whose value is null, such as `event_column`, `start` or `result_cutoff`:
 
 ```yaml
 defaults:
-  training_version: 12
+  training_table_version: 12
   record_key_columns: [customer_id]
   input_columns: [income, age]
   target_column: claim_amount
@@ -460,7 +460,7 @@ can scan the selected source several times.
 With `training_window_mode: auto`, setup writes `full_snapshot` for random
 projects and an editable `rolling_calendar` with four months and
 `window_timezone: "UTC"` for temporal projects. Every `train`
-invocation resolves latest once when `training_version` is null or missing;
+invocation resolves latest once when `training_table_version` is null or missing;
 an explicit version is honored regardless of trigger. `rolling_calendar` and
 `rolling_days` derive new observation boundaries, including for manual runs. Fixed
 windows stay fixed even if a job runs again a month later.
@@ -567,7 +567,7 @@ supported format vocabulary is a subset of Python's
 [strptime directives](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes);
 source timezone rules use [IANA zoneinfo](https://docs.python.org/3/library/zoneinfo.html).
 
-`training_version` defaults to `null`, resolving latest once at the start of
+`training_table_version` defaults to `null`, resolving latest once at the start of
 each `train` invocation. Set an explicit version for a repeatable snapshot.
 Date boundaries default to null and are required only for `fixed_window`;
 `rolling_calendar` and `rolling_days` derive them at invocation. Scoring and saved-evidence actions

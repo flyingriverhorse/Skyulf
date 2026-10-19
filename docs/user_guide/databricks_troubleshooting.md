@@ -19,7 +19,7 @@ The linked section explains the cause and the fix.
 | --- | --- |
 | `Pre-split step '<step>' reads target '<target>'. Set SKIP_TARGET_PRE_SPLIT_STEPS=True or SCORING_MODE='custom'.` | [Below](#a-pre-split-step-reads-the-target) |
 | `feature_lookup.lookups[<n>].table_name: Unity Catalog names must be catalog.schema.name; each part a simple identifier (letters, digits, underscore; not starting with a digit).` | [Below](#a-feature-lookup-table-name-is-incomplete) |
-| `feature_lookup.lookups[<n>] is not filled in: complete feature_lookup and online_features in config/training.yml, or regenerate with include_online_serving=false.` | [Below](#a-feature-lookup-table-name-is-incomplete) |
+| `feature_lookup.lookups[<n>] is not filled in: complete feature_lookup and online_features in config/training.yml, or regenerate with include_online_feature_lookup=false.` | [Below](#a-feature-lookup-table-name-is-incomplete) |
 | `Automatic promotion requires quality_threshold.` | [Below](#automatic-promotion-has-no-quality-threshold) |
 | `AliasOutcomeUnknownError`, or a pending alias event | [Lifecycle recovery](databricks_lifecycle_recovery.md#common-errors-and-fixes) |
 | `Project and job definitions disagree; regenerate/redeploy the Bundle together.` after a Core or template upgrade (workflow contract) | [Project upgrade](databricks_project_upgrade.md#common-errors-and-fixes) |
@@ -133,7 +133,7 @@ placeholder, has fewer than three parts or has invalid identifier syntax. The in
 is zero-based: `[0]` is the first list entry and `[1]` is the second. A completely
 blank generated entry (no `table_name`, `lookup_key` or `feature_names`) reports
 `feature_lookup.lookups[N] is not filled in: ...` instead: fill the entry, or
-regenerate the project with `include_online_serving=false`. These checks validate names locally; passing them does not prove the table exists
+regenerate the project with `include_online_feature_lookup=false`. These checks validate names locally; passing them does not prove the table exists
 or that the job can read it.
 
 **Fix.** In `config/training.yml`, find the effective `feature_lookup` under

@@ -28,6 +28,8 @@ def test_generated_serving_endpoint_supports_each_layout(tmp_path, layout):
     project = _generate_project(tmp_path, training_layout=layout, prediction_delivery="both")
     config = yaml.safe_load((project / "config/serving.yml").read_text())["serving_endpoint"]
     assert config["enabled"] is True
+    assert config["verification"] == {"sample_rows": 20}
+    assert "smoke" not in config and "selection" not in config
     assert config["logging_mode"] == "disabled"
     assert config["follow_champion"] is True
     assert config["endpoint_name"] == "sm33-generated-{bundle_target}-endpoint{resource_suffix}"
@@ -156,7 +158,7 @@ def test_serving_logging_prefix_is_separate_from_online_setup(tmp_path):
     project = _generate_project(
         tmp_path,
         prediction_delivery="both",
-        include_online_serving="true",
+        include_online_feature_lookup="true",
         serving_endpoint_logging_mode="telemetry",
     )
     config = yaml.safe_load((project / "config/serving.yml").read_text())
@@ -164,7 +166,10 @@ def test_serving_logging_prefix_is_separate_from_online_setup(tmp_path):
         config["serving_endpoint"]["logging_table_prefix"]
         == "sm33_generated_serving{resource_suffix}"
     )
-    assert config["online_serving"]["endpoint"]["logging_table_prefix"] == "sm33_generated_endpoint"
+    assert (
+        config["online_feature_lookup"]["endpoint"]["logging_table_prefix"]
+        == "sm33_generated_endpoint"
+    )
 
 
 def test_polars_endpoint_option_is_not_offered_or_silently_generated(tmp_path):

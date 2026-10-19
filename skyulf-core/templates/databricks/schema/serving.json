@@ -44,7 +44,7 @@
     ],
     "description": "Online serving | Add a paused daily traffic rollout job? Uses an explicitly initialized rollout, verified monitoring, 10 percentage-point stages lasting at least 24 hours, and guarded champion promotion after the final stage passes. Configure config/serving.yml before enabling."
   },
-  "include_online_serving": {
+  "include_online_feature_lookup": {
     "order": 906,
     "type": "string",
     "default": "false",
@@ -52,7 +52,7 @@
       "false",
       "true"
     ],
-    "description": "Online features | Add explicit online endpoint setup and saved freshness policy configuration? Independent of publication and rollout. Requires pandas, non-temporal lookup and single-model or competition training. Configure training.yml and serving.yml before running.",
+    "description": "Online features | Add a separate setup job for an endpoint that fetches feature values online? Independent of publication and rollout. Requires pandas, non-temporal lookup and single-model or competition training. Configure training.yml and serving.yml before running.",
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -80,7 +80,7 @@
       "false",
       "true"
     ],
-    "description": "Online features | Add explicit native publication controls? Publishes one selected latest-value Delta feature table into an existing online store. Independent of online serving and rollout. Configure config/serving.yml before enabling."
+    "description": "Online features | Add explicit native publication controls? Publishes one selected latest-value Delta feature table into an existing online store. Independent of online feature lookup and rollout. Configure config/serving.yml before enabling."
   },
   "online_publication_mode": {
     "order": 907,
@@ -111,7 +111,7 @@
     "description": "Online features | Endpoint inference table: telemetry = log every REST and ai_query request (needed for rollout and serving monitoring); ai_gateway = the same where your workspace supports AI Gateway tables; disabled = no inference table, callers store predictions themselves",
     "skip_prompt_if": {
       "properties": {
-        "include_online_serving": {
+        "include_online_feature_lookup": {
           "const": "false"
         }
       }
@@ -159,7 +159,7 @@
       "anyOf": [
         {
           "properties": {
-            "include_online_serving": {
+            "include_online_feature_lookup": {
               "const": "false"
             }
           }

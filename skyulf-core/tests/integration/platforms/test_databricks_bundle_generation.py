@@ -667,7 +667,7 @@ def test_cli_basic_setup_defaults_match_explicit_advanced_settings(tmp_path):
     basic.mkdir()
     explicit.mkdir()
     advanced = (
-        "training_version",
+        "training_table_version",
         "test_size",
         "random_state",
         "stratify",
@@ -704,7 +704,9 @@ def test_cli_hidden_advanced_overrides_survive_initialization(tmp_path):
         "risk_category": "high",
     }
     overrides = {
-        key: value if isinstance(value, str) or key == "min_improvement" else json.dumps(value)
+        ("training_table_version" if key == "training_version" else key): (
+            value if isinstance(value, str) or key == "min_improvement" else json.dumps(value)
+        )
         for key, value in expected.items()
     }
     project = _generate_project(
@@ -970,7 +972,7 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
         tmp_path,
         engine=engine,
         task=task,
-        training_version="0",
+        training_table_version="0",
         **{f"{task}_model": model},
         cv_enabled="true",
         cv_folds="3",
@@ -1062,7 +1064,7 @@ def test_cli_random_window_and_non_utc_source_rules(tmp_path):
         event_text_kind="local_datetime",
         event_time_format="%d/%m/%Y %H:%M",
         event_time_timezone="Europe/Copenhagen",
-        training_version="0",
+        training_table_version="0",
         start="2026-06-01T00:00:00+02:00",
         cutoff="2026-09-01T00:00:00+02:00",
         filter_unavailable_results="true",
@@ -1124,7 +1126,7 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
         filter_unavailable_results="true",
         event_column="observed_at",
         result_available_at_column="labeled_at",
-        training_version="17",
+        training_table_version="17",
         start="2026-06-01T00:00:00+00:00",
         holdout_start="2026-07-01T00:00:00+00:00",
         cutoff="2026-08-01T00:00:00+00:00",
@@ -1315,7 +1317,7 @@ def test_cli_generates_date_free_training_contract(tmp_path, engine, task, avail
         tmp_path,
         engine=engine,
         task=task,
-        training_version="7",
+        training_table_version="7",
         filter_unavailable_results="true" if availability else "false",
         result_available_at_column="confirmed_at" if availability else "",
         result_cutoff="2026-09-01T00:00:00+00:00" if availability else "",
@@ -1359,7 +1361,7 @@ def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
     from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
-    project = _generate_project(tmp_path, event_column="observed_at", training_version="7")
+    project = _generate_project(tmp_path, event_column="observed_at", training_table_version="7")
     config = read_workflow_config(project / "config/training.yml")
     assert config["event_column"] == "observed_at"
     resolved = resolve_target_config(
@@ -1410,7 +1412,9 @@ def test_cli_training_examples_pass_manual_preflight(tmp_path, filename):
         },
     )
     checked = validate_workflow_config(_load_project_config(project, resolved), action="train")
-    assert checked.get("training_version") == json.loads(inputs.get("training_version", "null"))
+    assert checked.get("training_version") == json.loads(
+        inputs.get("training_table_version", "null")
+    )
     assert checked["split_strategy"] == inputs.get("split_strategy", "random")
     if inputs.get("start"):
         assert checked["training_window_mode"] == "fixed_window"

@@ -247,7 +247,7 @@ time and split policy.
 
 Review `training_window_mode`, optional `training_sample_rows`, `split_strategy`
 and `cv` separately. Random splitting needs no event dates. Temporal splitting
-requires the configured time column and boundaries. Null `training_version`
+requires the configured time column and boundaries. Null `training_table_version`
 resolves latest once at invocation; a concrete version pins that snapshot.
 A rolling window changes at invocation, while a fixed window keeps its boundaries.
 

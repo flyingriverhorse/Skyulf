@@ -2,6 +2,6 @@
 -r requirements.txt
 # Use the verified SDK instead of the serverless runtime's preinstalled version.
 databricks-sdk==0.140.0
-{{- if or (eq .include_online_serving "true") (eq .include_online_publication "true")}}
+{{- if or (eq .include_online_feature_lookup "true") (eq .include_online_publication "true")}}
 databricks-feature-engineering==0.18.1
 {{end -}}

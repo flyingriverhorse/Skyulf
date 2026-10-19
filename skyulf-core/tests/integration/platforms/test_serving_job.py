@@ -281,7 +281,7 @@ def test_notebook_entrypoints_return_mappings_for_generated_summary(api, tmp_pat
     """Generated notebook summary and exit serialize the same mapping exactly once."""
     path = tmp_path / "serving.yml"
     path.write_text(
-        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_serving:\n  enabled: false\n"
+        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_feature_lookup:\n  enabled: false\n"
     )
     dbutils = Mock()
     dbutils.widgets.get.return_value = str(path)
@@ -291,13 +291,13 @@ def test_notebook_entrypoints_return_mappings_for_generated_summary(api, tmp_pat
 
 
 @pytest.mark.parametrize(
-    "job_name", ["daily_rollout", "online_publication", "online_serving_setup"]
+    "job_name", ["daily_rollout", "online_publication", "online_feature_lookup_setup"]
 )
 def test_real_disabled_notebook_exits_with_one_json_object(tmp_path, job_name):
     """The actual template and runtime must agree before any remote work is enabled."""
     config = tmp_path / "serving.yml"
     config.write_text(
-        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_serving:\n  enabled: false\n"
+        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_feature_lookup:\n  enabled: false\n"
     )
     dbutils = Mock()
     dbutils.widgets.get.return_value = str(config)
@@ -407,10 +407,24 @@ def test_online_setup_does_not_report_ready_after_timeout(api, monkeypatch):
     create.assert_called_once()
 
 
+@pytest.mark.parametrize("include_new", [False, True])
+def test_online_setup_notebook_rejects_old_yaml_section(api, tmp_path, include_new):
+    """Old configuration must fail clearly instead of silently selecting the renamed feature job."""
+    path = tmp_path / "serving.yml"
+    document = "online_serving:\n  enabled: false\n"
+    if include_new:
+        document += "online_feature_lookup:\n  enabled: false\n"
+    path.write_text(document, encoding="utf-8")
+    dbutils = Mock()
+    dbutils.widgets.get.return_value = str(path)
+    with pytest.raises(ValueError, match="online_serving was renamed to online_feature_lookup"):
+        api.run_online_serving_setup_notebook(None, dbutils)
+
+
 def test_online_setup_refuses_incomplete_config_before_endpoint_mutation(api):
     """An opt-in without operator pins must fail before opening serving writes."""
     workspace = Mock()
-    with pytest.raises(ValueError, match="online_serving"):
+    with pytest.raises(ValueError, match="online_feature_lookup"):
         api.run_online_serving_setup(
             None, {"enabled": True, "exclusive_writer": True}, client=workspace
         )

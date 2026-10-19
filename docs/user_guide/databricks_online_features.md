@@ -34,7 +34,7 @@ performs the lookup; Skyulf applies the saved validation and prediction logic.
 
 | Bundle choice | What it adds | What you must supply |
 | --- | --- | --- |
-| `include_online_serving=true` | An unscheduled endpoint setup job and training lookup placeholders | Lookup fields, freshness policy, registered version and existing publication |
+| `include_online_feature_lookup=true` | An unscheduled endpoint setup job and training lookup placeholders | Lookup fields, freshness policy, registered version and existing publication |
 | `include_online_publication=true` | A feature synchronization job | Existing source table, source ID, destination and store name |
 | `online_publication_mode=TRIGGERED` | Manual or scheduled synchronization; hourly schedule starts paused | Run a sync and observe completion before relying on the new values |
 | `online_publication_mode=CONTINUOUS` | Start/status/stop/restart controls for native synchronization | Start once and inspect propagation and native pipeline health |
@@ -87,7 +87,7 @@ your own before generating:
   "task": "regression",
   "input_columns": "total_spend, feature_updated_at",
   "record_key_columns": "customer_id",
-  "include_online_serving": "true",
+  "include_online_feature_lookup": "true",
   "include_online_publication": "false",
   "include_daily_rollout": "false",
   "score_follow_champion": "false",
@@ -103,7 +103,7 @@ cd generated/customer_online
 
 The three serving selections are independent and default to `"false"`. Only detailed setup asks
 them; quick setup keeps `"false"`, so use detailed setup or an answer file like the one above.
-`include_online_serving` adds an unscheduled `online_serving_setup` job and its notebook. It
+`include_online_feature_lookup` adds an unscheduled `online_feature_lookup_setup` job and its notebook. It
 installs the native Feature Engineering dependency for training even when another project owns
 publication. Initialization creates files only. With `include_online_publication: "true"`, detailed
 setup asks for `online_publication_mode`; an answer file can set it directly: `TRIGGERED` (default)
@@ -324,7 +324,7 @@ With `TRIGGERED`, the same `start` command requests one sync and the generated
 hourly schedule remains `PAUSED` until you deliberately enable it. `status` inspects
 the latest native update; `SYNCED` does not attest entity freshness. Continuous
 stop/restart controls require a continuous publication. If online serving uses an
-external publication, set its `online_serving.publications[].publish_mode` to that
+external publication, set its `online_feature_lookup.publications[].publish_mode` to that
 publication's actual mode before setup.
 
 The SDK exposes the same operations without a Bundle:

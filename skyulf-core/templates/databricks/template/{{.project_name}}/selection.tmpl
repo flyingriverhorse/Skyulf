@@ -41,9 +41,9 @@
 {{- skip "resources/online_publication.job.yml" -}}
 {{- skip "src/jobs/online_publication.py" -}}
 {{- end -}}
-{{- if ne .include_online_serving "true" -}}
-{{- skip "resources/online_serving_setup.job.yml" -}}
-{{- skip "src/jobs/online_serving_setup.py" -}}
+{{- if ne .include_online_feature_lookup "true" -}}
+{{- skip "resources/online_feature_lookup_setup.job.yml" -}}
+{{- skip "src/jobs/online_feature_lookup_setup.py" -}}
 {{- end -}}
 {{- if eq .prediction_delivery "batch" -}}
 {{- skip "resources/serving_endpoint.job.yml" -}}
@@ -52,7 +52,7 @@
 {{- if eq .prediction_delivery "batch" -}}
 {{- skip "src/jobs/dispatch_serving.py" -}}
 {{- end -}}
-{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") (ne .include_online_serving "true") (eq .prediction_delivery "batch") -}}
+{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") (ne .include_online_feature_lookup "true") (eq .prediction_delivery "batch") -}}
 {{- skip "config/serving.yml" -}}
 {{- skip "deployment/serving-requirements.txt" -}}
 {{- end -}}

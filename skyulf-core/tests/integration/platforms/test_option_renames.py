@@ -189,7 +189,47 @@ def test_public_training_options_reach_defaults_and_model_overrides(tmp_path):
     assert "save_preprocessing_diagnostics" not in training["defaults"]
 
 
-@pytest.mark.parametrize("key", ["preprocessing_probe", "admit_probed_custom_steps"])
+@pytest.mark.parametrize(
+    "public,internal",
+    [
+        ("training_table_version", "training_version"),
+        ("training_label_table_version", "training_label_version"),
+    ],
+)
+@pytest.mark.parametrize("version", [None, 0, 17])
+def test_training_table_versions_translate_defaults_and_overrides(
+    tmp_path, public, internal, version
+):
+    """Public table versions must preserve null and zero while reaching existing snapshot contracts."""
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+
+    path = _project(tmp_path)
+    path.with_name("training.yml").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "defaults": {public: version},
+                "models": {"main": {"model": {"type": "linear_regression"}, public: 3}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    training = read_training_config(path.parent)
+    assert training is not None
+    assert training["defaults"][internal] == version
+    assert training["models"]["main"][internal] == 3
+    assert public not in training["defaults"] and public not in training["models"]["main"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "preprocessing_probe",
+        "admit_probed_custom_steps",
+        "training_version",
+        "training_label_version",
+    ],
+)
 def test_old_training_names_are_rejected(tmp_path, key):
     """Old training option names are unknown settings, also inside a model override."""
     from skyulf.integrations.databricks.projects.yaml_config import read_training_config

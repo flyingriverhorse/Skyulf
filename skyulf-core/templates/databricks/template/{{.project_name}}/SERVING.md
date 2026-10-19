@@ -60,7 +60,7 @@ only as the source for the endpoint's bounded smoke sample in endpoint-only mode
 Run only the jobs selected and configured in your project:
 
 ```bash
-databricks bundle run online_serving_setup -t test --profile YOUR_PROFILE
+databricks bundle run online_feature_lookup_setup -t test --profile YOUR_PROFILE
 databricks bundle run online_publication -t test --profile YOUR_PROFILE --params publication_action=start
 databricks bundle run online_publication -t test --profile YOUR_PROFILE --params publication_action=status
 # Requires an already initialized rollout:

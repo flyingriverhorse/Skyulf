@@ -35,7 +35,7 @@ def test_ensemble_expansion_has_unique_ordered_candidate_fields():
     )
     assert (
         properties["target_column"]["order"]
-        < properties["training_version"]["order"]
+        < properties["training_table_version"]["order"]
         < properties["cv_enabled"]["order"]
     )
     for slot in range(1, 9):
@@ -107,9 +107,9 @@ def test_schema_rejects_prompt_order_precision_instead_of_truncating(tmp_path):
     shutil.copytree(ROOT / "schema", source)
     path = source / "project.json"
     fields = json.loads(path.read_text(encoding="utf-8"))
-    fields["training_version"]["order"] = 12.19
+    fields["training_table_version"]["order"] = 12.19
     path.write_text(json.dumps(fields), encoding="utf-8")
-    with pytest.raises(ValueError, match="training_version.*one decimal place"):
+    with pytest.raises(ValueError, match="training_table_version.*one decimal place"):
         build(source)
 
 

@@ -2,7 +2,8 @@
 version: 1
 prediction_delivery: batch
 batch_compute: spark
-# from_now checkpoints without predictions on the first run; rebuilds keep that boundary.
+# full_snapshot predicts existing rows. from_now skips them on the first run and
+# predicts later inserts only, including after model changes or recovery.
 initial_scoring: full_snapshot
 spark_udf_env_manager: local
 spark_udf_prediction_batch_rows: 10000

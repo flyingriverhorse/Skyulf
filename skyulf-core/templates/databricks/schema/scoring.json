@@ -49,7 +49,7 @@
       "full_snapshot",
       "from_now"
     ],
-    "description": "4. Scoring | First run: full_snapshot predicts existing rows; from_now records the current Delta version without predictions, then scores new inserts. Rebuilds keep the boundary using saved keys and recent CDF; CDF-expiry recovery needs the original snapshot",
+    "description": "4. Scoring | First run: full_snapshot predicts existing rows; from_now skips existing rows and starts predicting later inserts on subsequent runs. Model changes and recovery keep previously skipped rows excluded.",
     "skip_prompt_if": {
       "properties": {
         "prediction_delivery": {

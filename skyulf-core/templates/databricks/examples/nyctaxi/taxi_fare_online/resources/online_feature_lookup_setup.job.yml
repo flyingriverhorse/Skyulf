@@ -1,7 +1,7 @@
 resources:
   jobs:
-    online_serving_setup:
-      name: ${bundle.name}_online_serving_setup
+    online_feature_lookup_setup:
+      name: ${bundle.name}_online_feature_lookup_setup
       tags: ${var.job_tags}
       budget_policy_id: ${var.monitoring_budget_policy_id}
       max_concurrent_runs: 1
@@ -9,7 +9,7 @@ resources:
         enabled: true
       timeout_seconds: ${var.monitoring_timeout_seconds}
       tasks:
-        - task_key: online_serving_setup
+        - task_key: online_feature_lookup_setup
           description: Inspect a concrete online feature model and create one new endpoint
           # Allow model inspection plus the default one-hour endpoint readiness wait.
           timeout_seconds: ${var.monitoring_timeout_seconds}
@@ -17,7 +17,7 @@ resources:
           disable_auto_optimization: true
           environment_key: serving
           notebook_task:
-            notebook_path: ../src/jobs/online_serving_setup.py
+            notebook_path: ../src/jobs/online_feature_lookup_setup.py
             base_parameters:
               serving_config_path: ${workspace.file_path}/config/serving.yml
       environments:

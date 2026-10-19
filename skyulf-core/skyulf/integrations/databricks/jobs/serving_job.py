@@ -268,18 +268,20 @@ def _online_setup_contract(
     required = {"endpoint", "publications", "tracking_uri", "registry_uri"}
     if not required.issubset(settings) or not isinstance(settings["endpoint"], dict):
         raise ValueError(
-            "online_serving requires endpoint, publications, tracking_uri and registry_uri."
+            "online_feature_lookup requires endpoint, publications, tracking_uri and registry_uri."
         )
     rows = settings["publications"]
     if not isinstance(rows, list) or not rows or any(not isinstance(row, dict) for row in rows):
-        raise ValueError("online_serving.publications must contain explicit publication bindings.")
+        raise ValueError(
+            "online_feature_lookup.publications must contain explicit publication bindings."
+        )
     try:
         return PinnedEndpointSpec(**settings["endpoint"]), tuple(
             OnlinePublicationSpec(**row) for row in rows
         )
     except TypeError as exc:
         raise ValueError(
-            "online_serving endpoint or publication fields are incomplete or unknown."
+            "online_feature_lookup endpoint or publication fields are incomplete or unknown."
         ) from exc
 
 
@@ -303,7 +305,7 @@ def validate_serving_section(section: str, settings: Any) -> None:
     network, so a passing check does not prove the pinned resources exist.
 
     Args:
-        section: ``online_serving``, ``rollout`` or ``online_publication``.
+        section: ``online_feature_lookup``, ``rollout`` or ``online_publication``.
         settings: The section's parsed YAML value.
 
     Raises:
@@ -312,7 +314,7 @@ def validate_serving_section(section: str, settings: Any) -> None:
     """
     if not _enabled(settings):
         return
-    if section == "online_serving":
+    if section == "online_feature_lookup":
         _online_setup_contract(settings)
     elif section == "online_publication":
         _publication_spec(settings)
@@ -326,6 +328,8 @@ def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:
     if not isinstance(path, str) or not path.strip():
         raise ValueError("serving_config_path must identify the deployed serving YAML file.")
     payload = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    if isinstance(payload, dict) and "online_serving" in payload:
+        raise ValueError("online_serving was renamed to online_feature_lookup.")
     if not isinstance(payload, dict) or section not in payload:
         raise ValueError(f"Serving configuration requires the {section} section.")
     settings = payload[section]
@@ -375,7 +379,7 @@ def run_online_publication_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
 
 def run_online_serving_setup_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
     """Create the explicitly configured endpoint using the notebook workspace identity."""
-    settings = _notebook_settings(dbutils, "online_serving")
+    settings = _notebook_settings(dbutils, "online_feature_lookup")
     if not settings["enabled"]:
         return {"status": "DISABLED"}
     from databricks.sdk import WorkspaceClient  # noqa: PLC0415

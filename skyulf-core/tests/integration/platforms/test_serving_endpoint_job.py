@@ -101,7 +101,6 @@ def endpoint_project(tmp_path):
     settings = {
         "enabled": True,
         "follow_champion": True,
-        "selection": "champion",
         "endpoint_name": "sample-endpoint{resource_suffix}",
         "model_name": "{catalog}.{metadata_schema}.sample_model{resource_suffix}",
         "logging_mode": "disabled",
@@ -113,7 +112,6 @@ def endpoint_project(tmp_path):
             "name": "{catalog}.{metadata_schema}.sample_score{resource_suffix}",
         },
         "permissions": [],
-        "smoke": {"rows": 20},
     }
     document = {"serving_endpoint": settings}
     path = tmp_path / "serving.yml"
@@ -160,7 +158,7 @@ def test_settings_reject_invalid_cost_tags_before_remote_work(endpoint_project, 
         api.read_serving_endpoint_settings(values)
 
 
-@pytest.mark.parametrize("section", ["rollout", "online_serving"])
+@pytest.mark.parametrize("section", ["rollout", "online_feature_lookup"])
 def test_settings_refuse_an_endpoint_managed_by_another_optional_job(endpoint_project, section):
     """Single-version serving must not overwrite traffic rollout or online lookup endpoints."""
     api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
@@ -178,12 +176,12 @@ def test_settings_refuse_an_endpoint_managed_by_another_optional_job(endpoint_pr
 @pytest.mark.parametrize(
     "field,value,match",
     [
-        ("smoke", {"rows": 0}, "smoke.rows"),
+        ("verification", {"sample_rows": 0}, "verification.sample_rows"),
         ("enabled", "true", "boolean"),
         ("follow_champion", "true", "boolean"),
         ("follow_champion", None, "boolean"),
         ("follow_champion", 1, "boolean"),
-        ("selection", "latest", "champion"),
+        ("selection", "latest", "Unknown serving_endpoint fields.*selection"),
         ("ready_timeout_s", -1, "positive"),
         ("endpoint_name", "x" * 64, "endpoint_name"),
         ("permisions", [], "Unknown"),
@@ -194,6 +192,65 @@ def test_invalid_settings_fail_before_any_cloud_access(endpoint_project, field, 
     api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
     document, path, values = endpoint_project
     document["serving_endpoint"][field] = value
+    path.write_text(yaml.safe_dump(document))
+    with pytest.raises(ValueError, match=match):
+        api.read_serving_endpoint_settings(values)
+
+
+@pytest.mark.parametrize("field,value", [("selection", "champion"), ("smoke", {"rows": 20})])
+def test_settings_reject_removed_serving_options(endpoint_project, field, value):
+    """Removed public settings cannot silently survive in newly deployed YAML."""
+    api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
+    document, path, values = endpoint_project
+    document["serving_endpoint"][field] = value
+    path.write_text(yaml.safe_dump(document))
+    with pytest.raises(ValueError, match=f"Unknown serving_endpoint fields.*{field}"):
+        api.read_serving_endpoint_settings(values)
+
+
+@pytest.mark.parametrize("sample_rows", [None, 1, 20, 1000])
+def test_verification_settings_keep_default_and_accept_sample_bounds(endpoint_project, sample_rows):
+    """The renamed control retains the default sample size and both supported bounds."""
+    api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
+    document, path, values = endpoint_project
+    if sample_rows is not None:
+        document["serving_endpoint"]["verification"] = {"sample_rows": sample_rows}
+    path.write_text(yaml.safe_dump(document))
+    settings = api.read_serving_endpoint_settings(values)
+    assert settings["verification"] == {"sample_rows": 20 if sample_rows is None else sample_rows}
+    assert "selection" not in settings and "smoke" not in settings
+
+
+@pytest.mark.parametrize("sample_rows", [-1, 1001, True, 20.0, "20", None])
+def test_verification_rejects_noninteger_or_unbounded_samples(endpoint_project, sample_rows):
+    """Verification limits cannot accept coercible scalars or exceed the bounded source read."""
+    api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
+    document, path, values = endpoint_project
+    document["serving_endpoint"]["verification"] = {"sample_rows": sample_rows}
+    path.write_text(yaml.safe_dump(document))
+    with pytest.raises(
+        ValueError, match="verification.sample_rows must be an integer from 1 to 1000"
+    ):
+        api.read_serving_endpoint_settings(values)
+
+
+@pytest.mark.parametrize(
+    "verification,match",
+    [
+        (None, "verification must be a mapping"),
+        ([], "verification must be a mapping"),
+        ({}, "verification.sample_rows must be an integer"),
+        ({"rows": 20}, "Unknown verification fields.*rows"),
+        ({"sample_rows": 20, "rows": 20}, "Unknown verification fields.*rows"),
+    ],
+)
+def test_verification_rejects_malformed_blocks_and_removed_nested_rows(
+    endpoint_project, verification, match
+):
+    """Renaming the parent block must not preserve rows as a hidden alias or weaken validation."""
+    api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
+    document, path, values = endpoint_project
+    document["serving_endpoint"]["verification"] = verification
     path.write_text(yaml.safe_dump(document))
     with pytest.raises(ValueError, match=match):
         api.read_serving_endpoint_settings(values)
@@ -293,7 +350,7 @@ def test_logging_sinks_cannot_be_shared_with_online_setup(endpoint_project):
         "logging_table_prefix": "payload",
     }
     document["serving_endpoint"].update(logging)
-    document["online_serving"] = {"endpoint": {"endpoint_name": "other", **logging}}
+    document["online_feature_lookup"] = {"endpoint": {"endpoint_name": "other", **logging}}
     path.write_text(yaml.safe_dump(document))
     with pytest.raises(ValueError, match="logging"):
         api.read_serving_endpoint_settings(values)
@@ -513,13 +570,20 @@ def prepared_job(endpoint_project, monkeypatch):
     return api, settings, registry, prepare, ensure, events
 
 
-def test_job_pins_alias_once_and_compares_both_paths(prepared_job):
+@pytest.mark.parametrize("sample_rows", [None, 1, 1000])
+def test_job_pins_alias_once_and_compares_both_paths(prepared_job, sample_rows):
     """SQL and REST must compare the same sample against the same registered version."""
     api, settings, registry, prepare, ensure, events = prepared_job
+    if sample_rows is not None:
+        settings["verification"] = {"sample_rows": sample_rows}
     result = api.run_serving_endpoint(
         None, settings, source_table="main.source.inputs", client=Mock(), registry_client=registry
     )
-    assert result["smoke"] == {"sampled": 2, "rest_compared": 2, "sql_compared": 2}
+    assert result["verification"] == {"sampled": 2, "rest_compared": 2, "sql_compared": 2}
+    assert "smoke" not in result
+    assert api.sample_serving_rows.call_args.kwargs["rows"] == (
+        20 if sample_rows is None else sample_rows
+    )
     assert events == ["endpoint", "sql", "grants", "rest", "sql_smoke"]
     registry.get_model_version_by_alias.assert_called_once_with(settings["model_name"], "champion")
     assert prepare.call_args.args[0].model_version == "2"
@@ -590,9 +654,73 @@ def test_explicit_version_does_not_read_champion_and_sql_can_be_disabled(prepare
         model_version="2",
     )
     registry.get_model_version_by_alias.assert_not_called()
-    assert result["smoke"]["sql_compared"] == 0
+    assert result["verification"]["sql_compared"] == 0
     assert result["sql_function"] is None
     assert events == ["endpoint", "grants", "rest"]
+
+
+def test_invalid_verification_fails_before_model_lookup_or_endpoint_write(prepared_job):
+    """Direct runtime callers must receive the same preflight bound checks as YAML callers."""
+    api, settings, registry, prepare, ensure, events = prepared_job
+    settings["verification"] = {"sample_rows": 0}
+    with pytest.raises(ValueError, match="verification.sample_rows"):
+        api.run_serving_endpoint(
+            None,
+            settings,
+            source_table="main.source.inputs",
+            client=Mock(),
+            registry_client=registry,
+        )
+    registry.get_model_version_by_alias.assert_not_called()
+    prepare.assert_not_called()
+    ensure.assert_not_called()
+    assert events == []
+
+
+@pytest.mark.parametrize("field,value", [("selection", "champion"), ("smoke", {"rows": 1})])
+def test_direct_job_rejects_removed_serving_options_before_cloud_work(prepared_job, field, value):
+    """Direct calls cannot silently ignore a removed selector or verification size."""
+    api, settings, registry, prepare, ensure, events = prepared_job
+    settings[field] = value
+    with pytest.raises(ValueError, match=f"Unknown serving_endpoint fields.*{field}"):
+        api.run_serving_endpoint(
+            None,
+            settings,
+            source_table="main.source.inputs",
+            client=Mock(),
+            registry_client=registry,
+        )
+    registry.get_model_version_by_alias.assert_not_called()
+    prepare.assert_not_called()
+    ensure.assert_not_called()
+    assert events == []
+
+
+@pytest.mark.parametrize("field,value", [("selection", "champion"), ("smoke", {"rows": 1})])
+def test_disabled_direct_job_rejects_removed_serving_options(field, value):
+    """Disabling an endpoint must not keep removed public option names accepted."""
+    api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
+    with pytest.raises(ValueError, match=f"Unknown serving_endpoint fields.*{field}"):
+        api.run_serving_endpoint(
+            None,
+            {"enabled": False, field: value},
+            source_table="",
+            client=None,
+            registry_client=None,
+        )
+
+
+def test_disabled_direct_job_keeps_unused_setting_values_inert():
+    """Only option names are checked while disabled, so incomplete endpoint setup stays inert."""
+    api = import_module("skyulf.integrations.databricks.jobs.serving_endpoint_job")
+    result = api.run_serving_endpoint(
+        None,
+        {"enabled": False, "verification": {"sample_rows": 0}},
+        source_table="",
+        client=None,
+        registry_client=None,
+    )
+    assert result == {"status": "DISABLED"}
 
 
 @pytest.mark.parametrize("invalid", ["permissions", "sql_schema", "empty"])

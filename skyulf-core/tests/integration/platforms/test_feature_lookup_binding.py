@@ -149,13 +149,13 @@ def test_unbound_lookup_table_error_names_the_setting_to_complete(lookup):
     ],
 )
 def test_unfilled_generated_lookup_stub_reports_one_actionable_message(stub):
-    """The include_online_serving stub must say what to fill, not misreport a name syntax."""
+    """The include_online_feature_lookup stub must say what to fill, not misreport a name syntax."""
     with pytest.raises(ValueError) as error:
         bind_lookup_tables({"lookups": [stub]}, {"catalog": "workspace"})
     assert str(error.value) == (
         "feature_lookup.lookups[0] is not filled in: complete feature_lookup and "
         "online_features in config/training.yml, or regenerate with "
-        "include_online_serving=false."
+        "include_online_feature_lookup=false."
     )
 
 

@@ -74,10 +74,10 @@ The online model needs its zone features in an online store at request time.
 2. In `config/serving.yml`, under `online_publication`, set `enabled: true`,
    `exclusive_writer: true` and `source_table: workspace.taxi_fare_online.zone_features`,
    then run the `online_publication` job to sync the table into the store.
-3. After approving a model version, fill `online_serving`: `enabled: true`,
+3. After approving a model version, fill `online_feature_lookup`: `enabled: true`,
    `exclusive_writer: true`, an `endpoint_name`, the `model_name` and the
    concrete approved `model_version`, and the publication's source table, its
-   table id, online table and `online_store` name. Run `online_serving_setup`.
+   table id, online table and `online_store` name. Run `online_feature_lookup_setup`.
 4. Refresh `zone_features` (and its publication) within `max_age_seconds` in
    `config/training.yml` (7 days); older features are rejected as stale.
 

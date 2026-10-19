@@ -25,6 +25,10 @@ TRAINING_OPTIONS = {
     "save_preprocessing_diagnostics": ("preprocessing_probe", None),
     "allow_tested_custom_steps": ("admit_probed_custom_steps", None),
 }
+TRAINING_RENAMES = {
+    "training_table_version": "training_version",
+    "training_label_table_version": "training_label_version",
+}
 MODEL_SET_OPTIONS = {
     "on_source_change": (
         "source_change_policy",
@@ -57,18 +61,23 @@ MODEL_FIELDS = {
     "explainability",
 }
 TRAINING_FIELDS = (
-    WORKFLOW_FIELDS
-    - INFERENCE_FIELDS
-    - _INTERNAL_OPTIONS
-    - {
-        "pipeline",
-        "competition",
-        "weights_python_source",
-        "weights_python_sha256",
-        "reserved_weight_columns",
-        "pre_split_steps",
-    }
-) | set(TRAINING_OPTIONS)
+    (
+        WORKFLOW_FIELDS
+        - INFERENCE_FIELDS
+        - _INTERNAL_OPTIONS
+        - set(TRAINING_RENAMES.values())
+        - {
+            "pipeline",
+            "competition",
+            "weights_python_source",
+            "weights_python_sha256",
+            "reserved_weight_columns",
+            "pre_split_steps",
+        }
+    )
+    | set(TRAINING_OPTIONS)
+    | set(TRAINING_RENAMES)
+)
 TUNING_FIELDS = {
     "strategy",
     "metric",
@@ -222,7 +231,7 @@ def _model_entry(value: Any, label: str) -> dict[str, Any]:
             raise ValueError(f"{label}.model.params must be a mapping.")
     if "tuning" in entry:
         _fields(entry["tuning"], TUNING_FIELDS, f"{label}.tuning")
-    return entry
+    return {TRAINING_RENAMES.get(key, key): value for key, value in entry.items()}
 
 
 def read_training_config(directory: str | Path) -> dict[str, Any] | None:

@@ -172,7 +172,7 @@ def test_data_settings_use_defaults_without_extra_prompts(task):
     values["setup_mode"] = "detailed"
     values.update(task=task, cv_enabled="true", training_sample_rows="1000")
     for name in (
-        "training_version",
+        "training_table_version",
         "test_size",
         "random_state",
         "stratify",

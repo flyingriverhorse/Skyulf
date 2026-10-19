@@ -6,7 +6,7 @@
   "schema": "my_dev_schema",
   "source_table_name": "labeled_customers",
   "target_column": "churn",
-  "training_version": "12",
+  "training_table_version": "12",
   "split_strategy": "random",
   "stratify": "true",
   "cv_enabled": "true",

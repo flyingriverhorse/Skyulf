@@ -40,7 +40,7 @@ def test_generated_jobs_install_core_from_one_shared_requirement(
         compute_mode=compute,
         include_online_publication="true",
         # Core supports online serving only for single-model and competition training.
-        include_online_serving=str(layout != "multi_target").lower(),
+        include_online_feature_lookup=str(layout != "multi_target").lower(),
         include_daily_rollout="true",
     )
     requirements = (project / "deployment/requirements.txt").read_text().splitlines()
@@ -57,21 +57,21 @@ def test_generated_jobs_install_core_from_one_shared_requirement(
     jobs = {}
     for resource in (project / "resources").glob("*.yml"):
         jobs.update(yaml.safe_load(resource.read_text())["resources"]["jobs"])
-    online_serving = {"online_serving_setup"} if layout != "multi_target" else set()
+    online_feature_lookup = {"online_feature_lookup_setup"} if layout != "multi_target" else set()
     assert set(jobs) == {
         "train",
         "score",
         "monitoring",
         "online_publication",
         "daily_rollout",
-        *online_serving,
+        *online_feature_lookup,
     }
     for role, job in jobs.items():
         filename = (
             "train-requirements.txt"
             if role == "train"
             else "serving-requirements.txt"
-            if role in {"online_publication", "online_serving_setup", "daily_rollout"}
+            if role in {"online_publication", "online_feature_lookup_setup", "daily_rollout"}
             else "requirements.txt"
         )
         path = "${workspace.file_path}/deployment/" + filename
@@ -98,7 +98,7 @@ def test_publication_without_serving_inherits_feature_client_requirement(
     from test_databricks_bundle_generation import _generate_project
 
     project = _generate_project(
-        tmp_path, include_online_publication="true", include_online_serving="false"
+        tmp_path, include_online_publication="true", include_online_feature_lookup="false"
     )
     shared = (project / "deployment/requirements.txt").read_text()
     serving = (project / "deployment/serving-requirements.txt").read_text()

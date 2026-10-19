@@ -28,7 +28,7 @@
   "quality_threshold": "6.0",
   "monitoring_catalog": "",
   "monitoring_schema": "",
-  "include_online_serving": "true",
+  "include_online_feature_lookup": "true",
   "include_daily_rollout": "false",
   "include_online_publication": "true",
   "save_preprocessing_diagnostics": "true"

@@ -19,7 +19,7 @@ from .yaml_config import (
 from .yaml_models import static_workflows
 from .yaml_recipes import feature_project_source
 
-_SERVING_SECTIONS = ("online_serving", "rollout", "online_publication")
+_SERVING_SECTIONS = ("online_feature_lookup", "rollout", "online_publication")
 
 
 def _check_search(checked: dict[str, Any]) -> None:
@@ -67,6 +67,8 @@ def _check_serving(root: Path) -> None:
     label = "config/serving.yml"
     try:
         document = read_yaml_mapping(path)
+        if "online_serving" in document:
+            raise ValueError("online_serving was renamed to online_feature_lookup.")
     except (OSError, ValueError) as exc:
         raise ValueError(f"{label}: {exc}") from exc
     for section in _SERVING_SECTIONS:

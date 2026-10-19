@@ -51,10 +51,10 @@ performance retraining requests. Set a model's performance policy to
 `on_drift` remains an independent setting. Either trigger uses the same guarded
 train job request. Neither trigger bypasses model evaluation or approval.
 
-Set `training_version: null`. Maintain the configured training features upstream.
+Set `training_table_version: null`. Maintain the configured training features upstream.
 Targets may be embedded in that table or read through an explicit
 [`training_label_table` join](databricks_training_data.md#train-from-separate-outcomes).
-With the join, use `training_label_version: null` for fresh runs: new eligible
+With the join, use `training_label_table_version: null` for fresh runs: new eligible
 outcomes can count as changed training data even when feature rows are unchanged.
 Monitoring's optional label binding alone does not enable the training join or
 write outcomes back to a source table.

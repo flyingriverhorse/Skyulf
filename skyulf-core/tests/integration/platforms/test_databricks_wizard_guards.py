@@ -119,12 +119,12 @@ def test_full_snapshot_window_hides_the_split_question(layout, prefix):
         ({"engine": "polars"}, False),
     ],
 )
-def test_online_serving_is_offered_only_for_pandas_single_or_competition(answers, visible):
+def test_online_feature_lookup_is_offered_only_for_pandas_single_or_competition(answers, visible):
     """Core accepts online features only for pandas single-model or competition training."""
     properties = _properties()
     values = {name: field["default"] for name, field in properties.items()}
     values.update(setup_mode="detailed", **answers)
-    assert _visible(properties, "include_online_serving", values) is visible
+    assert _visible(properties, "include_online_feature_lookup", values) is visible
 
 
 @pytest.mark.parametrize(
@@ -166,7 +166,7 @@ _ESTIMATOR_RESOURCE = "ERROR_search_resource_n_estimators_requires_a_model_with_
 _COMPETITION_METRIC = "ERROR_metric_is_not_supported_for_model_competition"
 _STRATIFIED = "ERROR_stratified_cv_requires_task_classification"
 _FULL_SNAPSHOT = "ERROR_training_window_mode_full_snapshot_requires_random_split"
-_ONLINE = "ERROR_online_serving_requires_engine_pandas_and_single_model_or_competition"
+_ONLINE = "ERROR_online_feature_lookup_requires_engine_pandas_and_single_model_or_competition"
 _HALVING = {"search_strategy": "halving_random", "search_settings": "custom"}
 _BRANCH_HALVING = {f"branch_1_{key}": value for key, value in _HALVING.items()}
 
@@ -264,8 +264,8 @@ _BRANCH_HALVING = {f"branch_1_{key}": value for key, value in _HALVING.items()}
                 "branch_1_split_strategy": "temporal",
             },
         ),
-        (_ONLINE, {"include_online_serving": "true", "training_layout": "multi_target"}),
-        (_ONLINE, {"include_online_serving": "true", "engine": "polars"}),
+        (_ONLINE, {"include_online_feature_lookup": "true", "training_layout": "multi_target"}),
+        (_ONLINE, {"include_online_feature_lookup": "true", "engine": "polars"}),
     ],
 )
 def test_cli_refuses_answers_that_core_rejects(tmp_path, guard, answers):
@@ -305,9 +305,9 @@ def test_cli_keeps_valid_neighbouring_answers(tmp_path, answers):
 
 
 @needs_cli
-def test_cli_keeps_online_serving_stub_for_pandas_single_model(tmp_path):
+def test_cli_keeps_online_feature_lookup_stub_for_pandas_single_model(tmp_path):
     """Online serving still generates the lookup declarations users must complete."""
-    project = _generate_project(tmp_path, include_online_serving="true")
+    project = _generate_project(tmp_path, include_online_feature_lookup="true")
     text = (project / "config/training.yml").read_text(encoding="utf-8")
     assert "feature_lookup:" in text and "online_features:" in text
 

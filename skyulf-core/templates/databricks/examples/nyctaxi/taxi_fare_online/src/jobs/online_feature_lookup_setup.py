@@ -10,7 +10,7 @@ from skyulf.integrations.databricks.jobs.shared.notebook_diagnostics import (
 )
 
 if __name__ == "__main__":
-    with notebook_task("online_serving_setup", globals()["dbutils"]):
+    with notebook_task("online_feature_lookup_setup", globals()["dbutils"]):
         output = run_online_serving_setup_notebook(globals()["spark"], globals()["dbutils"])
         print(result_summary(output))
 

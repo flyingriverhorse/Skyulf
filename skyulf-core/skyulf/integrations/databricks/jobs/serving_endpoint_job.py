@@ -31,12 +31,11 @@ _SPEC_FIELDS = {field.name for field in fields(PinnedEndpointSpec)} - {"model_ve
 _SETTINGS_FIELDS = _SPEC_FIELDS | {
     "enabled",
     "follow_champion",
-    "selection",
     "tracking_uri",
     "registry_uri",
     "sql_function",
     "permissions",
-    "smoke",
+    "verification",
 }
 _BINDINGS = ("catalog", "input_schema", "output_schema", "metadata_schema", "resource_suffix")
 
@@ -122,15 +121,16 @@ def _owner(values: dict[str, str], suffix: str) -> dict[str, str]:
 def _validate_settings(settings: dict[str, Any]) -> None:
     """Check behavioral controls and compute before downloading a model or mutating resources."""
     _boolean(settings.get("enabled"), "serving_endpoint.enabled")
-    if settings.get("selection", "champion") != "champion":
-        raise ValueError(
-            "serving_endpoint.selection must be champion; override runs with model_version."
-        )
     _boolean(settings.get("follow_champion", True), "serving_endpoint.follow_champion")
-    smoke = _known_fields(settings.get("smoke", {"rows": 20}), {"rows"}, "smoke")
-    if type(smoke.get("rows")) is not int or not 1 <= smoke["rows"] <= 1000:
-        raise ValueError("smoke.rows must be an integer from 1 to 1000.")
-    settings["smoke"] = smoke
+    verification = _known_fields(
+        settings.get("verification", {"sample_rows": 20}), {"sample_rows"}, "verification"
+    )
+    if (
+        type(verification.get("sample_rows")) is not int
+        or not 1 <= verification["sample_rows"] <= 1000
+    ):
+        raise ValueError("verification.sample_rows must be an integer from 1 to 1000.")
+    settings["verification"] = verification
     settings["permissions"] = validate_serving_principals(settings.get("permissions", []))
     settings["tags"] = validate_serving_tags(settings.get("tags"))
     _spec(settings, "1")
@@ -145,10 +145,10 @@ def _spec(settings: dict[str, Any], version: str) -> PinnedEndpointSpec:
 
 def _refuse_shared_resources(settings: dict, document: dict) -> None:
     """Do not compete with rollout/online setup or mix their payload sinks."""
-    online = document.get("online_serving", {}).get("endpoint", {})
+    online = document.get("online_feature_lookup", {}).get("endpoint", {})
     rollout = document.get("rollout", {}).get("monitoring", {})
     if settings["endpoint_name"] in {online.get("endpoint_name"), rollout.get("serving_endpoint")}:
-        raise ValueError("Endpoint is already managed by rollout or online_serving setup.")
+        raise ValueError("Endpoint is already managed by rollout or online_feature_lookup setup.")
     if settings.get("logging_mode") == "disabled":
         return
     keys = ("logging_catalog", "logging_schema", "logging_table_prefix")
@@ -351,6 +351,7 @@ def run_serving_endpoint(
     monitoring_values: dict[str, str] | None = None,
 ) -> dict:
     """Prepare and validate the whole request before updating owned resources, then prove parity."""
+    _known_fields(settings, _SETTINGS_FIELDS | {"ownership", "tags"}, "serving_endpoint")
     if not settings["enabled"]:
         return {"status": "DISABLED"}
     _validate_settings(settings)
@@ -373,7 +374,7 @@ def run_serving_endpoint(
         spark,
         source_table,
         plan.input_schema,
-        rows=settings["smoke"]["rows"],
+        rows=settings["verification"]["sample_rows"],
         record_key_columns=plan.record_key_columns,
     )
     frame, records = _smoke_inputs(raw, plan)
@@ -425,7 +426,7 @@ def run_serving_endpoint(
             tracking_uri=settings.get("tracking_uri", "databricks"),
             registry_uri=settings.get("registry_uri", "databricks-uc"),
         ),
-        "smoke": counts,
+        "verification": counts,
         "examples": _request_examples(plan, function, source_table, records[0]),
     }
 
