@@ -90,7 +90,9 @@ def validate_monitoring_settings(values: dict[str, str], workflow: dict[str, Any
         workflow["model_name"]
     }:
         raise ValueError("Performance policy model name does not match the workflow model.")
-    build_monitor_enrollment_config(workflow, values, "1")
+    # Endpoint-only delivery has no batch prediction table; serving enrollment builds its own config.
+    if workflow.get("prediction_delivery") != "endpoint":
+        build_monitor_enrollment_config(workflow, values, "1")
 
 
 def register_scoring_monitor(

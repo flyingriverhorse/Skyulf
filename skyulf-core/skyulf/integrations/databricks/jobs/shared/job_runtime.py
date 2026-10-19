@@ -26,7 +26,7 @@ from ...observability.monitoring.monitoring_registration import (
     validate_monitoring_settings,
 )
 from ...projects.workflow_config import validate_deployed_contract, validate_workflow_config
-from ..serving_handoff import publish_serving_handoff
+from ..serving_handoff import active_serving_settings, publish_serving_handoff
 from .job_output import render_bundle_output, render_lifecycle_output
 from .notebook_diagnostics import result_summary
 
@@ -356,6 +356,7 @@ def _prepared_notebook_request(
         )
     config = validate_workflow_config(config, action=action)
     validate_monitoring_settings(values, config)
+    active_serving_settings(values)  # fail before training or alias changes
     if action == "train" and "competition" in config:
         from ..training.training_node_notebook import validate_model_task_names  # noqa: PLC0415
 

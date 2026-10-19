@@ -1076,12 +1076,26 @@ def _fit_data_config(
     if "training_weights" in holdout.attrs:
         evidence["training_weights"] = holdout.attrs["training_weights"]
     if "source_column_conversions" in frame.attrs:
-        evidence["source_column_conversions"] = [
-            dict(item)
-            for item in frame.attrs["source_column_conversions"]
-            if item["column"] in spec.input_columns
-        ]
+        evidence["source_column_conversions"] = fitted_source_conversions(
+            frame.attrs["source_column_conversions"], spec.input_columns
+        )
     return {**config, **evidence} if evidence else config
+
+
+def fitted_source_conversions(conversions: Any, input_columns: Any) -> list[dict[str, Any]]:
+    """Keep the model-input conversions that fitting seals into the pipeline config.
+
+    Replay checks call this with saved evidence to rebuild the same expected config.
+    """
+    return [dict(item) for item in conversions if item["column"] in input_columns]
+
+
+def with_source_conversions(config: dict, saved: dict, input_columns: Any) -> dict:
+    """Return the replay-expected config when ``saved`` evidence recorded conversions."""
+    if "source_column_conversions" not in saved:
+        return config
+    conversions = fitted_source_conversions(saved["source_column_conversions"], input_columns)
+    return {**config, "source_column_conversions": conversions}
 
 
 def fit_candidate(

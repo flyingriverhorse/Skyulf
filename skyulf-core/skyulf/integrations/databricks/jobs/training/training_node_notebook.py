@@ -11,7 +11,7 @@ from ...model_sets.model_set_project import (
 )
 from ...observability.reports.training_node_output import render_training_node
 from ...observability.reports.training_summary import render_final_training_report
-from ..serving_handoff import publish_serving_handoff
+from ..serving_handoff import active_serving_settings, publish_serving_handoff
 from ..shared.job_output import render_lifecycle_output
 from ..shared.job_runtime import (
     lifecycle_widget_context,
@@ -69,6 +69,7 @@ def run_initialize_models_notebook(spark: Any, dbutils: Any, *, display_html: An
     context = LifecycleContext(**lifecycle_widget_context(values))
     action = values.get("lifecycle_action", "train")
     operator_options(action, values)
+    active_serving_settings(values)  # fail before training or alias changes
     settings = load_project_model_set(values)
     source = ""
     if action == "train":

@@ -24,6 +24,19 @@ def _automatic_serving_enabled(values: dict[str, str]) -> bool:
     return True
 
 
+def active_serving_settings(values: dict[str, str]) -> dict[str, Any] | None:
+    """Return validated endpoint settings only when this run hands off to serving.
+
+    Initialization calls this too, so a bad config/serving.yml stops the run
+    before training or any champion change instead of after the decision.
+    """
+    if values.get("deployed_serving_endpoint") != "true" or not _automatic_serving_enabled(values):
+        return None
+    from .serving_endpoint_job import read_serving_endpoint_settings  # noqa: PLC0415
+
+    return read_serving_endpoint_settings(values)
+
+
 def serving_transition(receipt: dict[str, Any] | None, *, model_name: str) -> str:
     """Return the concrete changed champion version, or no request for other outcomes."""
     if not receipt or receipt.get("kind") not in {"initial", "promotion", "rollback"}:
@@ -46,14 +59,12 @@ def publish_serving_handoff(
     Old projects have no serving deployment contract and remain inert. Manual
     endpoint runs are independent; automatic handoff requires production mode.
     """
-    from .serving_endpoint_job import read_serving_endpoint_settings  # noqa: PLC0415
-
-    version = ""
     if values.get("deployed_serving_endpoint") != "true":
         return
-    if _automatic_serving_enabled(values):
-        settings = read_serving_endpoint_settings(values)
-        version = serving_transition(receipt, model_name=settings["model_name"])
+    settings = active_serving_settings(values)
+    version = (
+        "" if settings is None else serving_transition(receipt, model_name=settings["model_name"])
+    )
     dbutils.jobs.taskValues.set(key="serving_requested", value=bool(version))
     dbutils.jobs.taskValues.set(key="serving_model_version", value=version)
 

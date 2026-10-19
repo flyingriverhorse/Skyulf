@@ -376,6 +376,9 @@ def _load_training_evidence(store: PhaseStore) -> _ReplayEvidence:
             **effective_config,
             "training_weights": evidence.get("training_weights"),
         }
+    effective_config = training.with_source_conversions(
+        effective_config, store.read("training_data.json"), spec.input_columns
+    )
     if (
         artifact.manifest.fitted_engine != config["engine"]
         or artifact.manifest.project_source_sha256 != source_sha
