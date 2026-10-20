@@ -32,7 +32,7 @@ pyarrow>=23.0.1                      # Parquet support for Pandas/Polars
 boto3>=1.34.0                        # AWS SDK (transitive via s3fs, pinned for stability)
 s3fs>=2023.12.0                      # S3 Filesystem for Pandas
 fsspec>=2026.6.0                     # Patched reference-filesystem template handling
-aiohttp>=3.13.4,<4.0.0              # Pinned to avoid pip backtracking (transitive via s3fs)
+aiohttp>=3.14.4,<4.0.0              # Security floor; also avoids backtracking via s3fs
 aiofiles>=24.1.0                     # Async file operations
 
 # === STATISTICS & ANALYSIS ===
