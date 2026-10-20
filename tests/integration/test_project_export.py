@@ -177,6 +177,47 @@ async def test_download_errors_are_explicit(export_client, job_id, mode, status)
     assert response.status_code == status
 
 
+@pytest.mark.parametrize("artifact_uri", [None, "pipeline/private-missing-model.pkl"])
+async def test_download_rejects_unavailable_artifacts_without_leaking_paths(
+    export_client, artifact_uri
+):
+    """Missing saved state must return an actionable error without exposing storage paths."""
+    client, database = export_client
+    async with AsyncSession(database) as session:
+        job = await session.get(TrainingJob, "job-1")
+        job.artifact_uri = artifact_uri
+        await session.commit()
+
+    response = await client.post("/deployment/export/job-1")
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "artifact" in detail
+    assert "private-missing-model" not in detail
+    async with AsyncSession(database) as session:
+        assert await DeploymentService.get_active_deployment(session) is None
+
+
+async def test_download_hides_unexpected_packaging_errors(export_client, monkeypatch):
+    """Packaging failures must not leak local paths or return a partial downloadable project."""
+    from backend.ml_pipeline.project_export import service
+
+    def unreadable_installation():
+        """Represent a filesystem failure while reading the installed Core distribution."""
+        raise OSError("Permission denied: PRIVATE_INSTALLATION_PATH")
+
+    monkeypatch.setattr(service, "bundled_core_wheel", unreadable_installation)
+    client, database = export_client
+
+    response = await client.post("/deployment/export/job-1")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Model project export failed."}
+    assert "content-disposition" not in response.headers
+    async with AsyncSession(database) as session:
+        assert await DeploymentService.get_active_deployment(session) is None
+
+
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_actual_training_records_raw_schema_before_encoding(tmp_path, monkeypatch, engine):
     """The downloaded project must accept raw categories, never generated dummy columns."""

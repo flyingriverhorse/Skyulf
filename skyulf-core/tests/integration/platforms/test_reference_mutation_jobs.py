@@ -1,5 +1,6 @@
 """Generated mutation phases share reference admission without locking fitting."""
 
+import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -7,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-pytest.importorskip("mlflow")
+mlflow = pytest.importorskip("mlflow")
 
 from skyulf.integrations.databricks.jobs.lifecycle import lifecycle_tasks
 from skyulf.integrations.databricks.jobs.shared import job_runtime
@@ -130,27 +131,46 @@ def test_unconfigured_phase_does_not_touch_monitoring(monkeypatch, admission):
     assert admission.calls == []
 
 
-def test_failed_acquisition_prevents_alias_network_mutation(monkeypatch):
-    """Deferred validation may run, but a competing cleanup still blocks the alias request."""
+def test_failed_acquisition_prevents_alias_network_mutation(monkeypatch, tmp_path):
+    """Refused admission aborts the prepared receipt without sending an alias request."""
     from skyulf.integrations.mlflow.lifecycle import promotion
 
     monkeypatch.setattr(
         reference_admission, "hold_reference_mutation", Mock(side_effect=RuntimeError("busy"))
     )
-    client = Mock()
+    uri = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
+    client = mlflow.MlflowClient(tracking_uri=uri, registry_uri=uri)
+    client.create_registered_model("c.s.m")
+    for _ in range(2):
+        client.create_model_version("c.s.m", source=tmp_path.as_uri())
+    client.set_registered_model_alias("c.s.m", "champion", "1")
+    assign_alias = Mock(wraps=client.set_registered_model_alias)
+    delete_alias = Mock(wraps=client.delete_registered_model_alias)
+    monkeypatch.setattr(client, "set_registered_model_alias", assign_alias)
+    monkeypatch.setattr(client, "delete_registered_model_alias", delete_alias)
+    store = _store()
+    record_failure = Mock()
 
     def mutation(*args):
         """Reach the actual alias transport after the phase's ordinary validation."""
         receipt = promotion.AliasChangeReceipt(
             "event", "promotion", "c.s.m", "champion", "1", "2", "digest", None
         )
-        promotion._apply_alias_updates(client, receipt, [("champion", "2", "1")])
+        promotion.commit_change(client, receipt, [("champion", "2", "1")])
 
     monkeypatch.setattr(lifecycle_tasks, "_operator", mutation)
-    monkeypatch.setattr(lifecycle_tasks, "record_phase_failure", Mock())
+    monkeypatch.setattr(lifecycle_tasks, "record_phase_failure", record_failure)
     with pytest.raises(RuntimeError, match="busy"):
-        lifecycle_tasks._execute_phase("spark", _store(), "operator", {})
-    client.set_registered_model_alias.assert_not_called()
+        lifecycle_tasks._execute_phase("spark", store, "operator", {})
+    assign_alias.assert_not_called()
+    delete_alias.assert_not_called()
+    assert str(client.get_model_version_by_alias("c.s.m", "champion").version) == "1"
+    assert "pending_alias_event" not in client.get_registered_model("c.s.m").tags
+    event = json.loads(client.get_model_version("c.s.m", "2").tags["promotion_event"])
+    assert event["state"] == "aborted"
+    record_failure.assert_called_once_with(store, "operator")
+    store.complete.assert_not_called()
+    assert promotion._BEFORE_ALIAS_WRITE.get() is None
 
 
 def test_notebook_initialization_pins_monitoring_destination(monkeypatch):

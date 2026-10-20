@@ -172,7 +172,6 @@ def test_simple_restores_missing_fitted_column_with_existing_row_anchor(strategy
     [
         {"strategy": "median"},
         {"columns": ["g"]},
-        {"fill_value": 7},
         {"unknown_option": True},
     ],
 )
@@ -186,6 +185,29 @@ def test_simple_mode_alias_retains_fitted_recipe_binding(engine, change):
         get_inference_capability("SimpleImputer", {**config, **change}, state, engine=engine)
         is None
     )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "strategy,expected_fill", [("mode", 1), ("most_frequent", 1), ("median", 1.5)]
+)
+def test_simple_nonconstant_recipe_ignores_inactive_fill_value(engine, strategy, expected_fill):
+    """Inactive constants cannot change learned statistics or revoke saved replay."""
+    config = {"columns": ["x"], "strategy": strategy}
+    train = _frame(engine, [1, 2, None, None])
+    calculator = NodeRegistry.get_calculator("SimpleImputer")()
+    baseline = calculator.fit(train, config)
+    state = calculator.fit(train, {**config, "fill_value": 7})
+    assert state == baseline
+    restored = pickle.loads(pickle.dumps(state))
+    for fill_value in (7, 4):
+        capability = get_inference_capability(
+            "SimpleImputer", {**config, "fill_value": fill_value}, restored, engine=engine
+        )
+        assert capability is not None and capability.context == "row"
+        assert capability.execution_kind == ("python_batch" if engine == "pandas" else "local")
+    full = _assert_replay("SimpleImputer", restored, _frame(engine, [None, 4, None, 7]))
+    assert full["x"].to_list() == [expected_fill, 4, expected_fill, 7]
 
 
 @pytest.mark.parametrize("node", ["SimpleImputer", "GroupImputer"])
