@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -160,6 +160,24 @@ describe('ModelRegistry error retry', () => {
 });
 
 describe('ModelRegistry lineage (OPS-002)', () => {
+  it('offers a separate project export for each completed job version', async () => {
+    // Exporting an older fitted version must never silently select the latest job.
+    const versions = [
+      makeVersion({ job_id: 'job-latest', version: 3, is_deployed: true }),
+      makeVersion({ job_id: 'job-older', version: 2 }),
+      makeVersion({ job_id: 'job-failed', version: 1, status: 'failed' }),
+    ];
+    mockRegistryHooks({ models: [makeEntry({ versions })] });
+    renderRegistry();
+
+    await act(async () => { await userEvent.click(screen.getByRole('button', { name: /View Versions/i })); });
+
+    expect(screen.getByRole('combobox', { name: 'Project format for random_forest v2' })).toHaveValue('both');
+    expect(screen.getByRole('button', { name: 'Export project for random_forest v2' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Export project for random_forest v3' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Export project for random_forest v1' })).not.toBeInTheDocument();
+  });
+
   it('does not render any client-only manual-deployment tracking control', () => {
     const version = makeVersion({ job_id: 'job-1', version: 1, is_deployed: true, deployment_id: 7 });
     mockRegistryHooks({ models: [makeEntry({ versions: [version] })] });

@@ -322,6 +322,7 @@ def interaction_config(raw: dict, state: dict) -> dict:
         raise ValueError("Interaction configuration must be a plain mapping.")
     params = _normalize(raw)
     params.pop("target_column", None)
+    params.pop("_display_name", None)
     params.pop("_auto_columns", None)
     resolved = {"columns": [], **_DEFAULT_OPTIONS, **params}
     if set(resolved) != _OPTIONS:

@@ -207,7 +207,7 @@ class FoldAwareModelStep(BaseEstimator):
         worker = copy.deepcopy(self.preprocessor)
         model = copy.deepcopy(self.estimator)
         X_t, y_t, sample_weight = fit_preprocessor(worker, X, y, sample_weight)
-        SklearnBridge.validate_features(X_t)
+        X_t, y_t = SklearnBridge.to_sklearn((X_t, y_t), validate_features=True)
         sample_weight = sample_weight_for_fit(model, self.class_weight, y_t, sample_weight)
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
         model.fit(X_t, y_t, **fit_kwargs)
@@ -218,8 +218,7 @@ class FoldAwareModelStep(BaseEstimator):
 
     def _transform_x(self, X: Any) -> Any:
         if self.preprocessor_ is None:
-            SklearnBridge.validate_features(X)
-            return X, None
+            return SklearnBridge.to_sklearn(X, validate_features=True)
         X, _y = self._ensure_frames(X, None)
         tracker = getattr(self.preprocessor_, "transform_tracking_order", None)
         if tracker is not None:
@@ -227,7 +226,7 @@ class FoldAwareModelStep(BaseEstimator):
         else:
             X_t, _y_t = self.preprocessor_.transform(X, None)
             positions = None
-        SklearnBridge.validate_features(X_t)
+        X_t, _y_t = SklearnBridge.to_sklearn(X_t, validate_features=True)
         validate_prediction_rows(len(X), len(X_t), stage="Fold preprocessing")
         return X_t, positions
 

@@ -1,5 +1,22 @@
+import { isAxiosError } from 'axios';
 import { apiClient } from './client';
 import { validateThresholds } from '../utils/thresholdValidation';
+
+export type ProjectExportMode = 'api' | 'batch' | 'both';
+
+/** Decode server rejections even when Axios requested a binary ZIP response. */
+async function projectExportError(error: unknown): Promise<Error> {
+  if (isAxiosError<Blob>(error) && error.response?.data instanceof Blob) {
+    try {
+      const body = JSON.parse(await error.response.data.text()) as { detail?: unknown; message?: unknown };
+      if (typeof body.detail === 'string') return new Error(body.detail);
+      if (typeof body.message === 'string') return new Error(body.message);
+    } catch {
+      // Proxy HTML or malformed JSON should preserve the original request error.
+    }
+  }
+  return error instanceof Error ? error : new Error('Unable to export this project. Please try again.');
+}
 
 export interface DeploymentInfo {
   id: number;
@@ -30,6 +47,19 @@ export interface PredictionResponse {
 }
 
 export const deploymentApi = {
+  exportProject: async (jobId: string, mode: ProjectExportMode = 'both'): Promise<Blob> => {
+    try {
+      const response = await apiClient.post<Blob>(
+        `/deployment/export/${encodeURIComponent(jobId)}`,
+        undefined,
+        { params: { mode }, responseType: 'blob' },
+      );
+      return response.data;
+    } catch (error) {
+      throw await projectExportError(error);
+    }
+  },
+
   deployModel: async (jobId: string): Promise<DeploymentInfo> => {
     const response = await apiClient.post<DeploymentInfo>(`/deployment/deploy/${jobId}`);
     return response.data;

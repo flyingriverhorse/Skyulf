@@ -98,6 +98,7 @@ class ClipValuesApplier(BaseApplier):
         """Bind inference configuration to this node's inspected fitted artifact."""
         params = _normalize(raw)
         params.pop("target_column", None)
+        params.pop("_display_name", None)
         params.pop("_auto_columns", None)
         _fields(params, {"bounds"})
         bounds = _bounds(params["bounds"])

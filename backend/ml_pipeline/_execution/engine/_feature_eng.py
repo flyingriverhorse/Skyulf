@@ -85,6 +85,7 @@ class FeatureEngMixin:
     _get_merge_strategy: Any
     _upstream_dropped_columns: Any
     _execution_target_column: Any
+    _raw_input_schemas: dict[str, list[dict[str, str]]]
 
     @staticmethod
     def _node_steps(node: NodeConfig) -> list[dict[str, Any]]:
@@ -330,6 +331,7 @@ class FeatureEngMixin:
         feature_columns: list[str] | None = None,
         feature_dtypes: dict[str, str] | None = None,
         engine: str | None = None,
+        input_schema: list[dict[str, str]] | None = None,
     ):
         """Bundles fitted transformers with the model artifact for inference.
 
@@ -382,6 +384,8 @@ class FeatureEngMixin:
                 )
 
             # Save to job_id key if available - this is the final artifact for the job
+            if input_schema is not None:
+                full_artifact["input_schema"] = input_schema
             if job_id and job_id != "unknown":
                 uri = self.artifact_store.get_artifact_uri(job_id)
                 self.log(f"Saving bundled artifact to {uri}")
@@ -390,6 +394,18 @@ class FeatureEngMixin:
         except Exception:
             logger.exception("Failed to bundle transformers with model")
             raise
+
+    def _export_input_schema(
+        self, node: NodeConfig, target_column: str
+    ) -> list[dict[str, str]] | None:
+        """Attach only a proven raw-loader schema; merged/unknown inputs remain unexportable."""
+        resolved = self._upstream_fe_chain(node)
+        if resolved is None:
+            return None
+        schema = self._raw_input_schemas.get(resolved[0])
+        if schema is None:
+            return None
+        return [dict(column) for column in schema if column["name"] != target_column]
 
     @staticmethod
     def _has_multiple_inputs(node: NodeConfig) -> bool:

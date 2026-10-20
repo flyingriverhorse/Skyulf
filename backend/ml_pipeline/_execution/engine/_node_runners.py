@@ -142,6 +142,8 @@ class NodeRunnersMixin:
     _resolve_fold_preprocessing: Any
     _execution_target_column: Any
     _node_steps: Any
+    _export_input_schema: Any
+    _raw_input_schemas: dict[str, list[dict[str, str]]]
 
     def _record_split_dataset_shape_metrics(
         self, metrics: dict[str, Any], data: SplitDataset, target_col: str
@@ -248,6 +250,9 @@ class NodeRunnersMixin:
             ) from None
 
         self._assert_loader_frame(df, dataset_id)
+        self._raw_input_schemas[node.node_id] = [
+            {"name": column, "dtype": str(df[column].dtype)} for column in df.columns
+        ]
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
         )
@@ -502,6 +507,7 @@ class NodeRunnersMixin:
             feature_columns=feature_columns,
             feature_dtypes=feature_dtypes,
             engine=self._resolve_train_engine(data),
+            input_schema=self._export_input_schema(node, target_col),
         )
 
     def _flatten_split_metrics(self, splits: dict[str, Any], metrics: dict[str, Any]) -> None:

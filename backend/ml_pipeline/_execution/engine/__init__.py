@@ -89,6 +89,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         ] = []  # Track fitted transformers for inference pipeline
         self._results: dict[str, NodeExecutionResult] = {}
         self._node_configs: dict[str, NodeConfig] = {}
+        self._raw_input_schemas: dict[str, list[dict[str, str]]] = {}
         self._on_leakage: OnLeakage = "raise"
         # Engine-emitted advisories surfaced via PipelineExecutionResult.
         # Initialized here (not just in run()) so direct callers of
@@ -130,6 +131,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         self.dataset_name = dataset_name
         start_time = datetime.now(UTC)
         self.executed_transformers = []  # Reset for new run
+        self._raw_input_schemas = {}
         self._node_configs = {n.node_id: n for n in config.nodes}
         # Per-run merge advisories surfaced to API/UI so the user understands
         # what fan-in semantics were applied (column union, last-wins, etc.).
