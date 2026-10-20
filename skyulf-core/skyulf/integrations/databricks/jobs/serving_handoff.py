@@ -8,9 +8,11 @@ from ..projects.yaml_config import read_yaml_mapping
 
 
 def _automatic_serving_enabled(values: dict[str, str]) -> bool:
-    """Read dispatch gates before requiring endpoint deployment bindings."""
-    if values.get("bundle_mode") != "production":
-        return False
+    """Read dispatch gates before requiring endpoint deployment bindings.
+
+    Development targets follow the champion too; their endpoint and SQL function
+    names carry the per-user resource suffix, so they never touch shared ones.
+    """
     document = read_yaml_mapping(values["serving_config_path"])
     settings = document.get("serving_endpoint")
     if not isinstance(settings, dict):
@@ -57,7 +59,7 @@ def publish_serving_handoff(
     """Set child-job values without making cloud calls or changing the score policy.
 
     Old projects have no serving deployment contract and remain inert. Manual
-    endpoint runs are independent; automatic handoff requires production mode.
+    endpoint runs are independent; automatic handoff follows serving.yml in every target.
     """
     if values.get("deployed_serving_endpoint") != "true":
         return

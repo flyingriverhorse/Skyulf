@@ -26,7 +26,7 @@
   "score_follow_champion": "true",
   "regression_metric": "heldout_rmse",
   "quality_threshold": "6.0",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",

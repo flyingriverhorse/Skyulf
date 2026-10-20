@@ -53,8 +53,9 @@ def test_generated_serving_endpoint_supports_each_layout(tmp_path, layout):
     ]
     assert train["timeout_seconds"] == "${var.train_timeout_seconds}"
     tasks = {task["task_key"]: task for task in train["tasks"]}
-    assert tasks["serving_allowed"]["condition_task"]["left"] == "${bundle.mode}"
-    assert tasks["serving_allowed"]["condition_task"]["right"] == "production"
+    # Every target follows the champion; development endpoints carry the user suffix.
+    assert "serving_allowed" not in tasks
+    assert tasks["serving_requested"]["depends_on"] == [{"task_key": "training_report"}]
     assert (
         tasks["serving_requested"]["condition_task"]["left"]
         == "{{tasks.training_report.values.serving_requested}}"

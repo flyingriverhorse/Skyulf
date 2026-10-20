@@ -44,7 +44,7 @@
   "score_follow_champion": "true",
   "classification_metric": "heldout_f1",
   "quality_threshold": "0.5",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",

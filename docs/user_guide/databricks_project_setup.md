@@ -224,29 +224,35 @@ to change them afterwards.
 
 #### Monitoring destination
 
-Both setup modes ask two monitoring questions, after the deployment questions:
+Both setup modes ask the monitoring questions after the deployment questions:
 
-| Question | Answer | Result in `deployment/variables.yml` |
+| Question | Answer | Result |
 | --- | --- | --- |
-| `monitoring_catalog` | Existing catalog for the shared monitoring store, or blank | Default of `monitoring_catalog` |
-| `monitoring_schema` | Shared schema in that catalog; omitted or blank uses `skyulf_monitoring` | Shared schema when a catalog is set; blank when monitoring is off |
+| `monitoring` | `true` or `false` | `monitoring_enabled`; `monitoring_catalog` defaults to each target's `catalog` (`deployment/variables.yml`) |
+| `monitoring_schema` | Shared schema; omitted or blank uses `skyulf_monitoring` | `monitoring_schema` in `deployment/variables.yml` |
+| `development_monitoring` (with personal development targets) | `true` or `false` | Development targets monitor into their own schema (`deployment/monitoring.yml`) |
+| `development_monitoring_schema` | Any schema except the shared one | `development_monitoring_schema` in `deployment/variables.yml` |
+| `monitoring_dashboard` | `none`, `create` or `connect` | The `test` dashboard block in `deployment/monitoring.yml` |
 
-Give every project the same catalog and schema, reserved for monitoring (for
-example `skyulf_monitoring`), not the project's own schema: all models then
-appear in one store and one dashboard. Only one project creates the dashboard;
-the others connect to it with `--dashboard-url`, see
+Give every project the same schema, reserved for monitoring (for example
+`skyulf_monitoring`), not the project's own schema: all models then appear in one
+store and one dashboard. Every monitoring table and view is created in that one
+schema. Only one project creates the dashboard; the others connect to it, see
 [the shared dashboard](databricks_monitoring_dashboard.md).
 [Tables in your workspace](databricks_workspace_tables.md) lists every table the
 jobs create and where each one belongs.
 
-A catalog answer sets `monitoring_enabled` to `"true"`: train and score enroll
-models and run monitoring. A blank catalog sets `monitoring_enabled` to
-`"false"`: train and score run without monitoring. A catalog without a schema
-uses `skyulf_monitoring`. A user-selected schema is preserved, including an
-existing store. Each answer is blank or one identifier. The schema is created
+`monitoring: "true"` sets `monitoring_enabled` to `"true"`: train and score
+enroll models and run monitoring. `monitoring: "false"` sets it to `"false"`:
+train and score run without monitoring. A user-selected schema is preserved,
+including an existing store. To use a central catalog instead of each target's
+own, set `monitoring_catalog` in `deployment/variables.yml` or per target in
+`deployment/monitoring.yml`. The schema is created
 on first use if the run-as identity may
-create schemas. Personal development targets always set `monitoring_enabled`
-to `"false"`.
+create schemas. Personal development targets set `monitoring_enabled` to
+`"false"` unless `development_monitoring` is `"true"`; then they monitor into
+their own separate store (see
+[development monitoring](databricks_monitoring_enrollment.md#development-monitoring-optional)).
 
 Configured projects also include an independent weekly `monitoring_cleanup`
 job. It defaults to Sunday 04:00 UTC, confirmed cleanup and a 90-day minimum

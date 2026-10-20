@@ -62,7 +62,7 @@ and redeploy to collect observations automatically.
 ## 3. Open Online serving
 
 Reuse the dashboard for `workspace.taxi_monitoring` if one exists: copy the
-commented `connect` example in `deployment/dashboards.yml` under `test` and paste
+commented `connect` example in `deployment/monitoring.yml` under `test` and paste
 its published URL and ID. If this is the first project owning that store's
 dashboard, copy the `create` example instead and set your SQL warehouse ID; the file
 explains where to find it. Then deploy and run monitoring:

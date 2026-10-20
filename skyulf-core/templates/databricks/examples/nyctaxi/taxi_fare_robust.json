@@ -23,7 +23,7 @@
   "regression_metric": "heldout_rmse",
   "quality_threshold": "6.0",
   "min_scored_fraction": "0.80",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",

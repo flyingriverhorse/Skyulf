@@ -65,7 +65,7 @@
   "model_set_promotion_policy": "manual_approval",
   "score_model_selection": "pinned_version",
   "score_follow_champion": "false",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "bike_demand_set",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",

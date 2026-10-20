@@ -7,7 +7,7 @@
       "false",
       "true"
     ],
-    "description": "6. Deployment | Add personal development targets inside test, syst and prod workspaces? Jobs and outputs stay user-scoped; schedules start paused"
+    "description": "6. Deployment | Add personal development targets inside test, syst and prod workspaces? Jobs, models, outputs and endpoints stay user-scoped and schedules start paused. Automatic retraining stays off; endpoint projects also follow the champion with per-user endpoints. Development monitoring is a separate, optional question"
   },
   "deployment_identity": {
     "order": 747,

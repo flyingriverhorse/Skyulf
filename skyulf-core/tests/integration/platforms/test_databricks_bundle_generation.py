@@ -212,12 +212,20 @@ def test_optional_runtime_pins_are_unique_across_selected_models(tmp_path, layou
 
 
 def _read_bundle(project):
-    """Read the root and deployment includes without emulating CLI variable resolution."""
+    """Read the root and deployment includes without emulating CLI variable resolution.
+
+    deployment/monitoring.yml repeats target keys; its target variables are merged
+    into targets.yml's, as the CLI merges them (its dashboard resources are not).
+    """
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     for name in ("variables", "targets"):
         path = project / "deployment" / f"{name}.yml"
         if path.is_file():
             bundle.update(yaml.safe_load(path.read_text()))
+    monitoring = project / "deployment/monitoring.yml"
+    if monitoring.is_file():
+        for name, target in (yaml.safe_load(monitoring.read_text())["targets"] or {}).items():
+            bundle["targets"][name].setdefault("variables", {}).update(target.get("variables", {}))
     return bundle
 
 

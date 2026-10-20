@@ -2,25 +2,37 @@
 {{- if and (eq .monitoring_dashboard "connect") .monitoring_dashboard_url -}}
 {{- $id = index ((regexp "dashboardsv3/([0-9a-fA-F-]+)").FindStringSubmatch .monitoring_dashboard_url) 1 -}}
 {{- end -}}
-# Monitoring dashboard for each shared target (optional).
+{{- $create := eq .monitoring_dashboard "create" -}}
+{{- $connect := eq .monitoring_dashboard "connect" -}}
+{{- $dev := eq .personal_development_targets "true" -}}
+{{- $devmon := and (eq .monitoring "true") (eq .development_monitoring "true") -}}
+# Monitoring for each target.
 #
-# One dashboard per workspace shows every model saved in the monitoring store
-# (monitoring_catalog / monitoring_schema in deployment/variables.yml). The
-# monitoring job measures and saves results with or without a dashboard; a
-# configured target also refreshes its dashboard after each monitoring run.
+# Where monitoring writes:
+# - test, syst and prod write to monitoring_catalog.monitoring_schema. Both are in
+#   deployment/variables.yml; monitoring_catalog defaults to each target's own
+#   catalog. To use another name in one target, set it under that target here, for
+#   example `prod: variables: monitoring_schema: mlops_monitoring`.
+# - Development targets write to monitoring_catalog.development_monitoring_schema
+#   (variables.yml) only when their block below sets monitoring_enabled: "true".
+#   That schema must differ from monitoring_schema; dev models never enter the
+#   shared store. Development never retrains or runs scheduled monitoring.
+# All monitoring tables and views (inventory, observations, references and the
+# views the dashboard reads) are created in that one schema on first use.
 #
-# For each target (test, syst, prod) choose one, then deploy that target:
+# Dashboards (optional): one dashboard per workspace shows every model in a
+# monitoring store. For each target choose one, then deploy that target:
 #   create  - only in the FIRST project that uses this target's monitoring store.
 #             Deploy creates the dashboard. Every other project connects to it.
 #   connect - paste the dashboard's published URL and its ID (the 32 characters
 #             after /dashboardsv3/ in that URL).
-#   nothing - leave the target out of this file.
-#
+#   nothing - leave the dashboard out.
 # warehouse_id is the SQL warehouse that runs the dashboard queries:
 # SQL Warehouses > your warehouse > Connection details (16 hexadecimal
 # characters); it is also in the warehouse page URL, .../sql/warehouses/<id>.
 # Each workspace has its own warehouses, so syst and prod need their own ID.
-# Development targets never refresh a dashboard.
+# A development target can only create its own dashboard over the development
+# store; never connect it to a shared dashboard.
 #
 # How the refresh task reaches the monitoring job:
 # resources/monitoring.job.yml defines the `monitoring` job for every target:
@@ -34,23 +46,54 @@
 # run_as and permissions to jobs defined in resources/.
 #
 # Copy a commented example below under `targets:` and replace the target name.
-{{- if eq .monitoring_dashboard "none"}}
+{{- if not (or $create $connect $dev)}}
 targets: {}
 {{- else}}
 targets:
-  test:
+{{- range $target := (regexp "[a-z_]+").FindAllString "test test_development syst_development prod_development" -1}}
+{{- $isdev := ne $target "test"}}
+{{- $dash := or (and (eq $target "test") (or $create $connect)) (and (eq $target "test_development") $create $devmon)}}
+{{- if or (and $isdev $dev) $dash}}
+  {{$target}}:
     variables:
-{{- if eq .monitoring_dashboard "create"}}
+{{- if $isdev}}
+{{- if $devmon}}
+      # Development monitoring writes to development_monitoring_schema, never to
+      # the shared monitoring_schema.
+      monitoring_enabled: "true"
+{{- else}}
+      # Development monitoring is off; dev models never enter the shared store. To
+      # turn it on, set development_monitoring_schema in deployment/variables.yml
+      # (it needs monitoring), then set monitoring_enabled: "true" here.
+      monitoring_enabled: "false"
+{{- end}}
+      monitoring_pause_status: PAUSED
+      monitoring_cleanup_pause_status: PAUSED
+      monitoring_performance_policies: '{}'
+      on_drift: disabled
+{{- end}}
+{{- if $dash}}
+{{- if $create}}
+      # Dashboard: create. This project creates and owns this target's dashboard;
+      # other projects connect to it.
+{{- if $isdev}}
+      # Your own dashboard over the development store (development mode prefixes its name).
+{{- end}}
       monitoring_dashboard_url: ${workspace.host}/dashboardsv3/${resources.dashboards.monitoring_dashboard.id}/published
     resources:
       dashboards:
         monitoring_dashboard:
           display_name: "${bundle.name} monitoring"
           file_path: ../src/monitoring/monitoring.lvdash.json
-          warehouse_id: {{printf "%q" .monitoring_dashboard_warehouse_id}}
+          warehouse_id: {{printf "%q" $.monitoring_dashboard_warehouse_id}}
           dataset_catalog: ${var.monitoring_catalog}
-          dataset_schema: ${var.monitoring_schema}
+          dataset_schema: {{if $isdev}}${var.development_monitoring_schema}{{else}}${var.monitoring_schema}{{end}}
           embed_credentials: false
+{{- else}}
+      # Dashboard: connect. Another project created it; this target only refreshes it.
+      monitoring_dashboard_url: {{printf "%q" $.monitoring_dashboard_url}}
+    resources:
+{{- end}}
       jobs:
         # Same job name as resources/monitoring.job.yml: this task is added to it.
         monitoring:
@@ -69,31 +112,15 @@ targets:
                   outcome: "true"
               timeout_seconds: ${var.monitoring_task_timeout_seconds}
               dashboard_task:
+{{- if $create}}
                 dashboard_id: ${resources.dashboards.monitoring_dashboard.id}
 {{- else}}
-      monitoring_dashboard_url: {{printf "%q" .monitoring_dashboard_url}}
-    resources:
-      jobs:
-        # Same job name as resources/monitoring.job.yml: this task is added to it.
-        monitoring:
-          tasks:
-            - task_key: dashboard_refresh_enabled
-              description: Refresh only when monitoring is enabled
-              depends_on:
-                - task_key: evaluate_retraining
-              condition_task:
-                op: EQUAL_TO
-                left: "${var.monitoring_enabled}"
-                right: "true"
-            - task_key: refresh_monitoring_dashboard
-              depends_on:
-                - task_key: dashboard_refresh_enabled
-                  outcome: "true"
-              timeout_seconds: ${var.monitoring_task_timeout_seconds}
-              dashboard_task:
                 dashboard_id: {{printf "%q" $id}}
-{{- if .monitoring_dashboard_warehouse_id}}
-                warehouse_id: {{printf "%q" .monitoring_dashboard_warehouse_id}}
+{{- if $.monitoring_dashboard_warehouse_id}}
+                warehouse_id: {{printf "%q" $.monitoring_dashboard_warehouse_id}}
+{{- end}}
+{{- end}}
+{{- end}}
 {{- end}}
 {{- end}}
 {{- end}}

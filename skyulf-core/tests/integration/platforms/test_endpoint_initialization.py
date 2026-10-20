@@ -119,19 +119,16 @@ def test_invalid_active_serving_stops_before_initialization(endpoint_initializat
     dbutils.notebook.exit.assert_not_called()
 
 
-@pytest.mark.parametrize("gate", ["development", "disabled", "manual"])
+@pytest.mark.parametrize("gate", ["disabled", "manual"])
 def test_inactive_serving_does_not_block_training(endpoint_initialization, gate):
-    """Unused serving settings must not break developer runs or manual endpoint management."""
+    """Unused serving settings must not break runs that manage the endpoint by hand."""
     _, values, _, execute = endpoint_initialization
     values["cost_tag_value"] = "REPLACE_WITH_COST_TAG"
-    if gate == "development":
-        values["bundle_mode"] = "development"
-    else:
-        path = Path(values["serving_config_path"])
-        document = yaml.safe_load(path.read_text())
-        field = "enabled" if gate == "disabled" else "follow_champion"
-        document["serving_endpoint"][field] = False
-        path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    path = Path(values["serving_config_path"])
+    document = yaml.safe_load(path.read_text())
+    field = "enabled" if gate == "disabled" else "follow_champion"
+    document["serving_endpoint"][field] = False
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
     with pytest.raises(InitializationReached):
         _initialize(endpoint_initialization)
     execute.assert_called_once()

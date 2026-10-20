@@ -28,7 +28,7 @@ Batch scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps key
 | Custom feature/scoring callbacks and packaged assets | `src/features/` |
 | Online publication, endpoint setup and rollout | `config/serving.yml`, when generated |
 | Host, namespaces, run identities, compute and schedules | `deployment/targets.yml`, `deployment/variables.yml` |
-| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml` |
+| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `development_monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml`; per-target dashboards and development monitoring in `deployment/monitoring.yml` |
 | Installed Core and optional dependencies | `deployment/*requirements.txt` |
 
 The shared runtime pin is `skyulf-core[mlflow]==0.9.5` in

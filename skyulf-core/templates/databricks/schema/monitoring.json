@@ -13,29 +13,31 @@
     "description": "1. Data | UTC timestamp column recording when the actual outcome became available; required with an outcomes table",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
   },
-  "monitoring_catalog": {
+  "monitoring": {
     "order": 749,
     "type": "string",
-    "default": "",
-    "description": "6. Deployment | Monitoring store catalog for drift and performance tracking. Use the same catalog and schema in every project so all models appear in one dashboard. Leave blank to start without monitoring; enable it later in deployment/variables.yml",
-    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+    "default": "false",
+    "enum": ["false", "true"],
+    "description": "6. Deployment | Monitor drift and performance? The monitoring store uses each environment's own catalog (override monitoring_catalog in deployment/variables.yml for a central catalog). false starts without monitoring; enable it later in deployment/variables.yml"
   },
   "monitoring_schema": {
     "order": 750,
     "type": "string",
     "default": "skyulf_monitoring",
-    "description": "6. Deployment | Shared monitoring store schema; omitted or blank uses skyulf_monitoring when a catalog is set. Choose another existing store if needed. Ignored when the catalog is blank. Created on first use when the run-as identity may create schemas",
-    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+    "description": "6. Deployment | Shared monitoring schema in each environment's catalog; every project using the same schema appears in one dashboard. All monitoring tables and views are created there on first use when the run-as identity may create schemas",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "skip_prompt_if": {"properties": {"monitoring": {"const": "false"}}}
   },
   "monitoring_dashboard": {
-    "order": 750.1,
+    "order": 750.3,
     "type": "string",
     "default": "none",
     "enum": ["none", "create", "connect"],
-    "description": "6. Deployment | Monitoring dashboard: one dashboard shows every model in this monitoring store. create makes it in this project (choose create only in the first project using this store); connect links a dashboard another project created; none adds no dashboard. Requires a monitoring store. This answer sets up the test target only; set syst and prod by hand in deployment/dashboards.yml, which explains both choices"
+    "skip_prompt_if": {"properties": {"monitoring": {"const": "false"}}},
+    "description": "6. Deployment | Monitoring dashboard: one dashboard shows every model in this monitoring store. create makes it in this project (choose create only in the first project using this store); connect links a dashboard another project created; none adds no dashboard. This answer sets up the test target only; set syst and prod by hand in deployment/monitoring.yml, which explains both choices"
   },
   "monitoring_dashboard_warehouse_id": {
-    "order": 750.2,
+    "order": 750.4,
     "type": "string",
     "default": "",
     "description": "6. Deployment | SQL warehouse ID (16 hexadecimal characters; SQL Warehouses > your warehouse > Connection details, or the warehouse page URL) that runs the dashboard queries. Required for create; for connect, blank keeps the published dashboard's warehouse",
@@ -43,12 +45,28 @@
     "skip_prompt_if": {"properties": {"monitoring_dashboard": {"const": "none"}}}
   },
   "monitoring_dashboard_url": {
-    "order": 750.3,
+    "order": 750.5,
     "type": "string",
     "default": "",
     "description": "6. Deployment | Published dashboard URL from the project that created it, for example https://<workspace>/dashboardsv3/<id>/published",
     "pattern": "^(?:https://[A-Za-z0-9.-]+(?::[0-9]+)?/(?:sql/)?dashboardsv3/(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})(?:/published(?:/pages/[A-Za-z0-9_-]+)?)?/?(?:\\?[A-Za-z0-9=&%_.~-]*)?)?$",
     "skip_prompt_if": {"properties": {"monitoring_dashboard": {"enum": ["none", "create"]}}}
+  },
+  "development_monitoring": {
+    "order": 750.1,
+    "type": "string",
+    "default": "false",
+    "enum": ["false", "true"],
+    "description": "6. Deployment | Also monitor models in personal development targets? true writes them to their own schema in the monitoring catalog (named in the next question), never to the shared store, and gives test_development its own dashboard with create. Development never retrains. The run-as user may need permission to create that schema",
+    "skip_prompt_if": {"anyOf": [{"properties": {"personal_development_targets": {"const": "false"}}}, {"properties": {"monitoring": {"const": "false"}}}]}
+  },
+  "development_monitoring_schema": {
+    "order": 750.2,
+    "type": "string",
+    "default": "development_monitoring",
+    "description": "6. Deployment | Schema in the monitoring catalog for development monitoring, for example an existing development schema in your workspace. Any name except the shared monitoring schema; change it later in deployment/variables.yml",
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+    "skip_prompt_if": {"properties": {"development_monitoring": {"const": "false"}}}
   },
   "performance_policy_mode": {
     "order": 760,

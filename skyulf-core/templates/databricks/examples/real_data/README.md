@@ -217,7 +217,7 @@ schema, or deliberately choose one shared monitoring store for a production
 installation.
 
 To let each example own its dashboard, copy the commented `create` example in
-that project's `deployment/dashboards.yml` under `test`, set an existing SQL
+that project's `deployment/monitoring.yml` under `test`, set an existing SQL
 warehouse ID, then validate and deploy the Bundle again:
 
 ```powershell

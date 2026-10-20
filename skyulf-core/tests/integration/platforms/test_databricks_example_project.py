@@ -40,7 +40,7 @@ def test_endpoint_example_serves_and_monitors_without_a_batch_sink():
     assert serving["logging_mode"] == "telemetry"
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
     assert variables["monitoring_enabled"]["default"] == "true"
-    assert variables["monitoring_catalog"]["default"] == "workspace"
+    assert variables["monitoring_catalog"]["default"] == "${var.catalog}"
     assert variables["monitoring_schema"]["default"] == "taxi_monitoring"
     assert variables["cost_tag_value"]["default"] == "taxi-fare-endpoint-demo"
     assert variables["monitoring_label_table"]["default"] == ""

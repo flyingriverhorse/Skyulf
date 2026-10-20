@@ -68,6 +68,9 @@ variables:
   monitoring_enabled:
     description: Enroll activated models and measure drift after scoring; set true only with catalog and schema
     default: "false"
+  development_monitoring_schema:
+    description: Development targets' own monitoring store in monitoring_catalog. Any name except monitoring_schema; blank keeps development monitoring off
+    default: ""
   monitoring_dashboard_url:
     description: Published shared dashboard HTTPS URL shown in monitoring and drift task output
     default: ""
@@ -75,7 +78,7 @@ variables:
     description: Optional MLflow experiment for post-scoring monitoring reports
     default: ""
   monitoring_catalog:
-    description: Central monitoring catalog, independent of model and input catalogs
+    description: Monitoring catalog; defaults to each target's own catalog. Set one name here (or per target) for a central catalog
     default: ""
   monitoring_schema:
     description: Central monitoring schema shared by model repositories; created on first use if allowed

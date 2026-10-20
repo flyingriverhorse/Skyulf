@@ -16,15 +16,45 @@ from .monitoring_config import (
 from .monitoring_store import enroll_monitor, ensure_monitoring_store, validate_activation_order
 
 
+def monitoring_store_schema(values: dict[str, str], *, development: bool) -> str:
+    """Return the schema a target writes to; development targets use their own store.
+
+    Shared targets use ``monitoring_schema``. Development targets use
+    ``development_monitoring_schema``, which may have any name but must differ
+    from the shared schema, so trial models never mix with shared models.
+
+    Args:
+        values: Job parameters, including both schema names.
+        development: Whether the Bundle target runs in development mode.
+
+    Raises:
+        ValueError: A development target has no store of its own, or names the
+            shared store.
+    """
+    shared = values.get("monitoring_schema", "")
+    if not development:
+        return shared
+    own = values.get("development_monitoring_schema", "")
+    if not own:
+        raise ValueError("Set development_monitoring_schema to monitor development targets.")
+    if own == shared:
+        raise ValueError(
+            "development_monitoring_schema must differ from the shared monitoring_schema."
+        )
+    return own
+
+
 def monitoring_destination(values: dict[str, str]) -> str | None:
     """Require an independent monitoring destination whenever registration is configured."""
-    if values.get("monitoring_deployment_mode") == "development":
+    development = values.get("monitoring_deployment_mode") == "development"
+    # Development writes nothing unless the target explicitly opts in to its own store.
+    if development and values.get("monitoring_enabled") != "true":
         return None
     enabled = values.get("monitoring_enabled", "false")
     if enabled not in {"true", "false"}:
         raise ValueError("monitoring_enabled must be true or false.")
     catalog = values.get("monitoring_catalog", "")
-    schema = values.get("monitoring_schema", "")
+    schema = monitoring_store_schema(values, development=development)
     if enabled == "false" and not catalog and not schema:
         return None
     if not catalog or not schema:
@@ -73,7 +103,11 @@ def build_monitor_enrollment_config(
         execution_engine=execution,
         reference_namespace=(
             store_namespace(
-                values.get("monitoring_catalog", ""), values.get("monitoring_schema", "")
+                values.get("monitoring_catalog", ""),
+                monitoring_store_schema(
+                    values,
+                    development=values.get("monitoring_deployment_mode") == "development",
+                ),
             )
             if execution == "spark"
             else None

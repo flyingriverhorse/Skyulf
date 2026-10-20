@@ -75,6 +75,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
@@ -208,18 +209,10 @@ resources:
               decision_result_state: '{{tasks.model_decision.result_state}}'
               workspace_host: ${workspace.host}
 
-        - task_key: serving_allowed
-          description: Automatically follow champion changes in shared production targets only
+        - task_key: serving_requested
+          description: Follow champion changes in every target; development endpoints carry the user suffix
           depends_on:
             - task_key: training_report
-          condition_task:
-            op: EQUAL_TO
-            left: ${bundle.mode}
-            right: production
-        - task_key: serving_requested
-          depends_on:
-            - task_key: serving_allowed
-              outcome: "true"
           condition_task:
             op: EQUAL_TO
             left: '{{tasks.training_report.values.serving_requested}}'

@@ -43,13 +43,14 @@ consecutive-window policy or guarded training requests. See
 
 ## What to edit
 
-Setup asks `monitoring_catalog` and `monitoring_schema` in both quick and
-detailed mode. When a catalog is given, an omitted or blank schema defaults to
-`skyulf_monitoring`. A different schema answer is preserved; existing stores
-are never moved or migrated. Setup writes the destination to `deployment/variables.yml`; see
+Setup asks `monitoring` (on or off) and, when on, `monitoring_schema` in both
+quick and detailed mode. An omitted or blank schema defaults to
+`skyulf_monitoring`; a different answer is preserved, and existing stores are
+never moved or migrated. The catalog is not asked: `monitoring_catalog` defaults to
+each target's own `catalog`. Setup writes both to `deployment/variables.yml`; see
 [the setup questions](databricks_project_setup.md#monitoring-destination). To
-set or change them per target, put this excerpt under
-`targets.<target>.variables` in `deployment/targets.yml`. The values are
+use other names in one target, put this excerpt under
+`targets.<target>.variables` in `deployment/monitoring.yml`. The values are
 examples; use your existing catalog and a schema reserved for the shared store.
 
 ```yaml
@@ -60,8 +61,8 @@ monitoring_enabled: "true"
 
 ### If no destination is set
 
-A blank catalog at setup generates `monitoring_enabled: "false"`. Train and
-score then run normally without enrollment, monitoring or a store. Nothing is
+`monitoring: "false"` at setup generates `monitoring_enabled: "false"`. Train
+and score then run normally without enrollment, monitoring or a store. Nothing is
 written to a monitoring schema, and both generated destination values are blank.
 To enable monitoring later, set both names and
 `monitoring_enabled: "true"`, then validate and redeploy.
@@ -73,7 +74,8 @@ To enable monitoring later, set both names and
 | `"true"` | Both set | Enrolls and monitors |
 | `"true"`, or either value set alone | Not both set | Fails with `Set both monitoring_catalog and monitoring_schema.` |
 
-Development targets skip this check and never monitor.
+Development targets skip this check unless they opt in to their own separate
+store; see [development monitoring](databricks_monitoring_enrollment.md#development-monitoring-optional).
 
 Every project uses the same independent
 `monitoring_catalog` and `monitoring_schema` values. These control monitoring
@@ -224,9 +226,9 @@ deletion.
 
 The job uses the same monitoring identity, permissions, notifications and
 serverless environment as observation. It only runs `cleanup_references`;
-it does not measure drift or request training. Projects initialized with a
-blank catalog have no cleanup resource. Enable their monitoring destination
-and use the manual action below, or regenerate with a configured catalog to
+it does not measure drift or request training. Projects initialized with
+monitoring off have no cleanup resource. Enable their monitoring destination
+and use the manual action below, or regenerate with monitoring on to
 obtain `resources/monitoring_cleanup.job.yml` and its target settings.
 
 Before deploying an enabled cleanup schedule, meet the lifecycle-writer

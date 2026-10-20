@@ -83,6 +83,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
@@ -245,6 +246,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
@@ -425,18 +427,10 @@ resources:
               workspace_host: ${workspace.host}
 {{end}}
 {{- if ne .prediction_delivery "batch"}}
-        - task_key: serving_allowed
-          description: Automatically follow champion changes in shared production targets only
+        - task_key: serving_requested
+          description: Follow champion changes in every target; development endpoints carry the user suffix
           depends_on:
             - task_key: training_report
-          condition_task:
-            op: EQUAL_TO
-            left: ${bundle.mode}
-            right: production
-        - task_key: serving_requested
-          depends_on:
-            - task_key: serving_allowed
-              outcome: "true"
           condition_task:
             op: EQUAL_TO
             left: '{{"{{tasks.training_report.values.serving_requested}}"}}'
@@ -466,14 +460,15 @@ resources:
 {{end}}
 {{if ne .prediction_delivery "endpoint"}}
         - task_key: monitoring_allowed
-          description: Register shared deployments only; skip ephemeral development models
+          description: Register shared deployments, and development ones only with a development monitoring store
           max_retries: 0
           depends_on:
             - task_key: training_report
           condition_task:
-            op: EQUAL_TO
-            left: ${bundle.mode}
-            right: production
+            # Shared targets always register; development only with its own monitoring store.
+            op: NOT_EQUAL
+            left: "${bundle.mode}:${var.monitoring_enabled}"
+            right: "development:false"
 {{if eq .training_layout "multi_target"}}
         - <<: *branch_task
           task_key: register_monitor

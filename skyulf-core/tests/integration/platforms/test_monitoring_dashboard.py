@@ -360,8 +360,8 @@ def test_history_charts_and_date_filters_use_the_data_window() -> None:
 
 
 def _dashboard_examples() -> dict:
-    """Uncomment the hand-copy examples in deployment/dashboards.yml.tmpl and parse them."""
-    text = (TEMPLATE / "deployment/dashboards.yml.tmpl").read_text(encoding="utf-8")
+    """Uncomment the hand-copy examples in deployment/monitoring.yml.tmpl and parse them."""
+    text = (TEMPLATE / "deployment/monitoring.yml.tmpl").read_text(encoding="utf-8")
     parsed = {}
     for block in text.split("# Example: ")[1:]:
         title, _, body = block.partition("\n")

@@ -22,9 +22,8 @@ SHARED = {
     "include_source_sql",
     "initial_scoring",
     "record_key_columns",
-    # No default can name a monitoring store; blank answers start without monitoring.
-    "monitoring_catalog",
-    "monitoring_schema",
+    # Monitoring defaults to off; its schema is asked only after "monitoring: true".
+    "monitoring",
     "label_table_name",
     "label_available_at_column",
 }
@@ -244,3 +243,10 @@ def test_upgrade_steps_have_one_central_home_that_first_run_points_to():
     first_run = (TEMPLATE / "START_HERE.md.tmpl").read_text(encoding="utf-8")
     assert "changelog/0.9.x.md" in first_run
     assert "Upgrade steps for generated Databricks projects" in first_run
+
+
+def test_quick_setup_asks_for_the_monitoring_schema_once_monitoring_is_on():
+    """Turning monitoring on in quick setup must still ask where the shared store lives."""
+    asked = _asked(setup_mode="quick", monitoring="true")
+    assert "monitoring_schema" in asked
+    assert "monitoring_catalog" not in PROPERTIES

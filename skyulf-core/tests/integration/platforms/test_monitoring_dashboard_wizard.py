@@ -1,4 +1,4 @@
-"""The wizard sets up the test dashboard; deployment/dashboards.yml explains syst and prod."""
+"""The wizard sets up the test dashboard; deployment/monitoring.yml explains syst and prod."""
 
 import json
 from pathlib import Path
@@ -18,7 +18,7 @@ TEMPLATE_ROOT = Path(__file__).resolve().parents[3] / "templates/databricks"
 WAREHOUSE_ID = "d047a4d9aa276958"
 DASHBOARD_ID = "01f1c090238e1b6da5d633032ad9960b"
 URL = f"https://dbc-45604623-c18b.cloud.databricks.com/dashboardsv3/{DASHBOARD_ID}/published?o=1"
-STORE = {"monitoring_catalog": "workspace", "monitoring_schema": "taxi_monitoring"}
+STORE = {"monitoring": "true", "monitoring_schema": "taxi_monitoring"}
 needs_cli = pytest.mark.skipif(
     not (PROFILE or OFFLINE_CLI) or not CLI,
     reason="Set SKYULF_BUNDLE_OFFLINE_CLI=1 to render the template with the installed CLI.",
@@ -37,7 +37,7 @@ def _visible(name, values):
 
 def _dashboards(project):
     """Parse the per-target dashboard file of a rendered project."""
-    return yaml.safe_load((project / "deployment/dashboards.yml").read_text(encoding="utf-8"))
+    return yaml.safe_load((project / "deployment/monitoring.yml").read_text(encoding="utf-8"))
 
 
 def _refresh_task(target):
@@ -57,7 +57,7 @@ def _refresh_task(target):
 
 def _examples(project):
     """Uncomment the hand-copy examples so their YAML is checked like real configuration."""
-    text = (project / "deployment/dashboards.yml").read_text(encoding="utf-8")
+    text = (project / "deployment/monitoring.yml").read_text(encoding="utf-8")
     blocks = text.split("# Example: ")[1:]
     parsed = {}
     for block in blocks:
@@ -175,7 +175,7 @@ def test_connect_refreshes_the_existing_dashboard(tmp_path, warehouse):
     assert _refresh_task(test)["dashboard_task"] == expected
     assert test["variables"]["monitoring_dashboard_url"] == URL
     assert (
-        "deployment/dashboards.yml"
+        "deployment/monitoring.yml"
         in yaml.safe_load((project / "databricks.yml").read_text(encoding="utf-8"))["include"]
     )
 
@@ -195,7 +195,7 @@ def test_connect_refreshes_the_existing_dashboard(tmp_path, warehouse):
         (
             "ERROR_monitoring_dashboard_requires_monitoring_store",
             {
-                "monitoring_catalog": "",
+                "monitoring": "false",
                 "monitoring_dashboard": "create",
                 "monitoring_dashboard_warehouse_id": WAREHOUSE_ID,
             },

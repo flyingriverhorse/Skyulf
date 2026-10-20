@@ -26,11 +26,23 @@ def test_active_handoff_settings_reject_stale_fields(endpoint_project):  # noqa:
 
 
 def test_inactive_handoff_skips_settings_check(endpoint_project):  # noqa: F811
-    """Development runs never hand off, so they keep ignoring endpoint settings."""
+    """Manual endpoint management keeps ignoring endpoint settings, in every target."""
     from skyulf.integrations.databricks.jobs.serving_handoff import active_serving_settings
 
-    assert active_serving_settings(_stale(endpoint_project, "development")) is None
+    document, path, values = endpoint_project
+    document["serving_endpoint"].update(smoke={"rows": 20}, follow_champion=False)
+    path.write_text(yaml.safe_dump(document))
+    for mode in ("development", "production"):
+        assert active_serving_settings({**values, "bundle_mode": mode}) is None
     assert active_serving_settings({"deployed_serving_endpoint": "false"}) is None
+
+
+def test_development_handoff_checks_settings_too(endpoint_project):  # noqa: F811
+    """Development follows the champion, so a bad serving.yml fails there before training too."""
+    from skyulf.integrations.databricks.jobs.serving_handoff import active_serving_settings
+
+    with pytest.raises(ValueError, match="Unknown serving_endpoint fields"):
+        active_serving_settings(_stale(endpoint_project, "development"))
 
 
 def test_lifecycle_initialization_rejects_stale_serving_settings(

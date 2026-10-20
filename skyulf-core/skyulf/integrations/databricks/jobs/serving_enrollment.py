@@ -12,6 +12,7 @@ from ..observability.monitoring.monitoring_config import (
     parse_performance_policies,
     store_namespace,
 )
+from ..observability.monitoring.monitoring_registration import monitoring_store_schema
 from ..observability.monitoring.serving import serving_registration
 from ..serving.contracts import PinnedEndpointSpec
 from .shared import reference_mutations
@@ -29,7 +30,8 @@ def serving_monitoring_namespace(logging_mode: str, values: dict[str, str]) -> s
     """Require an explicitly configured shared store before changing a logged endpoint."""
     if not _monitoring_enabled(values) or logging_mode == "disabled":
         return None
-    catalog, schema = values.get("monitoring_catalog", ""), values.get("monitoring_schema", "")
+    catalog = values.get("monitoring_catalog", "")
+    schema = monitoring_store_schema(values, development=values.get("bundle_mode") == "development")
     if not catalog or not schema:
         raise ValueError(
             "Logged serving requires both monitoring_catalog and monitoring_schema; "

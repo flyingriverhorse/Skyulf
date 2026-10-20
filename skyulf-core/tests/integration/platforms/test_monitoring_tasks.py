@@ -19,7 +19,7 @@ def test_development_monitoring_tasks_exit_before_reading_models_or_tables(monke
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings(
-        monitoring_deployment_mode="development", on_drift="retrain"
+        monitoring_deployment_mode="development", monitoring_enabled="false", on_drift="retrain"
     )
     run = Mock(side_effect=AssertionError("Development must not run monitoring"))
     monkeypatch.setattr(tasks, "run_monitoring", run)

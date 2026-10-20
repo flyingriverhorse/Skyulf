@@ -74,7 +74,7 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.monitoring_permissions}
 {{end}}
-{{if .monitoring_catalog}}
+{{if eq .monitoring "true"}}
         monitoring_cleanup:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
@@ -109,7 +109,7 @@ targets:
           name: score
 {{end}}        monitoring:
           name: monitoring
-{{if .monitoring_catalog}}
+{{if eq .monitoring "true"}}
         monitoring_cleanup:
           name: monitoring_cleanup
 {{end}}
@@ -122,12 +122,7 @@ targets:
       output_schema: ${var.test_development_output_schema}
       metadata_schema: ${var.test_development_metadata_schema}
       resource_suffix: _test_dev_${workspace.current_user.id}
-      # Ephemeral dev models never enter the shared monitoring inventory.
-      monitoring_enabled: "false"
-      monitoring_pause_status: PAUSED
-      monitoring_cleanup_pause_status: PAUSED
-      monitoring_performance_policies: '{}'
-      on_drift: disabled
+      # Monitoring settings for this target are in deployment/monitoring.yml.
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}
@@ -206,7 +201,7 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.monitoring_permissions}
 {{end}}
-{{if .monitoring_catalog}}
+{{if eq .monitoring "true"}}
         monitoring_cleanup:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
@@ -241,7 +236,7 @@ targets:
           name: score
 {{end}}        monitoring:
           name: monitoring
-{{if .monitoring_catalog}}
+{{if eq .monitoring "true"}}
         monitoring_cleanup:
           name: monitoring_cleanup
 {{end}}
@@ -254,12 +249,7 @@ targets:
       output_schema: ${var.syst_development_output_schema}
       metadata_schema: ${var.syst_development_metadata_schema}
       resource_suffix: _syst_dev_${workspace.current_user.id}
-      # Ephemeral dev models never enter the shared monitoring inventory.
-      monitoring_enabled: "false"
-      monitoring_pause_status: PAUSED
-      monitoring_cleanup_pause_status: PAUSED
-      monitoring_performance_policies: '{}'
-      on_drift: disabled
+      # Monitoring settings for this target are in deployment/monitoring.yml.
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}
@@ -338,7 +328,7 @@ targets:
 {{if eq .manage_job_permissions "true"}}
           permissions: ${var.monitoring_permissions}
 {{end}}
-{{if .monitoring_catalog}}
+{{if eq .monitoring "true"}}
         monitoring_cleanup:
 {{if eq .deployment_identity "shared_service_principal"}}
           run_as:
@@ -373,7 +363,7 @@ targets:
           name: score
 {{end}}        monitoring:
           name: monitoring
-{{if .monitoring_catalog}}
+{{if eq .monitoring "true"}}
         monitoring_cleanup:
           name: monitoring_cleanup
 {{end}}
@@ -386,12 +376,7 @@ targets:
       output_schema: ${var.prod_development_output_schema}
       metadata_schema: ${var.prod_development_metadata_schema}
       resource_suffix: _prod_dev_${workspace.current_user.id}
-      # Ephemeral dev models never enter the shared monitoring inventory.
-      monitoring_enabled: "false"
-      monitoring_pause_status: PAUSED
-      monitoring_cleanup_pause_status: PAUSED
-      monitoring_performance_policies: '{}'
-      on_drift: disabled
+      # Monitoring settings for this target are in deployment/monitoring.yml.
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}

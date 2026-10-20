@@ -188,10 +188,11 @@ def test_multi_target_cli_graph_has_same_three_jobs(tmp_path, compute, policy, h
     assert len(train["tasks"]) == 12
     tasks = {item["task_key"]: item for item in train["tasks"]}
     assert tasks["monitoring_allowed"]["depends_on"] == [{"task_key": "training_report"}]
+    # Shared targets always pass; development passes only with its own monitoring store.
     assert tasks["monitoring_allowed"]["condition_task"] == {
-        "op": "EQUAL_TO",
-        "left": "${bundle.mode}",
-        "right": "production",
+        "op": "NOT_EQUAL",
+        "left": "${bundle.mode}:${var.monitoring_enabled}",
+        "right": "development:false",
     }
     assert tasks["register_monitor"]["depends_on"] == [
         {"task_key": "monitoring_allowed", "outcome": "true"}

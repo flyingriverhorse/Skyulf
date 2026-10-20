@@ -34,7 +34,7 @@
   "promotion_policy": "automatic",
   "score_model_selection": "champion",
   "score_follow_champion": "true",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "skyulf_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",

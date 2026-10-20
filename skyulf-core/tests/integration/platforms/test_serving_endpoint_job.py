@@ -258,15 +258,15 @@ def test_verification_rejects_malformed_blocks_and_removed_nested_rows(
 
 @pytest.mark.parametrize("mode", ["development", "production"])
 @pytest.mark.parametrize("setting", [False, True])
-def test_handoff_uses_production_gate_and_keeps_score_independent(
+def test_handoff_follows_yaml_in_every_target_and_keeps_score_independent(
     endpoint_project, handoff, mode, setting
 ):
-    """The YAML switch alone controls dispatch while developer training stays inert."""
+    """The YAML switch alone controls dispatch; development follows the champion too."""
     document, path, values = endpoint_project
     document["serving_endpoint"]["follow_champion"] = setting
     path.write_text(yaml.safe_dump(document))
     values["bundle_mode"] = mode
-    enabled = mode == "production" and setting
+    enabled = setting
     receipt = {
         "kind": "initial",
         "alias": "champion",
@@ -286,7 +286,7 @@ def test_handoff_uses_production_gate_and_keeps_score_independent(
 
 @pytest.mark.parametrize(
     "mode,enabled,follow",
-    [("development", True, True), ("production", True, False), ("production", False, True)],
+    [("development", True, False), ("production", True, False), ("production", False, True)],
 )
 @pytest.mark.parametrize("bad_binding", ["cost_tag_value", "catalog"])
 def test_inactive_handoff_ignores_unused_endpoint_bindings(

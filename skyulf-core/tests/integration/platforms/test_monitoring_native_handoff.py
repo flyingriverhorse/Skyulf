@@ -50,7 +50,10 @@ def test_native_handoff_preserves_successful_receipt(monkeypatch, recovery, noop
 
 @pytest.mark.parametrize(
     "values",
-    [settings(monitoring_enabled="false"), settings(monitoring_deployment_mode="development")],
+    [
+        settings(monitoring_enabled="false"),
+        settings(monitoring_deployment_mode="development", monitoring_enabled="false"),
+    ],
 )
 def test_native_handoff_disabled_does_not_read_receipt(monkeypatch, values):
     """Paused or ephemeral deployments must exclude the native child job entirely."""

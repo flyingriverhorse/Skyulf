@@ -232,7 +232,7 @@ def _add_weighted_choice(result: dict[str, Any], name: str, field: dict[str, Any
 
 _QUICK_PROMPTS = re.compile(
     r"training_layout|project_name|setup_mode|task|source_table_name|record_key_columns"
-    r"|input_columns|target_column|branch_count|monitoring_catalog|monitoring_schema"
+    r"|input_columns|target_column|branch_count|monitoring|monitoring_schema"
     r"|label_table_name|label_available_at_column"
     r"|source_layout|score_source_table_name|include_source_sql|initial_scoring"
     r"|branch_[1-8]_(?:task|target_column|input_columns)"

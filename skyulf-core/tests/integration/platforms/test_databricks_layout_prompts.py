@@ -34,7 +34,7 @@ SHARED_FIELDS = {
     "syst_view_group",
     "prod_view_group",
     "personal_development_targets",
-    "monitoring_catalog",
+    "monitoring",
     "monitoring_schema",
     "monitoring_dashboard",
     "rescore_when_history_expires",
@@ -269,8 +269,7 @@ def test_prediction_delivery_controls_only_batch_and_endpoint_prompts(delivery, 
     assert visible & endpoint_fields == (set() if delivery == "batch" else endpoint_fields)
     retained = {
         "score_source_table_name",
-        "monitoring_catalog",
-        "monitoring_schema",
+        "monitoring",
         "label_table_name",
         "label_available_at_column",
         "performance_policy_mode",

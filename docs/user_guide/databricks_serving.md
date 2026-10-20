@@ -120,11 +120,14 @@ databricks bundle run serving_endpoint -t test --profile YOUR_PROFILE --params m
 ```
 
 - **Automatic:** completed champion initialization, promotion or rollback,
-  including daily-rollout promotion, submits a separate serving run in production
-  Bundle mode. Pending/rejected/unchanged candidates do not. The receipt pins the
+  including daily-rollout promotion, submits a separate serving run in every
+  target. Personal development targets do too: their endpoint and SQL function
+  names carry the per-user resource suffix, so each developer gets their own
+  endpoint and never changes a shared one. They need `cost_tag_value` like any
+  target. Pending/rejected/unchanged candidates do not. The receipt pins the
   numeric version; submission retries are idempotent.
-- **Manual:** personal development targets, `follow_champion: false`, or champion changes
-  made outside the template. Batch `follow_champion` in `config/inference.yml` is independent when `both` is selected.
+- **Manual:** `follow_champion: false`, or champion changes made outside the
+  template. Batch `follow_champion` in `config/inference.yml` is independent when `both` is selected.
 - **Check the child run:** training waits only for submission and retains its
   timeout. Open the returned serving run ID and inspect `serving_result`.
 

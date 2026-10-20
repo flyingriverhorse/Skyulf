@@ -32,13 +32,14 @@ No separate monitoring template or setup Bundle is required. The first activatio
 scoring registration or scheduled monitoring run bootstraps missing objects.
 Initialize before validating the dashboard SQL, because its queries need the views.
 
-Dashboards are set per shared target in `deployment/dashboards.yml`. Each workspace
+Dashboards are set per shared target in `deployment/monitoring.yml`. Each workspace
 has its own dashboard and SQL warehouse, so `test`, `syst` and `prod` are configured
 separately; leave a target out for no dashboard. A configured target adds two tasks
 after `evaluate_retraining` in the monitoring job: `dashboard_refresh_enabled` checks
 that `monitoring_enabled` is `"true"`, then `refresh_monitoring_dashboard` refreshes.
 Existing schedules, policies and compute are unchanged, and no email subscription is
-created. Development targets have no dashboard block, so they never refresh. For a dashboard published without shared
+created. Development targets have no dashboard block unless development monitoring is on; then
+`test_development` can create its own dashboard over the development store. For a dashboard published without shared
 data permissions, the job's Run as identity needs access to its data and warehouse.
 See the [Databricks dashboard task documentation](https://docs.databricks.com/aws/en/jobs/tasks/dashboard).
 
@@ -52,7 +53,7 @@ For each target choose one:
 
 ### How the refresh task is added
 
-`deployment/dashboards.yml` does not define a second job. `resources/monitoring.job.yml`
+`deployment/monitoring.yml` does not define a second job. `resources/monitoring.job.yml`
 defines the `monitoring` job for every target, and a target block repeats only its
 name with two extra tasks:
 
@@ -66,7 +67,7 @@ resources:
         - task_key: monitoring_report
         - task_key: evaluate_retraining
 
-# deployment/dashboards.yml (only the test target)
+# deployment/monitoring.yml (only the test target)
 targets:
   test:
     resources:
@@ -124,7 +125,7 @@ retraining job. No separate monitoring Bundle is required.
 
 ## The command
 
-After editing `deployment/dashboards.yml` for a target, validate and deploy it:
+After editing `deployment/monitoring.yml` for a target, validate and deploy it:
 
 ```powershell
 databricks bundle validate --strict -t test --profile <profile>
