@@ -30,7 +30,11 @@ def validate_output_head(head: Any) -> None:
     identity, version = head["table_id"], head["version"]
     if identity is None and version is None:
         return
-    if type(identity) is not str or not 0 < len(identity) <= 256:
+    if identity is None:
+        raise ValueError("Invalid feature publication table identity.")
+    if type(identity) is not str:
+        raise ValueError("Invalid feature publication table identity.")
+    if not 0 < len(identity) <= 256:
         raise ValueError("Invalid feature publication table identity.")
     if type(version) is not int or version < 0:
         raise ValueError("Invalid feature publication output version.")

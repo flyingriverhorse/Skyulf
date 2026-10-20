@@ -5,11 +5,11 @@ import json
 import math
 import pickle
 import re
-from contextlib import suppress
+from contextlib import AbstractContextManager, suppress
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -319,7 +319,9 @@ class Predictor:
     def _features(self, frame: pd.DataFrame) -> tuple[pd.DataFrame, list[int], list]:
         """Return model features, their input positions and a reason for each excluded row."""
         engineer = self.state["feature_engineer"]
-        with config_context(transform_output="pandas"):
+        # sklearn exposes this generator-based context manager without a return
+        # annotation; state its documented protocol at the package boundary.
+        with cast(AbstractContextManager[None], config_context(transform_output="pandas")):
             if not self.has_exclusions():
                 features = engineer.transform(frame, preserve_rows=True)
                 return self._model_features(features), list(range(len(frame))), [None] * len(frame)
