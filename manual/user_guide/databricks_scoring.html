@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -6026,15 +6082,15 @@ output or a new output provisioned by the workflow.</p>
 this complete local-scoring example. Replace version <code>1</code> with the concrete
 version you inspected in training evidence:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<span class="nt">inference_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
+<span class="nt">batch_compute</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">single_node</span>
 <span class="nt">initial_scoring</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full_snapshot</span>
 <span class="nt">score_source_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">workspace.demo.customer_score</span>
 <span class="nt">prediction_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{output_schema}.customer_scores{resource_suffix}"</span>
 <span class="nt">score_model_selection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pinned_version</span>
 <span class="nt">model_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1"</span>
-<span class="nt">model_change_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incremental_append</span>
-<span class="nt">auto_rebuild_on_cdf_expiry</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-<span class="nt">score_handoff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">disabled</span>
+<span class="nt">on_model_change</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">score_new_rows</span>
+<span class="nt">rescore_when_history_expires</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">follow_champion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div>
 <p><code>local</code> means bounded whole-frame prediction, including on Databricks compute.
 It is not a choice of workstation versus cloud. <code>max_rows</code> and <code>max_input_mb</code>
@@ -6111,7 +6167,7 @@ scoring. It does not change training selection or serving endpoint requests.</p>
 <td>Scores those 100 rows. The 50,000 old rows remain excluded.</td>
 </tr>
 <tr>
-<td>Model changes with <code>full_rebuild</code></td>
+<td>Model changes with <code>rescore_all</code></td>
 <td>Current source snapshot</td>
 <td>Recomputes eligible rows added after version 12; keeps the original exclusion boundary.</td>
 </tr>
@@ -6435,9 +6491,9 @@ projects.</p>
 <td>Companion-file format; distinct from deployed workflow_contract.</td>
 </tr>
 <tr>
-<td><code>inference_mode</code></td>
-<td>String <code>local</code></td>
-<td>local or spark; selects whole-frame or admitted distributed batch inference.</td>
+<td><code>batch_compute</code></td>
+<td>String <code>single_node</code></td>
+<td>single_node or spark; selects whole-frame or admitted distributed batch scoring.</td>
 </tr>
 <tr>
 <td><code>score_source_table</code></td>
@@ -6460,19 +6516,19 @@ projects.</p>
 <td>Required concrete pin for pinned single-model selection; replace with an inspected version.</td>
 </tr>
 <tr>
-<td><code>model_change_mode</code></td>
-<td>String <code>incremental_append</code></td>
-<td>incremental_append or full_rebuild; controls behavior when model/set selection changes.</td>
+<td><code>on_model_change</code></td>
+<td>String <code>score_new_rows</code></td>
+<td>score_new_rows or rescore_all; controls behavior when model/set selection changes.</td>
 </tr>
 <tr>
-<td><code>auto_rebuild_on_cdf_expiry</code></td>
+<td><code>rescore_when_history_expires</code></td>
 <td>Boolean <code>false</code></td>
 <td>Opt into the matching deployed recovery graph for recognized expiry only.</td>
 </tr>
 <tr>
-<td><code>score_handoff</code></td>
-<td>String <code>disabled</code></td>
-<td>disabled or after_alias_change; must match deployed graph parameters.</td>
+<td><code>follow_champion</code></td>
+<td>Boolean <code>false</code></td>
+<td>true or false; must match deployed graph parameters.</td>
 </tr>
 <tr>
 <td><code>spark_udf_env_manager</code></td>
@@ -6523,13 +6579,13 @@ receipt. The workflow rejects those changes rather than guessing a watermark.</p
 </tr>
 <tr>
 <td>Selected model version changes</td>
-<td><code>incremental_append</code> leaves old predictions intact and uses the selected version for new inserts.</td>
-<td><code>model_change_mode: full_rebuild</code> starts a versioned generation, preserving the initial scoring boundary.</td>
+<td><code>score_new_rows</code> leaves old predictions intact and uses the selected version for new inserts.</td>
+<td><code>on_model_change: rescore_all</code> starts a versioned generation, preserving the initial scoring boundary.</td>
 </tr>
 <tr>
 <td>Readable source UPDATE/DELETE</td>
 <td>Ordinary single-model/competition insert scorer rejects it; model sets also default to reject.</td>
-<td>Model sets alone support <code>model_set.source_change_policy: rebuild_on_change</code>.</td>
+<td>Model sets alone support <code>model_set.on_source_change: rescore_all</code>.</td>
 </tr>
 <tr>
 <td>Required CDF history expired</td>
@@ -6538,10 +6594,10 @@ receipt. The workflow rejects those changes rather than guessing a watermark.</p
 </tr>
 </tbody>
 </table>
-<p>In incremental_append, one target can contain predictions from several model
+<p>With score_new_rows, one target can contain predictions from several model
 versions. Use stored provenance when comparing rows. Merely choosing a different
 version with no new source rows does not rescore the old population.</p>
-<p>In full_rebuild, the logical prediction name is a managed view over a physical
+<p>With rescore_all, the logical prediction name is a managed view over a physical
 <code>&lt;prediction_table&gt;_v&lt;version&gt;</code> generation. A new version scores the eligible
 snapshot and switches the view after successful publication; older generation
 tables remain. Repeated runs for that generation can continue incrementally.
@@ -6559,14 +6615,14 @@ updates in the current generation.</p>
 <p>For a multi_target project, merge this <strong>fragment</strong> into its existing model_set
 mapping, keeping its registered set and destination settings:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">model_set</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">source_change_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rebuild_on_change</span>
+<span class="w">  </span><span class="nt">on_source_change</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rescore_all</span>
 </code></pre></div>
 <p>When CDF contains UPDATE/DELETE, that policy rebuilds the eligible current source
 with the selected set, preserving any <code>from_now</code> boundary. Deleted observations disappear and corrected values,
 business outputs and temporal history are recomputed. Even if append mode had
 mixed earlier versions, the source-triggered rebuild uses the selected set for
 all eligible rows. It does not retrain. The selected local snapshot must fit row/byte
-limits. Do not add source_change_policy at the top level or to a single-model
+limits. Do not add on_source_change at the top level or to a single-model
 project expecting the same behavior.</p>
 <h2 id="model-set-outputs-and-business-views">Model-set outputs and business views</h2>
 <p>A multi_target score loads one saved set with its component versions. Component rules run first;
@@ -6575,7 +6631,7 @@ chooses <code>all</code>, <code>combined_only</code> or <code>separate_views</co
 <a href="databricks_model_sets.html#choose-the-output-mode">model set guide</a> owns the modes, view names and
 combined rules.</p>
 <h2 id="recover-recognized-cdf-expiry">Recover recognized CDF expiry</h2>
-<p><code>auto_rebuild_on_cdf_expiry: true</code> is opt-in and changes the generated task graph.
+<p><code>rescore_when_history_expires: true</code> is opt-in and changes the generated task graph.
 Generate/deploy a matching project with recovery enabled; changing inference.yml
 alone is rejected because deployed_auto_rebuild_on_cdf_expiry in the job must
 agree in both job definitions. Leave recovery disabled until those tasks are
@@ -6602,7 +6658,7 @@ so keep capacity limits appropriate. It does not retrain or change aliases.
 If scoring fails after a successful promotion, repair/retry scoring separately;
 do not rerun a lifecycle action whose alias effects may already have committed.</p>
 <h2 id="schedules-handoff-and-execution-engines">Schedules, handoff and execution engines</h2>
-<p><code>score_handoff: disabled</code> is the default. after_alias_change starts the score
+<p><code>follow_champion: false</code> is the default. <code>true</code> starts the score
 job after successful champion initialization/promotion/rollback. Pending review,
 failed quality gates and rejection do not trigger it. It is a deploy-time setting,
 not a Run now parameter. To change it, edit inference.yml and the matching
@@ -6623,15 +6679,15 @@ job serialization is not a lock against unrelated external writers.</p>
 <span id="capacity-and-worker-environment"></span>
 <span id="certified-estimators-and-model-set-composition"></span>
 <span id="results-and-model-set-composition"></span></p>
-<p>Without <code>inference_mode</code>, scoring is whole-frame (<code>local</code>). With
-<code>inference_mode: spark</code>, the Bundle uses <code>mlflow.pyfunc.spark_udf</code> to apply the
+<p>Without <code>batch_compute</code>, scoring is whole-frame (<code>single_node</code>). With
+<code>batch_compute: spark</code>, the Bundle uses <code>mlflow.pyfunc.spark_udf</code> to apply the
 saved preprocessing and model to pandas batches on Spark workers; it does not
 turn fitting or tuning into distributed training. Admission checks the exact
 fitted artifact, and a package logged without a certificate cannot use Spark.
 <a href="databricks_spark_scoring.html">Score on Spark workers</a> covers worker
 configuration, the support table, capacity and results.</p>
 <h2 id="training-without-publishing-a-prediction-table">Training without publishing a prediction table</h2>
-<p>The generated <code>train</code> and <code>score</code> jobs are separate. Set <code>score_handoff: disabled</code>
+<p>The generated <code>train</code> and <code>score</code> jobs are separate. Set <code>follow_champion: false</code>
 in <code>config/inference.yml</code> to prevent automatic scoring after an alias change.
 Choose <code>scoring_mode: manual</code> during initialization to omit a score schedule.
 For an existing project, also update matching <code>deployed_score_handoff</code> parameters
@@ -6671,7 +6727,7 @@ can consume predictions without publishing a Delta prediction table.</p>
 </tr>
 <tr>
 <td>UPDATE/DELETE causes failure</td>
-<td>Review source correction policy; model-set rebuild_on_change is not a single-model option.</td>
+<td>Review source correction policy; model-set <code>on_source_change: rescore_all</code> is not a single-model option.</td>
 </tr>
 <tr>
 <td>Source is unchanged but a different model was selected</td>

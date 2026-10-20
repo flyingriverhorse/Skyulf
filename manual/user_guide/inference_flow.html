@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5864,7 +5920,7 @@ distributed input. Install the model's recorded dependencies in each process tha
     B --&gt; C["score_pipeline or predict_local: one Python process"]
     B --&gt; D["predict_spark: native_features"]
     B --&gt; E["predict_spark: python_pipeline"]
-    B --&gt; F["Bundle inference_mode: spark"]
+    B --&gt; F["Bundle batch_compute: spark"]
     D --&gt; G["Spark workers: model on batches"]
     E --&gt; G
     F --&gt; G</code></pre>
@@ -5997,9 +6053,9 @@ infer from numeric values whether a column has already been scaled.</p>
 <td><code>pandas</code> or <code>polars</code>; a fitted artifact records its training engine</td>
 </tr>
 <tr>
-<td>Bundle/SDK <code>inference_mode</code></td>
+<td>Bundle <code>batch_compute</code> / SDK <code>inference_mode</code></td>
 <td>Whole-frame scoring or certified distributed prediction</td>
-<td><code>local</code> or <code>spark</code>; the certified Spark route requires pandas</td>
+<td>Bundle <code>single_node</code> or <code>spark</code> (SDK <code>local</code> or <code>spark</code>); the certified Spark route requires pandas</td>
 </tr>
 <tr>
 <td>Portable runner <code>mode</code></td>
@@ -6144,7 +6200,7 @@ the execution adapter's fitted-state checks are separate requirements.</p>
 </tr>
 <tr>
 <td>Certified fitted pandas model on Spark</td>
-<td>Bundle <code>inference_mode="spark"</code></td>
+<td>Bundle <code>batch_compute: spark</code></td>
 <td>Exact fitted recipe, model and worker environment must pass admission</td>
 </tr>
 </tbody>

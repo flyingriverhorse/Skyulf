@@ -2239,6 +2239,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5941,7 +5997,7 @@ calls <code>apply</code> with the information saved during training.</p>
 </tr>
 <tr>
 <td>When does it run?</td>
-<td>After training, only when you turn it on, for example with <code>preprocessing_probe: true</code>.</td>
+<td>After training, only when you turn it on, for example with <code>save_preprocessing_diagnostics: true</code>.</td>
 </tr>
 <tr>
 <td>What does it not do?</td>
@@ -6271,7 +6327,7 @@ segment means and categories remain the ones from <code>training</code>.</p>
 <h3 id="optional-training-report">Optional training report</h3>
 <p>In generated <code>config/training.yml</code>, enable the diagnostic explicitly:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">defaults</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">preprocessing_probe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">save_preprocessing_diagnostics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>The default is <code>false</code>. Single-model, competition and multi-target training use the same saved-model
 check. Each fit checks its saved and reloaded artifact using at most the first 256 holdout input

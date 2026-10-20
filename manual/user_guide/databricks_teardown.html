@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5880,7 +5936,7 @@ confirmation. Read the list before you confirm. Repeat per target; destroying
 <td><code>resources/*.job.yml</code></td>
 </tr>
 <tr>
-<td>Optional jobs <code>online_serving_setup</code>, <code>online_publication</code>, <code>daily_rollout</code></td>
+<td>Optional jobs <code>online_feature_lookup_setup</code>, <code>online_publication</code>, <code>daily_rollout</code></td>
 <td>Present when selected at setup</td>
 </tr>
 <tr>
@@ -5888,12 +5944,12 @@ confirmation. Read the list before you confirm. Repeat per target; destroying
 <td><code>resources/features.job.yml</code>, when created by <code>refresh_feature_graph.py</code></td>
 </tr>
 <tr>
-<td>The dashboard refresh tasks</td>
-<td><code>resources/monitoring_dashboard.job.yml</code>, part of the monitoring job</td>
+<td>The dashboard refresh task</td>
+<td>A target's block in <code>deployment/monitoring.yml</code>, part of the monitoring job</td>
 </tr>
 <tr>
 <td>The shared monitoring dashboard</td>
-<td>Only in the owner target, when <code>resources/monitoring.dashboard.yml</code> was created with <code>--create-dashboard</code></td>
+<td>Only in a target whose <code>deployment/monitoring.yml</code> block uses <code>create</code></td>
 </tr>
 <tr>
 <td>Job permissions managed by the Bundle</td>
@@ -5948,7 +6004,7 @@ those runs no longer open.</p>
 </tr>
 <tr>
 <td>Serving endpoints and UC SQL functions</td>
-<td>Created by the SDK or the <code>online_serving_setup</code> job, not by the Bundle</td>
+<td>Created by the SDK or the <code>online_feature_lookup_setup</code> job, not by the Bundle</td>
 </tr>
 <tr>
 <td>Online stores, online tables and publication pipelines</td>

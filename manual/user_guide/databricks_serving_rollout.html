@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -6060,7 +6116,27 @@ not repeat creation after a timeout without inspecting the endpoint first.</p>
 quality settings from the challenger's saved training result. The approval
 settings below are examples; their metric, threshold and improvement must match
 that saved comparison.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">mlflow.tracking</span><span class="w"> </span><span class="kn">import</span> <span class="n">MlflowClient</span>
+<p>Set the traffic step and timing in your generated project's <code>config/serving.yml</code>
+<strong>before initialization</strong>, then read that same file in the initialization cell:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">rollout</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Keep the other generated rollout fields.</span>
+<span class="w">  </span><span class="nt">traffic_step_percent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">  </span><span class="nt">stage_minimum_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24.0</span>
+<span class="w">  </span><span class="nt">evidence_max_age_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24.0</span>
+</code></pre></div>
+<p><code>traffic_step_percent</code> is an integer from 1 to 100; both hour values must be
+positive and finite. <code>stage_minimum_hours</code> applies to every stage, including
+the final 100% stage. <code>evidence_max_age_hours</code> limits how old the observation
+and its window end may be; it is independent of the stage's length. For an
+isolated test, <code>stage_minimum_hours: 0.1</code> means six minutes; keep the 24-hour
+default for normal use. Shorter stages still require enough requests and
+request-keyed labels under <code>health</code>. They do not change the daily job schedule:
+invoke the job manually after each test interval or adjust its schedule while
+preserving one writer. Each invocation advances at most one step.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mlflow.tracking</span><span class="w"> </span><span class="kn">import</span> <span class="n">MlflowClient</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">SingleWriterAdmission</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.serving</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">DailyRolloutPolicy</span><span class="p">,</span>
@@ -6087,15 +6163,14 @@ that saved comparison.</p>
 <span class="n">experiment_id</span> <span class="o">=</span> <span class="s2">"REPLACE_WITH_EXISTING_EXPERIMENT_ID"</span>
 <span class="n">run</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create_run</span><span class="p">(</span><span class="n">experiment_id</span><span class="p">)</span>
 <span class="n">store</span> <span class="o">=</span> <span class="n">MLflowRolloutStore</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">run</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">run_id</span><span class="p">)</span>
+<span class="c1"># Use the deployed file's absolute /Workspace/.../config/serving.yml path.</span>
+<span class="n">serving_config_path</span> <span class="o">=</span> <span class="s2">"/Workspace/REPLACE_WITH_PROJECT_PATH/config/serving.yml"</span>
+<span class="n">rollout_settings</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">serving_config_path</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())[</span><span class="s2">"rollout"</span><span class="p">]</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">initialize_rollout</span><span class="p">(</span>
     <span class="n">workspace</span><span class="p">,</span>
     <span class="n">plan</span><span class="p">,</span>
     <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span>
-    <span class="n">policy</span><span class="o">=</span><span class="n">DailyRolloutPolicy</span><span class="p">(</span>
-        <span class="n">increment_percentage</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-        <span class="n">minimum_stage_hours</span><span class="o">=</span><span class="mf">24.0</span><span class="p">,</span>
-        <span class="n">evidence_max_age_hours</span><span class="o">=</span><span class="mf">24.0</span><span class="p">,</span>
-    <span class="p">),</span>
+    <span class="n">policy</span><span class="o">=</span><span class="n">DailyRolloutPolicy</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">rollout_settings</span><span class="p">),</span>
     <span class="n">admission</span><span class="o">=</span><span class="n">SingleWriterAdmission</span><span class="p">(),</span>
     <span class="n">rollout_id</span><span class="o">=</span><span class="n">run</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">run_id</span><span class="p">,</span>
     <span class="n">promotion</span><span class="o">=</span><span class="n">promotion</span><span class="p">,</span>
@@ -6103,6 +6178,11 @@ that saved comparison.</p>
 <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"rollout run_id:"</span><span class="p">,</span> <span class="n">run</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">run_id</span><span class="p">)</span>
 </code></pre></div>
+<p>The job checks these YAML values against the saved policy before reconciling
+the endpoint. To change a policy, initialize a new rollout on a settled 100/0
+endpoint and configure its new <code>run_id</code>; editing YAML alone cannot shorten an
+active rollout. Missing timing fields use the 10-point/24-hour defaults. For an
+older run initialized with custom SDK values, add matching fields to its YAML.</p>
 <p><code>SingleWriterAdmission</code> is an explicit ownership contract, not a distributed
 lock. Restrict endpoint and alias mutation permissions to the controller's
 identity, serialize all its writers, and keep <code>max_concurrent_runs: 1</code>. Another
@@ -6141,6 +6221,9 @@ required approval, endpoint and monitoring identities:</p>
 <span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">  </span><span class="nt">exclusive_writer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">  </span><span class="nt">run_id</span><span class="p">:</span><span class="w"> </span><span class="s">"COPY_THE_INITIALIZED_ROLLOUT_RUN_ID"</span>
+<span class="w">  </span><span class="nt">traffic_step_percent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">  </span><span class="nt">stage_minimum_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24.0</span>
+<span class="w">  </span><span class="nt">evidence_max_age_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24.0</span>
 <span class="w">  </span><span class="nt">comparison_sha256</span><span class="p">:</span><span class="w"> </span><span class="s">"COPY_THE_SAVED_COMPARISON_DIGEST"</span>
 <span class="w">  </span><span class="nt">smoke_records</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">income</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42000.0</span>
@@ -6153,9 +6236,9 @@ required approval, endpoint and monitoring identities:</p>
 <span class="w">    </span><span class="nt">minimum_label_coverage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.8</span>
 </code></pre></div>
 <p>Replace the smoke fields with the actual request schema; an online feature
-model may require keys and additional source fields instead. Stage size and
-duration belong to the saved <code>DailyRolloutPolicy</code> initialized above, while these
-health thresholds configure the job's observation. Preserve both deliberately.</p>
+model may require keys and additional source fields instead. The three policy
+fields must match initialization; the health thresholds configure the job's
+observation. Preserve both deliberately.</p>
 <p>From the configured generated project:</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">test</span> <span class="p">-</span><span class="n">-profile</span> <span class="n">YOUR_PROFILE</span>
 <span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">test</span> <span class="p">-</span><span class="n">-profile</span> <span class="n">YOUR_PROFILE</span>
@@ -6299,12 +6382,57 @@ After a timeout or interruption, rerun the job to reconcile that request. A
 reconciliation run does not immediately apply another traffic increase. The
 stage clock advances only after the expected endpoint revision and routes are
 verified.</p>
-<p>If the request remains <code>PREPARED</code> while the endpoint still shows its old
-configuration, the controller holds. It cannot tell whether an uncertain request
-will still apply. Inspect the recorded intent and native endpoint operation
-before resolving the rollout; do not edit receipt tags or blindly resend the
-request. An unexpected endpoint ID, revision, model or routing setting stops
-automation rather than overwriting another writer's change.</p>
+<p>New <code>PREPARED</code> receipts distinguish two submission states:</p>
+<table>
+<thead>
+<tr>
+<th><code>request.submission_state</code></th>
+<th>Recovery on the next invocation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NOT_SUBMITTED</code></td>
+<td>Revalidate the endpoint and send the saved request once.</td>
+</tr>
+<tr>
+<td><code>OUTCOME_UNKNOWN</code>, or absent in an older receipt</td>
+<td>Inspect the endpoint without resending. Commit the receipt only when the exact target revision, model pair and routes are ready.</td>
+</tr>
+</tbody>
+</table>
+<p>The controller persists <code>OUTCOME_UNKNOWN</code> immediately before sending the
+request. A crash between those operations is therefore ambiguous even if the
+endpoint still has its old configuration. Repeated invocations hold that
+receipt; elapsed time alone does not prove that an update cannot still apply.</p>
+<p>Inspect the saved intent and endpoint using the same clients and store as
+initialization:</p>
+<div class="highlight"><pre><span></span><code><span class="n">receipt</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<span class="n">request</span> <span class="o">=</span> <span class="n">receipt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"request"</span><span class="p">,</span> <span class="p">{})</span>
+<span class="n">endpoint</span> <span class="o">=</span> <span class="n">workspace</span><span class="o">.</span><span class="n">api_client</span><span class="o">.</span><span class="n">do</span><span class="p">(</span>
+    <span class="s2">"GET"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"/api/2.0/serving-endpoints/</span><span class="si">{</span><span class="n">receipt</span><span class="p">[</span><span class="s1">'state'</span><span class="p">][</span><span class="s1">'endpoint_name'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">({</span>
+    <span class="s2">"receipt_status"</span><span class="p">:</span> <span class="n">receipt</span><span class="p">[</span><span class="s2">"status"</span><span class="p">],</span>
+    <span class="s2">"submission_state"</span><span class="p">:</span> <span class="n">request</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"submission_state"</span><span class="p">,</span> <span class="s2">"OUTCOME_UNKNOWN"</span><span class="p">),</span>
+    <span class="s2">"prior_revision"</span><span class="p">:</span> <span class="n">request</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"prior_config_version"</span><span class="p">),</span>
+    <span class="s2">"target_revision"</span><span class="p">:</span> <span class="n">request</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_config_version"</span><span class="p">),</span>
+    <span class="s2">"current_revision"</span><span class="p">:</span> <span class="n">endpoint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"config"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"config_version"</span><span class="p">),</span>
+    <span class="s2">"pending_config"</span><span class="p">:</span> <span class="n">endpoint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"pending_config"</span><span class="p">),</span>
+    <span class="s2">"endpoint_state"</span><span class="p">:</span> <span class="n">endpoint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"state"</span><span class="p">),</span>
+<span class="p">})</span>
+</code></pre></div>
+<p>If the exact requested configuration has settled, rerun <code>daily_rollout</code> to
+reconcile it. A pending update must settle before proceeding. An unexpected
+endpoint ID, revision, model or routing setting stops automation rather than
+overwriting another writer's change.</p>
+<p>There is no force-abort API for an ambiguous receipt. If the request cannot be
+resolved, pause the job, establish exclusive ownership and inspect the native
+endpoint operation with your workspace administrator. Retain the old run as
+evidence. Once no old update can still apply, explicitly restore an admitted,
+ready 100/0 endpoint and initialize a new rollout run using the sequence above;
+update <code>rollout.run_id</code> before resuming. Do not edit receipt artifacts or tags,
+reset the submission marker, or blindly resend an uncertain request.</p>
 <p>Pause the scheduled job to stop further decisions. A verified regression rollback
 is terminal for that rollout; starting again requires a new explicit rollout.
 After a successful promotion, both concrete served entities remain available.

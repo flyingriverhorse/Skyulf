@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5965,12 +6021,12 @@ how to verify them before the first run. The prepared examples create them with 
 </tr>
 <tr>
 <td><code>&lt;prediction_table&gt;_v&lt;version&gt;</code> plus a view under the logical name</td>
-<td>Score job with <code>model_change_mode: full_rebuild</code></td>
+<td>Score job with <code>on_model_change: rescore_all</code></td>
 <td>One physical table per model version; the view always points at the current generation. Older generations remain until you remove them.</td>
 </tr>
 </tbody>
 </table>
-<p>The default <code>incremental_append</code> mode keeps one table and appends new
+<p>The default <code>on_model_change: score_new_rows</code> mode keeps one table and appends new
 predictions. See <a href="databricks_scoring.html">Scoring</a>.</p>
 <h2 id="feature-tables-optional">Feature tables (optional)</h2>
 <p>Projects that use <code>config/features.yml</code> and <code>src/features/groups/</code> also run a
@@ -6174,7 +6230,7 @@ stay in that old store; they are not automatically copied to the new one.</p>
 </tr>
 <tr>
 <td><code>_v&lt;version&gt;</code> prediction generations</td>
-<td>New versions in <code>full_rebuild</code> mode</td>
+<td>New versions in <code>on_model_change: rescore_all</code> mode</td>
 <td>Drop old generations once consumers use the new view.</td>
 </tr>
 </tbody>

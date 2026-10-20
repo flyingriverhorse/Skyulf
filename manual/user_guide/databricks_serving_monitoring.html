@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5846,7 +5902,24 @@
 <p>For REST deployment and typed SQL function/<code>ai_query</code> calls, follow
 <a href="databricks_serving.html">Deploy and call a model</a>. The optional helper uses one concrete registered
 model version and derives SQL input/output types from its inspected package.</p>
-<p>First <a href="databricks_serving.html#the-command">prepare and create a pinned endpoint</a>
+<p>The generated <code>serving_endpoint</code> job automatically enrolls its concrete version
+after successful verification when payload logging is enabled and the target's
+<code>monitoring_enabled</code> variable is <code>"true"</code>. Configure the shared monitoring
+catalog/schema first. For a model set it enrolls every branch;
+updating the endpoint disables its prior registrations while retaining history.
+No separate <code>enroll_serving</code> run is needed for this job. Send requests and run
+the monitoring job to create observations; enrollment itself does not populate
+traffic charts. <code>prediction_delivery: endpoint</code> keeps monitoring without a batch
+score job.</p>
+<p>Set <code>monitoring_enabled: "false"</code> in the target variables to skip automatic
+enrollment while keeping endpoint logging and REST/SQL verification enabled.
+An absent flag also disables enrollment. The serving result reports
+<code>monitoring_disabled</code>; no monitoring namespace, reference or inventory work
+runs, and existing registrations remain unchanged. Only exact <code>"true"</code> and
+<code>"false"</code> values are accepted. When monitoring is enabled but payload logging
+is disabled, the result instead reports <code>logging_disabled</code>.</p>
+<p>For an endpoint created outside that job, first
+<a href="databricks_serving.html#the-command">prepare and create a pinned endpoint</a>
 with full payload capture. Keep its concrete model version, endpoint name and
 payload view together; a registry alias can move independently of requests
 already logged. Endpoint creation, runtime admission and logging-mode selection
@@ -5861,7 +5934,7 @@ runtimes. Keep training/scoring runtime changes separate when their saved
 artifact certificates require the original packaged source.</p>
 <pre class="mermaid"><code>flowchart LR
     A["Pinned endpoint with payload logging"] --&gt; B["Payload view"]
-    B --&gt; C["monitoring job: enroll_serving"]
+    B --&gt; C["Serving job enrollment or manual enroll_serving"]
     C --&gt; D["Scheduled monitoring job: observe"]
     D --&gt; E["Saved serving report"]
     E --&gt; F["Dashboard: Online serving"]</code></pre>
@@ -5887,8 +5960,8 @@ training references, and saves the enrollments to the shared inventory. It does
 not observe, publish an observation reference, or request training in that run.
 Later scheduled <code>monitoring_action=observe</code> runs select active batch and online
 enrollments together and use the existing report, policy and dashboard.</p>
-<p>For two served versions, add a separate entry for each concrete version and
-endpoint. A model-set branch needs its own entry with <code>model_set_name</code>,
+<p>For manually enrolled endpoints with two served versions, add a separate entry
+for each concrete version and endpoint. A model-set branch needs its own entry with <code>model_set_name</code>,
 <code>model_set_version</code> and <code>model_set_branch</code> identifying the parent release and
 output. Labels are provided independently in a Delta table keyed by
 <code>databricks_request_id</code> and zero-based <code>request_row_index</code>, with the actual target
@@ -5898,8 +5971,9 @@ eligible observation; choose <code>mode: report</code> first and make any retrai
 an explicit later decision.</p>
 <p>Keep performance in <code>report</code> mode initially. The inline online policy determines its measured
 verdict; automatic requests also require the deployment gate described in
-<a href="databricks_retraining.html#what-to-edit">guarded retraining</a>. Retraining does not update the
-endpoint.</p>
+<a href="databricks_retraining.html#what-to-edit">guarded retraining</a>. Retraining alone does
+not update an endpoint. After a completed champion change, the independently
+configured serving handoff can submit its update job in production mode.</p>
 <p>To retire or pause one online enrollment, resubmit its complete JSON entry with
 <code>enabled: false</code> using <code>monitoring_action=enroll_serving</code>. Keep the endpoint,
 model/version and parent branch identity unchanged. Disabling does not require
@@ -5956,9 +6030,9 @@ matching the run command below:</p>
 requests do not launch monitoring jobs; observation reads asynchronously delivered
 logs on that schedule. Completed performance windows are revisited according to
 <code>monitoring_revisit_windows</code> so late logs and outcomes can update their evidence.
-If you configured refresh with <code>configure_monitoring_dashboard.py</code>, its native
+If the target has a dashboard in <code>deployment/monitoring.yml</code>, its native
 Dashboard task refreshes the published dashboard after the monitoring flow
-completes, in production mode with monitoring enabled. Without it, new Delta rows alone do not
+completes with monitoring enabled; development targets never refresh. Without it, new Delta rows alone do not
 invalidate the dashboard's cached view.
 <code>sampling_fraction: 1.0</code> requests full payload capture, but it does not make
 recorded counts a complete HTTP request count: custom-model 4xx or 5xx errors

@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5859,7 +5915,7 @@ matching Core release/build for your project revision.</p>
 <tr>
 <td>Preprocessing probe</td>
 <td>An optional check that replays the saved preprocessing on up to 256 holdout rows, whole, repeated, in chunks and reversed. It does not refit or block promotion.</td>
-<td>Set <code>preprocessing_probe: true</code>; read <a href="preprocessing_context.html#how-to-read-the-report">preprocessing diagnostics</a>.</td>
+<td>Set <code>save_preprocessing_diagnostics: true</code>; read <a href="preprocessing_context.html#how-to-read-the-report">preprocessing diagnostics</a>.</td>
 </tr>
 <tr>
 <td>Row, group, window and global context</td>
@@ -5935,7 +5991,7 @@ error, see <a href="databricks_troubleshooting.html#a-pre-split-step-reads-the-t
 <tr>
 <td>Change Data Feed (CDF)</td>
 <td>Delta's record of source inserts, updates and deletes over retained versions. Incremental scoring uses it to discover source changes after a saved checkpoint.</td>
-<td>Enable CDF on the configured source upstream. Ordinary single/competition scoring accepts inserts; only model sets expose <code>model_set.source_change_policy</code> in <code>config/inference.yml</code> for readable corrections. Use the documented recovery action if required history expires.</td>
+<td>Enable CDF on the configured source upstream. Ordinary single/competition scoring accepts inserts; only model sets expose <code>model_set.on_source_change</code> in <code>config/inference.yml</code> for readable corrections. Use the documented recovery action if required history expires.</td>
 </tr>
 <tr>
 <td>Full rebuild</td>
@@ -5983,14 +6039,19 @@ error, see <a href="databricks_troubleshooting.html#a-pre-split-step-reads-the-t
 <td>Never edit it by hand. See <a href="databricks_scoring.html#how-new-rows-are-discovered">how new rows are discovered</a>.</td>
 </tr>
 <tr>
-<td><code>score_handoff</code></td>
-<td>Whether a successful champion change starts the score job (<code>after_alias_change</code>) or not (<code>disabled</code>). It is fixed at deployment.</td>
+<td>Batch <code>follow_champion</code></td>
+<td>Whether a successful champion change starts the score job (<code>true</code>) or not (<code>false</code>). It is fixed at deployment.</td>
 <td>Set it in <code>config/inference.yml</code>, then redeploy. See <a href="databricks_lifecycle.html#operator-actions-through-run-now">operator actions</a>.</td>
 </tr>
 <tr>
+<td>Serving <code>follow_champion</code></td>
+<td>Whether a successful champion change starts the serving endpoint job, in shared and personal development targets alike (<code>true</code>) or leaves it to a manual run (<code>false</code>). It is read from YAML at run time.</td>
+<td>Set <code>serving_endpoint.follow_champion</code> in <code>config/serving.yml</code> and deploy the updated file; no job-parameter change is needed. See <a href="databricks_serving.html#run-the-bundle-serving-job">the serving job</a>.</td>
+</tr>
+<tr>
 <td>Handoff</td>
-<td>A saved request from one job to another, such as activation requesting scoring or scoring requesting monitoring. It carries concrete evidence rather than leaving the child to guess the current alias.</td>
-<td>Set <code>score_handoff</code> in <code>config/inference.yml</code>; follow the native child job in the run graph.</td>
+<td>A saved request from one job to another, such as activation requesting scoring or serving, or scoring requesting monitoring. It carries concrete evidence rather than leaving the child to guess the current alias.</td>
+<td>Set the relevant <code>follow_champion</code> in <code>config/inference.yml</code> or <code>config/serving.yml</code>; follow the native child job in the run graph.</td>
 </tr>
 </tbody>
 </table>
@@ -6074,7 +6135,7 @@ and <a href="databricks_training_config.html#quality-weights-and-bounded-reports
 <tr>
 <td>Inference mode</td>
 <td>The route that applies a saved model, such as local scoring or the supported Spark UDF route. Spark inference does not turn training into Spark-native fitting.</td>
-<td>Set <code>inference_mode</code> and Spark UDF options in <code>config/inference.yml</code>; verify the selected artifact's support boundary.</td>
+<td>Set <code>batch_compute</code> and Spark UDF options in <code>config/inference.yml</code>; verify the selected artifact's support boundary.</td>
 </tr>
 <tr>
 <td>Admission / certified package</td>
@@ -6088,7 +6149,7 @@ and <a href="databricks_training_config.html#quality-weights-and-bounded-reports
 </tr>
 <tr>
 <td>Production-mode target</td>
-<td>The shared <code>test</code>, <code>syst</code> and <code>prod</code> targets. Only they enroll models in monitoring; personal development targets skip it.</td>
+<td>The shared <code>test</code>, <code>syst</code> and <code>prod</code> targets. Only they enroll models in the shared monitoring store; development targets can opt in to their own separate store.</td>
 <td>Select the target with <code>-t</code>. See <a href="databricks_deployment.html">deployment</a>.</td>
 </tr>
 <tr>
@@ -6099,7 +6160,7 @@ and <a href="databricks_training_config.html#quality-weights-and-bounded-reports
 <tr>
 <td>Dashboard refresh</td>
 <td>Rerunning the dashboard's published datasets over saved monitoring evidence. It neither computes a new observation nor retrains the model.</td>
-<td>Configure the native refresh task with <code>src/tools/configure_monitoring_dashboard.py</code>; inspect the monitoring job separately.</td>
+<td>Configure the native refresh task per target in <code>deployment/monitoring.yml</code>; inspect the monitoring job separately.</td>
 </tr>
 <tr>
 <td>Drift</td>

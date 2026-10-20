@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -3451,6 +3507,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-core-with-model-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading Core with model sets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrading Core with model sets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#migrating-an-older-decimal-input-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrating an older DECIMAL input contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -5940,7 +6024,7 @@ existing set. Packaging changed rules creates a new set candidate.</p>
     E --&gt; F["run_batch_scoring"]
     F --&gt; G["score job: score_models.py"]</code></pre>
 <p><code>train_name</code> stands for each concrete <code>train_&lt;name&gt;</code> task. <code>run_batch_scoring</code>
-starts the score job only when <code>score_handoff</code> requests it after a set alias
+starts the score job only when <code>follow_champion</code> requests it after a set alias
 change. See <a href="databricks_training_reports.html#training-graph-and-notebook-files">training reports</a>
 for the notebook behind each task.</p>
 <h2 id="what-to-edit">What to edit</h2>
@@ -5958,7 +6042,7 @@ inside the training folds and the final holdout stays separate.</p>
 <p>All branches are required. If one fails, the run stops and earlier component
 versions remain available for inspection. MLflow records a parent run and a
 linked child run for each branch. Branches keep <code>promotion_policy=manual_approval</code>
-and <code>score_handoff=disabled</code>; the set has its own promotion policy.</p>
+and <code>follow_champion: false</code>; the set has its own promotion policy.</p>
 <p>Select recipes per branch. Declare named lists under <code>recipes</code> in
 <code>config/preprocessing.yml</code> and <code>config/pre_split.yml</code>. Keep custom factories in
 <code>src/features/preprocessing.py</code> and <code>src/features/pre_split.py</code>:</p>
@@ -6012,9 +6096,9 @@ with a changed model list is rejected before any model is trained.</p>
 <td>Declarative alternative to <code>combined_rules_path</code>; the two cannot coexist.</td>
 </tr>
 <tr>
-<td><code>source_change_policy</code></td>
-<td><code>reject</code></td>
-<td><code>reject</code> or <code>rebuild_on_change</code> for source updates and deletes.</td>
+<td><code>on_source_change</code></td>
+<td><code>stop</code></td>
+<td><code>stop</code> or <code>rescore_all</code> for source updates and deletes.</td>
 </tr>
 <tr>
 <td><code>publication</code></td>
@@ -6223,16 +6307,16 @@ prediction-table writes exclusively.</p>
 <li><strong>Full rebuild</strong> replaces the compatible output table when the selected set
   changes, even without new input. Changes that involve temporal carry history
   require full rebuild.</li>
-<li><strong><code>source_change_policy: rebuild_on_change</code></strong>: when CDF shows an update or
+<li><strong><code>on_source_change: rescore_all</code></strong>: when CDF shows an update or
   delete, the selected set rescores all current rows, recomputes rules and
   resets temporal history. Deleted records disappear. New inserts alone still
   append. The full snapshot must fit the row/byte limits. Receipts record
-  <code>source_change_policy</code>, <code>source_rebuilt</code> and <code>write_mode</code>.</li>
+  the internal <code>source_change_policy</code>, <code>source_rebuilt</code> and <code>write_mode</code>.</li>
 </ul>
-<p>Single-model scoring has no <code>rebuild_on_change</code>; it rejects source updates and
+<p>Single-model scoring has no <code>rescore_all</code> source option; it rejects source updates and
 deletes. See <a href="databricks_scoring.html#source-changes-are-separate-from-model-changes">source changes</a>.</p>
 <h3 id="spark-scoring">Spark scoring</h3>
-<p>With <code>inference_mode: spark</code>, every component must pass Spark admission. Admission runs at
+<p>With <code>batch_compute: spark</code>, every component must pass Spark admission. Admission runs at
 activation (manual approval or automatic promotion) and again at scoring. Independent outputs and
 <code>composition_config</code> with <code>weighted_sum</code>/<code>weighted_mean</code> are admitted. Function rules from
 scoring.yml and legacy Python hooks are admitted when
@@ -6294,6 +6378,41 @@ on. These tags are for display; the saved manifest is the execution authority.</
 <p>The final <code>training_report</code> task (<code>models_report.py</code>) shows <strong>Where to look</strong>,
 the set version, the operator blocks and <strong>Decision details (JSON)</strong>. Score
 results are in the score job's <code>score</code> task.</p>
+<h2 id="upgrading-core-with-model-sets">Upgrading Core with model sets</h2>
+<p>After upgrading Core, retrain the existing set normally. If its champion requires
+an earlier runtime, training retains that champion's concrete component
+versions and checks each new candidate against its saved absolute quality gates.
+The set stays pending; automatic promotion is disabled for this decision.</p>
+<p>Review the component metrics and the filled-in approval command in the training
+report. When every component passes its configured <code>quality_threshold</code> and other
+gates, run that command on the same Bundle target. For example, replacing set
+version <code>4</code> with candidate <code>5</code> on <code>prod</code>:</p>
+<div class="highlight"><pre><span></span><code>databricks<span class="w"> </span>bundle<span class="w"> </span>run<span class="w"> </span>train<span class="w"> </span>-t<span class="w"> </span>prod<span class="w"> </span>--params<span class="w"> </span><span class="nv">lifecycle_action</span><span class="o">=</span>approve,candidate_version<span class="o">=</span><span class="m">5</span>,expected_champion_version<span class="o">=</span><span class="m">4</span>,allow_unloadable_champion<span class="o">=</span><span class="nb">true</span>
+</code></pre></div>
+<p>This explicit approval records that the previous champion could not be compared.
+It rechecks candidate quality and the expected champion before moving the alias.
+Configured score and serving handoffs use the resulting concrete-version receipt.
+Never delete the champion alias to recover from an upgrade. Rollback to a
+pre-upgrade set requires a runtime that can load both sets; the recovery flag
+applies only to approval.</p>
+<h3 id="migrating-an-older-decimal-input-contract">Migrating an older DECIMAL input contract</h3>
+<p>Older models may have recorded a Spark DECIMAL input as <code>object</code> or string. New
+training converts that model value to float64 and records the source conversion.
+If champion comparison reports this schema mismatch, use new registered identities:</p>
+<ol>
+<li>In <code>config/training.yml</code>, give every affected <code>models.&lt;branch&gt;.model_name</code> a new
+   name; for a single model, update its effective <code>model_name</code>.</li>
+<li>For a model set, also change <code>config/inference.yml</code> → <code>model_set.model_name</code>.
+   Renaming only the set leaves its component champions unchanged.</li>
+<li>Train and review the new float64 candidate under the normal quality policy.
+   Keep the old registered versions and their champion records for existing consumers.</li>
+<li>Validate the new model's batch output and serving requests before switching
+   destinations. Use a separate prediction table and endpoint/SQL function for this
+   check; update <code>config/serving.yml</code> model and destination names deliberately.</li>
+</ol>
+<p><code>allow_unloadable_champion</code> handles incompatible runtime versions only. It does not
+approve a changed input schema. The diagnostic names the affected columns and the
+concrete old champion. See <a href="databricks_training_data.html#spark-decimal-model-values">DECIMAL conversion evidence</a>.</p>
 <h2 id="common-errors-and-fixes">Common errors and fixes</h2>
 <table>
 <thead>
@@ -6316,6 +6435,10 @@ results are in the score job's <code>score</code> task.</p>
 <td>A branch regressed or failed an absolute gate; read the failed components in the report.</td>
 </tr>
 <tr>
+<td>Champion belongs to an earlier Core release</td>
+<td>Retrain, review the pending report, then explicitly approve as described above.</td>
+</tr>
+<tr>
 <td>Changed branch names are rejected</td>
 <td>A replacement needs the same branches and component names; create a new set for a new layout.</td>
 </tr>
@@ -6329,11 +6452,11 @@ results are in the score job's <code>score</code> task.</p>
 </tr>
 <tr>
 <td>Spark admission rejects the set</td>
-<td>Read the named rule and check, then follow <a href="databricks_spark_scoring.html#when-the-probe-fails">When the probe fails</a>; or use <code>inference_mode: local</code>.</td>
+<td>Read the named rule and check, then follow <a href="databricks_spark_scoring.html#when-the-probe-fails">When the probe fails</a>; or use <code>batch_compute: single_node</code>.</td>
 </tr>
 <tr>
 <td>Update or delete fails scoring</td>
-<td>Choose <code>source_change_policy: rebuild_on_change</code> deliberately.</td>
+<td>Choose <code>on_source_change: rescore_all</code> deliberately.</td>
 </tr>
 </tbody>
 </table>

@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5871,7 +5927,7 @@
 
 <h1 id="score-on-spark-workers">Score on Spark workers</h1>
 <p>This page covers distributed scoring for a generated Databricks Bundle:
-<code>inference_mode: spark</code> worker configuration and admission, the table of what
+<code>batch_compute: spark</code> worker configuration and admission, the table of what
 Spark scoring supports, worker capacity and environment settings, and how to
 read results and model-set composition. Read it when a saved model should score
 a Delta source in pandas batches on Spark workers instead of as one whole frame.
@@ -5883,14 +5939,14 @@ can apply that fitted model to a whole frame or distribute admitted pandas
 prediction batches across Spark workers. Distributed inference does not turn
 the estimator's fit or tuning trials into distributed training.</p>
 <pre class="mermaid"><code>flowchart LR
-    A["Pinned Delta source"] --&gt; B{"inference_mode"}
+    A["Pinned Delta source"] --&gt; B{"batch_compute"}
     B --&gt; C["local: whole pandas/Polars frame"]
     B --&gt; D["spark: admitted pandas worker batches"]
     C --&gt; E["Saved preprocessing and model"]
     D --&gt; E
     E --&gt; F["Keyed predictions"]
     F --&gt; G["Guarded Delta publication"]</code></pre>
-<p>Here <code>inference_mode: local</code> means whole-frame scoring, including on Databricks
+<p>Here <code>batch_compute: single_node</code> means whole-frame scoring, including on Databricks
 compute. It is separate from SDK <code>runtime="standalone"</code> versus
 <code>runtime="databricks"</code>, which chooses the integration environment.
 UC Delta publication requires <code>runtime="databricks"</code>. SDK <code>runtime</code> accepts
@@ -5904,14 +5960,14 @@ Monitoring already uses Spark and has no separate engine choice.</p>
 <span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># config/inference.yml</span>
-<span class="nt">inference_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">spark</span>
+<span class="nt">batch_compute</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">spark</span>
 <span class="nt">spark_udf_env_manager</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
 <span class="nt">spark_udf_prediction_batch_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
 </code></pre></div>
 <p>The Bundle uses <code>mlflow.pyfunc.spark_udf</code>; workers receive pandas batches and
 apply saved preprocessing without refitting. Explicit Spark with Polars is
 rejected. The library's <code>predict_spark</code>/<code>mapInPandas</code> API is a separate route.
-Without <code>inference_mode</code>, scoring is whole-frame (<code>local</code>).</p>
+Without <code>batch_compute</code>, scoring is whole-frame (<code>single_node</code>).</p>
 <h3 id="what-spark-scoring-supports">What Spark scoring supports</h3>
 <p>Admission checks the exact fitted artifact, not just its model-family name.
 The setup menus also serve whole-frame projects and therefore offer more
@@ -5970,12 +6026,12 @@ choices than distributed scoring admits.</p>
 </tr>
 <tr>
 <td>Custom/context-dependent code</td>
-<td><code>column_step</code>/<code>fitted_step</code> steps are admitted when training linted and probed them (see below). An <code>inference_context="row"</code> declaration is optional. <code>group</code>, <code>window</code> and <code>global</code> declarations, custom classes from <code>custom_step</code>, unreviewed fitted states and temporal carry history are rejected. A passing <code>preprocessing_probe</code> report alone grants no admission.</td>
+<td><code>column_step</code>/<code>fitted_step</code> steps are admitted when training linted and probed them (see below). An <code>inference_context="row"</code> declaration is optional. <code>group</code>, <code>window</code> and <code>global</code> declarations, custom classes from <code>custom_step</code>, unreviewed fitted states and temporal carry history are rejected. A passing preprocessing diagnostics report (<code>save_preprocessing_diagnostics</code>) alone grants no admission.</td>
 </tr>
 </tbody>
 </table>
 <p>Models packaged with <a href="databricks_features.html">feature lookup</a> require
-<code>inference_mode: spark</code>; whole-frame mode rejects them, including feature-backed
+<code>batch_compute: spark</code>; whole-frame mode rejects them, including feature-backed
 model-set components. They score through the Feature Engineering <code>score_batch</code>
 route. Lookup does not relax the model/preprocessing checks.</p>
 <h3 id="built-in-recipes-and-model-evidence">Built-in recipes and model evidence</h3>
@@ -6110,7 +6166,7 @@ instead of registering a model that would score inconsistently. Typical cases:</
 </ul>
 <p>Spark and online-feature projects run the checks automatically. Endpoint-only
 projects enable the same training check with
-<code>defaults.admit_probed_custom_steps: true</code> in <code>config/training.yml</code>; despite its
+<code>defaults.allow_tested_custom_steps: true</code> in <code>config/training.yml</code>; despite its
 historical name, this setting also seals built-in and model evidence. Train and
 register a new version after enabling it. Editing an old artifact's flag does
 not create evidence.</p>
@@ -6152,7 +6208,7 @@ as <code>df["x"].mean()</code>, would give different answers on each Spark worke
 Training therefore checks your own code before it can run on Spark workers or
 endpoints:</p>
 <ul>
-<li>In a project with <code>inference_mode: spark</code> or <code>online_features</code>, the check runs
+<li>In a project with <code>batch_compute: spark</code> or <code>online_features</code>, the check runs
   automatically whenever the model has a <code>column_step</code>, a <code>fitted_step</code> or
   saved scoring rules. No setting is needed.</li>
 <li>Other projects, for example one that only serves an endpoint from
@@ -6160,7 +6216,7 @@ endpoints:</p>
 </ul>
 <div class="highlight"><pre><span></span><code><span class="c1"># config/training.yml</span>
 <span class="nt">defaults</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">admit_probed_custom_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">allow_tested_custom_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># src/features/preprocessing.py; inference_context="row" is optional</span>
 <span class="n">fitted_step</span><span class="p">(</span><span class="s2">"clip_duration"</span><span class="p">,</span> <span class="n">learn</span><span class="p">,</span> <span class="n">apply</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">"duration"</span><span class="p">)</span>
@@ -6257,7 +6313,7 @@ df['x'].mean()). Compute it in learn() and read it from state in apply() ...
    <code>groups/</code> Spark producer that writes a feature column, or into a pre-split
    step if it only concerns training rows. Otherwise declare
    <code>inference_context="group"</code> or <code>"window"</code> and keep the project on
-   <code>inference_mode: local</code>.</li>
+   <code>batch_compute: single_node</code>.</li>
 <li><strong>Lint false alarm on a per-row call.</strong> Write the row axis explicitly, for
    example <code>df[["a", "b"]].sum(axis=1)</code>. There is no switch to turn the lint
    off, by design.</li>

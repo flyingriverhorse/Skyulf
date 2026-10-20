@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5886,6 +5942,19 @@ is outcome availability, not the prediction time or the job execution time.</p>
 <p>Both need the saved target column and a valid UTC availability timestamp (or an aware ISO timestamp
 string). Eligible label keys must be unique. Actuals must use the saved classification classes or
 finite numeric regression targets.</p>
+<p>For endpoint-only projects, <code>monitoring_label_table</code> is a request-outcomes table:
+<code>databricks_request_id</code> must be a string and <code>request_row_index</code> an integer.
+The endpoint job checks these columns before creating or updating serving resources.
+Keep the request ID returned by serving and the position of each input row when
+recording its eventual outcome. Two requests for the same business record remain
+two observations; Skyulf does not guess that relationship from a customer or transaction ID.</p>
+<p>The table used by <code>training_label_table</code> still joins by the training record keys.
+It can be a different table. If one automatically configured monitoring label table
+serves both batch and endpoint observations, it must satisfy both key contracts.
+For separate outcome tables, enroll the serving monitor with its own request-key
+label table using the <a href="databricks_monitoring_enrollment.html">monitoring enrollment configuration</a>.
+Leave the label table and availability setting empty for operational monitoring
+and drift alone; those measurements do not require actual outcomes.</p>
 <p>For a model set, include the target columns required by each monitored component. Skyulf does not
 discover an arbitrary target source, generate outcomes, or write labels back into the training
 table. <code>source_layout: separate_outcomes</code> also configures a read-only training

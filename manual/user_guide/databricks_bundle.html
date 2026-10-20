@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -6012,6 +6068,11 @@ when the installed release differs. Training fits in one bounded Python process;
 For basic or nested cross-validation, see
 <a href="databricks_tuning.html#cv-nested-cv-and-total-work">CV and total work</a>.</p>
 <h2 id="monitoring-and-serving">Monitoring and serving</h2>
+<p>Detailed setup asks <code>prediction_delivery</code>: <code>batch</code> creates the score job,
+<code>endpoint</code> creates only the serving job, and <code>both</code> creates both. Quick setup
+defaults to <code>batch</code>. All choices keep monitoring. Logged endpoints created by
+the serving job enroll automatically after verification; observations still
+require requests and a monitoring run. See <a href="databricks_serving.html#choose-how-predictions-are-produced">delivery choices and setup</a>.</p>
 <table>
 <thead>
 <tr>

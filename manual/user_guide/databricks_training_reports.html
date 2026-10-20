@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5887,7 +5943,7 @@ Start with the <a href="databricks_bundle_walkthrough.html">training walkthrough
 project. <a href="databricks_lifecycle.html">Lifecycle decisions</a> explain approval,
 rejection and rollback; this page explains the reports that support them.</p>
 <h2 id="what-to-edit">What to edit</h2>
-<p>Set <code>evaluation_charts</code>, <code>explainability</code> and <code>preprocessing_probe</code> under
+<p>Set <code>evaluation_charts</code>, <code>explainability</code> and <code>save_preprocessing_diagnostics</code> under
 <code>defaults</code> or the supported named-model override in <code>config/training.yml</code>.
 The <a href="databricks_training_config.html">field reference</a> lists allowed values.
 Generated optional report tasks and their pinned dependencies must be present:
@@ -6381,7 +6437,7 @@ and preserves split membership without rereading the source. These artifacts
 contain training data: apply the experiment's access and retention policy.
 Registration and approval retain their source/evidence replay checks.</p>
 <h3 id="preprocessing-diagnostics">Preprocessing diagnostics</h3>
-<p>With <code>defaults.preprocessing_probe: true</code>, each fitting run saves
+<p>With <code>defaults.save_preprocessing_diagnostics: true</code>, each fitting run saves
 <code>preprocessing_probe.json</code>; the fitting task's Output (<code>train_and_tune</code> or
 <code>train_&lt;name&gt;</code>) shows the result. The
 <a href="preprocessing_context.html">preprocessing diagnostics guide</a> explains the check

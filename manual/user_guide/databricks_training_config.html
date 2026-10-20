@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -6113,12 +6169,12 @@ answers use the same question name with a <code>branch_N_</code> prefix.</p>
 <td><code>source_table_name</code> plus catalog/input schema</td>
 </tr>
 <tr>
-<td><code>training_version</code></td>
+<td><code>training_table_version</code></td>
 <td>Integer or null</td>
 <td>Omitted/null</td>
 <td>Nonnegative Delta version, including <code>0</code></td>
 <td>Null resolves latest once per invocation; an integer pins that snapshot.</td>
-<td><code>training_version</code></td>
+<td><code>training_table_version</code></td>
 </tr>
 <tr>
 <td><code>training_label_table</code></td>
@@ -6129,7 +6185,7 @@ answers use the same question name with a <code>branch_N_</code> prefix.</p>
 <td><code>source_layout=separate_outcomes</code>, or YAML</td>
 </tr>
 <tr>
-<td><code>training_label_version</code></td>
+<td><code>training_label_table_version</code></td>
 <td>Integer or null</td>
 <td>Omitted/null</td>
 <td>Nonnegative Delta version; requires <code>training_label_table</code></td>
@@ -6605,7 +6661,7 @@ answers use the same question name with a <code>branch_N_</code> prefix.</p>
 <td><code>risk_category</code></td>
 </tr>
 <tr>
-<td><code>preprocessing_probe</code></td>
+<td><code>save_preprocessing_diagnostics</code></td>
 <td>Boolean</td>
 <td><code>false</code></td>
 <td>Explicit opt-in</td>
@@ -6613,9 +6669,9 @@ answers use the same question name with a <code>branch_N_</code> prefix.</p>
 <td>YAML</td>
 </tr>
 <tr>
-<td><code>admit_probed_custom_steps</code></td>
+<td><code>allow_tested_custom_steps</code></td>
 <td>Boolean</td>
-<td><code>false</code>; automatic with <code>inference_mode: spark</code> or <code>online_features</code></td>
+<td><code>false</code>; automatic with <code>batch_compute: spark</code> or <code>online_features</code></td>
 <td>Explicit opt-in for other projects, such as endpoint-only serving</td>
 <td>Seals partition evidence for eligible models, ensembles and built-in preprocessing; also lints and probes <code>column_step</code>/<code>fitted_step</code> steps and saved scoring rules. Checks use 16 to 256 holdout rows. A failing required check stops training before registration. See <a href="databricks_spark_scoring.html#built-in-recipes-and-model-evidence">Built-in evidence</a> and <a href="databricks_spark_scoring.html#admit-your-own-row-steps-opt-in">Custom row steps</a>.</td>
 <td>YAML</td>
@@ -6658,7 +6714,7 @@ answers use the same question name with a <code>branch_N_</code> prefix.</p>
 <td>Omitted/null</td>
 <td>Requires feature_lookup, pandas, non-temporal supported request shape</td>
 <td>Saves required-feature and freshness guards with the model; does not create a store or endpoint.</td>
-<td><code>include_online_serving</code> creates placeholders; complete YAML</td>
+<td><code>include_online_feature_lookup</code> creates placeholders; complete YAML</td>
 </tr>
 </tbody>
 </table>
@@ -6879,8 +6935,8 @@ worker to avoid nested parallel fits.</p>
 </tr>
 <tr>
 <td>explainability</td>
-<td>Required <code>method: shap</code>; max_samples 100 (1..200), max_features 30 (1..100), max_display_samples min(10,max_samples) (0..50 and no larger than max_samples)</td>
-<td>Bounded training explanation and report display.</td>
+<td>Required <code>method: shap</code>; max_samples 100 (1..200), max_features 30 (positive integer, no fixed upper bound), max_display_samples min(10,max_samples) (0..50 and no larger than max_samples)</td>
+<td>Training explanation and report display bounded by the configured budgets.</td>
 </tr>
 <tr>
 <td>evaluation_charts</td>
@@ -6961,7 +7017,7 @@ holdout does not fit them. The absolute RMSE gate is illustrative.</p>
 <span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
 <span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regression</span>
 <span class="w">  </span><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.customer_training"</span>
-<span class="w">  </span><span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">             </span><span class="c1"># Resolve latest once when invoked.</span>
+<span class="w">  </span><span class="nt">training_table_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">             </span><span class="c1"># Resolve latest once when invoked.</span>
 <span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]</span><span class="w">        </span><span class="c1"># Keys and labels are not features.</span>
 <span class="w">  </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue</span>
@@ -7002,7 +7058,7 @@ settings. The winner alone proceeds to final holdout comparison and registration
 <span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
 <span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regression</span>
 <span class="w">  </span><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.customer_training"</span>
-<span class="w">  </span><span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">training_table_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
 <span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue</span>
@@ -7052,7 +7108,7 @@ per target. No branch uses the sibling label as a feature.</p>
 <span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
 <span class="w">  </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regression</span>
 <span class="w">  </span><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.customer_training"</span>
-<span class="w">  </span><span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="w">  </span><span class="nt">training_table_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
 <span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">split_strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">random</span>

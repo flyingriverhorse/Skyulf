@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5918,8 +5974,8 @@ change; it does not invent a leaf if the graph has none.</p>
 </tr>
 <tr>
 <td><code>max_features</code></td>
-<td>1–100; default 30</td>
-<td>Guard on transformed input width. It does <strong>not</strong> select the top features or drop columns; exceeding it produces <code>unavailable</code>.</td>
+<td>Positive integer; default 30; no fixed upper bound</td>
+<td>Guard on transformed input width. It does <strong>not</strong> select the top features or drop columns; exceeding your configured value produces <code>unavailable</code>.</td>
 </tr>
 <tr>
 <td><code>max_display_samples</code></td>
@@ -5931,6 +5987,13 @@ change; it does not invent a leaf if the graph has none.</p>
 <p>Budgets apply per fitted model: eight candidates can each compute an
 explanation. Samples are training inputs transformed with saved preprocessing;
 holdout labels, record keys and time/target metadata are not explanation features.</p>
+<p>Set <code>defaults.explainability.max_features</code> in <code>config/training.yml</code> to cover the
+features produced by preprocessing. For example, four numeric inputs plus 111
+one-hot columns produce 115 model features, so <code>max_features: 115</code> admits that
+model. A value such as <code>200</code> leaves room for a wider fitted model. The setting
+controls the allowed width, not the number of features displayed in a chart.
+Higher values can increase SHAP computation time and memory use; use
+<code>max_samples</code> to choose how many training rows to explain.</p>
 <p>Row-independent steps can preprocess only the sampled rows. Steps that need
 other rows, such as <code>LagFeatures</code> or <code>RollingAggregate</code>, first preprocess the
 complete training population supplied by the training job, then select the SHAP

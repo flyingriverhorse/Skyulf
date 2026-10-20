@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -6057,7 +6113,7 @@ job behavior. Detailed setup asks it; quick setup keeps <code>deployer</code>.</
 <p>Monitoring reuses the scoring identity in separate mode. Arrange its monitoring
 source reads and evidence-store writes explicitly; this does not require model
 ownership. There is no additional monitoring principal to configure.</p>
-<p>The optional <code>online_serving_setup</code>, <code>online_publication</code> and <code>daily_rollout</code>
+<p>The optional <code>online_feature_lookup_setup</code>, <code>online_publication</code> and <code>daily_rollout</code>
 jobs get no <code>run_as</code> override in any mode. They run as the deploying identity,
 even with <code>shared_service_principal</code>. Add a job-level <code>run_as</code> under the target
 in <code>targets.yml</code> if they must run as a service principal.</p>
@@ -6270,7 +6326,7 @@ in <code>resources/score.job.yml</code>. The root <code>databricks.yml</code> in
 <code>resources/*.yml</code>. Each job has its own schedule and compute settings. Training
 calls scoring through <code>${resources.jobs.score.id}</code> when handoff is enabled.
 <code>resources/monitoring.job.yml</code> holds the monitoring job. Optional selections add
-<code>online_serving_setup.job.yml</code>, <code>online_publication.job.yml</code> and
+<code>online_feature_lookup_setup.job.yml</code>, <code>online_publication.job.yml</code> and
 <code>daily_rollout.job.yml</code>; local tools can add <code>features.job.yml</code> and dashboard
 overlays.</p>
 <h3 id="inference-runtime">Inference runtime</h3>
@@ -6289,17 +6345,17 @@ independent Spark/serverless path in every layout.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>inference_mode: local</code></td>
+<td><code>batch_compute: single_node</code></td>
 <td>Local pandas/Polars under row and byte bounds</td>
 <td>Project task environment</td>
 </tr>
 <tr>
-<td><code>inference_mode: spark</code>, serverless</td>
+<td><code>batch_compute: spark</code>, serverless</td>
 <td><code>mlflow.pyfunc.spark_udf</code></td>
 <td><code>local</code>, using the declared environment</td>
 </tr>
 <tr>
-<td><code>inference_mode: spark</code>, policy cluster</td>
+<td><code>batch_compute: spark</code>, policy cluster</td>
 <td><code>mlflow.pyfunc.spark_udf</code></td>
 <td><code>virtualenv</code>, installing the recorded wheel and pins</td>
 </tr>
@@ -6482,7 +6538,7 @@ automatic optimization remains disabled so it cannot add hidden attempts. See
 <a href="https://docs.databricks.com/aws/en/jobs/configure-task">Databricks task retry settings</a>.</p>
 <p>Train and score notebook tasks default to <code>max_retries: 0</code>; their serverless
 tasks also set <code>disable_auto_optimization: true</code>. The optional
-<code>online_serving_setup</code>, <code>online_publication</code> and <code>daily_rollout</code> tasks always use
+<code>online_feature_lookup_setup</code>, <code>online_publication</code> and <code>daily_rollout</code> tasks always use
 <code>max_retries: 0</code> with automatic optimization disabled. Monitoring tasks are the
 exception: they retry once by default through <code>monitoring_max_retries</code>. A
 retried monitoring attempt does not duplicate saved observations, because exact
@@ -6490,7 +6546,7 @@ retries deduplicate. A new training run can register another
 candidate version. Inspect run evidence and registry state before rerunning;
 these guards do not promise exactly-once training. See
 <a href="https://docs.databricks.com/aws/en/jobs/run-serverless-jobs">Databricks serverless retry behavior</a>.</p>
-<p>When <code>auto_rebuild_on_cdf_expiry=true</code> was selected during initialization, the
+<p>When <code>rescore_when_history_expires: true</code> was selected during initialization, the
 same notebook timeout and retry settings also apply to <code>recover_predictions</code>
 and <code>scoring_report</code>. These tasks use the existing score job's identity,
 single-run queue, compute and notifications. The <code>recovery_needed</code> condition

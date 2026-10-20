@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -6069,7 +6125,7 @@ package after the files move.</p>
 <h2 id="changes-to-adopt-from-earlier-releases">Changes to adopt from earlier releases</h2>
 <h3 id="selection-and-promotion-policy-fields">Selection and promotion policy fields</h3>
 <p>Earlier projects used one <code>model_selection_mode</code>. Generated projects use
-<code>score_model_selection</code> and <code>promotion_policy</code> together, plus <code>score_handoff</code>.
+<code>score_model_selection</code> and <code>promotion_policy</code> together, plus <code>follow_champion</code>.
 Remove <code>model_selection_mode</code> when adding the two fields; mixed or partial
 configurations fail before training or scoring. Migrate the configuration, all
 notebook entrypoints and the job graph together; changing only a configuration
@@ -6124,8 +6180,8 @@ the same Core version, and upgrade them together.</p>
 </ul>
 <h3 id="spark-scoring-changes">Spark scoring changes</h3>
 <p>A whole-frame MLflow package logged without a Spark safety certificate cannot
-use <code>inference_mode: spark</code>. Log a new certified version. Configurations without
-<code>inference_mode</code> keep whole-frame scoring.</p>
+use <code>batch_compute: spark</code>. Log a new certified version. Configurations without
+<code>batch_compute</code> keep whole-frame scoring.</p>
 <h3 id="project-layout-and-configuration-files">Project layout and configuration files</h3>
 <ul>
 <li>Projects configured through older Python or JSON files remain readable. Keep one

@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5843,27 +5899,27 @@ The layout shapes the generated train job, so choose it at <code>bundle init</co
 <tbody>
 <tr>
 <td>A scheduled job writing a Delta table within <code>max_rows</code>/<code>max_input_mb</code></td>
-<td><code>score</code> job, <code>inference_mode: local</code> (default)</td>
+<td><code>score</code> job, <code>batch_compute: single_node</code> (default)</td>
 <td><code>taxi_high_fare</code></td>
 <td><a href="databricks_scoring.html">Scoring</a></td>
 </tr>
 <tr>
 <td>A scheduled job on a table too large for one Python process</td>
-<td><code>score</code> job, <code>inference_mode: spark</code></td>
+<td><code>score</code> job, <code>batch_compute: spark</code></td>
 <td><code>taxi_fare</code></td>
 <td><a href="databricks_spark_scoring.html">Spark scoring</a></td>
 </tr>
 <tr>
 <td>An application sending raw feature values</td>
 <td>REST serving endpoint</td>
-<td><code>taxi_fare_robust</code></td>
+<td><code>taxi_fare_endpoint</code></td>
 <td><a href="databricks_serving.html">Serving</a></td>
 </tr>
 <tr>
 <td>SQL users, SQL jobs and dashboards</td>
 <td>SQL function calling the endpoint with <code>ai_query</code></td>
-<td><code>taxi_fare_robust</code></td>
-<td><a href="databricks_serving.html#3-create-the-sql-function">SQL function</a></td>
+<td><code>taxi_fare_endpoint</code></td>
+<td><a href="databricks_serving.html#sql-with-ai_query">SQL function</a></td>
 </tr>
 <tr>
 <td>Requests that send only an entity key</td>
@@ -5875,11 +5931,15 @@ The layout shapes the generated train job, so choose it at <code>bundle init</co
 </table>
 <p>The batch job never calls an endpoint, and an endpoint never writes the
 prediction table. Models packaged with feature lookup score in batch only with
-<code>inference_mode: spark</code>. Runtime and cost per path are compared in
+<code>batch_compute: spark</code>. Runtime and cost per path are compared in
 <a href="databricks_serving.html#choose-how-predictions-are-produced">how predictions are produced</a>.</p>
 <p>For rows excluded by preprocessing at scoring, start with <code>taxi_fare_robust</code>.
 Its Spark and raw-input endpoint examples retain row identity and explain
 <code>excluded</code> status, null predictions and the resulting monitoring coverage.</p>
+<p>For endpoint delivery without a batch prediction table, copy
+<a href="https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint">taxi_fare_endpoint</a>.
+Its serving job follows champion and enrolls the endpoint's telemetry logs for
+monitoring. Its guide includes a SQL request and the <strong>Online serving</strong> dashboard.</p>
 <h2 id="which-steps-run-on-spark-workers-and-endpoints">Which steps run on Spark workers and endpoints?</h2>
 <p>Spark workers and serving endpoints both run the saved pandas pipeline on
 independent batches, so the same admission applies to both.</p>
@@ -5914,7 +5974,7 @@ independent batches, so the same admission applies to both.</p>
 </tr>
 <tr>
 <td>Steps that need other rows (<code>group</code>, <code>window</code>, <code>global</code>), <code>custom_step</code> classes</td>
-<td>Rejected; keep <code>inference_mode: local</code></td>
+<td>Rejected; keep <code>batch_compute: single_node</code></td>
 <td><a href="databricks_custom_steps.html">Custom steps</a></td>
 </tr>
 </tbody>

@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -6930,7 +6986,7 @@ settings and the <code>models</code> mapping:</p>
 <span class="w">  </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_amount</span>
 <span class="w">  </span><span class="nt">pre_split_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">known_income</span>
 <span class="w">  </span><span class="nt">preprocessing_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_inputs</span>
-<span class="w">  </span><span class="nt">preprocessing_probe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">save_preprocessing_diagnostics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>The defaults use linear regression with a bounded search. Keep them for this run,
 or remove the model's <code>tuning</code> block to fit fixed parameters. The
@@ -6953,7 +7009,7 @@ search and fitting. Label availability filtering is independent of observation
 time and split policy.</p>
 <p>Review <code>training_window_mode</code>, optional <code>training_sample_rows</code>, <code>split_strategy</code>
 and <code>cv</code> separately. Random splitting needs no event dates. Temporal splitting
-requires the configured time column and boundaries. Null <code>training_version</code>
+requires the configured time column and boundaries. Null <code>training_table_version</code>
 resolves latest once at invocation; a concrete version pins that snapshot.
 A rolling window changes at invocation, while a fixed window keeps its boundaries.</p>
 <h4 id="three-independent-decisions">Three independent decisions</h4>
@@ -6977,9 +7033,9 @@ A rolling window changes at invocation, while a fixed window keeps its boundarie
 <td>Resolve the controlled champion or use a pinned <code>model_version</code></td>
 </tr>
 <tr>
-<td><code>score_handoff</code></td>
+<td><code>follow_champion</code></td>
 <td><code>config/inference.yml</code></td>
-<td><code>after_alias_change</code> starts scoring after a successful champion transition; <code>disabled</code> leaves scoring to its own trigger</td>
+<td><code>true</code> starts scoring after a successful champion transition; <code>false</code> leaves scoring to its own trigger</td>
 </tr>
 </tbody>
 </table>
@@ -7125,7 +7181,7 @@ exercise; a registered candidate is usable by pinned scoring without becoming ch
 <p>Open <strong>Workflows &gt; train run &gt; training_report &gt; Output</strong>. The
 <a href="databricks_training_reports.html">training reports guide</a> explains the task
 graph, the notebook output and the saved input evidence. Chapter 4 turned on
-<code>preprocessing_probe</code>; <a href="preprocessing_context.html#how-to-read-the-report">preprocessing diagnostics</a>
+<code>save_preprocessing_diagnostics</code>; <a href="preprocessing_context.html#how-to-read-the-report">preprocessing diagnostics</a>
 explains where its report is and how to read it.</p>
 <p>The report lists the next actions with their exact parameters. Run them on the
 same train job; they reuse the saved candidate and do not fit a new model. For

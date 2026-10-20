@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5954,7 +6010,7 @@ follow the <a href="databricks_bundle_walkthrough.html">end-to-end guide</a>. In
 not inspect your tables.</p>
 <h3 id="start-from-the-closest-example">Start from the closest example</h3>
 <p>Copying a finished project is usually faster than answering the setup wizard.
-Five NYC taxi projects on <code>samples.nyctaxi.trips</code> cover the main shapes:</p>
+Six NYC taxi projects on <code>samples.nyctaxi.trips</code> cover the main shapes:</p>
 <table>
 <thead>
 <tr>
@@ -5968,6 +6024,11 @@ Five NYC taxi projects on <code>samples.nyctaxi.trips</code> cover the main shap
 <td>One model, scored on Spark workers</td>
 <td><code>taxi_fare</code></td>
 <td>Promotes automatically and scores after promotion</td>
+</tr>
+<tr>
+<td>REST/SQL serving and monitoring without batch output</td>
+<td><a href="https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint">taxi_fare_endpoint</a></td>
+<td>Automatic endpoint after promotion, <code>ai_query</code> and captured-request monitoring; no score job or prediction table</td>
 </tr>
 <tr>
 <td>Preprocessing exclusions with Spark and raw-input serving</td>
@@ -6216,7 +6277,7 @@ entries can activate together and expose a saved profit rule. See
 <span class="nt">defaults</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">training_layout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">single_model</span>
 <span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
-<span class="w">  </span><span class="nt">preprocessing_probe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">save_preprocessing_diagnostics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <span class="nt">models</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">main</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">model</span><span class="p">:</span>
@@ -6277,43 +6338,61 @@ for the same answers. Explicit answer-file values are honored even for prompts
 hidden in quick mode; edit the generated <code>config/*.yml</code> and <code>deployment/</code> files
 to change them afterwards.</p>
 <h4 id="monitoring-destination">Monitoring destination</h4>
-<p>Both setup modes ask two monitoring questions, after the deployment questions:</p>
+<p>Both setup modes ask the monitoring questions after the deployment questions:</p>
 <table>
 <thead>
 <tr>
 <th>Question</th>
 <th>Answer</th>
-<th>Result in <code>deployment/variables.yml</code></th>
+<th>Result</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>monitoring_catalog</code></td>
-<td>Existing catalog for the shared monitoring store, or blank</td>
-<td>Default of <code>monitoring_catalog</code></td>
+<td><code>monitoring</code></td>
+<td><code>true</code> or <code>false</code></td>
+<td><code>monitoring_enabled</code>; <code>monitoring_catalog</code> defaults to each target's <code>catalog</code> (<code>deployment/variables.yml</code>)</td>
 </tr>
 <tr>
 <td><code>monitoring_schema</code></td>
-<td>Shared schema in that catalog; omitted or blank uses <code>skyulf_monitoring</code></td>
-<td>Shared schema when a catalog is set; blank when monitoring is off</td>
+<td>Shared schema; omitted or blank uses <code>skyulf_monitoring</code></td>
+<td><code>monitoring_schema</code> in <code>deployment/variables.yml</code></td>
+</tr>
+<tr>
+<td><code>development_monitoring</code> (with personal development targets)</td>
+<td><code>true</code> or <code>false</code></td>
+<td>Development targets monitor into their own schema (<code>deployment/monitoring.yml</code>)</td>
+</tr>
+<tr>
+<td><code>development_monitoring_schema</code></td>
+<td>Any schema except the shared one</td>
+<td><code>development_monitoring_schema</code> in <code>deployment/variables.yml</code></td>
+</tr>
+<tr>
+<td><code>monitoring_dashboard</code></td>
+<td><code>none</code>, <code>create</code> or <code>connect</code></td>
+<td>The <code>test</code> dashboard block in <code>deployment/monitoring.yml</code></td>
 </tr>
 </tbody>
 </table>
-<p>Give every project the same catalog and schema, reserved for monitoring (for
-example <code>skyulf_monitoring</code>), not the project's own schema: all models then
-appear in one store and one dashboard. Only one project creates the dashboard;
-the others connect to it with <code>--dashboard-url</code>, see
+<p>Give every project the same schema, reserved for monitoring (for example
+<code>skyulf_monitoring</code>), not the project's own schema: all models then appear in one
+store and one dashboard. Every monitoring table and view is created in that one
+schema. Only one project creates the dashboard; the others connect to it, see
 <a href="databricks_monitoring_dashboard.html">the shared dashboard</a>.
 <a href="databricks_workspace_tables.html">Tables in your workspace</a> lists every table the
 jobs create and where each one belongs.</p>
-<p>A catalog answer sets <code>monitoring_enabled</code> to <code>"true"</code>: train and score enroll
-models and run monitoring. A blank catalog sets <code>monitoring_enabled</code> to
-<code>"false"</code>: train and score run without monitoring. A catalog without a schema
-uses <code>skyulf_monitoring</code>. A user-selected schema is preserved, including an
-existing store. Each answer is blank or one identifier. The schema is created
+<p><code>monitoring: "true"</code> sets <code>monitoring_enabled</code> to <code>"true"</code>: train and score
+enroll models and run monitoring. <code>monitoring: "false"</code> sets it to <code>"false"</code>:
+train and score run without monitoring. A user-selected schema is preserved,
+including an existing store. To use a central catalog instead of each target's
+own, set <code>monitoring_catalog</code> in <code>deployment/variables.yml</code> or per target in
+<code>deployment/monitoring.yml</code>. The schema is created
 on first use if the run-as identity may
-create schemas. Personal development targets always set <code>monitoring_enabled</code>
-to <code>"false"</code>.</p>
+create schemas. Personal development targets set <code>monitoring_enabled</code> to
+<code>"false"</code> unless <code>development_monitoring</code> is <code>"true"</code>; then they monitor into
+their own separate store (see
+<a href="databricks_monitoring_enrollment.html#development-monitoring-optional">development monitoring</a>).</p>
 <p>Configured projects also include an independent weekly <code>monitoring_cleanup</code>
 job. It defaults to Sunday 04:00 UTC, confirmed cleanup and a 90-day minimum
 reference age. Its cron, confirmation and pause controls are editable per
@@ -6370,7 +6449,7 @@ apply to the chosen layout and earlier answers:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>training_version</code> (not asked for <code>single_model</code>)</td>
+<td><code>training_table_version</code> (not asked for <code>single_model</code>)</td>
 <td><code>null</code>: pin the latest snapshot at run start</td>
 </tr>
 <tr>
@@ -6390,7 +6469,7 @@ apply to the chosen layout and earlier answers:</p>
 <td><code>null</code>: read all rows within the limits; this never samples predictions</td>
 </tr>
 <tr>
-<td><code>preprocessing_probe</code></td>
+<td><code>save_preprocessing_diagnostics</code></td>
 <td><code>false</code>: enable to check fitted preprocessing on a bounded holdout sample</td>
 </tr>
 <tr>
@@ -6402,7 +6481,17 @@ apply to the chosen layout and earlier answers:</p>
 <p>Most answer-file values are strings, including <code>"true"</code>, <code>"42"</code> and <code>"null"</code>;
 <code>min_improvement</code> is a JSON number. The generated <code>config/training.yml</code> uses
 native YAML booleans and numbers, and omits keys whose value is null.
-For fixed dates, start from
+Nonempty values under known removed answer names, including <code>inference_mode</code>, <code>score_handoff</code>,
+<code>model_change_mode</code>, <code>auto_rebuild_on_cdf_expiry</code>, <code>preprocessing_probe</code>,
+<code>admit_probed_custom_steps</code> and <code>monitoring_catalog</code>, now fail initialization
+instead of silently selecting defaults. Use the current names in the examples
+and generated schema.
+For monitoring, initialize with <code>monitoring: "true"</code>; <code>monitoring_catalog</code>
+remains an editable deployment variable.
+The Databricks CLI can still discard other unknown answer keys before the template
+sees them, so check the generated configuration when editing an answer file.
+This is an upstream CLI behavior, not a general unknown-key validation guarantee.</p>
+<p>For fixed dates, start from
 <code>random-window-init.example.json</code> or <code>temporal-delayed-results-init.example.json</code>.
 For stratified CV and sampling, use <code>guided-classification-init.example.json</code>.
 From the Skyulf checkout, for example:</p>
@@ -6667,7 +6756,7 @@ shows the actual pipeline, input selection, final holdout, CV and
 score/promotion policies. Competition prints a <code>Candidate:</code> section for each
 candidate; model sets print a <code>Branch:</code> section for each branch. The same training
 rules apply to manual and scheduled runs. Preview starts no cloud job, reads no
-Delta rows, fits no model and does not execute <code>preprocessing_probe</code>. A
+Delta rows, fits no model and does not execute <code>save_preprocessing_diagnostics</code>. A
 preview-resolution <code>ValueError</code> prints <code>Configuration error:</code> and exits with
 code 2; fix the reported setting before deployment. File/parsing failures that
 happen before resolution may raise directly.</p>
@@ -6702,13 +6791,9 @@ update the preview script's defaults.</p>
 <td><code>refresh_training_graph.py</code></td>
 <td>After editing competition candidates or model-set branch names/count: <code>python src/tools/refresh_training_graph.py</code>. Single-model projects remain unchanged.</td>
 </tr>
-<tr>
-<td><code>configure_monitoring_dashboard.py</code></td>
-<td>Configure an existing dashboard's target refresh: <code>python src/tools/configure_monitoring_dashboard.py --dashboard-id YOUR_DASHBOARD_ID --target test</code>. See <a href="databricks_monitoring_dashboard.html">dashboard configuration</a> for ownership, warehouse and disable options.</td>
-</tr>
 </tbody>
 </table>
-<p>Graph/dashboard tools change local resource YAML. Validate and redeploy before
+<p>Graph tools change local resource YAML. Validate and redeploy before
 running the updated job. They do not start a cloud job by themselves.</p>
 <p>The answer-file examples include <code>guided-classification-init.example.json</code>
 (Polars, random forest, stratified CV and explicit sample) and

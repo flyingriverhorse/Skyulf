@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5887,10 +5943,10 @@ performance retraining requests. Set a model's performance policy to
 <code>mode: "retrain"</code> inside the JSON mapping to enable its performance trigger;
 <code>on_drift</code> remains an independent setting. Either trigger uses the same guarded
 train job request. Neither trigger bypasses model evaluation or approval.</p>
-<p>Set <code>training_version: null</code>. Maintain the configured training features upstream.
+<p>Set <code>training_table_version: null</code>. Maintain the configured training features upstream.
 Targets may be embedded in that table or read through an explicit
 <a href="databricks_training_data.html#train-from-separate-outcomes"><code>training_label_table</code> join</a>.
-With the join, use <code>training_label_version: null</code> for fresh runs: new eligible
+With the join, use <code>training_label_table_version: null</code> for fresh runs: new eligible
 outcomes can count as changed training data even when feature rows are unchanged.
 Monitoring's optional label binding alone does not enable the training join or
 write outcomes back to a source table.

@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5999,7 +6055,7 @@ performs the lookup; Skyulf applies the saved validation and prediction logic.</
 </thead>
 <tbody>
 <tr>
-<td><code>include_online_serving=true</code></td>
+<td><code>include_online_feature_lookup=true</code></td>
 <td>An unscheduled endpoint setup job and training lookup placeholders</td>
 <td>Lookup fields, freshness policy, registered version and existing publication</td>
 </tr>
@@ -6092,10 +6148,10 @@ your own before generating:</p>
 <span class="w">  </span><span class="nt">"task"</span><span class="p">:</span><span class="w"> </span><span class="s2">"regression"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"input_columns"</span><span class="p">:</span><span class="w"> </span><span class="s2">"total_spend, feature_updated_at"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"record_key_columns"</span><span class="p">:</span><span class="w"> </span><span class="s2">"customer_id"</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"include_online_serving"</span><span class="p">:</span><span class="w"> </span><span class="s2">"true"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"include_online_feature_lookup"</span><span class="p">:</span><span class="w"> </span><span class="s2">"true"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"include_online_publication"</span><span class="p">:</span><span class="w"> </span><span class="s2">"false"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"include_daily_rollout"</span><span class="p">:</span><span class="w"> </span><span class="s2">"false"</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"score_handoff"</span><span class="p">:</span><span class="w"> </span><span class="s2">"disabled"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"score_follow_champion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"false"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"scoring_mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"manual"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"promotion_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"manual_approval"</span>
 <span class="p">}</span>
@@ -6105,7 +6161,7 @@ your own before generating:</p>
 </code></pre></div>
 <p>The three serving selections are independent and default to <code>"false"</code>. Only detailed setup asks
 them; quick setup keeps <code>"false"</code>, so use detailed setup or an answer file like the one above.
-<code>include_online_serving</code> adds an unscheduled <code>online_serving_setup</code> job and its notebook. It
+<code>include_online_feature_lookup</code> adds an unscheduled <code>online_feature_lookup_setup</code> job and its notebook. It
 installs the native Feature Engineering dependency for training even when another project owns
 publication. Initialization creates files only. With <code>include_online_publication: "true"</code>, detailed
 setup asks for <code>online_publication_mode</code>; an answer file can set it directly: <code>TRIGGERED</code> (default)
@@ -6288,7 +6344,7 @@ this adapter never drops or recreates an online table.</p>
 hourly schedule remains <code>PAUSED</code> until you deliberately enable it. <code>status</code> inspects
 the latest native update; <code>SYNCED</code> does not attest entity freshness. Continuous
 stop/restart controls require a continuous publication. If online serving uses an
-external publication, set its <code>online_serving.publications[].publish_mode</code> to that
+external publication, set its <code>online_feature_lookup.publications[].publish_mode</code> to that
 publication's actual mode before setup.</p>
 <p>The SDK exposes the same operations without a Bundle:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.feature_store</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>

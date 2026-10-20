@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5910,21 +5966,22 @@ not replace this project's delayed-outcome matching, concrete training holdout r
 consecutive-window policy or guarded training requests. See
 <a href="https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/data-profiling/create-monitor-api">the current Data Profiling API</a>.</p>
 <h2 id="what-to-edit">What to edit</h2>
-<p>Setup asks <code>monitoring_catalog</code> and <code>monitoring_schema</code> in both quick and
-detailed mode. When a catalog is given, an omitted or blank schema defaults to
-<code>skyulf_monitoring</code>. A different schema answer is preserved; existing stores
-are never moved or migrated. Setup writes the destination to <code>deployment/variables.yml</code>; see
+<p>Setup asks <code>monitoring</code> (on or off) and, when on, <code>monitoring_schema</code> in both
+quick and detailed mode. An omitted or blank schema defaults to
+<code>skyulf_monitoring</code>; a different answer is preserved, and existing stores are
+never moved or migrated. The catalog is not asked: <code>monitoring_catalog</code> defaults to
+each target's own <code>catalog</code>. Setup writes both to <code>deployment/variables.yml</code>; see
 <a href="databricks_project_setup.html#monitoring-destination">the setup questions</a>. To
-set or change them per target, put this excerpt under
-<code>targets.&lt;target&gt;.variables</code> in <code>deployment/targets.yml</code>. The values are
+use other names in one target, put this excerpt under
+<code>targets.&lt;target&gt;.variables</code> in <code>deployment/monitoring.yml</code>. The values are
 examples; use your existing catalog and a schema reserved for the shared store.</p>
 <div class="highlight"><pre><span></span><code><span class="nt">monitoring_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">operations</span>
 <span class="nt">monitoring_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model_monitoring</span>
 <span class="nt">monitoring_enabled</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span>
 </code></pre></div>
 <h3 id="if-no-destination-is-set">If no destination is set</h3>
-<p>A blank catalog at setup generates <code>monitoring_enabled: "false"</code>. Train and
-score then run normally without enrollment, monitoring or a store. Nothing is
+<p><code>monitoring: "false"</code> at setup generates <code>monitoring_enabled: "false"</code>. Train
+and score then run normally without enrollment, monitoring or a store. Nothing is
 written to a monitoring schema, and both generated destination values are blank.
 To enable monitoring later, set both names and
 <code>monitoring_enabled: "true"</code>, then validate and redeploy.</p>
@@ -5959,7 +6016,8 @@ To enable monitoring later, set both names and
 </tr>
 </tbody>
 </table>
-<p>Development targets skip this check and never monitor.</p>
+<p>Development targets skip this check unless they opt in to their own separate
+store; see <a href="databricks_monitoring_enrollment.html#development-monitoring-optional">development monitoring</a>.</p>
 <p>Every project uses the same independent
 <code>monitoring_catalog</code> and <code>monitoring_schema</code> values. These control monitoring
 storage only; they do not change model, training, source or prediction locations.
@@ -6144,9 +6202,9 @@ or <code>monitoring_cleanup_confirm: "false"</code> to keep reporting candidates
 deletion.</p>
 <p>The job uses the same monitoring identity, permissions, notifications and
 serverless environment as observation. It only runs <code>cleanup_references</code>;
-it does not measure drift or request training. Projects initialized with a
-blank catalog have no cleanup resource. Enable their monitoring destination
-and use the manual action below, or regenerate with a configured catalog to
+it does not measure drift or request training. Projects initialized with
+monitoring off have no cleanup resource. Enable their monitoring destination
+and use the manual action below, or regenerate with monitoring on to
 obtain <code>resources/monitoring_cleanup.job.yml</code> and its target settings.</p>
 <p>Before deploying an enabled cleanup schedule, meet the lifecycle-writer
 requirements below. Existing corporate tables are not relocated or removed by

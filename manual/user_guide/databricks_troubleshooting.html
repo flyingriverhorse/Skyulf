@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5853,7 +5909,7 @@ The linked section explains the cause and the fix.</p>
 <td><a href="#a-feature-lookup-table-name-is-incomplete">Below</a></td>
 </tr>
 <tr>
-<td><code>feature_lookup.lookups[&lt;n&gt;] is not filled in: complete feature_lookup and online_features in config/training.yml, or regenerate with include_online_serving=false.</code></td>
+<td><code>feature_lookup.lookups[&lt;n&gt;] is not filled in: complete feature_lookup and online_features in config/training.yml, or regenerate with include_online_feature_lookup=false.</code></td>
 <td><a href="#a-feature-lookup-table-name-is-incomplete">Below</a></td>
 </tr>
 <tr>
@@ -5869,7 +5925,7 @@ The linked section explains the cause and the fix.</p>
 <td><a href="databricks_project_upgrade.html#common-errors-and-fixes">Project upgrade</a></td>
 </tr>
 <tr>
-<td>The same message after changing <code>score_handoff</code> in <code>config/inference.yml</code></td>
+<td>The same message after changing <code>follow_champion</code> in <code>config/inference.yml</code></td>
 <td>Redeploy the Bundle; see <a href="databricks_scoring.html#schedules-handoff-and-execution-engines">score handoff</a></td>
 </tr>
 <tr>
@@ -6082,7 +6138,7 @@ placeholder, has fewer than three parts or has invalid identifier syntax. The in
 is zero-based: <code>[0]</code> is the first list entry and <code>[1]</code> is the second. A completely
 blank generated entry (no <code>table_name</code>, <code>lookup_key</code> or <code>feature_names</code>) reports
 <code>feature_lookup.lookups[N] is not filled in: ...</code> instead: fill the entry, or
-regenerate the project with <code>include_online_serving=false</code>. These checks validate names locally; passing them does not prove the table exists
+regenerate the project with <code>include_online_feature_lookup=false</code>. These checks validate names locally; passing them does not prove the table exists
 or that the job can read it.</p>
 <p><strong>Fix.</strong> In <code>config/training.yml</code>, find the effective <code>feature_lookup</code> under
 <code>defaults</code> or the model override and repair the indexed entry's <code>table_name</code>.

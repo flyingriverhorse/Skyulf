@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -3804,6 +3860,17 @@
   
     <nav class="md-nav" aria-label="When you need it">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#development-monitoring-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development monitoring (optional)
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#if-monitoring-is-not-configured" class="md-nav__link">
@@ -5874,15 +5941,32 @@
 <p>Use this page after <a href="databricks_monitoring_setup.html">store setup</a> to enroll activated or scored
 batch models, prepare their references, and start observation. For endpoints, use
 <a href="databricks_serving_monitoring.html">serving monitoring</a>.</p>
-<p>Monitoring runs only for shared <code>mode: production</code> deployments (<code>test</code>, <code>syst</code>,
-<code>prod</code>). Personal development targets do not enroll temporary models or create
-monitoring tables. The <code>monitoring_allowed</code> condition excludes enrollment and the
-post-scoring monitoring handoff in <code>mode: development</code>; training
-and scoring still run normally, including automatic scoring after activation.
-Development targets also set <code>monitoring_enabled: "false"</code>,
-<code>monitoring_performance_policies: '{}'</code> and <code>on_drift: disabled</code>.
-The deployment-mode guard remains effective even if shared monitoring destinations
-or an enabled flag are inherited from common settings.</p>
+<p>Monitoring writes to the shared store only for <code>mode: production</code> deployments
+(<code>test</code>, <code>syst</code>, <code>prod</code>). By default, personal development targets do not enroll
+temporary models or create monitoring tables: they set <code>monitoring_enabled: "false"</code>,
+and the <code>monitoring_allowed</code> condition then skips enrollment and the post-scoring
+monitoring handoff. Training and scoring still run normally, including automatic
+scoring after activation. Development targets also set
+<code>monitoring_performance_policies: '{}'</code> and <code>on_drift: disabled</code>.</p>
+<h3 id="development-monitoring-optional">Development monitoring (optional)</h3>
+<p>To see your own development models, answer <code>development_monitoring: "true"</code> in
+setup. The question appears with personal development targets and needs a
+monitoring store; it defaults to off. Setup then asks for the schema name
+(<code>development_monitoring_schema</code>, default <code>development_monitoring</code>) in the same
+catalog. Any name works, including an existing schema in your workspace, as long
+as it is not the shared <code>monitoring_schema</code>. Every <code>*_development</code> target sets
+<code>monitoring_enabled: "true"</code>, and every job receives both names. Change the name
+later in <code>deployment/variables.yml</code>; a blank name keeps development monitoring off.</p>
+<p>Core keeps the two stores apart: in development mode it writes only to
+<code>development_monitoring_schema</code> and refuses one that is missing or equal to the
+shared schema; <code>test</code>, <code>syst</code> and <code>prod</code> always use the shared schema.
+Development models are measured and reported only; automatic retraining stays
+disabled. Development jobs run as you, so you may need permission to create the
+schema, or ask for it to be created first. <code>bundle destroy</code> does not remove a
+development model's enrollment, so old trial models remain in the development
+store until you clean or recreate it. With <code>monitoring_dashboard: create</code>,
+<code>test_development</code> also gets its own dashboard over this store; development mode
+prefixes its name for each user.</p>
 <pre class="mermaid"><code>flowchart LR
     A["train: register_monitor"] --&gt; B["score"]
     B --&gt; C["prepare_monitoring"]
@@ -5892,8 +5976,8 @@ or an enabled flag are inherited from common settings.</p>
 <p>Activation enrolls the model in the train job. Each successful score then hands
 its receipt to the separate monitoring job.</p>
 <h3 id="if-monitoring-is-not-configured">If monitoring is not configured</h3>
-<p>Monitoring runs only when setup received a monitoring catalog and schema, which
-sets <code>monitoring_enabled: "true"</code>. A blank catalog at setup sets it to <code>"false"</code>:
+<p>Monitoring runs only when setup answered <code>monitoring: "true"</code>, which sets
+<code>monitoring_enabled: "true"</code>. <code>monitoring: "false"</code> sets it to <code>"false"</code>:
 train and score run, <code>register_monitor</code> and <code>prepare_monitoring</code> report
 <code>disabled</code>, and the score job skips <code>monitor_model</code>. Nothing is enrolled or
 observed. Enable it later as described in

@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -2677,6 +2733,17 @@
     <span class="md-ellipsis">
       
         Prepare the source table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spark-decimal-model-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spark DECIMAL model values
       
     </span>
   </a>
@@ -5965,6 +6032,38 @@ training run, make sure the training and scoring sources meet these rules:</p>
 </code></pre></div>
 <p>For a worked example table, see the
 <a href="databricks_bundle_walkthrough.html">end-to-end guide</a>.</p>
+<h3 id="spark-decimal-model-values">Spark DECIMAL model values</h3>
+<p>At the Spark-to-model boundary, Skyulf converts selected <code>DECIMAL(p,s)</code> model inputs,
+numeric targets and weights to <code>DOUBLE</code> / <code>float64</code>. Bounded training, batch prediction,
+Spark worker inputs and the serving job's smoke sample use the same rule. Nulls remain
+missing values for the fitted preprocessing. Record keys, grouping identities and
+time controls retain their declared types.
+Use supported <code>STRING</code> or <code>BIGINT</code> record keys. Serving refuses a DECIMAL key that
+cannot be represented by its saved JSON contract; it does not round the key to float.</p>
+<p>For example, an <code>amount DECIMAL(17,6)</code> input becomes <code>float64</code> in the fitted pipeline,
+<code>double</code> in its MLflow signature and <code>DOUBLE</code> in the generated SQL scoring function.
+REST callers send JSON numbers or null, rather than Python <code>decimal.Decimal</code> objects.
+Converting DECIMAL to float64 may lose precision beyond roughly 15–17 significant digits.</p>
+<p>The completed training report and <code>training_data.json</code> list the observed conversions:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"source_column_conversions"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"amount"</span><span class="p">,</span><span class="w"> </span><span class="nt">"source_dtype"</span><span class="p">:</span><span class="w"> </span><span class="s2">"decimal(17,6)"</span><span class="p">,</span><span class="w"> </span><span class="nt">"target_dtype"</span><span class="p">:</span><span class="w"> </span><span class="s2">"float64"</span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The saved model's <code>manifest.json</code> records conversions for its fitted inputs; a model
+set retains these in each component manifest. The default offline preview cannot
+inspect a table's physical types. Use its source-validation action for planned casts
+on the current schema, and the training report for casts actually performed on the
+pinned snapshot. Older artifacts without this field have no recorded conversion evidence.</p>
+<p>Native Feature Engineering lookup reads its own source/feature tables after Skyulf's
+projection. Its model-value columns must already use <code>DOUBLE</code>; persist the converted
+column and retrain before logging or serving that native lookup model. Its existing
+admission check rejects DECIMAL storage with an actionable message.</p>
+<p>If an older champion learned a DECIMAL input as <code>object</code> or string, the new float64
+candidate has a different input contract. Follow the
+<a href="databricks_model_sets.html#upgrading-core-with-model-sets">schema migration steps</a>
+before switching consumers; a runtime-recovery flag does not override schema validation.</p>
 <h3 id="choose-a-table-layout">Choose a table layout</h3>
 <p>A project reads data in three roles. A layout only decides how many physical
 tables hold them:</p>
@@ -6124,7 +6223,7 @@ by default.</p>
 <li><strong>Incremental scoring accepts inserts only.</strong> For a single model or a
   competition, an UPDATE or DELETE in the scoring source fails the score job
   with <em>Source updates and deletes require an explicit rescore policy</em>. Model
-  sets alone can opt into <code>source_change_policy: rebuild_on_change</code>; see
+  sets alone can opt into <code>on_source_change: rescore_all</code>; see
   <a href="databricks_scoring.html#source-changes-are-separate-from-model-changes">source changes</a>.
   Writing an outcome into an existing scoring row is an update, so use a
   separate outcomes table instead.</li>
@@ -6162,9 +6261,9 @@ actual targets into the outcome table instead; the join supplies the labels.</p>
 The <code>separate_outcomes</code> layout generates this configuration; you can also add
 it explicitly to <code>defaults</code> or a model entry in <code>config/training.yml</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.measurements"</span>
-<span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="nt">training_table_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
 <span class="nt">training_label_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.outcomes"</span>
-<span class="nt">training_label_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<span class="nt">training_label_table_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
 <span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">record_id</span><span class="p p-Indicator">]</span>
 <span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">temperature</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">humidity</span><span class="p p-Indicator">]</span>
 <span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">demand</span>
@@ -6185,7 +6284,7 @@ labels or silently relax target validation.</p>
 are pinned. Saved training specifications, dataset identity and MLflow input
 provenance include that binding. Replaying the saved model uses those versions,
 even if outcomes have since arrived. A replaced same-name outcome table fails
-the identity check. <code>training_label_version: 12</code> explicitly selects version 12;
+the identity check. <code>training_label_table_version: 12</code> explicitly selects version 12;
 leave it null for new training runs to see later outcomes. No source rows are
 written or merged back into Delta.</p>
 <p>The same join is used for pandas/Polars training and Spark retraining freshness
@@ -6279,13 +6378,13 @@ does not create columns or generate timestamps. The same names are used
 throughout the library and saved training settings.</p>
 <h3 id="choose-the-evaluation-split-and-result-availability">Choose the evaluation split and result availability</h3>
 <p>The default <code>split_strategy: "random"</code> needs only existing keys, features and a
-nonnull target. <code>training_version</code> pins the source Delta snapshot; it is unrelated
+nonnull target. <code>training_table_version</code> pins the source Delta snapshot; it is unrelated
 to dates. Leave it null to resolve latest once at run start, or set a nonnegative
 integer to pin that version. This example shows the training-related
 part of the generated <code>config/training.yml</code> defaults. Generation omits keys
 whose value is null, such as <code>event_column</code>, <code>start</code> or <code>result_cutoff</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">defaults</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">training_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">12</span>
+<span class="w">  </span><span class="nt">training_table_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">12</span>
 <span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">input_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">target_column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claim_amount</span>
@@ -6419,7 +6518,7 @@ can scan the selected source several times.</p>
 <p>With <code>training_window_mode: auto</code>, setup writes <code>full_snapshot</code> for random
 projects and an editable <code>rolling_calendar</code> with four months and
 <code>window_timezone: "UTC"</code> for temporal projects. Every <code>train</code>
-invocation resolves latest once when <code>training_version</code> is null or missing;
+invocation resolves latest once when <code>training_table_version</code> is null or missing;
 an explicit version is honored regardless of trigger. <code>rolling_calendar</code> and
 <code>rolling_days</code> derive new observation boundaries, including for manual runs. Fixed
 windows stay fixed even if a job runs again a month later.</p>
@@ -6531,7 +6630,7 @@ the source timestamps' timezone. For Python APIs, use <code>TrainingDateSpec</co
 supported format vocabulary is a subset of Python's
 <a href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes">strptime directives</a>;
 source timezone rules use <a href="https://docs.python.org/3/library/zoneinfo.html">IANA zoneinfo</a>.</p>
-<p><code>training_version</code> defaults to <code>null</code>, resolving latest once at the start of
+<p><code>training_table_version</code> defaults to <code>null</code>, resolving latest once at the start of
 each <code>train</code> invocation. Set an explicit version for a repeatable snapshot.
 Date boundaries default to null and are required only for <code>fixed_window</code>;
 <code>rolling_calendar</code> and <code>rolling_days</code> derive them at invocation. Scoring and saved-evidence actions

@@ -2017,6 +2017,62 @@
   
   
     <li class="md-nav__item">
+      <a href="model_project_export_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Export Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="model_project_export.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Export a Model Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="extending_custom_nodes.html" class="md-nav__link">
         
   
@@ -5979,7 +6035,7 @@ continues scoring with v2 after a successful promotion of v4. Selecting
 <code>champion</code> instead resolves the controlled alias once per score run. A missing
 champion fails before output preparation; there is no fallback to latest.</p>
 <p>Set both fields together; a partial configuration fails before training or
-scoring. Generated projects also require <code>score_handoff</code>. Automatic promotion
+scoring. Generated projects also require <code>follow_champion</code>. Automatic promotion
 requires <code>quality_threshold</code>, including when scoring is pinned. Scoring never
 updates the caller's configured version. Moving from the single
 <code>model_selection_mode</code> field is covered in
@@ -6194,15 +6250,18 @@ metrics. The override is accepted only for <code>approve</code>, only as the exa
 <code>true</code>, only while the champion still cannot be loaded, and only when the
 candidate passes a configured <code>quality_threshold</code> and any <code>quality_gates</code>. The
 saved comparison records that the champion was not measured. It works under
-either promotion policy. Model sets do not support it: their training stops
-with a message naming the release that produced the champion set.</p>
-<p>Rolling back to a champion from the older release restores its alias, but the
-current score job cannot load it; keep that release's runtime if you need it.</p>
-<p><code>score_handoff</code> is a deploy-time setting in <code>config/inference.yml</code>, not a Run now parameter.
+either promotion policy. Model sets support the same explicit approval path;
+every candidate component must pass its own absolute quality gates. See
+<a href="databricks_model_sets.html#upgrading-core-with-model-sets">Upgrading Core with model sets</a>
+for the retained component versions and rollback requirements.</p>
+<p>For a single model, rolling back to a champion from the older release restores
+its alias, but the current score job cannot load it; keep that release's runtime
+if you need it.</p>
+<p>Batch <code>follow_champion</code> is a deploy-time setting in <code>config/inference.yml</code>, not a Run now parameter.
 Changing it needs the matching deployed job parameters and a redeploy; see
 <a href="databricks_scoring.html#schedules-handoff-and-execution-engines">schedules and handoff</a>.
-<code>after_alias_change</code> requests the existing score job after a successful initialization, promotion or
-rollback. <code>disabled</code> leaves scoring to an explicit score run or its schedule. Rejection and training
+<code>true</code> requests the existing score job after a successful initialization, promotion or
+rollback. <code>false</code> leaves scoring to an explicit score run or its schedule. Rejection and training
 without a champion transition never trigger score. Handoff preserves the score selector: a pinned
 scorer still uses its configured version even after champion changes.</p>
 <p>The project has separate train, score and monitoring jobs. The train graph runs the lifecycle
@@ -6347,7 +6406,8 @@ with the original destination version, pending event ID and shared admission.
 It completes fully applied changes or aborts untouched changes; mixed roles
 remain blocked for operator inspection. It does not change serving traffic or
 prediction tables, and it cannot adopt an uncontrolled alias automatically.</p>
-<p>For example, a regression project can select its gate in the generated config:</p>
+<p>For example, a regression project using legacy <code>workflow.json</code> can select its
+gate with these internal field names:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"engine"</span><span class="p">:</span><span class="w"> </span><span class="s2">"polars"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"score_model_selection"</span><span class="p">:</span><span class="w"> </span><span class="s2">"champion"</span><span class="p">,</span>
