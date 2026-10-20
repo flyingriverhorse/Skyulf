@@ -185,6 +185,13 @@ def workflow_policies(config: dict[str, Any]) -> tuple[str, str]:
     )
 
 
+def workflow_table_fields(config: dict[str, Any]) -> tuple[str, ...]:
+    """List required UC identities; endpoint-only delivery has no batch prediction sink."""
+    if config.get("prediction_delivery") == "endpoint":
+        return tuple(name for name in _TABLE_FIELDS if name != "prediction_table")
+    return _TABLE_FIELDS
+
+
 def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> dict[str, Any]:
     """Bind only UC object names to one validated Bundle target."""
     for name in ("catalog", "input_schema", "output_schema", "metadata_schema"):
@@ -194,7 +201,7 @@ def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> d
     if suffix and (not suffix.startswith("_") or not IDENTIFIER_PATTERN.fullmatch(suffix)):
         raise ValueError("Invalid resource_suffix for a Unity Catalog identifier.")
     resolved = config.copy()
-    for name in _TABLE_FIELDS:
+    for name in workflow_table_fields(config):
         resolved[name] = bind_target_name(name, config[name], bindings, suffix)
     if config.get("training_label_table") is not None:
         resolved["training_label_table"] = bind_target_name(
@@ -774,6 +781,8 @@ def _validate_action_layout(config: dict[str, Any], action: str) -> None:
     """Keep single-call training from silently ignoring competition candidates."""
     if action == "train" and config.get("training_layout") == "model_competition":
         raise ValueError("Model competition training requires the phased lifecycle job.")
+    if action == "score" and config.get("prediction_delivery") == "endpoint":
+        raise ValueError("prediction_delivery=endpoint does not allow batch scoring.")
 
 
 def run_action(

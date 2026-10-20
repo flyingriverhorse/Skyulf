@@ -1,0 +1,15 @@
+bundle:
+  name: taxi_fare_endpoint
+
+include:
+  - deployment/variables.yml
+  - deployment/targets.yml
+  - deployment/monitoring.yml
+  - resources/*.yml
+
+sync:
+  include:
+    - src/**/*.py
+    - deployment/*requirements.txt
+    - src/features/requirements.txt
+    - config/*.yml

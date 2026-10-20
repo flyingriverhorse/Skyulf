@@ -3,7 +3,7 @@
 This project trains a pandas random forest on up to 4,096 sampled January trips
 from `samples.nyctaxi.trips`. The train job fits and saves the filters and five
 preprocessing steps. Its admission checks run automatically because
-`inference_mode: spark`. The separate `preprocessing_probe: true` adds diagnostics.
+`batch_compute: spark`. The separate `save_preprocessing_diagnostics: true` adds diagnostics.
 
 ## Train and score
 

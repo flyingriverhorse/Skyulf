@@ -17,6 +17,51 @@ START = datetime(2026, 12, 31, 12, tzinfo=UTC)
 DAY = timedelta(days=1)
 
 
+def test_yaml_rollout_defaults_preserve_daily_ten_point_steps():
+    """Older YAML without timing fields must retain the production defaults."""
+    assert DailyRolloutPolicy.from_config({}) == DailyRolloutPolicy(10, 24.0, 24.0)
+
+
+def test_yaml_short_stage_and_evidence_age_drive_real_decisions():
+    """A test stage must honor both the configured wait and independent freshness limit."""
+    policy = DailyRolloutPolicy.from_config(
+        {
+            "traffic_step_percent": 20,
+            "stage_minimum_hours": 5 / 60,
+            "evidence_max_age_hours": 2 / 60,
+        }
+    )
+    current = state()
+    early = START + timedelta(minutes=4)
+    ready = START + timedelta(minutes=5)
+    assert decide_rollout(policy, current, evidence(current, early), now=early).action == "HOLD"
+    decision = decide_rollout(policy, current, evidence(current, ready), now=ready)
+    assert (decision.action, decision.target_percentage) == ("ADVANCE", 20)
+    assert (
+        decide_rollout(
+            policy, current, evidence(current, ready), now=ready + timedelta(minutes=3)
+        ).action
+        == "HOLD"
+    )
+
+
+@pytest.mark.parametrize("value", [0, -1, 101, True, 1.5, "10", None])
+def test_yaml_rejects_invalid_traffic_steps(value):
+    """YAML values must not be coerced into a different traffic allocation."""
+    with pytest.raises(ValueError):
+        DailyRolloutPolicy.from_config({"traffic_step_percent": value})
+
+
+@pytest.mark.parametrize("field", ["stage_minimum_hours", "evidence_max_age_hours"])
+@pytest.mark.parametrize(
+    "value", [0, -1, True, "24", None, float("nan"), float("inf"), 1e20, 1e-20]
+)
+def test_yaml_rejects_invalid_stage_and_freshness_hours(field, value):
+    """Nonfinite, missing or unrepresentable durations cannot authorize a traffic step."""
+    with pytest.raises(ValueError):
+        DailyRolloutPolicy.from_config({field: value})
+
+
 def state(share=0):
     """Bind test evidence to concrete model versions and a verified clock."""
     return RolloutState(

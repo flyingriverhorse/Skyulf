@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import pandas as pd
 import polars as pl
 
+from skyulf.engines.spark_engine import normalize_spark_decimals, restore_spark_decimal_dtypes
 from skyulf.integrations.databricks.shared._frames import frame_bytes
 
 from .....data.dataset import SplitDataset
@@ -116,6 +117,7 @@ def read_source(spark: Any, spec: SourceSpec) -> pd.DataFrame:
     )
     names = (*spec.record_key_columns, *spec.input_columns)
     selected = selected.select(*names).orderBy(*spec.record_key_columns).limit(spec.max_rows + 1)
+    selected, conversions = normalize_spark_decimals(selected, columns=spec.input_columns)
     records: list[dict[str, Any]] = []
     serialized_bytes = 0
     for row in selected.toLocalIterator():
@@ -127,7 +129,9 @@ def read_source(spark: Any, spec: SourceSpec) -> pd.DataFrame:
         if serialized_bytes > spec.max_bytes:
             raise ValueError("Source exceeds max_bytes.")
         records.append(record)
-    frame = pd.DataFrame.from_records(records, columns=names)
+    frame = restore_spark_decimal_dtypes(
+        pd.DataFrame.from_records(records, columns=names), conversions
+    )
     if frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Source local frame exceeds max_bytes.")
     if frame.loc[:, list(spec.record_key_columns)].isna().any().any():

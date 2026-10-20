@@ -1,15 +1,17 @@
 # Start here
 
 Read this page first. It takes **{{.project_name}}** from setup to a trained
-model and a scored table; the other Markdown files answer later questions.
+model and {{if eq .prediction_delivery "endpoint"}}a serving endpoint{{else}}a scored table{{end}}; the other Markdown files answer later questions.
 
 {{if eq .training_layout "multi_target"}}This project trains one model per target and packages them as one model set that is
 approved and scored together.
 {{else if eq .training_layout "model_competition"}}This project trains several candidate models for one target; cross-validation
 picks one winner, which becomes the registered candidate.
 {{else}}This project trains one model for one target and registers it as a candidate.
-{{end}}Training runs **{{.engine}}** in one bounded Python process; scoring uses
-**{{.inference_mode}}** inference. Run every command beside `databricks.yml`.
+{{end}}Training runs **{{.engine}}** in one bounded Python process.
+{{if eq .prediction_delivery "endpoint"}}Prediction delivery uses the serving endpoint; no batch score job is generated.
+{{else}}Batch scoring uses **{{.batch_compute}}** batch compute.
+{{end}}Run every command beside `databricks.yml`.
 
 ## Before the first run
 
@@ -21,15 +23,15 @@ check that the data exists before you deploy:
 | `deployment/targets.yml` | `host` under `test`{{if eq .personal_development_targets "true"}} and `test_development`{{end}}: replace `https://replace-test.example.invalid` with your workspace URL. |
 | `deployment/variables.yml` | `test_catalog`, `test_input_schema`, `test_output_schema` and `test_metadata_schema` (`REPLACE_TEST_*`){{if eq .personal_development_targets "true"}}, plus `test_development_input_schema`, `test_development_output_schema` and `test_development_metadata_schema`{{end}}. |
 | Commands below | `YOUR_PROFILE`: an authenticated Databricks CLI profile for that workspace. |
-| Unity Catalog | The catalog, schemas and source table must exist. The table needs the record key, input and target columns from setup, and Change Data Feed on before the first score. |
+| Unity Catalog | The catalog, schemas and source table must exist. The table needs the record key, input and target columns from setup{{if ne .prediction_delivery "endpoint"}}, and Change Data Feed on before the first score{{end}}. |
 | `config/training.yml` | A numeric `quality_threshold`{{if eq .training_layout "multi_target"}} in every `models` entry{{end}}, if you will approve the first champion or promote automatically. Set it before training; a trained version keeps its policy. |
-| `deployment/variables.yml` (optional) | Monitoring runs only when `monitoring_enabled` is `"true"` and `monitoring_catalog`/`monitoring_schema` name the store. A catalog answer defaults the shared schema to `skyulf_monitoring`; a blank catalog disables monitoring. Use the same store in every project so all models appear in one dashboard; only one project creates the dashboard, the others connect with `src/tools/configure_monitoring_dashboard.py --dashboard-url`. |
+| `deployment/variables.yml` and `deployment/monitoring.yml` (optional) | Monitoring runs only when `monitoring_enabled` is `"true"`. It writes to `monitoring_catalog`.`monitoring_schema` (variables.yml); the catalog defaults to each target's own catalog and the schema to `skyulf_monitoring`. Use the same schema in every project so all models appear in one dashboard. `deployment/monitoring.yml` holds each target's dashboard and the development targets' monitoring settings; only one project creates a dashboard, the others connect to it there. |
 
 For the shared `test` target, check that `test_root_path` in `deployment/variables.yml`
 is a workspace folder your team can write to. The local checks below do not flag
 these placeholders.
 
-## First train and score
+## First train and {{if eq .prediction_delivery "endpoint"}}serve{{else}}score{{end}}
 
 Replace `YOUR_PROFILE` in every command.
 
@@ -70,7 +72,7 @@ Replace `YOUR_PROFILE` in every command.
 {{end}}   into the train job's **Run now with different parameters**; see
    [operator actions](https://www.skyulf.com/manual/user_guide/databricks_lifecycle.html#operator-actions-through-run-now).
 
-6. **Score:**
+{{if ne .prediction_delivery "endpoint"}}6. **Score:**
 
    ```powershell
    databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE score
@@ -81,12 +83,24 @@ Replace `YOUR_PROFILE` in every command.
 {{else if eq .score_model_selection "champion"}}Scoring resolves the champion alias, so a version must be promoted first.
 {{else}}Scoring uses the pinned `model_version` in `config/inference.yml` (`"1"` for
    a new model) and needs no approval. Change it to score a later version.
-{{end}}{{if eq .score_handoff "after_alias_change"}}   An approval or promotion starts a score run by itself; inspect that run first.
+{{end}}{{if eq .score_follow_champion "true"}}   An approval or promotion starts a score run by itself; inspect that run first.
 {{end}}   Check the committed output, then `monitoring_report` and `evaluate_retraining`.
    Before monitoring an unactivated pinned candidate for the first time, prepare its
    [reference](https://www.skyulf.com/manual/user_guide/databricks_monitoring_enrollment.html).
 
-## When you need it
+{{end}}{{if ne .prediction_delivery "batch"}}
+## Serve the approved model
+
+Run `serving_endpoint` manually on personal development targets. In production
+Bundle mode, `serving_endpoint.follow_champion: true` submits a separate
+serving run when champion changes. Inspect that child run's verification result;
+training success only confirms submission. See [SERVING.md](SERVING.md) for the
+command, caller permissions, SQL/REST examples, costs and logging choices.
+With target `monitoring_enabled: "true"`, payload logging enabled and a monitoring
+store configured, successful verification automatically enrolls the endpoint. Run the monitoring job after
+requests arrive to populate the dashboard; no batch score run is needed.
+
+{{end}}## When you need it
 
 | Question | Read |
 | --- | --- |
@@ -113,7 +127,7 @@ model{{if eq .training_layout "multi_target"}} set{{end}} version. A monitoring 
 
 ## Upgrading this project
 
-This template pins `skyulf-core[mlflow]==0.9.4` in `deployment/requirements.txt`;
+This template pins `skyulf-core[mlflow]==0.9.5` in `deployment/requirements.txt`;
 public guides describe the current revision. Before changing the pin, follow
 [Upgrade an existing project](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html)
 and **Upgrade steps for generated Databricks projects** in the

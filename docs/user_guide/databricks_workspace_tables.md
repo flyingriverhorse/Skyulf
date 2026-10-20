@@ -61,9 +61,9 @@ how to verify them before the first run. The prepared examples create them with 
 | Table | Created by | Purpose |
 | --- | --- | --- |
 | Prediction table (`prediction_table` in `config/inference.yml`) | Score job, on its first run | One row per scored source row: record key, `prediction`, probabilities for classifiers, model name, version and run, and, when the model can exclude rows, `scoring_status` and `exclusion_reason`. Extra output columns from scoring rules (for example `no2_band`) are added here. |
-| `<prediction_table>_v<version>` plus a view under the logical name | Score job with `model_change_mode: full_rebuild` | One physical table per model version; the view always points at the current generation. Older generations remain until you remove them. |
+| `<prediction_table>_v<version>` plus a view under the logical name | Score job with `on_model_change: rescore_all` | One physical table per model version; the view always points at the current generation. Older generations remain until you remove them. |
 
-The default `incremental_append` mode keeps one table and appends new
+The default `on_model_change: score_new_rows` mode keeps one table and appends new
 predictions. See [Scoring](databricks_scoring.md).
 
 ## Feature tables (optional)
@@ -183,7 +183,7 @@ stay in that old store; they are not automatically copied to the new one.
 | Prediction table | New source inserts | Your retention policy; Skyulf does not delete predictions. |
 | `monitoring_results`, `performance_actions`, `retraining_requests` | Monitoring runs and decisions | Keep observation/action evidence for audit. Request status, job cooldown gates and the reserved reference-admission row also receive guarded updates. |
 | Reference tables | New monitored identities and distinct source populations | Use [guarded reference cleanup](databricks_monitoring_setup.md#retain-or-clean-old-spark-references); retained aliases, monitors, policy baselines and unfinished retraining protect references. Shared sources remain while another receipt needs them. |
-| `_v<version>` prediction generations | New versions in `full_rebuild` mode | Drop old generations once consumers use the new view. |
+| `_v<version>` prediction generations | New versions in `on_model_change: rescore_all` mode | Drop old generations once consumers use the new view. |
 
 Views never need cleanup. Do not drop or recreate the store's tables while any
 project still monitors into them; other projects share them.

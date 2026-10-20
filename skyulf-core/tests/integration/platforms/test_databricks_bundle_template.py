@@ -15,17 +15,18 @@ WORKFLOW = (
 )
 
 
-def test_inference_choice_precedes_training_engine_and_rejects_conflicts():
+def test_engine_choice_precedes_batch_compute_and_rejects_conflicts():
     """The setup wizard must reject an explicit Polars/Spark contradiction."""
     from jsonschema import Draft7Validator
 
     schema = json.loads((WORKFLOW.parents[4] / "databricks_template_schema.json").read_text())
     properties = schema["properties"]
-    assert properties["inference_mode"]["order"] < properties["engine"]["order"]
-    assert Draft7Validator(schema).is_valid({"inference_mode": "spark", "engine": "pandas"})
-    assert not Draft7Validator(schema).is_valid({"inference_mode": "spark", "engine": "polars"})
-    assert Draft7Validator(properties["engine"]["skip_prompt_if"]).is_valid(
-        {"inference_mode": "spark"}
+    assert properties["engine"]["order"] < properties["batch_compute"]["order"]
+    assert Draft7Validator(schema).is_valid({"batch_compute": "spark", "engine": "pandas"})
+    assert not Draft7Validator(schema).is_valid({"batch_compute": "spark", "engine": "polars"})
+    # Polars training hides the Spark batch-compute question instead of asking it.
+    assert Draft7Validator(properties["batch_compute"]["skip_prompt_if"]).is_valid(
+        {"engine": "polars"}
     )
 
 
@@ -34,7 +35,7 @@ def test_cdf_recovery_wizard_is_visible_and_disabled_by_default():
     from jsonschema import Draft7Validator
 
     schema = json.loads((WORKFLOW.parents[4] / "databricks_template_schema.json").read_text())
-    setting = schema["properties"]["auto_rebuild_on_cdf_expiry"]
+    setting = schema["properties"]["rescore_when_history_expires"]
     assert setting["default"] == "false"
     assert setting["enum"] == ["false", "true"]
     values = {name: spec["default"] for name, spec in schema["properties"].items()}
@@ -171,7 +172,7 @@ def test_data_settings_use_defaults_without_extra_prompts(task):
     values["setup_mode"] = "detailed"
     values.update(task=task, cv_enabled="true", training_sample_rows="1000")
     for name in (
-        "training_version",
+        "training_table_version",
         "test_size",
         "random_state",
         "stratify",
@@ -443,7 +444,7 @@ def test_preview_cli_exposes_one_training_action(tmp_path, monkeypatch, capsys):
         runpy.run_path(str(project / "src/tools/preview.py"), run_name="__main__")
     assert stopped.value.code == 0
     output = capsys.readouterr().out
-    assert "{score,train,sources}" in output
+    assert "{score,train,approve,sources}" in output
     assert "train_monthly" not in output
 
 
@@ -473,7 +474,7 @@ def test_init_exposes_both_model_change_modes_and_editable_training_cadence():
     root = WORKFLOW.parents[4]
     schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
     properties = schema["properties"]
-    assert properties["model_change_mode"]["enum"] == ["incremental_append", "full_rebuild"]
+    assert properties["on_model_change"]["enum"] == ["score_new_rows", "rescore_all"]
     assert properties["retraining_cron_expression"]["default"] == "0 0 3 3 * ?"
     assert properties["retraining_timezone_id"]["default"] == "UTC"
     bundle = (WORKFLOW.parents[2] / "deployment/variables.yml.tmpl").read_text(encoding="utf-8")

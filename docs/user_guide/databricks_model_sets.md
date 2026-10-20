@@ -28,7 +28,7 @@ flowchart LR
 ```
 
 `train_name` stands for each concrete `train_<name>` task. `run_batch_scoring`
-starts the score job only when `score_handoff` requests it after a set alias
+starts the score job only when `follow_champion` requests it after a set alias
 change. See [training reports](databricks_training_reports.md#training-graph-and-notebook-files)
 for the notebook behind each task.
 
@@ -51,7 +51,7 @@ inside the training folds and the final holdout stays separate.
 All branches are required. If one fails, the run stops and earlier component
 versions remain available for inspection. MLflow records a parent run and a
 linked child run for each branch. Branches keep `promotion_policy=manual_approval`
-and `score_handoff=disabled`; the set has its own promotion policy.
+and `follow_champion: false`; the set has its own promotion policy.
 
 Select recipes per branch. Declare named lists under `recipes` in
 `config/preprocessing.yml` and `config/pre_split.yml`. Keep custom factories in
@@ -85,7 +85,7 @@ with a changed model list is rejected before any model is trained.
 | `promotion_policy` | `manual_approval` | `manual_approval` or `automatic` set activation. |
 | `combined_rules_path` | `../features` | Feature package; captures combined rules from adjacent config/scoring.yml or legacy Python hooks with the next set. |
 | `composition_config` | Absent | Declarative alternative to `combined_rules_path`; the two cannot coexist. |
-| `source_change_policy` | `reject` | `reject` or `rebuild_on_change` for source updates and deletes. |
+| `on_source_change` | `stop` | `stop` or `rescore_all` for source updates and deletes. |
 | `publication` | `mode: all` | Output mode and optional views. |
 
 Names gain the target catalog, schema and deployment suffix. Unknown fields are
@@ -286,18 +286,18 @@ prediction-table writes exclusively.
 - **Full rebuild** replaces the compatible output table when the selected set
   changes, even without new input. Changes that involve temporal carry history
   require full rebuild.
-- **`source_change_policy: rebuild_on_change`**: when CDF shows an update or
+- **`on_source_change: rescore_all`**: when CDF shows an update or
   delete, the selected set rescores all current rows, recomputes rules and
   resets temporal history. Deleted records disappear. New inserts alone still
   append. The full snapshot must fit the row/byte limits. Receipts record
-  `source_change_policy`, `source_rebuilt` and `write_mode`.
+  the internal `source_change_policy`, `source_rebuilt` and `write_mode`.
 
-Single-model scoring has no `rebuild_on_change`; it rejects source updates and
+Single-model scoring has no `rescore_all` source option; it rejects source updates and
 deletes. See [source changes](databricks_scoring.md#source-changes-are-separate-from-model-changes).
 
 ### Spark scoring
 
-With `inference_mode: spark`, every component must pass Spark admission. Admission runs at
+With `batch_compute: spark`, every component must pass Spark admission. Admission runs at
 activation (manual approval or automatic promotion) and again at scoring. Independent outputs and
 `composition_config` with `weighted_sum`/`weighted_mean` are admitted. Function rules from
 scoring.yml and legacy Python hooks are admitted when
@@ -369,6 +369,49 @@ The final `training_report` task (`models_report.py`) shows **Where to look**,
 the set version, the operator blocks and **Decision details (JSON)**. Score
 results are in the score job's `score` task.
 
+## Upgrading Core with model sets
+
+After upgrading Core, retrain the existing set normally. If its champion requires
+an earlier runtime, training retains that champion's concrete component
+versions and checks each new candidate against its saved absolute quality gates.
+The set stays pending; automatic promotion is disabled for this decision.
+
+Review the component metrics and the filled-in approval command in the training
+report. When every component passes its configured `quality_threshold` and other
+gates, run that command on the same Bundle target. For example, replacing set
+version `4` with candidate `5` on `prod`:
+
+```bash
+databricks bundle run train -t prod --params lifecycle_action=approve,candidate_version=5,expected_champion_version=4,allow_unloadable_champion=true
+```
+
+This explicit approval records that the previous champion could not be compared.
+It rechecks candidate quality and the expected champion before moving the alias.
+Configured score and serving handoffs use the resulting concrete-version receipt.
+Never delete the champion alias to recover from an upgrade. Rollback to a
+pre-upgrade set requires a runtime that can load both sets; the recovery flag
+applies only to approval.
+
+### Migrating an older DECIMAL input contract
+
+Older models may have recorded a Spark DECIMAL input as `object` or string. New
+training converts that model value to float64 and records the source conversion.
+If champion comparison reports this schema mismatch, use new registered identities:
+
+1. In `config/training.yml`, give every affected `models.<branch>.model_name` a new
+   name; for a single model, update its effective `model_name`.
+2. For a model set, also change `config/inference.yml` → `model_set.model_name`.
+   Renaming only the set leaves its component champions unchanged.
+3. Train and review the new float64 candidate under the normal quality policy.
+   Keep the old registered versions and their champion records for existing consumers.
+4. Validate the new model's batch output and serving requests before switching
+   destinations. Use a separate prediction table and endpoint/SQL function for this
+   check; update `config/serving.yml` model and destination names deliberately.
+
+`allow_unloadable_champion` handles incompatible runtime versions only. It does not
+approve a changed input schema. The diagnostic names the affected columns and the
+concrete old champion. See [DECIMAL conversion evidence](databricks_training_data.md#spark-decimal-model-values).
+
 ## Common errors and fixes
 
 | Symptom | Fix |
@@ -376,8 +419,9 @@ results are in the score job's `score` task.
 | `Scoring rule '...' raised KeyError` during approval or scoring | The shared scoring rules run for every component with only that component's input columns. Read only columns all components receive. |
 | Replacement stays challenger | No branch improved by its `min_improvement`; ties alone never promote. |
 | Replacement fails quality | A branch regressed or failed an absolute gate; read the failed components in the report. |
+| Champion belongs to an earlier Core release | Retrain, review the pending report, then explicitly approve as described above. |
 | Changed branch names are rejected | A replacement needs the same branches and component names; create a new set for a new layout. |
 | `combined_only` fails | Add saved combined rules, then train and package a new set. |
 | Editing rules has no effect | Train and package a new set; scoring uses the saved rules. |
-| Spark admission rejects the set | Read the named rule and check, then follow [When the probe fails](databricks_spark_scoring.md#when-the-probe-fails); or use `inference_mode: local`. |
-| Update or delete fails scoring | Choose `source_change_policy: rebuild_on_change` deliberately. |
+| Spark admission rejects the set | Read the named rule and check, then follow [When the probe fails](databricks_spark_scoring.md#when-the-probe-fails); or use `batch_compute: single_node`. |
+| Update or delete fails scoring | Choose `on_source_change: rescore_all` deliberately. |

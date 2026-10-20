@@ -52,7 +52,7 @@ recipes:
 #   transformer: PowerTransformer
 #   params: {columns: [feature_value], method: yeo-johnson, standardize: false}
 # Time-based history needs an input observation_time different from event_column:
-# Window/history steps need inference_mode: local; Spark/endpoints do not admit them.
+# Window/history steps need batch_compute: single_node; Spark scoring and endpoints do not support them.
 # - name: recent_value
 #   transformer: RollingAggregate
 #   params:

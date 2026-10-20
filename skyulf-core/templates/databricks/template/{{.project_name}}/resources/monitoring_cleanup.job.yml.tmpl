@@ -1,4 +1,4 @@
-{{- if not .monitoring_catalog}}{{skip "monitoring_cleanup.job.yml"}}{{end -}}
+{{- if ne .monitoring "true"}}{{skip "monitoring_cleanup.job.yml"}}{{end -}}
 resources:
   jobs:
     monitoring_cleanup:
@@ -40,6 +40,7 @@ resources:
               monitoring_enabled: ${var.monitoring_enabled}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_environment: ${bundle.target}
               monitoring_deployment_mode: ${bundle.mode}
               monitoring_project: ${bundle.name}

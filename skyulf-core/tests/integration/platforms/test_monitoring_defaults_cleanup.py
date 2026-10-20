@@ -22,29 +22,29 @@ def test_monitoring_schema_default_is_shared():
     ("settings", "catalog", "schema"),
     [
         (
-            {"monitoring_catalog": "ops", "omit_fields": ("monitoring_schema",)},
-            "ops",
+            {"monitoring": "true", "omit_fields": ("monitoring_schema",)},
+            "${var.catalog}",
             "skyulf_monitoring",
         ),
-        ({"monitoring_catalog": "ops", "monitoring_schema": ""}, "ops", "skyulf_monitoring"),
-        ({"monitoring_catalog": "ops", "monitoring_schema": "team_store"}, "ops", "team_store"),
+        ({"monitoring": "true", "monitoring_schema": ""}, "${var.catalog}", "skyulf_monitoring"),
+        ({"monitoring": "true", "monitoring_schema": "team_store"}, "${var.catalog}", "team_store"),
         (
             {
-                "monitoring_catalog": "ops",
+                "monitoring": "true",
                 "monitoring_schema": "",
                 "performance_policy_mode": "report",
                 "label_table_name": "outcomes",
                 "label_available_at_column": "available_at",
             },
-            "ops",
+            "${var.catalog}",
             "skyulf_monitoring",
         ),
-        ({"monitoring_catalog": ""}, "", ""),
-        ({"monitoring_catalog": "", "monitoring_schema": "unused_store"}, "", ""),
+        ({"monitoring": "false"}, "", ""),
+        ({"monitoring": "false", "monitoring_schema": "unused_store"}, "", ""),
     ],
 )
 def test_rendered_monitoring_destination_defaults(tmp_path, settings, catalog, schema):
-    """A catalog selects the shared default while a blank catalog keeps monitoring fully off."""
+    """Monitoring uses each target's catalog and the shared default; off keeps it fully off."""
     project = _generate_project(tmp_path, **settings)
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
     assert variables["monitoring_catalog"]["default"] == catalog
@@ -61,11 +61,11 @@ def test_cleanup_job_has_independent_clock_and_existing_monitoring_identity(tmp_
     """Retention must not run observation/retraining and must preserve the monitoring permissions."""
     project = _generate_project(
         tmp_path,
-        monitoring_catalog="ops",
+        monitoring="true",
         deployment_identity=identity,
         manage_job_permissions="true",
         personal_development_targets="true",
-        auto_rebuild_on_cdf_expiry="true",
+        rescore_when_history_expires="true",
     )
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
     assert variables["monitoring_cleanup_cron"]["default"] == "0 0 4 ? * SUN"
@@ -111,9 +111,10 @@ def test_cleanup_job_has_independent_clock_and_existing_monitoring_identity(tmp_
         assert owner["task_key"] == task_key
         assert owner["workspace_host"] == "${workspace.host}"
     targets = yaml.safe_load((project / "deployment/targets.yml").read_text())["targets"]
-    for target in targets.values():
+    monitoring = yaml.safe_load((project / "deployment/monitoring.yml").read_text())["targets"]
+    for name, target in targets.items():
         if target["mode"] == "development":
-            assert target["variables"]["monitoring_cleanup_pause_status"] == "PAUSED"
+            assert monitoring[name]["variables"]["monitoring_cleanup_pause_status"] == "PAUSED"
             assert target["resources"]["jobs"]["monitoring_cleanup"]["name"] == "monitoring_cleanup"
         else:
             jobs = target["resources"]["jobs"]
@@ -124,9 +125,7 @@ def test_cleanup_job_has_independent_clock_and_existing_monitoring_identity(tmp_
 @pytest.mark.parametrize("target", ["test", "test_development"])
 def test_cleanup_schedule_and_destination_resolve_per_target(tmp_path, target, offline_workspace):
     """Real Bundle resolution must retain custom stores, dry runs, schedules and development pauses."""
-    project = _generate_project(
-        tmp_path, monitoring_catalog="ops", personal_development_targets="true"
-    )
+    project = _generate_project(tmp_path, monitoring="true", personal_development_targets="true")
     path = project / "deployment/targets.yml"
     document = yaml.safe_load(path.read_text())
     document["targets"]["test"]["variables"].update(

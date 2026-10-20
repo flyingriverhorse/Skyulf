@@ -41,11 +41,22 @@
     ],
     "description": "6. Multi-model outputs | all = save every model prediction and business result together; combined_only = run the models but save only combined business results plus keys/status/version (requires rules); separate_views = save all results once and expose model/business columns through separately named views, without duplicate tables",
     "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "single_model"
+      "anyOf": [
+        {
+          "properties": {
+            "prediction_delivery": {
+              "const": "endpoint"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_layout": {
+              "const": "single_model"
+            }
+          }
         }
-      }
+      ]
     }
   },
   "model_set_table_name": {
@@ -55,11 +66,22 @@
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
     "description": "6. Multi-model outputs | Physical result table name. Blank = <project_name>_set_scores. Target catalog/schema and dev suffix are added automatically",
     "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "single_model"
+      "anyOf": [
+        {
+          "properties": {
+            "prediction_delivery": {
+              "const": "endpoint"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_layout": {
+              "const": "single_model"
+            }
+          }
         }
-      }
+      ]
     }
   },
   "model_view_prefix": {
@@ -70,6 +92,13 @@
     "description": "6. Multi-model outputs | Prefix for each model view: <prefix>_<branch>. Blank = <project_name>_predictions. Customize individual names or select models in config/inference.yml (model_set)",
     "skip_prompt_if": {
       "anyOf": [
+        {
+          "properties": {
+            "prediction_delivery": {
+              "const": "endpoint"
+            }
+          }
+        },
         {
           "properties": {
             "training_layout": {
@@ -100,6 +129,13 @@
       "anyOf": [
         {
           "properties": {
+            "prediction_delivery": {
+              "const": "endpoint"
+            }
+          }
+        },
+        {
+          "properties": {
             "training_layout": {
               "const": "single_model"
             }
@@ -118,21 +154,32 @@
       ]
     }
   },
-  "source_change_policy": {
+  "on_source_change": {
     "order": 744,
     "type": "string",
-    "default": "reject",
+    "default": "stop",
     "enum": [
-      "reject",
-      "rebuild_on_change"
+      "stop",
+      "rescore_all"
     ],
-    "description": "6. Multi-model outputs | If existing source rows are updated/deleted: reject = stop and keep previous results; rebuild_on_change = rescore the full current snapshot with the selected model set, rebuilding lag/rolling history. New inserts still append. Full data must fit row/byte limits. Independent of the model-change setting",
+    "description": "6. Multi-model outputs | If existing source rows are updated/deleted: stop = stop and keep previous results; rescore_all = rescore the full current snapshot with the selected model set, rebuilding lag/rolling history. New inserts still append. Full data must fit row/byte limits. Independent of the model-change setting",
     "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "single_model"
+      "anyOf": [
+        {
+          "properties": {
+            "prediction_delivery": {
+              "const": "endpoint"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_layout": {
+              "const": "single_model"
+            }
+          }
         }
-      }
+      ]
     }
   }
 }

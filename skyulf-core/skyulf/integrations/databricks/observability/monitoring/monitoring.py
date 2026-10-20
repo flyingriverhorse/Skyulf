@@ -341,8 +341,13 @@ def run_monitoring_notebook(spark: Any, dbutils: Any) -> dict:
     observation_window(
         dates["as_of"] or datetime.now(UTC), dates["window_start"], dates["window_end"]
     )
+    from .monitoring_registration import monitoring_store_schema  # noqa: PLC0415
+
+    development = values.get("monitoring_deployment_mode") == "development"
     namespace = initialize_monitoring_store(
-        spark, values["monitoring_catalog"], values["monitoring_schema"]
+        spark,
+        values["monitoring_catalog"],
+        monitoring_store_schema(values, development=development),
     )
     result = run_monitoring(
         spark,

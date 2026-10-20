@@ -102,7 +102,10 @@ def existing_monitoring_store(monkeypatch):
 
 @pytest.mark.parametrize("enabled", ["true", "false"])
 def test_development_mode_never_registers_in_shared_monitoring(enabled):
-    """Ephemeral dev models must not create or pause central inventory entries."""
+    """Ephemeral dev models must not create or pause central inventory entries.
+
+    Without the opt-in nothing is written; an opt-in that names the shared store fails.
+    """
     from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         monitoring_destination,
         register_deployed_monitor,
@@ -115,6 +118,12 @@ def test_development_mode_never_registers_in_shared_monitoring(enabled):
         "monitoring_catalog": "workspace",
         "monitoring_schema": "shared_monitoring",
     }
+    if enabled == "true":
+        with pytest.raises(ValueError, match="development_"):
+            monitoring_destination(values)
+        with pytest.raises(ValueError, match="development_"):
+            register_scoring_monitor(None, {}, values, {})
+        return
     assert monitoring_destination(values) is None
     assert register_scoring_monitor(None, {}, values, {}) is None
     assert register_deployed_monitor(None, {}, values, {}, activation_started_ms=1) is None

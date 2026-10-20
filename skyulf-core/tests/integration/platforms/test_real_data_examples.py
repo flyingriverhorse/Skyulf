@@ -17,7 +17,7 @@ def test_real_data_example_runs_custom_code_on_spark(name):
     training = yaml.safe_load((project / "config/training.yml").read_text(encoding="utf-8"))
     inference = yaml.safe_load((project / "config/inference.yml").read_text(encoding="utf-8"))
     recipes = yaml.safe_load((project / "config/preprocessing.yml").read_text(encoding="utf-8"))
-    assert answers["inference_mode"] == inference["inference_mode"] == "spark"
+    assert answers["batch_compute"] == inference["batch_compute"] == "spark"
     assert answers["shap_enabled"] == answers["evaluation_charts_enabled"] == "true"
     assert answers["schema"] == name
     expected_store = "skyulf_monitoring" if name == "air_quality_no2" else name

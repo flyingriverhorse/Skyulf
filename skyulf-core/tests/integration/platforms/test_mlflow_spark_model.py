@@ -307,7 +307,18 @@ def test_missing_inputs_rejected_before_udf(artifact, monkeypatch):
 
 def test_feature_package_routes_missing_features_to_native_lookup(artifact, monkeypatch):
     """Feature packages require lookup keys before prediction rather than fetched columns."""
-    binding = {"version": 1}
+    binding = {
+        "version": 1,
+        "lookup_spec": {
+            "lookups": [
+                {
+                    "table_name": "main.data.features",
+                    "lookup_key": ["entity"],
+                    "feature_names": ["x"],
+                }
+            ]
+        },
+    }
     monkeypatch.setattr(spark_model, "feature_binding", lambda artifact: binding, raising=False)
     monkeypatch.setattr(
         spark_model, "feature_source_columns", lambda *args: ("entity",), raising=False
@@ -547,6 +558,104 @@ def test_spark_output_rejects_the_reserved_marker_and_inexact_integers():
         prepare_spark_output(
             numbers, (ColumnSpec(name="count", dtype="int64"),), True, nullable=True
         )
+
+
+def test_nullable_set_predictions_preserve_large_keys(tmp_path):
+    """A nullable prediction must not route nonnull int64 identities through float64."""
+    from skyulf.inference._manifest import ColumnSpec
+    from skyulf.inference.model_set import ComponentReference, save_model_set
+    from skyulf.integrations.databricks.training.shared.preprocessing_checks import (
+        seal_partition_probe,
+    )
+    from skyulf.integrations.mlflow.models import model_set as module
+
+    frame = pd.DataFrame({"x": [float(i) / 10 for i in range(-30, 30)]})
+    frame["target"] = (frame.x > 0).astype("int64")
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "bounds",
+                    "transformer": "ManualBounds",
+                    "params": {"bounds": {"x": {"lower": -3.0, "upper": 3.0}}},
+                }
+            ],
+            "modeling": {"type": "decision_tree_classifier", "params": {"max_depth": 3}},
+        }
+    )
+    pipeline.fit(SplitDataset(train=frame, test=frame.head(0)), target_column="target")
+    path = tmp_path / "model"
+    save_pipeline(pipeline, path)
+    artifact = seal_partition_probe(load_pipeline(path), frame, path, enabled=True)
+    saved = save_model_set(
+        tmp_path / "set-large",
+        {
+            "first": (
+                ComponentReference(
+                    name="model", version="1", digest=artifact.manifest.pipeline_sha256
+                ),
+                tmp_path / "model",
+            )
+        },
+        record_key_schema=(ColumnSpec(name="id", dtype="int64"),),
+    )
+    model = module.SkyulfModelSetPythonModel(
+        None, spark_model.partition_safety_certificate(saved), spark_model.runtime_source_digest()
+    )
+    model.load_context(SimpleNamespace(artifacts={"model_set": str(saved.directory)}))
+    query = pd.DataFrame({"id": [1, 2**53 + 1, 2**63 - 1], "x": [0.0, 100.0, -100.0]})
+    local = model.predict(None, query)
+    distributed = model.predict(None, query, params={"spark_output": True})
+    pd.testing.assert_series_equal(distributed.id, local.id)
+    assert distributed.id.tolist() == query.id.tolist()
+    pd.testing.assert_series_equal(
+        distributed.first__prediction.astype("Float64"), local.first__prediction.astype("Float64")
+    )
+    assert distributed.first__prediction.isna().tolist() == [False, True, True]
+
+
+def test_nullable_result_type_keeps_keys_in_native_integer_transport(monkeypatch):
+    """Worker output schema must not reintroduce a float cast around exact key values."""
+    from skyulf.inference._manifest import ColumnSpec
+
+    types = SimpleNamespace(
+        StructType=list, StructField=lambda name, dtype, nullable: (name, dtype)
+    )
+    monkeypatch.setattr(spark_model, "_spark_type", lambda dtype: dtype)
+    schema = spark_model._result_type(
+        types,
+        (ColumnSpec(name="id", dtype="int64"), ColumnSpec(name="prediction", dtype="int64")),
+        True,
+        ("id",),
+    )
+    assert schema == [("id", "int64"), ("prediction", "float64")]
+
+
+@pytest.mark.parametrize("raw_type", ["tinyint", "smallint", "int", "bigint"])
+def test_spark_set_keys_use_lossless_manifest_integer_type(expressions, monkeypatch, raw_type):
+    """Publication requires BIGINT even when the frozen source stores a narrower integer."""
+    from skyulf.inference._manifest import ColumnSpec
+
+    frame = Mock()
+    frame.schema = {"id": SimpleNamespace(dataType=SimpleNamespace(simpleString=lambda: raw_type))}
+    frame.select.return_value = frame
+    monkeypatch.setattr(spark_model, "_decoded", lambda field, *args: field)
+    spark_model._keyed_result(
+        frame, ("id",), (ColumnSpec(name="id", dtype="int64"),), Mock(), nullable=True
+    )
+    key = frame.select.call_args_list[0].args[0]
+    assert key.name == "`id`" and key.cast_type == "bigint"
+
+
+def test_spark_set_integer_keys_reject_noninteger_storage(expressions):
+    """A canonical integer cast must never accept potentially rounded floating identities."""
+    from skyulf.inference._manifest import ColumnSpec
+
+    frame = SimpleNamespace(
+        schema={"id": SimpleNamespace(dataType=SimpleNamespace(simpleString=lambda: "double"))}
+    )
+    with pytest.raises(ValueError, match="native integer"):
+        spark_model._record_keys(frame, ("id",), (ColumnSpec(name="id", dtype="int64"),))
 
 
 def test_spark_worker_bounds_model_calls_and_preserves_duplicate_indices(

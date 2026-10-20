@@ -33,6 +33,47 @@ SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
 For a worked example table, see the
 [end-to-end guide](databricks_bundle_walkthrough.md).
 
+### Spark DECIMAL model values
+
+At the Spark-to-model boundary, Skyulf converts selected `DECIMAL(p,s)` model inputs,
+numeric targets and weights to `DOUBLE` / `float64`. Bounded training, batch prediction,
+Spark worker inputs and the serving job's smoke sample use the same rule. Nulls remain
+missing values for the fitted preprocessing. Record keys, grouping identities and
+time controls retain their declared types.
+Use supported `STRING` or `BIGINT` record keys. Serving refuses a DECIMAL key that
+cannot be represented by its saved JSON contract; it does not round the key to float.
+
+For example, an `amount DECIMAL(17,6)` input becomes `float64` in the fitted pipeline,
+`double` in its MLflow signature and `DOUBLE` in the generated SQL scoring function.
+REST callers send JSON numbers or null, rather than Python `decimal.Decimal` objects.
+Converting DECIMAL to float64 may lose precision beyond roughly 15–17 significant digits.
+
+The completed training report and `training_data.json` list the observed conversions:
+
+```json
+{
+  "source_column_conversions": [
+    {"column": "amount", "source_dtype": "decimal(17,6)", "target_dtype": "float64"}
+  ]
+}
+```
+
+The saved model's `manifest.json` records conversions for its fitted inputs; a model
+set retains these in each component manifest. The default offline preview cannot
+inspect a table's physical types. Use its source-validation action for planned casts
+on the current schema, and the training report for casts actually performed on the
+pinned snapshot. Older artifacts without this field have no recorded conversion evidence.
+
+Native Feature Engineering lookup reads its own source/feature tables after Skyulf's
+projection. Its model-value columns must already use `DOUBLE`; persist the converted
+column and retrain before logging or serving that native lookup model. Its existing
+admission check rejects DECIMAL storage with an actionable message.
+
+If an older champion learned a DECIMAL input as `object` or string, the new float64
+candidate has a different input contract. Follow the
+[schema migration steps](databricks_model_sets.md#upgrading-core-with-model-sets)
+before switching consumers; a runtime-recovery flag does not override schema validation.
+
 ### Choose a table layout
 
 A project reads data in three roles. A layout only decides how many physical
@@ -149,7 +190,7 @@ Three behaviours decide which layout works:
 - **Incremental scoring accepts inserts only.** For a single model or a
   competition, an UPDATE or DELETE in the scoring source fails the score job
   with *Source updates and deletes require an explicit rescore policy*. Model
-  sets alone can opt into `source_change_policy: rebuild_on_change`; see
+  sets alone can opt into `on_source_change: rescore_all`; see
   [source changes](databricks_scoring.md#source-changes-are-separate-from-model-changes).
   Writing an outcome into an existing scoring row is an update, so use a
   separate outcomes table instead.
@@ -192,9 +233,9 @@ it explicitly to `defaults` or a model entry in `config/training.yml`:
 
 ```yaml
 training_table: "{catalog}.{input_schema}.measurements"
-training_version: null
+training_table_version: null
 training_label_table: "{catalog}.{input_schema}.outcomes"
-training_label_version: null
+training_label_table_version: null
 record_key_columns: [record_id]
 input_columns: [temperature, humidity]
 target_column: demand
@@ -217,7 +258,7 @@ At invocation, both Delta versions and the outcome table's immutable identity
 are pinned. Saved training specifications, dataset identity and MLflow input
 provenance include that binding. Replaying the saved model uses those versions,
 even if outcomes have since arrived. A replaced same-name outcome table fails
-the identity check. `training_label_version: 12` explicitly selects version 12;
+the identity check. `training_label_table_version: 12` explicitly selects version 12;
 leave it null for new training runs to see later outcomes. No source rows are
 written or merged back into Delta.
 
@@ -312,7 +353,7 @@ throughout the library and saved training settings.
 ### Choose the evaluation split and result availability
 
 The default `split_strategy: "random"` needs only existing keys, features and a
-nonnull target. `training_version` pins the source Delta snapshot; it is unrelated
+nonnull target. `training_table_version` pins the source Delta snapshot; it is unrelated
 to dates. Leave it null to resolve latest once at run start, or set a nonnegative
 integer to pin that version. This example shows the training-related
 part of the generated `config/training.yml` defaults. Generation omits keys
@@ -320,7 +361,7 @@ whose value is null, such as `event_column`, `start` or `result_cutoff`:
 
 ```yaml
 defaults:
-  training_version: 12
+  training_table_version: 12
   record_key_columns: [customer_id]
   input_columns: [income, age]
   target_column: claim_amount
@@ -419,7 +460,7 @@ can scan the selected source several times.
 With `training_window_mode: auto`, setup writes `full_snapshot` for random
 projects and an editable `rolling_calendar` with four months and
 `window_timezone: "UTC"` for temporal projects. Every `train`
-invocation resolves latest once when `training_version` is null or missing;
+invocation resolves latest once when `training_table_version` is null or missing;
 an explicit version is honored regardless of trigger. `rolling_calendar` and
 `rolling_days` derive new observation boundaries, including for manual runs. Fixed
 windows stay fixed even if a job runs again a month later.
@@ -526,7 +567,7 @@ supported format vocabulary is a subset of Python's
 [strptime directives](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes);
 source timezone rules use [IANA zoneinfo](https://docs.python.org/3/library/zoneinfo.html).
 
-`training_version` defaults to `null`, resolving latest once at the start of
+`training_table_version` defaults to `null`, resolving latest once at the start of
 each `train` invocation. Set an explicit version for a repeatable snapshot.
 Date boundaries default to null and are required only for `fixed_window`;
 `rolling_calendar` and `rolling_days` derive them at invocation. Scoring and saved-evidence actions

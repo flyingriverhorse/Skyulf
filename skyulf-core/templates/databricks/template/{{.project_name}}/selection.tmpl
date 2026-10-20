@@ -29,7 +29,7 @@
 {{- if ne .evaluation_charts_enabled "true" -}}
 {{- skip "src/jobs/generate_charts.py" -}}
 {{- end -}}
-{{- if ne .auto_rebuild_on_cdf_expiry "true" -}}
+{{- if ne .rescore_when_history_expires "true" -}}
 {{- skip "src/jobs/recover_predictions.py" -}}
 {{- skip "src/jobs/scoring_report.py" -}}
 {{- end -}}
@@ -41,11 +41,26 @@
 {{- skip "resources/online_publication.job.yml" -}}
 {{- skip "src/jobs/online_publication.py" -}}
 {{- end -}}
-{{- if ne .include_online_serving "true" -}}
-{{- skip "resources/online_serving_setup.job.yml" -}}
-{{- skip "src/jobs/online_serving_setup.py" -}}
+{{- if ne .include_online_feature_lookup "true" -}}
+{{- skip "resources/online_feature_lookup_setup.job.yml" -}}
+{{- skip "src/jobs/online_feature_lookup_setup.py" -}}
 {{- end -}}
-{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") (ne .include_online_serving "true") -}}
+{{- if eq .prediction_delivery "batch" -}}
+{{- skip "resources/serving_endpoint.job.yml" -}}
+{{- skip "src/jobs/serving_endpoint.py" -}}
+{{- end -}}
+{{- if eq .prediction_delivery "batch" -}}
+{{- skip "src/jobs/dispatch_serving.py" -}}
+{{- end -}}
+{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") (ne .include_online_feature_lookup "true") (eq .prediction_delivery "batch") -}}
 {{- skip "config/serving.yml" -}}
 {{- skip "deployment/serving-requirements.txt" -}}
+{{- end -}}
+
+{{- if eq .prediction_delivery "endpoint" -}}
+{{- skip "resources/score.job.yml" -}}
+{{- skip "deployment/score-requirements.txt" -}}
+{{- range $name := (regexp "[a-z_]+").FindAllString "score score_models recover_predictions scoring_report register_monitor register_set_monitor" -1 -}}
+{{- skip (printf "src/jobs/%s.py" $name) -}}
+{{- end -}}
 {{- end -}}

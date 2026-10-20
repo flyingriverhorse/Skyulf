@@ -222,11 +222,13 @@ def test_set_operator_never_loads_training_or_composition(
     assert operation.call_args.args[2]["model_name"] == "workspace.models.example_set_dev"
 
 
-def test_spark_approval_limits_only_functional_probe_after_global_key_check(monkeypatch):
+@pytest.mark.parametrize("mode", ["local", "spark"])
+def test_spark_approval_limits_only_functional_probe_after_global_key_check(monkeypatch, mode):
     """Large inference populations must not become local model-set approval inputs."""
     from skyulf.inference import model_set_partition_safety
     from skyulf.integrations.databricks.model_sets import model_set_project as module
     from skyulf.integrations.databricks.scoring.batch import spark_scoring
+    from skyulf.integrations.mlflow.spark import spark_model
 
     spark = Mock()
     artifact = SimpleNamespace(
@@ -237,6 +239,7 @@ def test_spark_approval_limits_only_functional_probe_after_global_key_check(monk
     )
     gate = Mock()
     monkeypatch.setattr(model_set_partition_safety, "require_partition_safe_model_set", gate)
+    monkeypatch.setattr(spark_model, "optional_partition_certificate", lambda artifact: {})
     monkeypatch.setattr(module, "latest_source_version", lambda *args: {"version": 17})
     selected = Mock()
     distributed = Mock(return_value=SimpleNamespace(frame=selected, row_count=4096))
@@ -250,10 +253,11 @@ def test_spark_approval_limits_only_functional_probe_after_global_key_check(monk
             "score_source_table": "a.b.source",
             "max_rows": 80,
             "max_input_mb": 4,
-            "inference_mode": "spark",
+            "inference_mode": mode,
         },
     )
-    gate.assert_called_once_with(artifact)
+    if mode == "spark":
+        gate.assert_called_once_with(artifact)
     distributed.assert_called_once_with(
         spark.read.option.return_value.table.return_value, ("id", "x"), ("id",)
     )
@@ -293,6 +297,7 @@ def test_set_key_schema_accepts_only_portable_types():
 def test_approval_frame_pins_integer_version_and_saved_columns(monkeypatch):
     """Delta history rows must be unpacked before configuring versionAsOf."""
     from skyulf.integrations.databricks.model_sets import model_set_project as module
+    from skyulf.integrations.mlflow.spark import spark_model
 
     spark = Mock()
     artifact = SimpleNamespace(
@@ -306,12 +311,38 @@ def test_approval_frame_pins_integer_version_and_saved_columns(monkeypatch):
     )
     bounded = Mock(return_value="frame")
     monkeypatch.setattr(module, "bounded_frame", bounded)
+    monkeypatch.setattr(spark_model, "optional_partition_certificate", lambda artifact: None)
     result = module.approval_frame(
         spark, artifact, {"score_source_table": "a.b.source", "max_rows": 80, "max_input_mb": 4}
     )
     spark.read.option.assert_called_once_with("versionAsOf", 17)
     assert bounded.call_args.args[1:4] == (("id", "x"), ("id",), 80)
     assert result == "frame"
+
+
+def test_local_contextful_approval_keeps_complete_population(monkeypatch):
+    """Uncertified group or window computations must still refuse a truncated population."""
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
+    from skyulf.integrations.mlflow.spark import spark_model
+
+    spark = Mock()
+    source = spark.read.option.return_value.table.return_value
+    artifact = SimpleNamespace(
+        manifest=SimpleNamespace(
+            input_schema=[SimpleNamespace(name="id"), SimpleNamespace(name="x")],
+            record_key_columns=("id",),
+        )
+    )
+    monkeypatch.setattr(spark_model, "optional_partition_certificate", lambda artifact: None)
+    monkeypatch.setattr(module, "latest_source_version", lambda *args: {"version": 17})
+    bounded = Mock(side_effect=ValueError("max_rows exceeded"))
+    monkeypatch.setattr(module, "bounded_frame", bounded)
+    with pytest.raises(ValueError, match="max_rows"):
+        module.approval_frame(
+            spark, artifact, {"score_source_table": "a.b.source", "max_rows": 80, "max_input_mb": 4}
+        )
+    assert bounded.call_args.args[0] is source
+    source.orderBy.assert_not_called()
 
 
 @pytest.mark.parametrize(

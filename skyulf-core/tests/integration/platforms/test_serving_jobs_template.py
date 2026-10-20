@@ -37,7 +37,13 @@ def test_serving_opt_ins_default_off_in_topic_and_generated_schema():
     assert source.is_file(), "Serving job opt-in schema is not implemented"
     topic = json.loads(source.read_text(encoding="utf-8"))
     generated = json.loads((ROOT / "databricks_template_schema.json").read_text(encoding="utf-8"))
-    for name in ("include_daily_rollout", "include_online_publication", "include_online_serving"):
+    assert "include_online_serving" not in topic
+    assert "include_online_serving" not in generated["properties"]
+    for name in (
+        "include_daily_rollout",
+        "include_online_publication",
+        "include_online_feature_lookup",
+    ):
         assert topic[name]["default"] == "false"
         assert topic[name]["enum"] == ["false", "true"]
         assert generated["properties"][name]["default"] == "false"
@@ -59,8 +65,8 @@ def test_endpoint_compute_answers_are_hidden_with_compatible_defaults():
 
 def test_online_setup_budget_allows_preparation_and_default_ready_wait():
     """The task must not expire before its own one-hour readiness timeout can finish."""
-    source = (TEMPLATE / "resources/online_serving_setup.job.yml.tmpl").read_text()
-    resource = yaml.safe_load(source)["resources"]["jobs"]["online_serving_setup"]
+    source = (TEMPLATE / "resources/online_feature_lookup_setup.job.yml.tmpl").read_text()
+    resource = yaml.safe_load(source)["resources"]["jobs"]["online_feature_lookup_setup"]
     assert resource["tasks"][0]["timeout_seconds"] == "${var.monitoring_timeout_seconds}"
 
 
@@ -79,15 +85,15 @@ def test_endpoint_settings_render_as_typed_yaml(tmp_path, kind, size, zero, time
 
     project = _generate_project(
         tmp_path,
-        include_online_serving="true",
+        include_online_feature_lookup="true",
         serving_workload_type=kind,
         serving_workload_size=size,
         serving_scale_to_zero_enabled=zero,
         serving_ready_timeout_s=timeout,
     )
-    endpoint = yaml.safe_load((project / "config/serving.yml").read_text())["online_serving"][
-        "endpoint"
-    ]
+    endpoint = yaml.safe_load((project / "config/serving.yml").read_text())[
+        "online_feature_lookup"
+    ]["endpoint"]
     assert endpoint["workload_type"] == kind
     assert endpoint["workload_size"] == size
     assert endpoint["scale_to_zero_enabled"] is (zero == "true")
@@ -118,7 +124,7 @@ def test_real_cli_publication_mode_controls_schedule_and_preserves_independent_s
     project = _generate_project(
         tmp_path,
         include_online_publication="true",
-        include_online_serving=serving,
+        include_online_feature_lookup=serving,
         online_publication_mode=mode,
     )
     config = yaml.safe_load((project / "config/serving.yml").read_text())
@@ -131,26 +137,23 @@ def test_real_cli_publication_mode_controls_schedule_and_preserves_independent_s
         job["tasks"][0]["notebook_task"]["base_parameters"]["publication_action"]
         == "{{job.parameters.publication_action}}"
     )
-    assert (project / "resources/online_serving_setup.job.yml").is_file() is (serving == "true")
+    assert (project / "resources/online_feature_lookup_setup.job.yml").is_file() is (
+        serving == "true"
+    )
     assert not (project / "resources/daily_rollout.job.yml").exists()
 
 
+@CLI
 @pytest.mark.parametrize("job", list(OPTIONAL))
-def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(job):
+def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(tmp_path, job):
     """Native job serialization must retain the guard against automatic retries."""
     jobs = pytest.importorskip("databricks.sdk.service.jobs")
-    path = TEMPLATE / (OPTIONAL[job][0] + ".tmpl")
+    from test_databricks_bundle_generation import _generate_project
+
+    project = _generate_project(tmp_path, **{"include_" + job: "true"})
+    path = project / OPTIONAL[job][0]
     assert path.is_file(), "Optional serving job resource is not implemented"
     text = path.read_text(encoding="utf-8")
-    if job == "online_publication":
-        text = text.replace('{{if eq .online_publication_mode "TRIGGERED"}}', "").replace(
-            "{{end}}", ""
-        )
-        text = text.replace(
-            "{{`{{job.parameters.publication_action}}`}}", "{{job.parameters.publication_action}}"
-        )
-    if job == "daily_rollout":
-        text = text.replace('{{"{{job.run_id}}"}}', "{{job.run_id}}")
     resource = yaml.safe_load(text)["resources"]["jobs"][job]
     assert resource["max_concurrent_runs"] == 1
     assert resource["schedule"]["pause_status"] == "PAUSED"
@@ -249,6 +252,9 @@ def test_real_cli_renders_only_requested_serving_jobs(tmp_path, daily, online):
         for section in config.values()
     )
     assert config["rollout"]["run_id"] == ""
+    assert config["rollout"]["traffic_step_percent"] == 10
+    assert config["rollout"]["stage_minimum_hours"] == 24.0
+    assert config["rollout"]["evidence_max_age_hours"] == 24.0
     assert config["rollout"]["smoke_records"] == []
     assert config["online_publication"]["source_table_id"] == ""
     assert "verdict" not in json.dumps(config) and "PASS" not in json.dumps(config)
@@ -266,17 +272,20 @@ def test_online_setup_generation_is_independent_of_publication_and_rollout(
     from test_databricks_bundle_generation import _generate_project
 
     project = _generate_project(
-        tmp_path, include_online_publication=publication, include_online_serving=serving
+        tmp_path, include_online_publication=publication, include_online_feature_lookup=serving
     )
     enabled = serving == "true"
-    assert (project / "resources/online_serving_setup.job.yml").is_file() is enabled
-    assert (project / "src/jobs/online_serving_setup.py").is_file() is enabled
+    assert (project / "resources/online_feature_lookup_setup.job.yml").is_file() is enabled
+    assert (project / "src/jobs/online_feature_lookup_setup.py").is_file() is enabled
+    assert not (project / "resources/online_serving_setup.job.yml").exists()
+    assert not (project / "src/jobs/online_serving_setup.py").exists()
     assert not (project / "resources/daily_rollout.job.yml").exists()
     assert (project / "resources/online_publication.job.yml").is_file() is (publication == "true")
     if enabled:
         config = yaml.safe_load((project / "config/serving.yml").read_text())
-        assert config["online_serving"]["enabled"] is False
-        assert config["online_serving"]["publications"][0]["source_table_id"] == ""
+        assert "online_serving" not in config
+        assert config["online_feature_lookup"]["enabled"] is False
+        assert config["online_feature_lookup"]["publications"][0]["source_table_id"] == ""
         training = yaml.safe_load((project / "config/training.yml").read_text())["defaults"]
         assert training["online_features"]["required_features"] == []
         assert training["online_features"]["freshness"][0]["max_age_seconds"] is None
@@ -288,8 +297,10 @@ def test_online_setup_generation_is_independent_of_publication_and_rollout(
         assert parsed["defaults"]["online_features"] == training["online_features"]
         requirements = (project / "deployment/requirements.txt").read_text()
         assert "databricks-feature-engineering==0.18.1" in requirements
-        resource = yaml.safe_load((project / "resources/online_serving_setup.job.yml").read_text())
-        job = resource["resources"]["jobs"]["online_serving_setup"]
+        resource = yaml.safe_load(
+            (project / "resources/online_feature_lookup_setup.job.yml").read_text()
+        )
+        job = resource["resources"]["jobs"]["online_feature_lookup_setup"]
         assert "schedule" not in job
         assert job["max_concurrent_runs"] == 1
         assert job["tasks"][0]["max_retries"] == 0

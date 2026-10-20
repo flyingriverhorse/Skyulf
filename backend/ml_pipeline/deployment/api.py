@@ -2,8 +2,10 @@
 
 import logging
 from collections.abc import AsyncGenerator
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
@@ -25,6 +27,36 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """Yield one async database session per request, closed when the request ends."""
     async with get_database_session() as session:
         yield session
+
+
+@router.post("/export/{job_id}")
+@limiter.limit("10/minute")
+async def export_project(
+    request: Request,
+    job_id: str,
+    mode: Literal["api", "batch", "both"] = "both",
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Download the selected fitted model as an independent API and/or batch project."""
+    from backend.ml_pipeline.project_export.service import (
+        ProjectJobNotFoundError,
+        export_model_project,
+    )
+
+    try:
+        content, filename = await export_model_project(session, job_id, mode)
+    except ProjectJobNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception:
+        logger.exception("Model project export failed")
+        raise HTTPException(500, "Model project export failed.") from None
+    return Response(
+        content,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/deploy/{job_id}", response_model=DeploymentInfo)

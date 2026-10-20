@@ -40,7 +40,7 @@ continues scoring with v2 after a successful promotion of v4. Selecting
 champion fails before output preparation; there is no fallback to latest.
 
 Set both fields together; a partial configuration fails before training or
-scoring. Generated projects also require `score_handoff`. Automatic promotion
+scoring. Generated projects also require `follow_champion`. Automatic promotion
 requires `quality_threshold`, including when scoring is pinned. Scoring never
 updates the caller's configured version. Moving from the single
 `model_selection_mode` field is covered in
@@ -241,17 +241,20 @@ metrics. The override is accepted only for `approve`, only as the exact value
 `true`, only while the champion still cannot be loaded, and only when the
 candidate passes a configured `quality_threshold` and any `quality_gates`. The
 saved comparison records that the champion was not measured. It works under
-either promotion policy. Model sets do not support it: their training stops
-with a message naming the release that produced the champion set.
+either promotion policy. Model sets support the same explicit approval path;
+every candidate component must pass its own absolute quality gates. See
+[Upgrading Core with model sets](databricks_model_sets.md#upgrading-core-with-model-sets)
+for the retained component versions and rollback requirements.
 
-Rolling back to a champion from the older release restores its alias, but the
-current score job cannot load it; keep that release's runtime if you need it.
+For a single model, rolling back to a champion from the older release restores
+its alias, but the current score job cannot load it; keep that release's runtime
+if you need it.
 
-`score_handoff` is a deploy-time setting in `config/inference.yml`, not a Run now parameter.
+Batch `follow_champion` is a deploy-time setting in `config/inference.yml`, not a Run now parameter.
 Changing it needs the matching deployed job parameters and a redeploy; see
 [schedules and handoff](databricks_scoring.md#schedules-handoff-and-execution-engines).
-`after_alias_change` requests the existing score job after a successful initialization, promotion or
-rollback. `disabled` leaves scoring to an explicit score run or its schedule. Rejection and training
+`true` requests the existing score job after a successful initialization, promotion or
+rollback. `false` leaves scoring to an explicit score run or its schedule. Rejection and training
 without a champion transition never trigger score. Handoff preserves the score selector: a pinned
 scorer still uses its configured version even after champion changes.
 
@@ -392,7 +395,8 @@ It completes fully applied changes or aborts untouched changes; mixed roles
 remain blocked for operator inspection. It does not change serving traffic or
 prediction tables, and it cannot adopt an uncontrolled alias automatically.
 
-For example, a regression project can select its gate in the generated config:
+For example, a regression project using legacy `workflow.json` can select its
+gate with these internal field names:
 
 ```json
 {

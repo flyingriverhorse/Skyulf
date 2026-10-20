@@ -128,7 +128,31 @@ quality settings from the challenger's saved training result. The approval
 settings below are examples; their metric, threshold and improvement must match
 that saved comparison.
 
+Set the traffic step and timing in your generated project's `config/serving.yml`
+**before initialization**, then read that same file in the initialization cell:
+
+```yaml
+rollout:
+  # Keep the other generated rollout fields.
+  traffic_step_percent: 10
+  stage_minimum_hours: 24.0
+  evidence_max_age_hours: 24.0
+```
+
+`traffic_step_percent` is an integer from 1 to 100; both hour values must be
+positive and finite. `stage_minimum_hours` applies to every stage, including
+the final 100% stage. `evidence_max_age_hours` limits how old the observation
+and its window end may be; it is independent of the stage's length. For an
+isolated test, `stage_minimum_hours: 0.1` means six minutes; keep the 24-hour
+default for normal use. Shorter stages still require enough requests and
+request-keyed labels under `health`. They do not change the daily job schedule:
+invoke the job manually after each test interval or adjust its schedule while
+preserving one writer. Each invocation advances at most one step.
+
 ```python
+from pathlib import Path
+
+import yaml
 from mlflow.tracking import MlflowClient
 from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
 from skyulf.integrations.databricks.serving import (
@@ -156,15 +180,14 @@ promotion = build_rollout_promotion(
 experiment_id = "REPLACE_WITH_EXISTING_EXPERIMENT_ID"
 run = registry.create_run(experiment_id)
 store = MLflowRolloutStore(registry, run.info.run_id)
+# Use the deployed file's absolute /Workspace/.../config/serving.yml path.
+serving_config_path = "/Workspace/REPLACE_WITH_PROJECT_PATH/config/serving.yml"
+rollout_settings = yaml.safe_load(Path(serving_config_path).read_text())["rollout"]
 result = initialize_rollout(
     workspace,
     plan,
     store=store,
-    policy=DailyRolloutPolicy(
-        increment_percentage=10,
-        minimum_stage_hours=24.0,
-        evidence_max_age_hours=24.0,
-    ),
+    policy=DailyRolloutPolicy.from_config(rollout_settings),
     admission=SingleWriterAdmission(),
     rollout_id=run.info.run_id,
     promotion=promotion,
@@ -172,6 +195,12 @@ result = initialize_rollout(
 print(result)
 print("rollout run_id:", run.info.run_id)
 ```
+
+The job checks these YAML values against the saved policy before reconciling
+the endpoint. To change a policy, initialize a new rollout on a settled 100/0
+endpoint and configure its new `run_id`; editing YAML alone cannot shorten an
+active rollout. Missing timing fields use the 10-point/24-hour defaults. For an
+older run initialized with custom SDK values, add matching fields to its YAML.
 
 `SingleWriterAdmission` is an explicit ownership contract, not a distributed
 lock. Restrict endpoint and alias mutation permissions to the controller's
@@ -216,6 +245,9 @@ rollout:
   enabled: true
   exclusive_writer: true
   run_id: "COPY_THE_INITIALIZED_ROLLOUT_RUN_ID"
+  traffic_step_percent: 10
+  stage_minimum_hours: 24.0
+  evidence_max_age_hours: 24.0
   comparison_sha256: "COPY_THE_SAVED_COMPARISON_DIGEST"
   smoke_records:
     - income: 42000.0
@@ -229,9 +261,9 @@ rollout:
 ```
 
 Replace the smoke fields with the actual request schema; an online feature
-model may require keys and additional source fields instead. Stage size and
-duration belong to the saved `DailyRolloutPolicy` initialized above, while these
-health thresholds configure the job's observation. Preserve both deliberately.
+model may require keys and additional source fields instead. The three policy
+fields must match initialization; the health thresholds configure the job's
+observation. Preserve both deliberately.
 
 From the configured generated project:
 
@@ -353,12 +385,50 @@ reconciliation run does not immediately apply another traffic increase. The
 stage clock advances only after the expected endpoint revision and routes are
 verified.
 
-If the request remains `PREPARED` while the endpoint still shows its old
-configuration, the controller holds. It cannot tell whether an uncertain request
-will still apply. Inspect the recorded intent and native endpoint operation
-before resolving the rollout; do not edit receipt tags or blindly resend the
-request. An unexpected endpoint ID, revision, model or routing setting stops
-automation rather than overwriting another writer's change.
+New `PREPARED` receipts distinguish two submission states:
+
+| `request.submission_state` | Recovery on the next invocation |
+| --- | --- |
+| `NOT_SUBMITTED` | Revalidate the endpoint and send the saved request once. |
+| `OUTCOME_UNKNOWN`, or absent in an older receipt | Inspect the endpoint without resending. Commit the receipt only when the exact target revision, model pair and routes are ready. |
+
+The controller persists `OUTCOME_UNKNOWN` immediately before sending the
+request. A crash between those operations is therefore ambiguous even if the
+endpoint still has its old configuration. Repeated invocations hold that
+receipt; elapsed time alone does not prove that an update cannot still apply.
+
+Inspect the saved intent and endpoint using the same clients and store as
+initialization:
+
+```python
+receipt = store.load()
+request = receipt.get("request", {})
+endpoint = workspace.api_client.do(
+    "GET", f"/api/2.0/serving-endpoints/{receipt['state']['endpoint_name']}"
+)
+print({
+    "receipt_status": receipt["status"],
+    "submission_state": request.get("submission_state", "OUTCOME_UNKNOWN"),
+    "prior_revision": request.get("prior_config_version"),
+    "target_revision": request.get("target_config_version"),
+    "current_revision": endpoint.get("config", {}).get("config_version"),
+    "pending_config": endpoint.get("pending_config"),
+    "endpoint_state": endpoint.get("state"),
+})
+```
+
+If the exact requested configuration has settled, rerun `daily_rollout` to
+reconcile it. A pending update must settle before proceeding. An unexpected
+endpoint ID, revision, model or routing setting stops automation rather than
+overwriting another writer's change.
+
+There is no force-abort API for an ambiguous receipt. If the request cannot be
+resolved, pause the job, establish exclusive ownership and inspect the native
+endpoint operation with your workspace administrator. Retain the old run as
+evidence. Once no old update can still apply, explicitly restore an admitted,
+ready 100/0 endpoint and initialize a new rollout run using the sequence above;
+update `rollout.run_id` before resuming. Do not edit receipt artifacts or tags,
+reset the submission marker, or blindly resend an uncertain request.
 
 Pause the scheduled job to stop further decisions. A verified regression rollback
 is terminal for that rollout; starting again requires a new explicit rollout.

@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -44,7 +43,8 @@ def _frame_receipt(path: Path, frame: pd.DataFrame) -> dict:
     return {
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "rows": len(frame),
-        "attrs": deepcopy(frame.attrs),
+        # Parquet and MLflow preserve JSON arrays, including tuple-valued Spark metadata.
+        "attrs": json.loads(json.dumps(frame.attrs, allow_nan=False)),
         "bytes": path.stat().st_size,
         "memory_bytes": int(frame.memory_usage(index=True, deep=True).sum()),
         "schema": frame_schema(frame),

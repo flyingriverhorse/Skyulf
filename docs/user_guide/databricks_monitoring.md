@@ -30,7 +30,8 @@ measures and saves the evidence, shows it in `monitoring_report`, and applies
 any retraining policy you enabled. The dashboard refresh task exists only after
 you configure it. The monitoring job also has its own schedule, which starts
 paused, to revisit delayed outcomes without a new score. Monitoring runs only in
-shared production-mode targets; personal development targets skip it.
+shared production-mode targets; personal development targets skip it unless they
+opt in to their own separate store.
 
 ## Read in this order
 

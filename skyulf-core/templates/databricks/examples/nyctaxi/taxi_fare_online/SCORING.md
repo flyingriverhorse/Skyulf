@@ -37,13 +37,13 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 
 - This example deliberately saves no scoring policy. The caller validates inputs;
   saved preprocessing and estimator validation still apply.
-- `model_change_mode` controls a changed model; model-set `source_change_policy`
+- `on_model_change` controls a changed model; model-set `on_source_change`
   separately controls UPDATE/DELETE. Ordinary single-model insert scoring rejects them.
 - CDF-expiry recovery is opt-in and requires matching graph/notebooks/wheel.
   It does not recover arbitrary permissions, schema or source-identity failures.
 - Keep `workflow_contract: "3"` and deployed handoff/recovery parameters aligned.
   Retry scoring independently after promotion; do not repair lifecycle actions.
-- This project uses `inference_mode=local`.
+- This project uses `batch_compute: single_node`.
   Local means whole-frame scoring on selected compute; size each initial/rebuild
   population against `max_rows` and `max_input_mb`.
 

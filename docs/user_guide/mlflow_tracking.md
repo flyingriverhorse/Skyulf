@@ -173,7 +173,7 @@ for the dataset input format.
 
 ## Training preprocessing diagnostics
 
-With `TrainingSpec(..., preprocessing_probe=True)` or `defaults.preprocessing_probe:
+With `TrainingSpec(..., preprocessing_probe=True)` or `defaults.save_preprocessing_diagnostics:
 true` in a generated Bundle, the run that fitted each pipeline saves
 `preprocessing_probe.json` in its **Artifacts** tab. The fitting task's Output
 (`train_and_tune` or `train_<name>`) shows the result; the final

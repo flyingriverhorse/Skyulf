@@ -192,14 +192,28 @@ def _validate_smoke_response(response: Any, role: str, count: int, schema: tuple
 
 
 def _validate_smoke_rows(rows: list, schema: tuple) -> None:
-    """Require every saved output field to be present, finite and available."""
+    """Require predictions while allowing null explanations for predicted outcomes."""
     names = {name for name, _ in schema}
     if any(not isinstance(row, dict) or set(row) != names for row in rows):
         raise ValueError("Smoke response predictions differ from the saved output schema.")
-    if any(value is None for row in rows for value in row.values()):
-        raise ValueError("Smoke response predictions are unavailable.")
+    for row in rows:
+        _validate_smoke_outcomes(row)
     validate_json_rows(rows)
     validate_schema_rows(rows, schema)
+
+
+def _validate_smoke_outcomes(row: dict[str, Any]) -> None:
+    """Keep pipeline and component status/reason pairs consistent with usable predictions."""
+    for name, value in row.items():
+        if name == "exclusion_reason" or name.endswith("__exclusion_reason"):
+            status = name.removesuffix("exclusion_reason") + "scoring_status"
+            if value is not None or row.get(status) != "predicted":
+                raise ValueError("Smoke response scoring outcomes are unavailable or inconsistent.")
+        elif name == "scoring_status" or name.endswith("__scoring_status"):
+            if value != "predicted":
+                raise ValueError("Smoke response scoring outcomes are unavailable or inconsistent.")
+        elif value is None:
+            raise ValueError("Smoke response predictions are unavailable.")
 
 
 def observe_bootstrap_rollout(
@@ -252,7 +266,7 @@ def observe_bootstrap_rollout(
 
 
 def _validate_live_binding(
-    plan: RolloutEndpointPlan, state: RolloutState, config: MonitorConfig, artifact: Any, spec: Any
+    plan: RolloutEndpointPlan, state: RolloutState, config: MonitorConfig, artifact: Any
 ) -> None:
     """Reject unsupported model sets and wrong endpoint/source/version before native reads."""
     from ....inference.fitted_pipeline import FittedPipelineArtifact  # noqa: PLC0415
@@ -270,8 +284,6 @@ def _validate_live_binding(
         selected.spec.inference_table,
     ):
         raise ValueError("Serving monitoring identity differs from the admitted rollout stage.")
-    if not set(spec.record_key_columns).issubset(selected.input_columns):
-        raise ValueError("Serving request schema must retain the declared source record keys.")
     actual = tuple((column.name, column.dtype) for column in scoring_output_schema(artifact))
     if selected.output_schema != actual:
         raise ValueError("Serving output schema differs from the loaded fitted artifact.")
@@ -394,7 +406,7 @@ def observe_live_rollout(
     start = _validate_stage(plan, state, now)
     if state.challenger_percentage == 0:
         raise ValueError("Live observation requires a nonzero challenger stage.")
-    _validate_live_binding(plan, state, config, artifact, training_spec)
+    _validate_live_binding(plan, state, config, artifact)
     validate_quality_policy(metric, quality_threshold, quality_gates, task=artifact.manifest.task)
     if quality_threshold is None:
         raise ValueError("Live rollout requires an explicit absolute quality threshold.")

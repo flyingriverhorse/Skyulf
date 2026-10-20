@@ -46,8 +46,8 @@ resources:
               on_drift_min_new_training_rows: ${var.on_drift_min_new_training_rows}
               train_job_name: ${bundle.name}_train
               workflow_contract: "3"
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .prediction_delivery `endpoint`}}disabled{{else}}{{if eq .score_follow_champion `true`}}after_alias_change{{else}}disabled{{end}}{{end}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{if eq .prediction_delivery `endpoint`}}false{{else}}{{.rescore_when_history_expires}}{{end}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
@@ -63,6 +63,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
@@ -92,8 +93,8 @@ resources:
               on_drift_min_new_training_rows: ${var.on_drift_min_new_training_rows}
               train_job_name: ${bundle.name}_train
               workflow_contract: "3"
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .prediction_delivery `endpoint`}}disabled{{else}}{{if eq .score_follow_champion `true`}}after_alias_change{{else}}disabled{{end}}{{end}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{if eq .prediction_delivery `endpoint`}}false{{else}}{{.rescore_when_history_expires}}{{end}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
@@ -109,6 +110,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
@@ -131,8 +133,8 @@ resources:
               on_drift_min_new_training_rows: ${var.on_drift_min_new_training_rows}
               train_job_name: ${bundle.name}_train
               workflow_contract: "3"
-              deployed_score_handoff: "{{.score_handoff}}"
-              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              deployed_score_handoff: "{{if eq .prediction_delivery `endpoint`}}disabled{{else}}{{if eq .score_follow_champion `true`}}after_alias_change{{else}}disabled{{end}}{{end}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{if eq .prediction_delivery `endpoint`}}false{{else}}{{.rescore_when_history_expires}}{{end}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
               config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
@@ -148,6 +150,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}

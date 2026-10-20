@@ -55,9 +55,9 @@ def test_generated_projects_bind_independent_monitoring_destination(
     project = _generate_project(
         tmp_path,
         training_layout=layout,
-        auto_rebuild_on_cdf_expiry=recovery,
+        rescore_when_history_expires=recovery,
         compute_mode=compute,
-        monitoring_catalog=catalog,
+        monitoring="true" if catalog else "false",
         monitoring_schema=schema,
     )
     retired = {
@@ -71,16 +71,17 @@ def test_generated_projects_bind_independent_monitoring_destination(
     assert not retired.intersection(path.name for path in (project / "src/jobs").glob("*.py"))
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
     targets = yaml.safe_load((project / "deployment/targets.yml").read_text())["targets"]
-    for target in targets.values():
+    # Development monitoring settings live in deployment/monitoring.yml.
+    monitoring = yaml.safe_load((project / "deployment/monitoring.yml").read_text())["targets"]
+    for name, target in targets.items():
+        assert "monitoring_enabled" not in target["variables"]
         if target["mode"] == "development":
-            assert target["variables"]["monitoring_enabled"] == "false"
-            assert target["variables"]["on_drift"] == "disabled"
-            assert target["variables"]["monitoring_performance_policies"] == "{}"
-        else:
-            assert "monitoring_enabled" not in target["variables"]
+            assert monitoring[name]["variables"]["monitoring_enabled"] == "false"
+            assert monitoring[name]["variables"]["on_drift"] == "disabled"
+            assert monitoring[name]["variables"]["monitoring_performance_policies"] == "{}"
     assert variables["monitoring_enabled"]["default"] == ("true" if catalog else "false")
     assert "monitoring_execution_engine" not in variables
-    assert variables["monitoring_catalog"]["default"] == catalog
+    assert variables["monitoring_catalog"]["default"] == ("${var.catalog}" if catalog else "")
     assert variables["monitoring_schema"]["default"] == schema
     assert variables["monitoring_drift_thresholds"]["default"] == "{}"
     assert variables["monitoring_performance_policies"]["default"] == "{}"
@@ -135,10 +136,11 @@ def test_generated_projects_bind_independent_monitoring_destination(
     assert allowed["depends_on"] == [
         {"task_key": "scoring_report" if recovery == "true" else "score"}
     ]
+    # Shared targets always pass; development passes only with its own monitoring store.
     assert allowed["condition_task"] == {
-        "op": "EQUAL_TO",
-        "left": "${bundle.mode}",
-        "right": "production",
+        "op": "NOT_EQUAL",
+        "left": "${bundle.mode}:${var.monitoring_enabled}",
+        "right": "development:false",
     }
     assert monitor["notebook_task"]["notebook_path"] == "../src/jobs/prepare_monitoring.py"
     assert "monitoring_invocation_id" not in monitor["notebook_task"]["base_parameters"]
@@ -213,8 +215,9 @@ def test_source_templates_propagate_performance_mapping_to_every_monitoring_task
         assert text.count(
             "monitoring_performance_policies: ${var.monitoring_performance_policies}"
         ) == (text.count("monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}"))
-    targets = (project / "deployment/targets.yml.tmpl").read_text()
-    assert targets.count("monitoring_performance_policies: '{}'") == 3
+    # One development block, rendered once for each personal development target.
+    monitoring = (project / "deployment/monitoring.yml.tmpl").read_text()
+    assert monitoring.count("monitoring_performance_policies: '{}'") == 1
     variables = (project / "deployment/variables.yml.tmpl").read_text()
     assert "  monitoring_performance_policies:" in variables
     assert "    default: '{}'" in variables

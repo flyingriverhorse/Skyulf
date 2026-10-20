@@ -295,7 +295,7 @@ def test_probe_is_not_run_without_the_flag(tmp_path):
 def test_row_step_without_flag_is_rejected(tmp_path, kind, node):
     """Without the project opt-in a custom step stays rejected even if it is row-wise."""
     artifact, _ = _sealed(tmp_path, flag=False, kind=kind)
-    with pytest.raises(UnsupportedExecutionError, match="admit_probed_custom_steps: true") as err:
+    with pytest.raises(UnsupportedExecutionError, match="allow_tested_custom_steps: true") as err:
         require_partition_safe_pipeline(artifact)
     assert "clip_duration" in str(err.value) and node in str(err.value)
 
@@ -305,8 +305,10 @@ def test_steps_declared_with_other_rows_are_rejected(tmp_path, context):
     """A declared group/window/global step needs other rows; evidence never admits it."""
     artifact, _ = _sealed(tmp_path, context=context)
     assert artifact.pipeline.config["partition_probe"]["steps"] == []
-    with pytest.raises(UnsupportedExecutionError, match=f"inference_context='{context}'"):
+    with pytest.raises(UnsupportedExecutionError, match=f"inference_context='{context}'") as err:
         require_partition_safe_pipeline(artifact)
+    assert "batch_compute: single_node" in str(err.value)
+    assert "inference_mode:" not in str(err.value)
 
 
 @pytest.mark.parametrize("kind", ["fitted", "column"])

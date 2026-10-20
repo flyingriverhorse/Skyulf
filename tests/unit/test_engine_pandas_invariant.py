@@ -34,6 +34,7 @@ class _Loader(NodeRunnersMixin):
         self.catalog.load.return_value = loaded
         self.catalog.get_dataset_name.return_value = "ds"
         self.artifact_store = MagicMock()
+        self._raw_input_schemas = {}
         self.logs: list[str] = []
 
     def log(self, msg: str) -> None:

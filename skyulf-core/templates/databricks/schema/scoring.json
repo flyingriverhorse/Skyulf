@@ -3,9 +3,18 @@
     "order": 7.1,
     "type": "string",
     "default": "",
-    "description": "1. Data | Prediction INPUT table: rows the model will read to make predictions. This is NOT the output table. Blank = same input as training",
+    "description": "1. Data | Prediction INPUT table: rows for batch predictions or the endpoint smoke sample. This is NOT the output table. Blank = same input as training",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
-    "skip_prompt_if": {"properties": {"source_layout": {"enum": ["single_table", "separate_outcomes"]}}}
+    "skip_prompt_if": {
+      "properties": {
+        "source_layout": {
+          "enum": [
+            "single_table",
+            "separate_outcomes"
+          ]
+        }
+      }
+    }
   },
   "prediction_table_name": {
     "order": 8,
@@ -14,29 +23,57 @@
     "description": "1. Data | Prediction OUTPUT table name, e.g. customer_predictions. Results are written here; blank uses <project_name>_predictions",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
     "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "multi_target"
+      "anyOf": [
+        {
+          "properties": {
+            "prediction_delivery": {
+              "const": "endpoint"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
         }
-      }
+      ]
     }
   },
   "initial_scoring": {
     "order": 722.5,
     "type": "string",
     "default": "full_snapshot",
-    "enum": ["full_snapshot", "from_now"],
-    "description": "4. Scoring | First run: full_snapshot predicts existing rows; from_now records the current Delta version without predictions, then scores new inserts. Rebuilds keep the boundary using saved keys and recent CDF; CDF-expiry recovery needs the original snapshot"
+    "enum": [
+      "full_snapshot",
+      "from_now"
+    ],
+    "description": "4. Scoring | First run: full_snapshot predicts existing rows; from_now skips existing rows and starts predicting later inserts on subsequent runs. Model changes and recovery keep previously skipped rows excluded.",
+    "skip_prompt_if": {
+      "properties": {
+        "prediction_delivery": {
+          "const": "endpoint"
+        }
+      }
+    }
   },
-  "model_change_mode": {
+  "on_model_change": {
     "order": 723,
     "type": "string",
-    "default": "incremental_append",
-    "description": "4. Lifecycle | When the selected model/model set changes: incremental_append keeps old predictions and scores new rows; full_rebuild recomputes eligible source rows with the new selection, preserving any from_now boundary. Independent of source UPDATE/DELETE handling",
+    "default": "score_new_rows",
+    "description": "4. Lifecycle | When the selected model/model set changes: score_new_rows keeps old predictions and scores only new rows; rescore_all recomputes eligible source rows with the new selection, preserving any from_now boundary. Independent of source UPDATE/DELETE handling",
     "enum": [
-      "incremental_append",
-      "full_rebuild"
-    ]
+      "score_new_rows",
+      "rescore_all"
+    ],
+    "skip_prompt_if": {
+      "properties": {
+        "prediction_delivery": {
+          "const": "endpoint"
+        }
+      }
+    }
   },
   "score_model_selection": {
     "order": 725,
@@ -48,11 +85,22 @@
       "champion"
     ],
     "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "multi_target"
+      "anyOf": [
+        {
+          "properties": {
+            "prediction_delivery": {
+              "const": "endpoint"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
         }
-      }
+      ]
     }
   },
   "promotion_policy": {
@@ -72,15 +120,22 @@
       }
     }
   },
-  "score_handoff": {
+  "score_follow_champion": {
     "order": 727,
     "type": "string",
-    "default": "disabled",
-    "description": "4. Lifecycle | Optionally start the score job after successful champion initialization, promotion or rollback (single, competition or model set). Pending approval, failed quality and rejection do not start scoring",
+    "default": "false",
+    "description": "4. Lifecycle | Start the score job automatically when a new champion is approved (first champion, promotion or rollback; single, competition or model set)? Pending approval, failed quality and rejection do not start scoring",
     "enum": [
-      "disabled",
-      "after_alias_change"
-    ]
+      "false",
+      "true"
+    ],
+    "skip_prompt_if": {
+      "properties": {
+        "prediction_delivery": {
+          "const": "endpoint"
+        }
+      }
+    }
   },
   "regression_metric": {
     "order": 728,
@@ -197,15 +252,22 @@
       }
     }
   },
-  "auto_rebuild_on_cdf_expiry": {
+  "rescore_when_history_expires": {
     "order": 724,
     "type": "string",
     "default": "false",
-    "description": "4. Lifecycle | Automatically rebuild predictions when retained Delta change history has expired? Adds a visible recovery task to the score job. May rescore the full source; independent of model-change policy",
+    "description": "4. Lifecycle | Automatically rescore when the source table's retained Delta change history has expired? Adds a visible recovery task to the score job. May rescore the full source; independent of the model-change setting",
     "enum": [
       "false",
       "true"
-    ]
+    ],
+    "skip_prompt_if": {
+      "properties": {
+        "prediction_delivery": {
+          "const": "endpoint"
+        }
+      }
+    }
   },
   "risk_category": {
     "order": 732,

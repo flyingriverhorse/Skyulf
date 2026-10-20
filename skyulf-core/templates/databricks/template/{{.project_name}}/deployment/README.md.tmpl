@@ -5,13 +5,13 @@ workflow or company adapter is generated. Keep credentials outside these files.
 
 ## Selected layout
 
-- Training engine: `{{.engine}}`; inference mode: `{{.inference_mode}}`.
+- Training engine: `{{.engine}}`; batch compute: `{{.batch_compute}}`.
 - Personal development targets: `{{.personal_development_targets}}`.
 - Shared execution identity: `{{.deployment_identity}}`.
 - Managed per-job permissions: `{{.manage_job_permissions}}`.
 - Every target grants `CAN_MANAGE` to the deployer and `pipeline_owner`
   (`--var pipeline_owner=<email>` in CI); shared targets may add a `CAN_VIEW` group.
-{{if eq .inference_mode "spark"}}
+{{if eq .batch_compute "spark"}}
 - Spark scoring uses `spark_udf_env_manager={{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}`
   and 10000-row batches; certified worker runtime requirements still apply.
 {{else}}
@@ -67,6 +67,6 @@ host, schemas, output suffixes, `run_as` and permissions before deployment.
 - [Existing-project upgrades](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html)
 - [Monitoring store and access setup](https://www.skyulf.com/manual/user_guide/databricks_monitoring_setup.html)
 
-Version: `deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.4`.
+Version: `deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.5`.
 Public links show the latest documentation. Use the runtime matching the template
 and saved model producer; changing a pin does not upgrade existing artifacts.

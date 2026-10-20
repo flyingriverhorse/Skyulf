@@ -203,7 +203,7 @@ def _checked_configs(configs: Any) -> dict[str, dict[str, Any]]:
         config = validate_workflow_config(configs[name], action="train")
         if config["promotion_policy"] != "manual_approval" or config["score_handoff"] != "disabled":
             raise ValueError(
-                "Training branches require manual_approval and disabled score_handoff."
+                "Training branches require manual_approval and follow_champion: false."
             )
         checked[name] = config
     _shared_endpoints(checked)

@@ -46,6 +46,7 @@ markdown_extensions:
       custom_fences:
         - name: mermaid
           class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
   - Home: index.md
@@ -99,6 +100,8 @@ nav:
     - Preprocessing Placement: user_guide/preprocessing_placement.md
     - Drift Monitoring: user_guide/drift_monitoring.md
     - Serialization: user_guide/serialization.md
+    - Project Export Quickstart: user_guide/model_project_export_quickstart.md
+    - Export a Model Project: user_guide/model_project_export.md
     - Extending Skyulf-Core: user_guide/extending_custom_nodes.md
     - Troubleshooting: user_guide/troubleshooting.md
   - Integrations:

@@ -3,10 +3,45 @@
 {{- if or (and .label_table_name (not .label_available_at_column)) (and .label_available_at_column (not .label_table_name))}}
 {{- template "ERROR_label_table_name_and_label_available_at_column_must_be_set_together" . -}}
 {{- end}}
-{{- if and (ne .performance_policy_mode "off") (or (not .label_table_name) (not .monitoring_catalog))}}
+{{- if and (eq .development_monitoring "true") (eq .development_monitoring_schema (or .monitoring_schema "skyulf_monitoring"))}}
+{{- template "ERROR_development_monitoring_schema_must_differ_from_monitoring_schema" . -}}
+{{- end}}
+{{- if and (eq .development_monitoring "true") (ne .monitoring "true")}}
+{{- template "ERROR_development_monitoring_requires_monitoring_store" . -}}
+{{- end}}
+{{- if and (ne .monitoring_dashboard "none") (ne .monitoring "true")}}
+{{- template "ERROR_monitoring_dashboard_requires_monitoring_store" . -}}
+{{- end}}
+{{- if and (eq .monitoring_dashboard "create") (not .monitoring_dashboard_warehouse_id)}}
+{{- template "ERROR_monitoring_dashboard_create_requires_warehouse_id" . -}}
+{{- end}}
+{{- if and (eq .monitoring_dashboard "connect") (not .monitoring_dashboard_url)}}
+{{- template "ERROR_monitoring_dashboard_connect_requires_published_url" . -}}
+{{- end}}
+{{- if and (ne .performance_policy_mode "off") (or (not .label_table_name) (ne .monitoring "true"))}}
 {{- template "ERROR_performance_policy_requires_outcomes_and_monitoring_store" . -}}
 {{- end}}
 variables:
+{{- if ne .prediction_delivery "batch"}}
+  serving_timeout_seconds:
+    description: Serving child job limit; keep at least 300 seconds above serving.yml ready_timeout_s
+    default: 7200
+{{if eq .compute_mode "serverless"}}
+  cost_tag_value:
+    description: Endpoint cost allocation tag value; set before the first serving run
+    default: {{printf "%q" .cost_tag_value}}
+{{end}}
+  serving_permissions:
+    description: Serving child ACL; retain the automatic train caller when overriding this list
+    type: complex
+{{if eq .deployment_identity "deployer"}}
+    default: []
+{{else}}
+    default:
+      - level: CAN_MANAGE_RUN
+        service_principal_name: ${var.{{if eq .deployment_identity "shared_service_principal"}}shared_service_principal{{else}}train_service_principal{{end}}}
+{{end}}
+{{end}}
   pipeline_owner:
     description: User with CAN_MANAGE on every target besides the deployer; CI may pass --var pipeline_owner
     default: "{{if .pipeline_owner}}{{.pipeline_owner}}{{else}}${workspace.current_user.userName}{{end}}"
@@ -89,10 +124,13 @@ variables:
     default: "true"
   monitoring_cleanup_pause_status:
     description: Pause reference cleanup independently of observation and retraining
-    default: "{{if .monitoring_catalog}}UNPAUSED{{else}}PAUSED{{end}}"
+    default: "{{if eq .monitoring `true`}}UNPAUSED{{else}}PAUSED{{end}}"
   monitoring_enabled:
     description: Enroll activated models and measure drift after scoring; set true only with catalog and schema
-    default: "{{if .monitoring_catalog}}true{{else}}false{{end}}"
+    default: "{{if eq .monitoring `true`}}true{{else}}false{{end}}"
+  development_monitoring_schema:
+    description: Development targets' own monitoring store in monitoring_catalog. Any name except monitoring_schema; blank keeps development monitoring off
+    default: "{{if and (eq .personal_development_targets `true`) (eq .monitoring `true`) (eq .development_monitoring `true`)}}{{.development_monitoring_schema}}{{end}}"
   monitoring_dashboard_url:
     description: Published shared dashboard HTTPS URL shown in monitoring and drift task output
     default: ""
@@ -100,11 +138,11 @@ variables:
     description: Optional MLflow experiment for post-scoring monitoring reports
     default: ""
   monitoring_catalog:
-    description: Central monitoring catalog, independent of model and input catalogs
-    default: "{{.monitoring_catalog}}"
+    description: Monitoring catalog; defaults to each target's own catalog. Set one name here (or per target) for a central catalog
+    default: "{{if eq .monitoring `true`}}${var.catalog}{{end}}"
   monitoring_schema:
     description: Central monitoring schema shared by model repositories; created on first use if allowed
-    default: "{{if .monitoring_catalog}}{{if .monitoring_schema}}{{.monitoring_schema}}{{else}}skyulf_monitoring{{end}}{{end}}"
+    default: "{{if eq .monitoring `true`}}{{if .monitoring_schema}}{{.monitoring_schema}}{{else}}skyulf_monitoring{{end}}{{end}}"
   monitoring_label_table:
     description: Optional fully qualified table of actual outcomes for monitoring
     default: "{{if .label_table_name}}{{if not ((regexp "\\.").MatchString .label_table_name)}}${var.catalog}.${var.input_schema}.{{end}}{{.label_table_name}}{{end}}"

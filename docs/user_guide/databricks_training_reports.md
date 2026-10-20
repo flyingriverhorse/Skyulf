@@ -10,7 +10,7 @@ rejection and rollback; this page explains the reports that support them.
 
 ## What to edit
 
-Set `evaluation_charts`, `explainability` and `preprocessing_probe` under
+Set `evaluation_charts`, `explainability` and `save_preprocessing_diagnostics` under
 `defaults` or the supported named-model override in `config/training.yml`.
 The [field reference](databricks_training_config.md) lists allowed values.
 Generated optional report tasks and their pinned dependencies must be present:
@@ -371,7 +371,7 @@ Registration and approval retain their source/evidence replay checks.
 
 ### Preprocessing diagnostics
 
-With `defaults.preprocessing_probe: true`, each fitting run saves
+With `defaults.save_preprocessing_diagnostics: true`, each fitting run saves
 `preprocessing_probe.json`; the fitting task's Output (`train_and_tune` or
 `train_<name>`) shows the result. The
 [preprocessing diagnostics guide](preprocessing_context.md) explains the check

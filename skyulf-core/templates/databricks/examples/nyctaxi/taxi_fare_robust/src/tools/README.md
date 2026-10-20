@@ -35,7 +35,7 @@ locally installed packages and selected options.
 
 Preview resolves trusted custom factories, so keep I/O out of imports and
 builders. It starts no cloud job, reads no Delta rows, fits no model and does
-not run `preprocessing_probe`. A preview-resolution failure prints
+not run `save_preprocessing_diagnostics`. A preview-resolution failure prints
 `Configuration error:` and exits with code 2. Fix the stated configuration
 before deployment; passing preview does not verify data or cloud permissions.
 
@@ -47,7 +47,6 @@ before deployment; passing preview does not verify data or cloud permissions.
 | `smoke.py --probe`: fit on a local sample and run the Spark/endpoint admission lint and probe before a training job. Export one with `SELECT * FROM <training_table> LIMIT 256`; columns must match `input_columns` plus the target. Training on the real holdout decides. | `python src/tools/smoke.py --probe sample.csv` |
 | `refresh_feature_graph.py`: after changing upstream feature groups/merges. | `python src/tools/refresh_feature_graph.py` |
 | `refresh_training_graph.py`: after changing competition candidates or model-set branch names/count; single model is unchanged. | `python src/tools/refresh_training_graph.py` |
-| `configure_monitoring_dashboard.py`: configure refresh of an existing dashboard in a target. | `python src/tools/configure_monitoring_dashboard.py --dashboard-id YOUR_DASHBOARD_ID --target test` |
 
 Smoke prints JSON with `"status": "passed"`, or `"status": "failed"` and exit code 1
 for a checked configuration/source failure. It accepts the same five binding

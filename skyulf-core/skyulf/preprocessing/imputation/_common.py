@@ -197,8 +197,9 @@ def _imputation_config(node: str, params: dict, state: dict) -> dict:
         raise ValueError("Configured strategy disagrees with fitted strategy.")
     if node == "GroupImputer" and resolved["group_by"] != state["group_by"]:
         raise ValueError("Configured group key disagrees with fitted key.")
-    if node == "SimpleImputer" and resolved["fill_value"] is not None:
-        raise ValueError("Mode imputation does not use a configured constant.")
+    if node == "SimpleImputer":
+        # Fitting median/mode ignores this hidden canvas default as well.
+        resolved["fill_value"] = None
     return resolved
 
 

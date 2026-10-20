@@ -166,7 +166,7 @@ def test_simple_median_keeps_existing_artifact_shape_and_count_validation(change
 
 @pytest.mark.parametrize(
     "change",
-    [{"strategy": "mean"}, {"columns": ["other"]}, {"fill_value": 7}, {"unexpected": 1}],
+    [{"strategy": "mean"}, {"columns": ["other"]}, {"unexpected": 1}],
 )
 def test_simple_median_keeps_fitted_config_binding(change):
     """A reviewed artifact cannot be borrowed by a different inference recipe."""
@@ -221,10 +221,11 @@ def test_simple_local_statistics_keep_normalized_python_strategy(strategy):
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("strategy", ["mean", "median", "mode", "constant"])
-def test_simple_explicit_empty_selection_is_a_valid_saved_identity(engine, strategy):
+@pytest.mark.parametrize("fill_value", [None, 4])
+def test_simple_explicit_empty_selection_is_a_valid_saved_identity(engine, strategy, fill_value):
     """Explicitly disabling imputation preserves rows with each engine's declared execution."""
     frame = _frame(engine, [1, None, 3, None])
-    config = {"columns": [], "strategy": strategy}
+    config = {"columns": [], "strategy": strategy, "fill_value": fill_value}
     state = NodeRegistry.get_calculator("SimpleImputer")().fit(frame, config)
     assert state == {}
     state = pickle.loads(pickle.dumps(state))
@@ -257,8 +258,6 @@ def test_simple_explicit_empty_selection_is_a_valid_saved_identity(engine, strat
         {"columns": ["x"]},
         {"columns": [], "_auto_columns": True},
         {"columns": [], "strategy": "unknown"},
-        {"columns": [], "strategy": "mode", "fill_value": 4},
-        {"columns": [], "strategy": "median", "fill_value": 4},
         {"columns": [], "strategy": "mode", "unexpected": True},
     ],
 )

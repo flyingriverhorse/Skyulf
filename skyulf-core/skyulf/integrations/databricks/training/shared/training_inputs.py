@@ -40,12 +40,18 @@ def log_training_inputs(
         "version": 1,
         "source_table_id": attrs.get("source_table_id"),
         "source_uc_table_id": attrs.get("source_uc_table_id"),
+        "feature_columns": list(spec.input_columns),
         "training_spec": spec_payload,
         "training_evidence": fitted.evidence,
         "source_evidence": source_receipt,
         "training_selection": attrs.get("training_selection"),
         "feature_lookup": attrs.get("feature_lookup"),
         **({"training_labels": attrs["training_labels"]} if "training_labels" in attrs else {}),
+        **(
+            {"source_column_conversions": attrs["source_column_conversions"]}
+            if "source_column_conversions" in attrs
+            else {}
+        ),
     }
     serialized = json.dumps(
         provenance, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
@@ -53,7 +59,7 @@ def log_training_inputs(
     run.client.log_dict(run.run_id, provenance, "dataset_inputs.json")
     source = _input_source(fitted, hashlib.sha256(serialized.encode()).hexdigest())
     roles = {
-        "skyulf.feature_columns": json.dumps(list(spec.input_columns)),
+        **_feature_column_tags(spec.input_columns),
         "skyulf.target_column": spec.target_column,
     }
     if spec.weight_column:
@@ -81,6 +87,18 @@ def log_training_inputs(
             )
         )
     run.log_inputs(inputs)
+
+
+def _feature_column_tags(columns: tuple[str, ...]) -> dict[str, str]:
+    """Keep short legacy roles inline and bind wide roles to complete saved evidence."""
+    serialized = json.dumps(list(columns))
+    if len(serialized) <= 500:
+        return {"skyulf.feature_columns": serialized}
+    return {
+        "skyulf.feature_columns_count": str(len(columns)),
+        "skyulf.feature_columns_sha256": hashlib.sha256(serialized.encode()).hexdigest(),
+        "skyulf.feature_columns_artifact": "dataset_inputs.json#/feature_columns",
+    }
 
 
 def _input_source(fitted: Any, provenance_digest: str) -> str:

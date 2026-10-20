@@ -239,8 +239,12 @@ def fit_and_score_candidate_fold(
             preprocessing, X_val_fold, y_val_fold, coverage_out=evaluation_coverage
         )
 
-        SklearnBridge.validate_features(X_train_fold)
-        SklearnBridge.validate_features(X_val_fold)
+        X_train_fold, y_train_fold = SklearnBridge.to_sklearn(
+            (X_train_fold, y_train_fold), validate_features=True
+        )
+        X_val_fold, y_val_fold = SklearnBridge.to_sklearn(
+            (X_val_fold, y_val_fold), validate_features=True
+        )
         constructor_params, class_weight = split_class_weight_params(
             model_class,
             {**model_calculator.default_params, **(seed_params_overlay or {}), **params},

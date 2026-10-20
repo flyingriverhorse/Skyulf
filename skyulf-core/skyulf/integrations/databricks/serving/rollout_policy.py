@@ -2,8 +2,10 @@
 
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from .contracts import is_uc_identifier
 
@@ -15,6 +17,25 @@ class DailyRolloutPolicy:
     increment_percentage: int = 10
     minimum_stage_hours: float = 24.0
     evidence_max_age_hours: float = 24.0
+
+    @classmethod
+    def from_config(cls, settings: Mapping[str, Any]) -> "DailyRolloutPolicy":
+        """Read timing fields from the ``rollout`` section of ``serving.yml``.
+
+        Omitted fields retain the daily ten-point defaults. Other job settings
+        are ignored. Use this same policy at initialization; the scheduled job
+        requires it to match the durable rollout policy before endpoint work.
+        """
+        defaults = cls()
+        return cls(
+            increment_percentage=settings.get(
+                "traffic_step_percent", defaults.increment_percentage
+            ),
+            minimum_stage_hours=settings.get("stage_minimum_hours", defaults.minimum_stage_hours),
+            evidence_max_age_hours=settings.get(
+                "evidence_max_age_hours", defaults.evidence_max_age_hours
+            ),
+        )
 
     def __post_init__(self) -> None:
         """Reject invalid shares and nonfinite or unrepresentable durations."""

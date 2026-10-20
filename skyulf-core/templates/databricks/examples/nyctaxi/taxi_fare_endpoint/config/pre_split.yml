@@ -1,0 +1,6 @@
+# Fixed row eligibility before the training split; never learn statistics here.
+# Select with pre_split_recipe in config/training.yml (default: default).
+# Competition shares its pre-split recipe. Scoring can reuse the saved filters.
+version: 1
+recipes:
+  default: []

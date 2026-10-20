@@ -64,6 +64,21 @@ Both need the saved target column and a valid UTC availability timestamp (or an 
 string). Eligible label keys must be unique. Actuals must use the saved classification classes or
 finite numeric regression targets.
 
+For endpoint-only projects, `monitoring_label_table` is a request-outcomes table:
+`databricks_request_id` must be a string and `request_row_index` an integer.
+The endpoint job checks these columns before creating or updating serving resources.
+Keep the request ID returned by serving and the position of each input row when
+recording its eventual outcome. Two requests for the same business record remain
+two observations; Skyulf does not guess that relationship from a customer or transaction ID.
+
+The table used by `training_label_table` still joins by the training record keys.
+It can be a different table. If one automatically configured monitoring label table
+serves both batch and endpoint observations, it must satisfy both key contracts.
+For separate outcome tables, enroll the serving monitor with its own request-key
+label table using the [monitoring enrollment configuration](databricks_monitoring_enrollment.md).
+Leave the label table and availability setting empty for operational monitoring
+and drift alone; those measurements do not require actual outcomes.
+
 For a model set, include the target columns required by each monitored component. Skyulf does not
 discover an arbitrary target source, generate outcomes, or write labels back into the training
 table. `source_layout: separate_outcomes` also configures a read-only training

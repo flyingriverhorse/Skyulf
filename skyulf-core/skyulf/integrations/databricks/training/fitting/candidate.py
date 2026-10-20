@@ -1068,6 +1068,36 @@ def _candidate_training_frame(
     return frame.loc[:, columns]
 
 
+def _fit_data_config(
+    config: dict[str, Any], frame: pd.DataFrame, holdout: pd.DataFrame, spec: TrainingSpec
+) -> dict[str, Any]:
+    """Bind observed source conversions and training weights to the fitted payload."""
+    evidence = {}
+    if "training_weights" in holdout.attrs:
+        evidence["training_weights"] = holdout.attrs["training_weights"]
+    if "source_column_conversions" in frame.attrs:
+        evidence["source_column_conversions"] = fitted_source_conversions(
+            frame.attrs["source_column_conversions"], spec.input_columns
+        )
+    return {**config, **evidence} if evidence else config
+
+
+def fitted_source_conversions(conversions: Any, input_columns: Any) -> list[dict[str, Any]]:
+    """Keep the model-input conversions that fitting seals into the pipeline config.
+
+    Replay checks call this with saved evidence to rebuild the same expected config.
+    """
+    return [dict(item) for item in conversions if item["column"] in input_columns]
+
+
+def with_source_conversions(config: dict, saved: dict, input_columns: Any) -> dict:
+    """Return the replay-expected config when ``saved`` evidence recorded conversions."""
+    if "source_column_conversions" not in saved:
+        return config
+    conversions = fitted_source_conversions(saved["source_column_conversions"], input_columns)
+    return {**config, "source_column_conversions": conversions}
+
+
 def fit_candidate(
     spark: Any,
     spec: TrainingSpec,
@@ -1102,8 +1132,7 @@ def fit_candidate(
     )
     train_frame, sample_weight = extract_training_weights(train_frame, spec.weight_column)
     train_frame = _candidate_training_frame(train_frame, spec, temporal_cv)
-    if "training_weights" in holdout.attrs:
-        pipeline_config = {**pipeline_config, "training_weights": holdout.attrs["training_weights"]}
+    pipeline_config = _fit_data_config(pipeline_config, train_frame, holdout, spec)
     native_train = pl.from_pandas(train_frame) if engine == "polars" else train_frame
     native_holdout = pl.from_pandas(holdout) if engine == "polars" else holdout
     search = pipeline_config["modeling"]["type"] == "hyperparameter_tuner"
@@ -1177,6 +1206,17 @@ def read_training_partitions(
         frame, spec, keep_training_event=temporal_cv, engine=engine
     )
     return frame, train, holdout, unavailable
+
+
+def _source_conversion_evidence(frame: pd.DataFrame) -> dict[str, Any]:
+    """Detach observed source conversion metadata while preserving legacy absence."""
+    if "source_column_conversions" not in frame.attrs:
+        return {}
+    return {
+        "source_column_conversions": [
+            dict(item) for item in frame.attrs["source_column_conversions"]
+        ]
+    }
 
 
 def log_fitted_candidate(
@@ -1255,7 +1295,11 @@ def log_fitted_candidate(
     if risk_category:
         tags["risk_category"] = risk_category
     run.set_tags(tags)
-    run.client.log_dict(run.run_id, {"dataset_id": spec.dataset_id, **tags}, "training_data.json")
+    run.client.log_dict(
+        run.run_id,
+        {"dataset_id": spec.dataset_id, **tags, **_source_conversion_evidence(holdout)},
+        "training_data.json",
+    )
     run.client.log_dict(
         run.run_id,
         {
@@ -1607,10 +1651,63 @@ def _pre_split_step_identity(step: Any, index: int) -> tuple[str, dict[str, Any]
     return step_type, params
 
 
+def _training_identity_columns(spec: TrainingSpec) -> set[str | None]:
+    """Keep record, grouping, time and lookup controls exact at every training stage."""
+    return {
+        *spec.record_key_columns,
+        spec.group_column,
+        spec.event_column,
+        spec.result_available_at_column,
+        *lookup_controls(spec),
+    }
+
+
+def training_numeric_columns(spec: TrainingSpec) -> tuple[str, ...]:
+    """Normalize model values while preserving exact source and duplicate identities."""
+    protected = _training_identity_columns(spec)
+    for step in spec.pre_split_steps:
+        if step["transformer"] == "Deduplicate":
+            protected.update(deduplicate_columns(step))
+    return tuple(name for name in spec.source_columns if name not in protected)
+
+
+def _deferred_model_columns(spec: TrainingSpec) -> set[str]:
+    """Select model inputs protected only until exact pre-split deduplication finishes."""
+    return set(spec.input_columns).difference(
+        _training_identity_columns(spec), training_numeric_columns(spec)
+    )
+
+
+def _normalize_model_partition(frame: pd.DataFrame, spec: TrainingSpec) -> pd.DataFrame:
+    """Apply recorded Decimal model casts after survivor and split membership are fixed."""
+    deferred = tuple(frame.attrs.get("deferred_source_column_conversions", ()))
+    if not deferred:
+        return frame
+    allowed = _deferred_model_columns(spec)
+    if any(item["column"] not in allowed or item["target_dtype"] != "float64" for item in deferred):
+        raise ValueError("Deferred source conversions differ from the admitted model inputs.")
+    result = frame.astype({item["column"]: "float64" for item in deferred})
+    result.attrs["source_column_conversions"] = (
+        *frame.attrs.get("source_column_conversions", ()),
+        *deferred,
+    )
+    result.attrs.pop("deferred_source_column_conversions", None)
+    return result
+
+
 def _materialize_training_rows(
     selected: Any, spec: TrainingSpec, names: tuple[str, ...]
 ) -> pd.DataFrame:
     """Decode bounded rows and dates while enforcing serialized and local frame budgets."""
+    from skyulf.engines.spark_engine import (  # noqa: PLC0415
+        normalize_spark_decimals,
+        restore_spark_decimal_dtypes,
+    )
+
+    _, deferred = normalize_spark_decimals(selected, columns=_deferred_model_columns(spec))
+    selected, conversions = normalize_spark_decimals(
+        selected, columns=training_numeric_columns(spec)
+    )
     records: list[dict[str, Any]] = []
     serialized_bytes = 0
     for row in selected.toLocalIterator():
@@ -1624,7 +1721,11 @@ def _materialize_training_rows(
         if serialized_bytes > spec.max_bytes:
             raise spec.byte_limit_error(serialized_bytes)
         records.append(record)
-    frame = pd.DataFrame.from_records(records, columns=names)
+    frame = restore_spark_decimal_dtypes(
+        pd.DataFrame.from_records(records, columns=names), conversions
+    )
+    if deferred:
+        frame.attrs["deferred_source_column_conversions"] = deferred
     if frame_bytes(frame) > spec.max_bytes:
         raise spec.byte_limit_error(frame_bytes(frame))
     return frame
@@ -1960,7 +2061,9 @@ def _raw_model_partitions(
     else:
         train_frame = train.loc[:, train_columns].reset_index(drop=True)
         holdout_frame = heldout.loc[:, columns].reset_index(drop=True)
-    return train_frame, holdout_frame
+    return _normalize_model_partition(train_frame, spec), _normalize_model_partition(
+        holdout_frame, spec
+    )
 
 
 def _validate_candidate_metadata(risk_category: str | None, min_improvement: float) -> None:

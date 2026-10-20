@@ -47,6 +47,14 @@ repos:
         entry: uv run --no-sync python -m pre_commit_hooks.check_yaml
         language: system
         types: [yaml]
+        exclude: ^mkdocs\.yml$
+      - id: check-mkdocs-yaml
+        name: check MkDocs YAML syntax
+        # MkDocs uses !!python/name for its Mermaid formatter. Parse the syntax
+        # without executing tags; mkdocs build --strict validates the config.
+        entry: uv run --no-sync python -m pre_commit_hooks.check_yaml --unsafe
+        language: system
+        files: ^mkdocs\.yml$
       - id: check-json
         name: check json
         entry: uv run --no-sync python -m pre_commit_hooks.check_json

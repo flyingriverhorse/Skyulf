@@ -35,6 +35,8 @@ def test_guard_refusal_prevents_alias_request(monkeypatch):
     """Lost ownership must fail before even the first alias request is sent."""
     client = Mock()
     callback = Mock(side_effect=RuntimeError("ownership lost"))
+    abort = Mock()
+    monkeypatch.setattr(promotion, "_abort_refused_change", abort)
     with (
         promotion.guard_alias_mutations(callback),
         pytest.raises(RuntimeError, match="ownership lost"),
@@ -42,6 +44,7 @@ def test_guard_refusal_prevents_alias_request(monkeypatch):
         promotion._apply_alias_updates(client, _receipt(), [("champion", "2", "1")])
     client.set_registered_model_alias.assert_not_called()
     client.delete_registered_model_alias.assert_not_called()
+    abort.assert_called_once_with(client, _receipt(), [("champion", "2", "1")])
 
 
 def test_nested_guards_restore_outer_scope_and_clear_after_failure(monkeypatch):

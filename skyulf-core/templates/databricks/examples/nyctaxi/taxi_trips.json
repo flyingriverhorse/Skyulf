@@ -2,7 +2,7 @@
   "project_name": "taxi_trips",
   "training_layout": "multi_target",
   "setup_mode": "detailed",
-  "inference_mode": "local",
+  "batch_compute": "single_node",
   "engine": "pandas",
   "catalog": "workspace",
   "schema": "taxi_trips",
@@ -41,9 +41,9 @@
   "model_set_output_mode": "all",
   "model_set_table_name": "trips_set_predictions",
   "model_set_promotion_policy": "manual_approval",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
   "score_source_table_name": "trips_score",
-  "preprocessing_probe": "true"
+  "save_preprocessing_diagnostics": "true"
 }

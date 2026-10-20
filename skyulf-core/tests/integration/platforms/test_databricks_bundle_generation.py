@@ -212,12 +212,20 @@ def test_optional_runtime_pins_are_unique_across_selected_models(tmp_path, layou
 
 
 def _read_bundle(project):
-    """Read the root and deployment includes without emulating CLI variable resolution."""
+    """Read the root and deployment includes without emulating CLI variable resolution.
+
+    deployment/monitoring.yml repeats target keys; its target variables are merged
+    into targets.yml's, as the CLI merges them (its dashboard resources are not).
+    """
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     for name in ("variables", "targets"):
         path = project / "deployment" / f"{name}.yml"
         if path.is_file():
             bundle.update(yaml.safe_load(path.read_text()))
+    monitoring = project / "deployment/monitoring.yml"
+    if monitoring.is_file():
+        for name, target in (yaml.safe_load(monitoring.read_text())["targets"] or {}).items():
+            bundle["targets"][name].setdefault("variables", {}).update(target.get("variables", {}))
     return bundle
 
 
@@ -230,7 +238,7 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
         tmp_path,
         training_layout=layout,
         compute_mode=compute,
-        auto_rebuild_on_cdf_expiry=enabled,
+        rescore_when_history_expires=enabled,
     )
     config = _read_validated_config(project)
     assert config["auto_rebuild_on_cdf_expiry"] is (enabled == "true")
@@ -506,7 +514,7 @@ def test_multi_target_output_selection_renders_custom_destinations(tmp_path, mod
         tmp_path,
         training_layout="multi_target",
         model_set_name="business_models",
-        source_change_policy="rebuild_on_change",
+        on_source_change="rescore_all",
         model_set_output_mode=mode,
         model_set_table_name="business_predictions",
         model_view_prefix="estimates",
@@ -667,7 +675,7 @@ def test_cli_basic_setup_defaults_match_explicit_advanced_settings(tmp_path):
     basic.mkdir()
     explicit.mkdir()
     advanced = (
-        "training_version",
+        "training_table_version",
         "test_size",
         "random_state",
         "stratify",
@@ -704,7 +712,9 @@ def test_cli_hidden_advanced_overrides_survive_initialization(tmp_path):
         "risk_category": "high",
     }
     overrides = {
-        key: value if isinstance(value, str) or key == "min_improvement" else json.dumps(value)
+        ("training_table_version" if key == "training_version" else key): (
+            value if isinstance(value, str) or key == "min_improvement" else json.dumps(value)
+        )
         for key, value in expected.items()
     }
     project = _generate_project(
@@ -970,7 +980,7 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
         tmp_path,
         engine=engine,
         task=task,
-        training_version="0",
+        training_table_version="0",
         **{f"{task}_model": model},
         cv_enabled="true",
         cv_folds="3",
@@ -1062,7 +1072,7 @@ def test_cli_random_window_and_non_utc_source_rules(tmp_path):
         event_text_kind="local_datetime",
         event_time_format="%d/%m/%Y %H:%M",
         event_time_timezone="Europe/Copenhagen",
-        training_version="0",
+        training_table_version="0",
         start="2026-06-01T00:00:00+02:00",
         cutoff="2026-09-01T00:00:00+02:00",
         filter_unavailable_results="true",
@@ -1124,7 +1134,7 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
         filter_unavailable_results="true",
         event_column="observed_at",
         result_available_at_column="labeled_at",
-        training_version="17",
+        training_table_version="17",
         start="2026-06-01T00:00:00+00:00",
         holdout_start="2026-07-01T00:00:00+00:00",
         cutoff="2026-08-01T00:00:00+00:00",
@@ -1177,7 +1187,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
         tmp_path,
         score_model_selection=selection,
         promotion_policy=policy,
-        score_handoff=handoff,
+        score_follow_champion=str(handoff == "after_alias_change").lower(),
         compute_mode=compute,
         engine="polars" if policy == "automatic" else "pandas",
         quality_threshold="100.0",
@@ -1315,7 +1325,7 @@ def test_cli_generates_date_free_training_contract(tmp_path, engine, task, avail
         tmp_path,
         engine=engine,
         task=task,
-        training_version="7",
+        training_table_version="7",
         filter_unavailable_results="true" if availability else "false",
         result_available_at_column="confirmed_at" if availability else "",
         result_cutoff="2026-09-01T00:00:00+00:00" if availability else "",
@@ -1359,7 +1369,7 @@ def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
     from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
-    project = _generate_project(tmp_path, event_column="observed_at", training_version="7")
+    project = _generate_project(tmp_path, event_column="observed_at", training_table_version="7")
     config = read_workflow_config(project / "config/training.yml")
     assert config["event_column"] == "observed_at"
     resolved = resolve_target_config(
@@ -1410,7 +1420,9 @@ def test_cli_training_examples_pass_manual_preflight(tmp_path, filename):
         },
     )
     checked = validate_workflow_config(_load_project_config(project, resolved), action="train")
-    assert checked.get("training_version") == json.loads(inputs.get("training_version", "null"))
+    assert checked.get("training_version") == json.loads(
+        inputs.get("training_table_version", "null")
+    )
     assert checked["split_strategy"] == inputs.get("split_strategy", "random")
     if inputs.get("start"):
         assert checked["training_window_mode"] == "fixed_window"

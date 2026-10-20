@@ -134,12 +134,12 @@ models:
 ## Spark scoring and serving endpoints
 
 Voting, stacking and calibrated ensembles can score on Spark workers
-(`inference_mode: spark`) and behind serving endpoints. Training first checks
+(`batch_compute: spark`) and behind serving endpoints. Training first checks
 the fitted ensemble as one model: every member, every calibration estimator and
 the stacking final learner must be a supported built-in model, and the
 ensemble's own predictions must give the same results in batches of any size.
 Spark and online-feature projects run this check automatically; an
-endpoint-only project enables it with `defaults.admit_probed_custom_steps: true`.
+endpoint-only project enables it with `defaults.allow_tested_custom_steps: true`.
 The check, its evidence and the full model list are described in
 [Score on Spark workers](databricks_spark_scoring.md#built-in-recipes-and-model-evidence).
 

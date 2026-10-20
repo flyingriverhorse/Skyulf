@@ -1,0 +1,237 @@
+# Authentication belongs to your CLI profile or external CI/CD, never to this file.
+# Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+variables:
+  serving_timeout_seconds:
+    description: Serving child job limit; keep at least 300 seconds above serving.yml ready_timeout_s
+    default: 7200
+
+  cost_tag_value:
+    description: Endpoint cost allocation tag value; set before the first serving run
+    default: "taxi-fare-endpoint-demo"
+
+  serving_permissions:
+    description: Serving child ACL; retain the automatic train caller when overriding this list
+    type: complex
+
+    default: []
+
+
+  pipeline_owner:
+    description: User with CAN_MANAGE on every target besides the deployer; CI may pass --var pipeline_owner
+    default: "${workspace.current_user.userName}"
+  job_tags:
+    description: Optional job attribution tags for either compute mode
+    type: complex
+    default: {}
+
+  serverless_environment_version:
+    description: Compatible serverless environment version for train and score jobs
+    default: "4"
+  serverless_budget_policy_id:
+    description: Optional existing serverless budget policy; blank uses workspace defaults
+    default: ""
+
+  monitoring_environment_version:
+    description: Independent serverless environment version for monitoring in either compute mode
+    default: "4"
+  monitoring_budget_policy_id:
+    description: Optional existing monitoring serverless budget policy; blank uses workspace defaults
+    default: ""
+  on_drift:
+    description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
+    default: "disabled"
+  on_drift_cooldown_hours:
+    description: Minimum hours between drift or performance training requests for this train job
+    default: "24"
+  on_drift_min_new_training_rows:
+    description: Minimum new or changed labeled training rows for either automatic trigger
+    default: "1"
+  monitoring_drift_thresholds:
+    description: 'JSON overrides: psi, ks_statistic, wasserstein, kl_divergence, categorical_top_k, id_like_uniqueness, max_category_summaries, psi_moderate, psi_critical, monitor_max_rows, monitor_max_bytes, missing_markers; {} preserves defaults. Row/byte overrides apply only to non-Spark monitoring. missing_markers maps numeric features to values counted as missing, e.g. {"co_gt": [-200]}.'
+    default: '{}'
+  monitoring_performance_policies:
+    description: 'JSON object keyed by fully qualified component model name; {} disables performance policy'
+    default: '{}'
+
+  monitoring_task_timeout_seconds:
+    description: Independent Spark monitoring task timeout
+    default: 3600
+  monitoring_timeout_seconds:
+    description: Independent Spark monitoring job timeout
+    default: 7200
+  monitoring_max_retries:
+    description: Independent monitoring task retries
+    default: 1
+  monitoring_cron:
+    description: UTC monitoring schedule, including late labels without new predictions
+    default: "0 0 * * * ?"
+  monitoring_revisit_windows:
+    description: Completed performance windows to revisit for late labels, including latest; 1 to 100
+    default: "3"
+  monitoring_pause_status:
+    description: Explicitly unpause after reference preparation and verification
+    default: "PAUSED"
+  monitoring_cleanup_cron:
+    description: Independent UTC schedule for old reference cleanup
+    default: "0 0 4 ? * SUN"
+  monitoring_cleanup_confirm:
+    description: Set false to report eligible references without deleting them
+    default: "true"
+  monitoring_cleanup_pause_status:
+    description: Pause reference cleanup independently of observation and retraining
+    default: "UNPAUSED"
+  monitoring_enabled:
+    description: Enroll activated models and measure drift after scoring; set true only with catalog and schema
+    default: "true"
+  development_monitoring_schema:
+    description: Development targets' own monitoring store in monitoring_catalog. Any name except monitoring_schema; blank keeps development monitoring off
+    default: ""
+  monitoring_dashboard_url:
+    description: Published shared dashboard HTTPS URL shown in monitoring and drift task output
+    default: ""
+  monitoring_experiment_name:
+    description: Optional MLflow experiment for post-scoring monitoring reports
+    default: ""
+  monitoring_catalog:
+    description: Monitoring catalog; defaults to each target's own catalog. Set one name here (or per target) for a central catalog
+    default: "${var.catalog}"
+  monitoring_schema:
+    description: Central monitoring schema shared by model repositories; created on first use if allowed
+    default: "taxi_monitoring"
+  monitoring_label_table:
+    description: Optional fully qualified table of actual outcomes for monitoring
+    default: ""
+  monitoring_result_available_at_column:
+    description: UTC outcome availability column in the monitoring label table
+    default: ""
+  monitoring_expected_interval_hours:
+    description: Maximum scoring age before the dashboard reports stale
+    default: "24"
+  # Operations are configured here or per target; no extra initializer questions.
+  # Zero timeout preserves unlimited execution until a project chooses its limits.
+  train_timeout_seconds:
+    description: Whole train job timeout in seconds; 0 disables the limit
+    default: 0
+  train_task_timeout_seconds:
+    description: Per-notebook train timeout in seconds; 0 disables the limit
+    default: 0
+  score_timeout_seconds:
+    description: Whole score job timeout in seconds; 0 disables the limit
+    default: 0
+  score_task_timeout_seconds:
+    description: Score notebook timeout in seconds; 0 disables the limit
+    default: 0
+  score_max_retries:
+    description: Opt-in score retries after failure; 0 disables retries; never use -1
+    default: 0
+  score_min_retry_interval_millis:
+    description: Minimum delay between score attempts when retries are enabled
+    default: 60000
+  train_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for train
+    type: complex
+    default: []
+  score_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for score
+    type: complex
+    default: []
+  monitoring_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for monitoring
+    type: complex
+    default: []
+  monitoring_email_notifications:
+    description: Optional monitoring job email events; measured drift needs a separate SQL alert
+    type: complex
+    default: {}
+  monitoring_reference_retention_days:
+    description: Minimum reference age in days for scheduled or manual cleanup; 1 to 3650
+    default: "90"
+  monitoring_webhook_notifications:
+    description: Optional monitoring job events with existing notification destination IDs
+    type: complex
+    default: {}
+  train_email_notifications:
+    description: Optional train email events and recipient lists
+    type: complex
+    default: {}
+  score_email_notifications:
+    description: Optional score email events and recipient lists
+    type: complex
+    default: {}
+  train_webhook_notifications:
+    description: Optional train events with existing notification destination IDs
+    type: complex
+    default: {}
+  score_webhook_notifications:
+    description: Optional score events with existing notification destination IDs
+    type: complex
+    default: {}
+  catalog:
+    description: Unity Catalog catalog selected by the active target
+    default: workspace
+  input_schema:
+    description: Existing training and scoring source schema
+    default: taxi_fare_endpoint
+  output_schema:
+    description: Prediction output schema
+    default: taxi_fare_endpoint
+  metadata_schema:
+    description: Registered model schema
+    default: taxi_fare_endpoint
+  resource_suffix:
+    description: Optional namespace suffix for shared development targets
+    default: ""
+
+
+
+  test_catalog:
+    description: "test catalog; shared and personal targets use the same environment binding"
+    default: "workspace"
+  test_input_schema:
+    description: "test input_schema for the shared target"
+    default: "taxi_fare_endpoint"
+  test_output_schema:
+    description: "test output_schema for the shared target"
+    default: "taxi_fare_endpoint"
+  test_metadata_schema:
+    description: "test metadata_schema for the shared target"
+    default: "taxi_fare_endpoint"
+
+  test_root_path:
+    description: Team-managed Bundle root for the shared test target
+    default: "/Workspace/Projects/taxi_fare_endpoint/test"
+  syst_catalog:
+    description: "syst catalog; shared and personal targets use the same environment binding"
+    default: "REPLACE_SYST_CATALOG"
+  syst_input_schema:
+    description: "syst input_schema for the shared target"
+    default: "REPLACE_SYST_INPUT_SCHEMA"
+  syst_output_schema:
+    description: "syst output_schema for the shared target"
+    default: "REPLACE_SYST_OUTPUT_SCHEMA"
+  syst_metadata_schema:
+    description: "syst metadata_schema for the shared target"
+    default: "REPLACE_SYST_METADATA_SCHEMA"
+
+  syst_root_path:
+    description: Team-managed Bundle root for the shared syst target
+    default: "/Workspace/Projects/taxi_fare_endpoint/syst"
+  prod_catalog:
+    description: "prod catalog; shared and personal targets use the same environment binding"
+    default: "REPLACE_PROD_CATALOG"
+  prod_input_schema:
+    description: "prod input_schema for the shared target"
+    default: "REPLACE_PROD_INPUT_SCHEMA"
+  prod_output_schema:
+    description: "prod output_schema for the shared target"
+    default: "REPLACE_PROD_OUTPUT_SCHEMA"
+  prod_metadata_schema:
+    description: "prod metadata_schema for the shared target"
+    default: "REPLACE_PROD_METADATA_SCHEMA"
+
+  prod_root_path:
+    description: Team-managed Bundle root for the shared prod target
+    default: "/Workspace/Projects/taxi_fare_endpoint/prod"
+
+
+

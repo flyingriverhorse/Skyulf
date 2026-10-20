@@ -36,7 +36,7 @@ that saved training population. New runs can pin newer outcome snapshots.
 {{else}}Training expects actual target values in its source. A monitoring outcome
 binding measures performance but does not automatically join labels into training.
 To use separate outcomes for training, explicitly configure `training_label_table`,
-`training_label_version: null`, `filter_unavailable_results: true`, and the UTC
+`training_label_table_version: null`, `filter_unavailable_results: true`, and the UTC
 `result_available_at_column` in each applicable training entry. The configured
 training input must include the new feature rows; a separate scoring table is
 never silently appended to training.

@@ -114,7 +114,7 @@ defaults:
   engine: pandas
   task: regression
   training_table: "{catalog}.{input_schema}.customer_training"
-  training_version: null
+  training_table_version: null
   record_key_columns: [customer_id]
   input_columns: [income]
   target_column: revenue

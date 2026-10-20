@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 from typing import Any
 
+from ..jobs.serving_endpoint_job import read_serving_endpoint_settings
 from ..jobs.serving_job import validate_serving_section
 from ..lifecycle.workflow import resolve_target_config
 from ..training.tuning.cv import CVSpec
@@ -19,7 +20,7 @@ from .yaml_config import (
 from .yaml_models import static_workflows
 from .yaml_recipes import feature_project_source
 
-_SERVING_SECTIONS = ("online_serving", "rollout", "online_publication")
+_SERVING_SECTIONS = ("online_feature_lookup", "rollout", "online_publication")
 
 
 def _check_search(checked: dict[str, Any]) -> None:
@@ -59,7 +60,18 @@ def _check_config(root: Path, bindings: dict[str, str]) -> dict:
         raise ValueError(f"config/{path.name}: {exc}") from exc
 
 
-def _check_serving(root: Path) -> None:
+def _check_permission_targets(root: Path, settings: Any) -> None:
+    """Catch mistyped target keys, which would otherwise silently grant nothing."""
+    permissions = settings.get("permissions") if isinstance(settings, dict) else None
+    if not isinstance(permissions, dict):
+        return
+    targets = read_yaml_mapping(root / "deployment" / "targets.yml").get("targets") or {}
+    unknown = sorted(str(name) for name in set(permissions) - set(targets))
+    if unknown:
+        raise ValueError(f"serving_endpoint.permissions names unknown targets: {unknown}.")
+
+
+def _check_serving(root: Path, bindings: dict[str, str]) -> None:
     """Validate optional serving jobs' settings offline, as each job does before remote work."""
     path = root / "config" / "serving.yml"
     if not path.exists():
@@ -67,6 +79,20 @@ def _check_serving(root: Path) -> None:
     label = "config/serving.yml"
     try:
         document = read_yaml_mapping(path)
+        if "online_serving" in document:
+            raise ValueError("online_serving was renamed to online_feature_lookup.")
+        if "serving_endpoint" in document:
+            _check_permission_targets(root, document["serving_endpoint"])
+            read_serving_endpoint_settings(
+                {
+                    **bindings,
+                    "serving_config_path": str(path),
+                    "bundle_project": "static_preview",
+                    "bundle_target": bindings.get("bundle_target", "static_preview"),
+                    "cost_tag_key": "CostCenter",
+                    "cost_tag_value": "static_preview",
+                }
+            )
     except (OSError, ValueError) as exc:
         raise ValueError(f"{label}: {exc}") from exc
     for section in _SERVING_SECTIONS:
@@ -113,7 +139,7 @@ def check_project(project_path: str | Path, bindings: dict[str, str]) -> dict[st
     """
     root = Path(project_path).resolve(strict=True)
     config = _check_config(root, bindings)
-    _check_serving(root)
+    _check_serving(root, bindings)
     sources = sorted((root / "src").rglob("*.py"))
     if not sources:
         raise ValueError("Project src must contain Python source files.")

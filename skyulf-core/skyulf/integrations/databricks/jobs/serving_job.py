@@ -33,10 +33,12 @@ from ..serving.rollout_evidence import (
     observe_bootstrap_rollout,
     observe_live_rollout,
 )
+from ..serving.rollout_policy import DailyRolloutPolicy
 from ..serving.rollout_promotion import approval_config_digest, promote_completed_rollout
 from ..serving.rollout_store import MLflowRolloutStore
 from ..shared.json_contracts import finite_json_digest
 from ..training.shared.training_evidence import load_candidate_evidence
+from .serving_handoff import publish_serving_handoff
 from .shared.reference_mutations import notebook_reference_holder, reference_mutation_scope
 
 
@@ -170,8 +172,14 @@ def run_daily_rollout(
     """
     if not _enabled(settings):
         return {"status": "DISABLED"}
+    policy = DailyRolloutPolicy.from_config(settings)
     store = MLflowRolloutStore(registry_client, settings["run_id"])
     before = store.load()
+    if policy != DailyRolloutPolicy(**before["policy"]):
+        raise ValueError(
+            "Daily rollout policy differs from the initialized policy. "
+            "Match the saved settings or initialize a new rollout."
+        )
     result = reconcile_rollout(client, store=store, admission=SingleWriterAdmission())
     record = store.load()
     approval = _approval(settings, record)
@@ -267,18 +275,20 @@ def _online_setup_contract(
     required = {"endpoint", "publications", "tracking_uri", "registry_uri"}
     if not required.issubset(settings) or not isinstance(settings["endpoint"], dict):
         raise ValueError(
-            "online_serving requires endpoint, publications, tracking_uri and registry_uri."
+            "online_feature_lookup requires endpoint, publications, tracking_uri and registry_uri."
         )
     rows = settings["publications"]
     if not isinstance(rows, list) or not rows or any(not isinstance(row, dict) for row in rows):
-        raise ValueError("online_serving.publications must contain explicit publication bindings.")
+        raise ValueError(
+            "online_feature_lookup.publications must contain explicit publication bindings."
+        )
     try:
         return PinnedEndpointSpec(**settings["endpoint"]), tuple(
             OnlinePublicationSpec(**row) for row in rows
         )
     except TypeError as exc:
         raise ValueError(
-            "online_serving endpoint or publication fields are incomplete or unknown."
+            "online_feature_lookup endpoint or publication fields are incomplete or unknown."
         ) from exc
 
 
@@ -298,11 +308,13 @@ def validate_serving_section(section: str, settings: Any) -> None:
 
     Every section needs the explicit ``enabled`` switch. Enabled online serving
     and online publication sections must also build the contracts their jobs
-    build before any workspace call. Nothing here reads Spark, MLflow or the
-    network, so a passing check does not prove the pinned resources exist.
+    build before any workspace call. Enabled rollouts validate timing and traffic
+    steps; the job additionally compares these with the saved policy. Nothing
+    here reads Spark, MLflow or the network, so a passing check does not prove
+    the pinned resources exist.
 
     Args:
-        section: ``online_serving``, ``rollout`` or ``online_publication``.
+        section: ``online_feature_lookup``, ``rollout`` or ``online_publication``.
         settings: The section's parsed YAML value.
 
     Raises:
@@ -311,10 +323,12 @@ def validate_serving_section(section: str, settings: Any) -> None:
     """
     if not _enabled(settings):
         return
-    if section == "online_serving":
+    if section == "online_feature_lookup":
         _online_setup_contract(settings)
     elif section == "online_publication":
         _publication_spec(settings)
+    elif section == "rollout":
+        DailyRolloutPolicy.from_config(settings)
 
 
 def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:
@@ -325,6 +339,8 @@ def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:
     if not isinstance(path, str) or not path.strip():
         raise ValueError("serving_config_path must identify the deployed serving YAML file.")
     payload = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    if isinstance(payload, dict) and "online_serving" in payload:
+        raise ValueError("online_serving was renamed to online_feature_lookup.")
     if not isinstance(payload, dict) or section not in payload:
         raise ValueError(f"Serving configuration requires the {section} section.")
     settings = payload[section]
@@ -335,7 +351,9 @@ def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:
 def run_daily_rollout_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
     """Run the configured daily job and return its result for notebook presentation."""
     settings = _notebook_settings(dbutils, "rollout")
+    values = dbutils.widgets.getAll()
     if not settings["enabled"]:
+        publish_serving_handoff(dbutils, None, values)
         return {"status": "DISABLED"}
     from databricks.sdk import WorkspaceClient  # noqa: PLC0415
     from mlflow.tracking import MlflowClient  # noqa: PLC0415
@@ -344,10 +362,11 @@ def run_daily_rollout_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         tracking_uri=settings.get("tracking_uri", "databricks"),
         registry_uri=settings.get("registry_uri", "databricks-uc"),
     )
-    values = dbutils.widgets.getAll()
     settings = _bind_rollout_target(settings, values.get("bundle_target", ""))
     settings = {**settings, "reference_holder": notebook_reference_holder(values)}
-    return run_daily_rollout(spark, settings, client=WorkspaceClient(), registry_client=registry)
+    output = run_daily_rollout(spark, settings, client=WorkspaceClient(), registry_client=registry)
+    publish_serving_handoff(dbutils, output.get("promotion"), values)
+    return output
 
 
 def _bind_rollout_target(settings: dict[str, Any], target: str) -> dict[str, Any]:
@@ -371,7 +390,7 @@ def run_online_publication_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
 
 def run_online_serving_setup_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
     """Create the explicitly configured endpoint using the notebook workspace identity."""
-    settings = _notebook_settings(dbutils, "online_serving")
+    settings = _notebook_settings(dbutils, "online_feature_lookup")
     if not settings["enabled"]:
         return {"status": "DISABLED"}
     from databricks.sdk import WorkspaceClient  # noqa: PLC0415

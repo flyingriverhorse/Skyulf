@@ -152,7 +152,7 @@ def test_envelope_errors_keep_priority(spark, inputs, outputs, message):
     """Scalar UDF checks must not mask earlier envelope or row-count errors."""
     frame = spark.createDataFrame([_row("bad", inputs, outputs)], PAYLOAD_SCHEMA)
     with pytest.raises(ValueError) as raised:
-        serving_payloads._parse_envelopes(frame)
+        serving_payloads._parse_envelopes(frame, (("x", "double"),))
     assert str(raised.value) == message
 
 

@@ -105,7 +105,7 @@ def test_enrollment_prepares_all_references_then_enrolls_two_versions(monkeypatc
     monkeypatch.setattr(
         serving_registration,
         "prepare_spark_monitoring_reference",
-        lambda spark, config: events.append(("prepare", config.model_version)),
+        lambda spark, config, **kwargs: events.append(("prepare", config.model_version)),
     )
     monkeypatch.setattr(
         serving_registration,
@@ -208,3 +208,27 @@ def test_observation_publishes_batch_and_serving_references():
         batch.monitor_id,
         online.monitor_id,
     ]
+
+
+@pytest.mark.parametrize(
+    "options,expected",
+    [
+        ({}, {"tracking_uri": "databricks", "registry_uri": "databricks-uc"}),
+        (
+            {"tracking_uri": "databricks://alternate", "registry_uri": "databricks-uc://alternate"},
+            {"tracking_uri": "databricks://alternate", "registry_uri": "databricks-uc://alternate"},
+        ),
+    ],
+)
+def test_shared_enrollment_reference_registry_options(monkeypatch, options, expected):
+    """Existing callers retain reference defaults while explicit registries survive enrollment."""
+    monkeypatch.setattr(serving_registration, "ensure_monitoring_store", Mock())
+    monkeypatch.setattr(serving_registration, "enroll_monitor", Mock())
+    prepare = Mock()
+    monkeypatch.setattr(serving_registration, "prepare_spark_monitoring_reference", prepare)
+    result = serving_registration.enroll_serving_configs(
+        object(), "ops.monitoring", _values([_config()]), **options
+    )
+    assert result["status"] == "enrolled"
+    assert prepare.call_count == 1
+    assert prepare.call_args.kwargs == expected

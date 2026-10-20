@@ -37,7 +37,7 @@ def _training_only(config: dict[str, Any], *, allow_set_handoff: bool = False) -
         raise ValueError("Multi-target training requires promotion_policy=manual_approval.")
     allowed = {"disabled", "after_alias_change"} if allow_set_handoff else {"disabled"}
     if config.get("score_handoff") not in allowed:
-        raise ValueError("Multi-target training requires score_handoff=disabled.")
+        raise ValueError("Multi-target training requires follow_champion: false.")
 
 
 def _branch_entries(path: Path) -> tuple[dict[str, Any], str]:
@@ -227,6 +227,12 @@ def set_next_actions(payload: dict) -> list[str]:
     """Offer a valid next step without suggesting manual approval can bypass failed gates."""
     if payload.get("alias_change") is not None:
         return ["Run the score job using the approved model set."]
+    if payload.get("quality", {}).get("unloadable_champion_approval_allowed"):
+        return [
+            "The champion could not be compared by this Core release; it remains unchanged.",
+            "Review every component's absolute quality gates and the explicit approve command.",
+            "Approve with the pinned versions and allow_unloadable_champion=true.",
+        ]
     if payload.get("quality", {}).get("passed") is False:
         return [
             "Inspect failed component quality decisions; the champion is unchanged.",

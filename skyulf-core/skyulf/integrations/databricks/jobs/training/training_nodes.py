@@ -119,12 +119,15 @@ def _adopt_model(store: PhaseStore, winner: dict, recipe: dict) -> str:
         tracking_uri=config["tracking_uri"],
     )
     expected_config = recipe["effective_config"]
+    prepared = store.receipt("prepare_dataset")["output"]
     if store.request["spec"].get("weight_column") is not None:
-        prepared = store.receipt("prepare_dataset")["output"]
         expected_config = {
             **expected_config,
             "training_weights": prepared["holdout"]["attrs"]["training_weights"],
         }
+    expected_config = training.with_source_conversions(
+        expected_config, prepared["holdout"]["attrs"], store.request["spec"]["input_columns"]
+    )
     if without_partition_probe(artifact.pipeline.config) != expected_config:
         raise ValueError("Winning model configuration differs from its frozen recipe.")
     with TemporaryDirectory(prefix="skyulf-winner-adoption-") as directory:

@@ -66,9 +66,6 @@ def _scalar(value: Any) -> None:
 
 def portable_config(node: str, raw: dict, state: dict) -> dict:
     """Normalize fitted defaults while rejecting changed explicit column selection."""
-    # Imputation owners import these shared validators during package loading.
-    from .imputation._constant import constant_matches  # noqa: PLC0415 - avoid owner import cycle
-
     columns = raw.get("columns")
     if (
         isinstance(columns, list)
@@ -77,19 +74,31 @@ def portable_config(node: str, raw: dict, state: dict) -> dict:
     ):
         raise ValueError("Configured columns disagree with fitted columns.")
     resolved = _config(node, raw, state)
-    if node == "SimpleImputer" and resolved["strategy"] == "constant":
-        fill = resolved["fill_value"]
-        if fill is not None and any(
-            not constant_matches(fill, value) for value in state.get("fill_values", {}).values()
-        ):
-            raise ValueError("Configured constant disagrees with fitted fill values.")
+    if node == "SimpleImputer":
+        _resolve_imputer_fill(resolved, state)
     return resolved
+
+
+def _resolve_imputer_fill(resolved: dict, state: dict) -> None:
+    """Ignore inactive UI constants while binding active constants to the learned fill."""
+    # Imputation owners import these shared validators during package loading.
+    from .imputation._constant import constant_matches  # noqa: PLC0415 - avoid owner import cycle
+
+    if resolved["strategy"] != "constant":
+        resolved["fill_value"] = None
+        return
+    fill = resolved["fill_value"]
+    if fill is not None and any(
+        not constant_matches(fill, value) for value in state.get("fill_values", {}).values()
+    ):
+        raise ValueError("Configured constant disagrees with fitted fill values.")
 
 
 def fitted_columns(raw: dict, state: dict) -> dict:
     """Resolve learned column selection without changing explicit caller choices."""
     params = _normalize(raw)
     params.pop("target_column", None)
+    params.pop("_display_name", None)
     auto = params.pop("_auto_columns", False)
     columns = params.get("columns")
     if columns is not None and not auto and columns != state["columns"]:

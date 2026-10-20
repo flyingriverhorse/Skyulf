@@ -73,9 +73,9 @@ answers use the same question name with a `branch_N_` prefix.
 | `task` | String | `regression` | `regression`, `classification`; must match estimator | Chooses label/metric semantics. Multi-target entries can differ. | `task` |
 | `engine` | String | `pandas` | `pandas`, `polars`; distributed fitted scoring requires pandas | Chooses local training and fitted preprocessing engine, not compute size. | `engine` |
 | `training_table` | String | Required | Three-part Delta name after target binding | Source of labeled rows; generation/deployment does not create it. | `source_table_name` plus catalog/input schema |
-| `training_version` | Integer or null | Omitted/null | Nonnegative Delta version, including `0` | Null resolves latest once per invocation; an integer pins that snapshot. | `training_version` |
+| `training_table_version` | Integer or null | Omitted/null | Nonnegative Delta version, including `0` | Null resolves latest once per invocation; an integer pins that snapshot. | `training_table_version` |
 | `training_label_table` | String or null | Omitted/null | Separate three-part Delta table; requires availability filtering and exact record-key types | Left-joins actual targets and availability into the training snapshot. External values replace embedded targets. See [separate outcomes](databricks_training_data.md#train-from-separate-outcomes). | `source_layout=separate_outcomes`, or YAML |
-| `training_label_version` | Integer or null | Omitted/null | Nonnegative Delta version; requires `training_label_table` | Null pins latest once per invocation; saved evidence also retains the immutable table identity. New labels can make an unchanged feature snapshot eligible for retraining. | YAML |
+| `training_label_table_version` | Integer or null | Omitted/null | Nonnegative Delta version; requires `training_label_table` | Null pins latest once per invocation; saved evidence also retains the immutable table identity. New labels can make an unchanged feature snapshot eligible for retraining. | YAML |
 | `record_key_columns` | String list | Required | Nonempty, nonnull, unique source identities; distinct roles | Stable row membership, split evidence and output alignment. Generated publication uses string/BIGINT keys. | `record_key_columns` |
 | `input_columns` | String list | Required | Ordered raw model inputs; excludes keys, targets, weights and time/group control roles | Selects features before saved preprocessing. | `input_columns` |
 | `target_column` | String | Required | One source label, distinct from other roles | Chooses the prediction target; omit it from future scoring input. | `target_column` |
@@ -147,13 +147,13 @@ answers use the same question name with a `branch_N_` prefix.
 | `champion_version` | String or null | Omitted/null | Concrete positive version string | Optional expectation guard; generated lifecycle resolves current controlled champion and rejects a mismatching explicit value. Does not move an alias. | YAML |
 | `weight_column` | String or null | Omitted/null | Existing numeric source column, distinct from all protected/input roles | Supplies training sample weights; support depends on estimator. Holdout metrics and threshold selection remain unweighted. | `sample_weight_enabled`, `weight_column` |
 | `risk_category` | String or null | Omitted | At most 256 UTF-8 bytes | Metadata tag only; does not change gates or compute policy. | `risk_category` |
-| `preprocessing_probe` | Boolean | `false` | Explicit opt-in | Saved/reloaded preprocessing diagnostic on at most 256 holdout rows, 8 MiB per frame; not worker admission. | YAML |
-| `admit_probed_custom_steps` | Boolean | `false`; automatic with `inference_mode: spark` or `online_features` | Explicit opt-in for other projects, such as endpoint-only serving | Seals partition evidence for eligible models, ensembles and built-in preprocessing; also lints and probes `column_step`/`fitted_step` steps and saved scoring rules. Checks use 16 to 256 holdout rows. A failing required check stops training before registration. See [Built-in evidence](databricks_spark_scoring.md#built-in-recipes-and-model-evidence) and [Custom row steps](databricks_spark_scoring.md#admit-your-own-row-steps-opt-in). | YAML |
+| `save_preprocessing_diagnostics` | Boolean | `false` | Explicit opt-in | Saved/reloaded preprocessing diagnostic on at most 256 holdout rows, 8 MiB per frame; not worker admission. | YAML |
+| `allow_tested_custom_steps` | Boolean | `false`; automatic with `batch_compute: spark` or `online_features` | Explicit opt-in for other projects, such as endpoint-only serving | Seals partition evidence for eligible models, ensembles and built-in preprocessing; also lints and probes `column_step`/`fitted_step` steps and saved scoring rules. Checks use 16 to 256 holdout rows. A failing required check stops training before registration. See [Built-in evidence](databricks_spark_scoring.md#built-in-recipes-and-model-evidence) and [Custom row steps](databricks_spark_scoring.md#admit-your-own-row-steps-opt-in). | YAML |
 | `evaluation_charts` | Mapping or null | `{enabled: false}` | enabled plus bounded sample/display controls below | Saves an evaluation sample for the independent chart task. Enabling a previously omitted task also requires matching resources/notebook. | `evaluation_charts_enabled`; detailed limits in YAML |
 | `competition_max_candidates` | Integer | `8` | 2..32 in loader; init wizard offers up to 8 | Bounds distinct candidate declarations in a one-target competition. | Generated; YAML for explicit validated limits |
 | `competition_max_trials` | Integer | Generated `1000`; loader fallback `100` | 1..10000; competition only | Aggregate search-work bound including nested/halving work, not wall-clock seconds. | `competition_max_trials` |
 | `feature_lookup` | Mapping or null | Omitted/null | Native lookup declaration; pandas and admitted Spark/online path | Adds explicit offline feature binding and source evidence; not an arbitrary join. | Online opt-in creates placeholders; complete YAML |
-| `online_features` | Mapping or null | Omitted/null | Requires feature_lookup, pandas, non-temporal supported request shape | Saves required-feature and freshness guards with the model; does not create a store or endpoint. | `include_online_serving` creates placeholders; complete YAML |
+| `online_features` | Mapping or null | Omitted/null | Requires feature_lookup, pandas, non-temporal supported request shape | Saves required-feature and freshness guards with the model; does not create a store or endpoint. | `include_online_feature_lookup` creates placeholders; complete YAML |
 
 <!-- training-fields:end -->
 
@@ -241,7 +241,7 @@ worker to avoid nested parallel fits.
 | decision_threshold, mode off | Only `mode: off` | Keep the estimator's normal hard-label decision. |
 | decision_threshold, mode manual | Binary: `value` in [0,1] plus typed `positive_class`; or `thresholds: [{class: ..., value: ...}, ...]` covering every class with positive values | Bind original class labels, not probability column indexes. Per-class decisions use the saved threshold policy. |
 | decision_threshold, mode auto | `metric: balanced_accuracy` (also f1, f1_macro, f1_weighted, matthews_corrcoef), `validation_fraction: 0.2` strictly between 0 and 1, `random_state: 42`, optional `positive_class` | Uses separate training-side calibration; temporal models retain chronological ordering. |
-| explainability | Required `method: shap`; max_samples 100 (1..200), max_features 30 (1..100), max_display_samples min(10,max_samples) (0..50 and no larger than max_samples) | Bounded training explanation and report display. |
+| explainability | Required `method: shap`; max_samples 100 (1..200), max_features 30 (positive integer, no fixed upper bound), max_display_samples min(10,max_samples) (0..50 and no larger than max_samples) | Training explanation and report display bounded by the configured budgets. |
 | evaluation_charts | Required boolean `enabled`; max_rows 2000 (2..10000), max_features 20 (1..50), max_classes 20 (2..50) | Bounded saved holdout chart sample; does not change full holdout metrics. |
 | feature_lookup | `lookups` list, each with table_name, lookup_key and feature_names; optional timestamp fields only on supported offline paths | Declare every fetched feature in input_columns. Keep lookup controls/source identities explicit. See online guide for exact native contract. |
 | online_features | `required_features` and `freshness: [{column: ..., max_age_seconds: ...}]` | Cover all fetched features; each lookup needs its saved DOUBLE UTC-epoch freshness input. The age bound is an explicit domain choice, not an automatic default. |
@@ -315,7 +315,7 @@ defaults:
   engine: pandas
   task: regression
   training_table: "{catalog}.{input_schema}.customer_training"
-  training_version: null             # Resolve latest once when invoked.
+  training_table_version: null             # Resolve latest once when invoked.
   record_key_columns: [customer_id]
   input_columns: [income, age]        # Keys and labels are not features.
   target_column: revenue
@@ -361,7 +361,7 @@ defaults:
   engine: pandas
   task: regression
   training_table: "{catalog}.{input_schema}.customer_training"
-  training_version: null
+  training_table_version: null
   record_key_columns: [customer_id]
   input_columns: [income, age]
   target_column: revenue
@@ -416,7 +416,7 @@ defaults:
   engine: pandas
   task: regression
   training_table: "{catalog}.{input_schema}.customer_training"
-  training_version: null
+  training_table_version: null
   record_key_columns: [customer_id]
   input_columns: [income, age]
   split_strategy: random

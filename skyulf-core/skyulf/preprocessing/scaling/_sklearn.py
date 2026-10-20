@@ -51,7 +51,8 @@ def _scaled_values(X: Any, params: dict[str, Any]) -> np.ndarray:
     values, _ = scaler_fit_values(X, {"columns": columns})
     if not len(values):
         return np.empty((0, len(columns)), dtype=np.float64)
-    return params["transformer_object"].transform(values)
+    # Serving may enable sklearn's pandas output; restoration below needs a matrix.
+    return np.asarray(params["transformer_object"].transform(values))
 
 
 def apply_scaler_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

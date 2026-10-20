@@ -55,10 +55,10 @@ confirmation. Read the list before you confirm. Repeat per target; destroying
 | Removed | Source |
 | --- | --- |
 | Jobs `train`, `score`, `monitoring` | `resources/*.job.yml` |
-| Optional jobs `online_serving_setup`, `online_publication`, `daily_rollout` | Present when selected at setup |
+| Optional jobs `online_feature_lookup_setup`, `online_publication`, `daily_rollout` | Present when selected at setup |
 | The `features` job | `resources/features.job.yml`, when created by `refresh_feature_graph.py` |
-| The dashboard refresh tasks | `resources/monitoring_dashboard.job.yml`, part of the monitoring job |
-| The shared monitoring dashboard | Only in the owner target, when `resources/monitoring.dashboard.yml` was created with `--create-dashboard` |
+| The dashboard refresh task | A target's block in `deployment/monitoring.yml`, part of the monitoring job |
+| The shared monitoring dashboard | Only in a target whose `deployment/monitoring.yml` block uses `create` |
 | Job permissions managed by the Bundle | `permissions` and `manage_job_permissions` settings |
 | Deployed files and Bundle state | The target's `root_path` workspace folder |
 
@@ -78,7 +78,7 @@ These stay, because the Bundle never created them as resources:
 | Monitoring enrollment rows | Stay in `model_inventory`; paused if you followed the steps above |
 | Registered models, versions, aliases and tags | Unity Catalog objects |
 | Monitoring experiment named by `monitoring_experiment_name` | Outside the project folder when set to a path such as `/Shared/...` |
-| Serving endpoints and UC SQL functions | Created by the SDK or the `online_serving_setup` job, not by the Bundle |
+| Serving endpoints and UC SQL functions | Created by the SDK or the `online_feature_lookup_setup` job, not by the Bundle |
 | Online stores, online tables and publication pipelines | Created through Feature Engineering, not by the Bundle |
 | A dashboard reused by URL | Owned by another project or created outside the Bundle |
 

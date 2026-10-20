@@ -199,7 +199,7 @@ def workflow_lookup_json(config: dict[str, Any]) -> str | None:
     if config.get("engine") != "pandas" or (
         config.get("inference_mode") != "spark" and config.get("online_features") is None
     ):
-        raise ValueError("feature_lookup requires engine=pandas and inference_mode=spark.")
+        raise ValueError("feature_lookup requires engine: pandas and batch_compute: spark.")
     spec = parse_lookup_config(
         value, label=config["target_column"], input_columns=tuple(config["input_columns"])
     )
@@ -245,11 +245,11 @@ def bind_lookup_tables(value: Any, bindings: dict[str, str]) -> dict[str, Any]:
             raise ValueError("feature_lookup table_name must be a string.")
         if not lookup["table_name"].strip() and not (
             lookup.get("lookup_key") or lookup.get("feature_names")
-        ):  # The include_online_serving stub is generated blank for the operator to fill.
+        ):  # The include_online_feature_lookup stub is generated blank for the operator to fill.
             raise ValueError(
                 f"feature_lookup.lookups[{index}] is not filled in: complete feature_lookup and "
                 "online_features in config/training.yml, or regenerate with "
-                "include_online_serving=false."
+                "include_online_feature_lookup=false."
             )
         for key, replacement in bindings.items():
             lookup["table_name"] = lookup["table_name"].replace("{" + key + "}", replacement)

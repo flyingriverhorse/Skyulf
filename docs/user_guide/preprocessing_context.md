@@ -12,7 +12,7 @@ calls `apply` with the information saved during training.
 | --- | --- |
 | What does it check? | A saved model's preprocessing on a small sample, without refitting. |
 | Why use it? | A step that changes results when a request is split, repeated or reordered can give wrong batch predictions. |
-| When does it run? | After training, only when you turn it on, for example with `preprocessing_probe: true`. |
+| When does it run? | After training, only when you turn it on, for example with `save_preprocessing_diagnostics: true`. |
 | What does it not do? | It does not block promotion, change the model, or alone approve Spark or serving use. Your own row steps need the separate [opt-in](databricks_spark_scoring.md#admit-your-own-row-steps-opt-in). |
 
 ## Prerequisites and outcome
@@ -334,7 +334,7 @@ In generated `config/training.yml`, enable the diagnostic explicitly:
 
 ```yaml
 defaults:
-  preprocessing_probe: true
+  save_preprocessing_diagnostics: true
 ```
 
 The default is `false`. Single-model, competition and multi-target training use the same saved-model

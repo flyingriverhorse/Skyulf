@@ -5,7 +5,7 @@ workflow or company adapter is generated. Keep credentials outside these files.
 
 ## Selected layout
 
-- Training engine: `pandas`; inference mode: `spark`.
+- Training engine: `pandas`; batch compute: `spark`.
 - Personal development targets: `false`.
 - Shared execution identity: `deployer`.
 - Managed per-job permissions: `false`.
@@ -63,6 +63,6 @@ host, schemas, output suffixes, `run_as` and permissions before deployment.
 - [Existing-project upgrades](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html)
 - [Monitoring store and access setup](https://www.skyulf.com/manual/user_guide/databricks_monitoring_setup.html)
 
-Version: `deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.4`.
+Version: `deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.5`.
 Public links show the latest documentation. Use the runtime matching the template
 and saved model producer; changing a pin does not upgrade existing artifacts.

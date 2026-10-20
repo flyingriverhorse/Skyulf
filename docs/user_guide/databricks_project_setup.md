@@ -9,11 +9,12 @@ not inspect your tables.
 ### Start from the closest example
 
 Copying a finished project is usually faster than answering the setup wizard.
-Five NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
+Six NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
 
 | Your project | Copy | Notes |
 | --- | --- | --- |
 | One model, scored on Spark workers | `taxi_fare` | Promotes automatically and scores after promotion |
+| REST/SQL serving and monitoring without batch output | [taxi_fare_endpoint](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint) | Automatic endpoint after promotion, `ai_query` and captured-request monitoring; no score job or prediction table |
 | Preprocessing exclusions with Spark and raw-input serving | `taxi_fare_robust` | Reuses pre-split preparation; IQR, PowerTransformer and imputer handling; REST/`ai_query` examples and labels for monitoring |
 | One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; no batch scoring |
 | One target, several candidate algorithms | `taxi_high_fare` | Competition with custom steps and manual approval |
@@ -147,7 +148,7 @@ version: 1
 defaults:
   training_layout: single_model
   engine: pandas
-  preprocessing_probe: false
+  save_preprocessing_diagnostics: false
 models:
   main:
     model:
@@ -223,29 +224,35 @@ to change them afterwards.
 
 #### Monitoring destination
 
-Both setup modes ask two monitoring questions, after the deployment questions:
+Both setup modes ask the monitoring questions after the deployment questions:
 
-| Question | Answer | Result in `deployment/variables.yml` |
+| Question | Answer | Result |
 | --- | --- | --- |
-| `monitoring_catalog` | Existing catalog for the shared monitoring store, or blank | Default of `monitoring_catalog` |
-| `monitoring_schema` | Shared schema in that catalog; omitted or blank uses `skyulf_monitoring` | Shared schema when a catalog is set; blank when monitoring is off |
+| `monitoring` | `true` or `false` | `monitoring_enabled`; `monitoring_catalog` defaults to each target's `catalog` (`deployment/variables.yml`) |
+| `monitoring_schema` | Shared schema; omitted or blank uses `skyulf_monitoring` | `monitoring_schema` in `deployment/variables.yml` |
+| `development_monitoring` (with personal development targets) | `true` or `false` | Development targets monitor into their own schema (`deployment/monitoring.yml`) |
+| `development_monitoring_schema` | Any schema except the shared one | `development_monitoring_schema` in `deployment/variables.yml` |
+| `monitoring_dashboard` | `none`, `create` or `connect` | The `test` dashboard block in `deployment/monitoring.yml` |
 
-Give every project the same catalog and schema, reserved for monitoring (for
-example `skyulf_monitoring`), not the project's own schema: all models then
-appear in one store and one dashboard. Only one project creates the dashboard;
-the others connect to it with `--dashboard-url`, see
+Give every project the same schema, reserved for monitoring (for example
+`skyulf_monitoring`), not the project's own schema: all models then appear in one
+store and one dashboard. Every monitoring table and view is created in that one
+schema. Only one project creates the dashboard; the others connect to it, see
 [the shared dashboard](databricks_monitoring_dashboard.md).
 [Tables in your workspace](databricks_workspace_tables.md) lists every table the
 jobs create and where each one belongs.
 
-A catalog answer sets `monitoring_enabled` to `"true"`: train and score enroll
-models and run monitoring. A blank catalog sets `monitoring_enabled` to
-`"false"`: train and score run without monitoring. A catalog without a schema
-uses `skyulf_monitoring`. A user-selected schema is preserved, including an
-existing store. Each answer is blank or one identifier. The schema is created
+`monitoring: "true"` sets `monitoring_enabled` to `"true"`: train and score
+enroll models and run monitoring. `monitoring: "false"` sets it to `"false"`:
+train and score run without monitoring. A user-selected schema is preserved,
+including an existing store. To use a central catalog instead of each target's
+own, set `monitoring_catalog` in `deployment/variables.yml` or per target in
+`deployment/monitoring.yml`. The schema is created
 on first use if the run-as identity may
-create schemas. Personal development targets always set `monitoring_enabled`
-to `"false"`.
+create schemas. Personal development targets set `monitoring_enabled` to
+`"false"` unless `development_monitoring` is `"true"`; then they monitor into
+their own separate store (see
+[development monitoring](databricks_monitoring_enrollment.md#development-monitoring-optional)).
 
 Configured projects also include an independent weekly `monitoring_cleanup`
 job. It defaults to Sunday 04:00 UTC, confirmed cleanup and a 90-day minimum
@@ -279,17 +286,28 @@ apply to the chosen layout and earlier answers:
 
 | Asked only in detailed setup | Quick default |
 | --- | --- |
-| `training_version` (not asked for `single_model`) | `null`: pin the latest snapshot at run start |
+| `training_table_version` (not asked for `single_model`) | `null`: pin the latest snapshot at run start |
 | `training_window_mode` | `auto`: full snapshot for random, rolling calendar for temporal |
 | `cv_enabled`, then `cv_folds`, `cv_type`, `cv_shuffle`, `cv_random_state` | CV off; `5`, `k_fold`, `true`, `42` |
 | `max_rows`, `max_input_mb` | `10000`, `64` |
 | `training_sample_rows` (per branch for model sets) | `null`: read all rows within the limits; this never samples predictions |
-| `preprocessing_probe` | `false`: enable to check fitted preprocessing on a bounded holdout sample |
+| `save_preprocessing_diagnostics` | `false`: enable to check fitted preprocessing on a bounded holdout sample |
 | `performance_policy_mode`, task-specific metric, tolerance and baseline version | `off`; when enabled, require outcomes and a monitoring store. See [performance policy](databricks_performance.md). |
 
 Most answer-file values are strings, including `"true"`, `"42"` and `"null"`;
 `min_improvement` is a JSON number. The generated `config/training.yml` uses
 native YAML booleans and numbers, and omits keys whose value is null.
+Nonempty values under known removed answer names, including `inference_mode`, `score_handoff`,
+`model_change_mode`, `auto_rebuild_on_cdf_expiry`, `preprocessing_probe`,
+`admit_probed_custom_steps` and `monitoring_catalog`, now fail initialization
+instead of silently selecting defaults. Use the current names in the examples
+and generated schema.
+For monitoring, initialize with `monitoring: "true"`; `monitoring_catalog`
+remains an editable deployment variable.
+The Databricks CLI can still discard other unknown answer keys before the template
+sees them, so check the generated configuration when editing an answer file.
+This is an upstream CLI behavior, not a general unknown-key validation guarantee.
+
 For fixed dates, start from
 `random-window-init.example.json` or `temporal-delayed-results-init.example.json`.
 For stratified CV and sampling, use `guided-classification-init.example.json`.
@@ -448,7 +466,7 @@ shows the actual pipeline, input selection, final holdout, CV and
 score/promotion policies. Competition prints a `Candidate:` section for each
 candidate; model sets print a `Branch:` section for each branch. The same training
 rules apply to manual and scheduled runs. Preview starts no cloud job, reads no
-Delta rows, fits no model and does not execute `preprocessing_probe`. A
+Delta rows, fits no model and does not execute `save_preprocessing_diagnostics`. A
 preview-resolution `ValueError` prints `Configuration error:` and exits with
 code 2; fix the reported setting before deployment. File/parsing failures that
 happen before resolution may raise directly.
@@ -472,9 +490,8 @@ update the preview script's defaults.
 | `smoke.py` | Check YAML, Python syntax and package snapshots without running editable hooks: `python src/tools/smoke.py`. It accepts preview's five binding flags; see [smoke result](#smoke-result) for status and exit codes. |
 | `refresh_feature_graph.py` | After editing feature groups or merges: `python src/tools/refresh_feature_graph.py`. |
 | `refresh_training_graph.py` | After editing competition candidates or model-set branch names/count: `python src/tools/refresh_training_graph.py`. Single-model projects remain unchanged. |
-| `configure_monitoring_dashboard.py` | Configure an existing dashboard's target refresh: `python src/tools/configure_monitoring_dashboard.py --dashboard-id YOUR_DASHBOARD_ID --target test`. See [dashboard configuration](databricks_monitoring_dashboard.md) for ownership, warehouse and disable options. |
 
-Graph/dashboard tools change local resource YAML. Validate and redeploy before
+Graph tools change local resource YAML. Validate and redeploy before
 running the updated job. They do not start a cloud job by themselves.
 
 The answer-file examples include `guided-classification-init.example.json`

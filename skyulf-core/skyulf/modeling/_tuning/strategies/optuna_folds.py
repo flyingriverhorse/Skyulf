@@ -90,8 +90,8 @@ def _prepare_fold(
     X_valid, y_valid, _coverage = transform_evaluation(
         worker, X_valid, y_valid, coverage_out=evaluation_coverage
     )
-    SklearnBridge.validate_features(X_train)
-    SklearnBridge.validate_features(X_valid)
+    X_train, y_train = SklearnBridge.to_sklearn((X_train, y_train), validate_features=True)
+    X_valid, y_valid = SklearnBridge.to_sklearn((X_valid, y_valid), validate_features=True)
     step.label_map_ = step._build_label_map(original_y, y_train, model, worker)
     step.preprocessor_ = None  # Scorers receive data already transformed as a pair.
     if step.label_map_ is not None:

@@ -1,15 +1,16 @@
-# Optional jobs remain paused until these pins are configured and verified.
+# Stable endpoint setup is ready to run when selected at initialization.
+# Enable rollout and online-feature jobs only after completing their settings.
 # The rollout must already be initialized; the daily job never creates endpoints.
-online_serving:
+online_feature_lookup:
   enabled: false
-  # Exclusive endpoint creation ownership; an existing endpoint is never overwritten.
+  # Set true only when no other job or person changes this endpoint. Existing endpoints are never overwritten.
   exclusive_writer: false
   tracking_uri: databricks
   registry_uri: databricks-uc
   endpoint:
     endpoint_name: ""
     model_name: ""
-    model_version: "" # A concrete registered version, never an alias.
+    model_version: "" # A registered model version number, such as 7; not a name like champion.
     workload_type: CPU # CPU | CPU_MEDIUM | CPU_LARGE
     workload_size: Small # Small | Medium | Large
     scale_to_zero_enabled: true
@@ -30,9 +31,13 @@ online_serving:
 
 rollout:
   enabled: false
-  # True only when this serialized job has exclusive endpoint and alias write access.
+  # Set true only when no other job or person changes this endpoint or its champion assignment.
   exclusive_writer: false
   run_id: ""
+  # Use these same values when initializing the rollout; changing them needs a new run.
+  traffic_step_percent: 10
+  stage_minimum_hours: 24.0
+  evidence_max_age_hours: 24.0
   tracking_uri: databricks
   registry_uri: databricks-uc
   comparison_sha256: ""
@@ -48,7 +53,7 @@ rollout:
     max_input_mb: 64
     tracking_uri: databricks
     registry_uri: databricks-uc
-  # Named rows matching the pinned request schema; native smoke calls both versions.
+  # Example requests with the saved model input columns; both model versions are checked.
   smoke_records: []
   health:
     minimum_requests: 100
@@ -75,9 +80,9 @@ rollout:
 online_publication:
   enabled: false
   publish_mode: TRIGGERED
-  # True only when source/publication writers share externally enforced exclusive access.
+  # Set true only when other writers cannot change this source or publication while this job runs.
   exclusive_writer: false
-  # Existing latest-value Delta feature table with CDF and NOT NULL primary keys.
+  # Existing Delta feature table with one current row per key, change data feed enabled, and no null keys.
   source_table: ""
   source_table_id: ""
   online_table: ""

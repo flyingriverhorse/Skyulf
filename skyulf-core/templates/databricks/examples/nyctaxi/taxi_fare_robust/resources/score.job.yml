@@ -48,6 +48,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
@@ -60,13 +61,14 @@ resources:
 
 
         - task_key: monitoring_allowed
-          description: Monitor shared deployments only; skip ephemeral development models
+          description: Monitor shared deployments, and development ones only with a development monitoring store
           depends_on:
             - task_key: score
           condition_task:
-            op: EQUAL_TO
-            left: ${bundle.mode}
-            right: production
+            # Shared targets always register; development only with its own monitoring store.
+            op: NOT_EQUAL
+            left: "${bundle.mode}:${var.monitoring_enabled}"
+            right: "development:false"
         - task_key: prepare_monitoring
           description: Validate the successful scoring receipt for the separate Spark monitoring job
           depends_on:
@@ -100,6 +102,7 @@ resources:
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}

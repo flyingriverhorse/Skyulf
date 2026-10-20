@@ -359,7 +359,7 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
         training_layout=layout,
         compute_mode=compute,
         cluster_policy_name="local-policy",
-        auto_rebuild_on_cdf_expiry=recovery,
+        rescore_when_history_expires=recovery,
     )
     path = project / "deployment/variables.yml"
     contents = yaml.safe_load(path.read_text())

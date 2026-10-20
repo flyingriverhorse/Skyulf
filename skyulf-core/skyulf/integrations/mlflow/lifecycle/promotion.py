@@ -773,9 +773,7 @@ def _apply_alias_updates(
     changed = False
     for update in updates:
         alias, new_version = update[:2]
-        before_write = _BEFORE_ALIAS_WRITE.get()
-        if before_write is not None:
-            before_write()
+        _check_alias_write_guard(client, receipt, updates, changed)
         try:
             if new_version is None:
                 client.delete_registered_model_alias(receipt.model_name, alias)
@@ -791,6 +789,27 @@ def _apply_alias_updates(
             raise AliasOutcomeUnknownError(
                 f"Alias outcome unknown; inspect prepared event {receipt.event_id}."
             ) from exc
+
+
+def _check_alias_write_guard(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    updates: list[tuple[str, str | None, str | None]],
+    changed: bool,
+) -> None:
+    """Release a refused untouched intent while retaining any earlier alias mutation."""
+    before_write = _BEFORE_ALIAS_WRITE.get()
+    if before_write is None:
+        return
+    try:
+        before_write()
+    except Exception as exc:  # noqa: BLE001 - guard rejection precedes the alias request
+        if changed:
+            raise AliasOutcomeUnknownError(
+                f"Alias outcome unknown; inspect prepared event {receipt.event_id}."
+            ) from exc
+        _abort_refused_change(client, receipt, updates)
+        raise
 
 
 def _raise_alias_write_error(

@@ -6,15 +6,35 @@ Use this page after [store setup](databricks_monitoring_setup.md) to enroll acti
 batch models, prepare their references, and start observation. For endpoints, use
 [serving monitoring](databricks_serving_monitoring.md).
 
-Monitoring runs only for shared `mode: production` deployments (`test`, `syst`,
-`prod`). Personal development targets do not enroll temporary models or create
-monitoring tables. The `monitoring_allowed` condition excludes enrollment and the
-post-scoring monitoring handoff in `mode: development`; training
-and scoring still run normally, including automatic scoring after activation.
-Development targets also set `monitoring_enabled: "false"`,
+Monitoring writes to the shared store only for `mode: production` deployments
+(`test`, `syst`, `prod`). By default, personal development targets do not enroll
+temporary models or create monitoring tables: they set `monitoring_enabled: "false"`,
+and the `monitoring_allowed` condition then skips enrollment and the post-scoring
+monitoring handoff. Training and scoring still run normally, including automatic
+scoring after activation. Development targets also set
 `monitoring_performance_policies: '{}'` and `on_drift: disabled`.
-The deployment-mode guard remains effective even if shared monitoring destinations
-or an enabled flag are inherited from common settings.
+
+### Development monitoring (optional)
+
+To see your own development models, answer `development_monitoring: "true"` in
+setup. The question appears with personal development targets and needs a
+monitoring store; it defaults to off. Setup then asks for the schema name
+(`development_monitoring_schema`, default `development_monitoring`) in the same
+catalog. Any name works, including an existing schema in your workspace, as long
+as it is not the shared `monitoring_schema`. Every `*_development` target sets
+`monitoring_enabled: "true"`, and every job receives both names. Change the name
+later in `deployment/variables.yml`; a blank name keeps development monitoring off.
+
+Core keeps the two stores apart: in development mode it writes only to
+`development_monitoring_schema` and refuses one that is missing or equal to the
+shared schema; `test`, `syst` and `prod` always use the shared schema.
+Development models are measured and reported only; automatic retraining stays
+disabled. Development jobs run as you, so you may need permission to create the
+schema, or ask for it to be created first. `bundle destroy` does not remove a
+development model's enrollment, so old trial models remain in the development
+store until you clean or recreate it. With `monitoring_dashboard: create`,
+`test_development` also gets its own dashboard over this store; development mode
+prefixes its name for each user.
 
 ```mermaid
 flowchart LR
@@ -30,8 +50,8 @@ its receipt to the separate monitoring job.
 
 ### If monitoring is not configured
 
-Monitoring runs only when setup received a monitoring catalog and schema, which
-sets `monitoring_enabled: "true"`. A blank catalog at setup sets it to `"false"`:
+Monitoring runs only when setup answered `monitoring: "true"`, which sets
+`monitoring_enabled: "true"`. `monitoring: "false"` sets it to `"false"`:
 train and score run, `register_monitor` and `prepare_monitoring` report
 `disabled`, and the score job skips `monitor_model`. Nothing is enrolled or
 observed. Enable it later as described in

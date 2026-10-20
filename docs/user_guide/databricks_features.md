@@ -341,6 +341,20 @@ group and dependent merge while keeping the original pinned inputs. External
 writes to the feature destinations are unsupported; serialized job runs do not
 lock unrelated producers.
 
+Each new run also pins the output table identities and records a publication
+generation. A newer run that starts publishing any group or the merged output
+supersedes an older run. Repairing that older run then fails before it can
+overwrite newer values; start a fresh run instead. This includes newer runs
+that failed partway through publication. Old saved mutation snapshots without
+generation evidence must also restart from initialization.
+
+Retrying the same current snapshot is supported after a lost write response,
+provided its transforms are deterministic. Keep one owning, serialized
+producer for these tables. The generation check detects stale repairs; it is
+not a distributed lock against simultaneous external writers. Existing outputs
+receive a publication-intent table property before the merge, which can add a
+metadata-only Delta history version even when no rows change.
+
 ## Bind existing UC features instead of materializing a merge
 
 Use `feature_lookup` when the model should retain native lookup lineage. The
@@ -363,7 +377,7 @@ feature_lookup:
       lookback_seconds: 2678400
 ```
 
-Set `inference_mode: spark` in `config/inference.yml` for this offline batch
+Set `batch_compute: spark` in `config/inference.yml` for this offline batch
 route and score from the corresponding observation table. The example's
 lookback is 31 days. For a non-temporal exact lookup, omit timestamp and lookback
 fields. Any direct model inputs not fetched must be present in the base table.
@@ -377,10 +391,20 @@ the matching Feature Engineering dependency in `deployment/requirements.txt`
 `databricks-feature-engineering==0.18.1`). Native lookup uses the saved model's
 feature binding and `score_batch`, not the ordinary merged-table pyfunc route.
 
-The saved `training_snapshot` binding records feature-table IDs/versions. Unchanged base data does
-not authorize silently reading updated feature tables: refresh training and explicitly choose a
-rebuild/new prediction target for changed lookup evidence. Before/after version checks detect
-concurrent writes; they do not lock the tables: the SDK provides no lookup `versionAsOf` argument.
+The saved `training_snapshot` binding records feature-table IDs/versions. When a
+feature table advances, scoring accepts it only if its identity and schema
+still match and a distributed comparison proves both retained snapshots
+contain exactly the same rows, including duplicates. This permits
+data-preserving maintenance such as compaction. Actual data or schema changes
+require refreshed training and an explicit rebuild/new prediction target.
+Missing historical snapshots fail validation; retain the training versions
+needed for this check.
+
+The equality proof can scan both complete feature-table snapshots. It is
+repeated on later scoring calls while the current version differs from the
+saved training version; there is no persistent proof cache. Plan for this cost
+on large feature tables. Before/after version checks detect concurrent writes;
+they do not lock the tables: the SDK provides no lookup `versionAsOf` argument.
 Keep those tables stable during training/scoring. Nullable integer/Boolean transport needing the
 post-lookup encoder is not admitted by this adapter. Driver training limits still apply even though
 lookup and batch scoring use Spark.

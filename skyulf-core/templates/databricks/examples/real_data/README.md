@@ -29,7 +29,7 @@ replay. For a new recipe, see the [built-in alternatives](diagnostic_single/src/
 filters, learned clipping, imputation, missing markers, frequency/rare encoding,
 cyclical dates and group deviations. The guide includes runnable YAML and the
 null, dtype and output-name differences to check before retraining. These new
-built-ins require the 0.9.4 development wheel until that release is published.
+built-ins require the 0.9.5 development wheel until that release is published.
 
 ## Data, ownership and leakage boundaries
 
@@ -52,7 +52,7 @@ a reconstruction of the original observation instants. `result_available_at`
 records when the example loads known outcomes for monitoring.
 
 All three projects train with pandas in one bounded Python process. Scoring uses
-`inference_mode: spark`, which applies the saved model through a Spark UDF.
+`batch_compute: spark`, which applies the saved model through a Spark UDF.
 This does not distribute estimator fitting across Spark workers. Each project's
 monitoring store is configured independently: diagnostic and bike keep their
 own schemas; air quality uses the shared `workspace.skyulf_monitoring` schema.
@@ -216,11 +216,11 @@ already ships in each project; publish one dashboard per isolated monitoring
 schema, or deliberately choose one shared monitoring store for a production
 installation.
 
-To let each example own its dashboard, run this from that project's directory
-with an existing SQL warehouse ID, then validate and deploy the Bundle again:
+To let each example own its dashboard, copy the commented `create` example in
+that project's `deployment/monitoring.yml` under `test`, set an existing SQL
+warehouse ID, then validate and deploy the Bundle again:
 
 ```powershell
-python src/tools/configure_monitoring_dashboard.py --create-dashboard --target test --warehouse-id YOUR_WAREHOUSE_ID
 databricks bundle validate --strict -t test --profile YOUR_PROFILE
 databricks bundle deploy -t test --profile YOUR_PROFILE
 ```

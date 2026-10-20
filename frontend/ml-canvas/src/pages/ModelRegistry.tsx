@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Archive, Box, CheckCircle, ChevronRight, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
 import { LoadingState, ErrorState, EmptyState, ModalShell, RecordLink, useConfirm } from '../components/shared';
+import { ExportProjectButton } from '../components/shared/ExportProjectButton';
 import { toast } from '../core/toast';
 import { parseOperationalContext } from '../core/utils/operationalContext';
 import {
@@ -280,6 +281,7 @@ export const ModelRegistry: React.FC = () => {
             </div>
           )}
 
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
             <thead>
               <tr>
@@ -365,12 +367,20 @@ export const ModelRegistry: React.FC = () => {
                           )
                         )}
                       </div>
+                      {version.status === 'completed' && (
+                        <ExportProjectButton
+                          jobId={version.job_id}
+                          modelName={selectedModel.model_type}
+                          version={version.version}
+                        />
+                      )}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </ModalShell>

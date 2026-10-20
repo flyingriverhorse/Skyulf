@@ -4,6 +4,7 @@ import importlib
 import json
 import math
 import re
+from collections.abc import Collection
 from datetime import UTC, datetime
 from itertools import pairwise
 from typing import Any
@@ -129,18 +130,22 @@ def _check_capture(payloads: Any) -> None:
     )
 
 
-def _scalar_record(record: Any) -> bool:
-    """Retain JSON primitives without accepting nested values or nonfinite numbers."""
+def _scalar_record(record: Any, missing_floats: Collection[str]) -> bool:
+    """Retain scalars and declared missing floats without accepting infinities or nesting."""
     if not isinstance(record, dict):
         return False
     return all(
         not isinstance(value, (dict, list))
-        and (not isinstance(value, float) or math.isfinite(value))
-        for value in record.values()
+        and (
+            not isinstance(value, float)
+            or math.isfinite(value)
+            or (name in missing_floats and math.isnan(value))
+        )
+        for name, value in record.items()
     )
 
 
-def _scalar_envelope(raw: str | None, field: str) -> bool:
+def _scalar_envelope(raw: str | None, field: str, missing_floats: Collection[str] = ()) -> bool:
     """Inspect one JSON document on its executor before Spark coerces map values."""
     try:
         document = json.loads(raw) if raw is not None else None
@@ -149,10 +154,11 @@ def _scalar_envelope(raw: str | None, field: str) -> bool:
     if not isinstance(document, dict):
         return False
     records = document.get(field)
-    return isinstance(records, list) and all(_scalar_record(record) for record in records)
+    allowed = missing_floats if field == "dataframe_records" else ()
+    return isinstance(records, list) and all(_scalar_record(record, allowed) for record in records)
 
 
-def _parse_envelopes(successes: Any) -> Any:
+def _parse_envelopes(successes: Any, input_columns: tuple[tuple[str, str], ...]) -> Any:
     """Accept only named dataframe records and record-shaped predictions."""
     fn = _spark_functions()
     request_schema = "STRUCT<dataframe_records: ARRAY<MAP<STRING, STRING>>>"
@@ -164,6 +170,9 @@ def _parse_envelopes(successes: Any) -> Any:
         "_outputs", fn.from_json("response", response_schema).getField("predictions")
     )
     scalar = fn.udf(_scalar_envelope, "boolean")
+    missing_floats = fn.array(
+        *(fn.lit(name) for name, dtype in input_columns if dtype.lower() in {"float", "double"})
+    )
     _check_invalid(
         parsed,
         [
@@ -182,7 +191,7 @@ def _parse_envelopes(successes: Any) -> Any:
             ),
             *(
                 (
-                    ~scalar(fn.col(source), fn.lit(field)),
+                    ~scalar(fn.col(source), fn.lit(field), missing_floats),
                     f"{source} {field} must contain finite scalar records",
                 )
                 for source, field in (("request", "dataframe_records"), ("response", "predictions"))
@@ -222,6 +231,9 @@ def _typed_records(frame: Any, columns: tuple[tuple[str, str], ...], prefix: str
             _check_invalid(frame, checks)
             raise
         source = fn.col("_record").getItem(name)
+        if dtype.lower() in ("float", "double"):
+            # Spark's JSON string maps quote numeric NaN; retain it as a missing float.
+            source = fn.when(source == '"NaN"', fn.lit("NaN")).otherwise(source)
         cast = source.try_cast(dtype)
         if dtype.lower() in ("boolean", "bool"):
             cast = fn.when(fn.lower(source).isin("true", "false"), cast)
@@ -345,7 +357,7 @@ def parse_serving_payloads(
         fn.col("status_code").between(200, 299)
         & (fn.col("logging_error_codes").isNull() | (fn.size("logging_error_codes") == 0))
     )
-    parsed = _parse_envelopes(successes)
+    parsed = _parse_envelopes(successes, input_columns)
     current = _typed_records(_expand(parsed, "_inputs"), input_columns)
     predictions = _typed_records(_expand(parsed, "_outputs"), output_columns, output_prefix)
     summary, observed_at = _summary(selected, predictions)

@@ -1,0 +1,78 @@
+resources:
+  jobs:
+    serving_endpoint:
+      name: ${bundle.name}_serving_endpoint
+      tags: ${var.job_tags}
+{{if eq .compute_mode "serverless"}}
+      budget_policy_id: ${var.serverless_budget_policy_id}
+{{end}}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: ${var.serving_timeout_seconds}
+      parameters:
+        - name: model_version
+          default: ""
+      tasks:
+        - task_key: serving_endpoint
+          description: Create or update the owned endpoint and verify REST and SQL predictions
+          timeout_seconds: ${var.serving_timeout_seconds}
+          max_retries: 0
+          retry_on_timeout: false
+{{if eq .compute_mode "serverless"}}
+          disable_auto_optimization: true
+          environment_key: serving
+{{else}}
+          job_cluster_key: serving
+          libraries:
+            - requirements: ${workspace.file_path}/deployment/serving-requirements.txt
+{{end}}
+          notebook_task:
+            notebook_path: ../src/jobs/serving_endpoint.py
+            base_parameters:
+              serving_config_path: ${workspace.file_path}/config/serving.yml
+              inference_config_path: ${workspace.file_path}/config/inference.yml
+              model_version: '{{"{{job.parameters.model_version}}"}}'
+              job_timeout_s: ${var.serving_timeout_seconds}
+              bundle_project: ${bundle.name}
+              bundle_target: ${bundle.target}
+              bundle_mode: ${bundle.mode}
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+              cost_tag_key: {{printf "%q" .cost_tag_key}}
+              cost_tag_value: ${var.cost_tag_value}
+              job_run_id: '{{"{{job.run_id}}"}}'
+              task_key: serving_endpoint
+              workspace_host: ${workspace.host}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              development_monitoring_schema: ${var.development_monitoring_schema}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_performance_policies: ${var.monitoring_performance_policies}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+{{if eq .compute_mode "serverless"}}
+      environments:
+        - environment_key: serving
+          spec:
+            client: ${var.serverless_environment_version}
+            dependencies:
+              - -r ${workspace.file_path}/deployment/serving-requirements.txt
+{{else}}
+      job_clusters:
+        - job_cluster_key: serving
+          new_cluster:
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
+            policy_id: ${var.cluster_policy_id}
+            custom_tags:
+              {{printf "%q" .cost_tag_key}}: ${var.cost_tag_value}
+            autoscale:
+              min_workers: ${var.min_workers}
+              max_workers: ${var.max_workers}
+{{end}}

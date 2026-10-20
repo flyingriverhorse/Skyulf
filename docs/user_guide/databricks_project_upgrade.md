@@ -159,7 +159,7 @@ package after the files move.
 ### Selection and promotion policy fields
 
 Earlier projects used one `model_selection_mode`. Generated projects use
-`score_model_selection` and `promotion_policy` together, plus `score_handoff`.
+`score_model_selection` and `promotion_policy` together, plus `follow_champion`.
 Remove `model_selection_mode` when adding the two fields; mixed or partial
 configurations fail before training or scoring. Migrate the configuration, all
 notebook entrypoints and the job graph together; changing only a configuration
@@ -221,8 +221,8 @@ the same Core version, and upgrade them together.
 ### Spark scoring changes
 
 A whole-frame MLflow package logged without a Spark safety certificate cannot
-use `inference_mode: spark`. Log a new certified version. Configurations without
-`inference_mode` keep whole-frame scoring.
+use `batch_compute: spark`. Log a new certified version. Configurations without
+`batch_compute` keep whole-frame scoring.
 
 ### Project layout and configuration files
 

@@ -21,6 +21,18 @@ questions. Their empty `skip_prompt_if` schema matches every answer set. Without
 explicit values, deployment settings are generated with editable `REPLACE_TEST_*`
 placeholders, matching the other environments.
 
+The builder adds hidden guards for known removed answer names. Supplying a
+nonempty old name such as `inference_mode` or `score_handoff` fails actual CLI
+initialization; use `batch_compute` and `score_follow_champion` instead.
+These are rejection guards, not migration aliases.
+The old `monitoring_catalog` answer also fails when nonempty; initialize with
+`monitoring: "true"` and override the generated deployment variable separately.
+
+Databricks CLI 1.17.0 discards arbitrary unknown answer keys before rendering,
+even when the schema forbids additional properties. The template cannot detect
+those discarded keys. Review answer names against the generated schema and
+inspect the generated configuration; the guards cover the listed removed names.
+
 ## Where to edit
 
 | File | Questions/settings |

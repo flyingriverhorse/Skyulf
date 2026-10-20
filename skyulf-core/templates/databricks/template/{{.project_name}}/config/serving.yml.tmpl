@@ -1,15 +1,67 @@
-# Optional jobs remain paused until these pins are configured and verified.
+# Stable endpoint setup is ready to run when selected at initialization.
+# Enable rollout and online-feature jobs only after completing their settings.
 # The rollout must already be initialized; the daily job never creates endpoints.
-{{if eq .include_online_serving "true"}}online_serving:
+{{- if or (eq .cost_tag_key "project") (eq .cost_tag_key "target") (eq .cost_tag_key "suffix") (eq .cost_tag_key "managed_by") }}
+{{- fail (printf "cost_tag_key %q is reserved for serving endpoint ownership" .cost_tag_key) }}
+{{- end }}
+{{if ne .prediction_delivery "batch" -}}
+serving_endpoint:
+  enabled: true
+  follow_champion: {{.serving_follow_champion}}  # false = manual runs only
+  # Target substitutions are resolved by the job; development gets a per-user suffix.
+  # Generated names over 63 characters keep a stable hash of the complete bound name.
+  endpoint_name: "{{(regexp "_").ReplaceAllString .project_name "-"}}-{bundle_target}-endpoint{resource_suffix}"
+  model_name: "{catalog}.{metadata_schema}.{{if eq .training_layout "multi_target"}}{{if .model_set_name}}{{.model_set_name}}{{else}}{{.project_name}}_set{{end}}{{else}}{{.project_name}}_model{{end}}{resource_suffix}"
+  tracking_uri: databricks
+  registry_uri: databricks-uc
+  workload_type: {{.serving_workload_type}}
+  workload_size: {{.serving_workload_size}}
+  scale_to_zero_enabled: {{.serving_scale_to_zero_enabled}}
+  ready_timeout_s: {{.serving_ready_timeout_s}}
+  logging_mode: {{.serving_endpoint_logging_mode}}
+{{if eq .serving_endpoint_logging_mode "disabled"}}  logging_catalog: ""
+  logging_schema: ""
+  logging_table_prefix: ""
+{{else}}  logging_catalog: "{catalog}"
+  logging_schema: "{metadata_schema}"
+  logging_table_prefix: "{{if .serving_endpoint_logging_table_prefix}}{{.serving_endpoint_logging_table_prefix}}{{else}}{{.project_name}}_serving{{end}}{resource_suffix}"
+{{end}}  sql_function:
+    enabled: true
+    name: "{catalog}.{metadata_schema}.{{.project_name}}_score{resource_suffix}"
+  # Who may call the endpoint: each entry gets endpoint CAN_QUERY and SQL function
+  # EXECUTE. Grants are additive; removing an entry does not revoke access.
+  #
+  # Same callers in every target:
+  #   permissions:
+  #     - group_name: xx-team
+  #       level: CAN_QUERY
+  #
+  # Different callers per target (groups differ per workspace). A target that is
+  # not listed, such as a personal development target, grants nothing:
+  #   permissions:
+  #     test:
+  #       - group_name: xx-team
+  #     syst:
+  #       - group_name: yy-team
+  #     prod:
+  #       - group_name: zz-team
+  #       - service_principal_name: <application-id>
+  #       - user_name: someone@example.com
+  permissions: []
+  verification:
+    sample_rows: 20 # Bounded sample from config/inference.yml score_source_table; zero rows fails.
+
+{{end -}}
+{{if eq .include_online_feature_lookup "true"}}online_feature_lookup:
   enabled: false
-  # Exclusive endpoint creation ownership; an existing endpoint is never overwritten.
+  # Set true only when no other job or person changes this endpoint. Existing endpoints are never overwritten.
   exclusive_writer: false
   tracking_uri: databricks
   registry_uri: databricks-uc
   endpoint:
     endpoint_name: ""
     model_name: ""
-    model_version: "" # A concrete registered version, never an alias.
+    model_version: "" # A registered model version number, such as 7; not a name like champion.
     workload_type: {{.serving_workload_type}} # CPU | CPU_MEDIUM | CPU_LARGE
     workload_size: {{.serving_workload_size}} # Small | Medium | Large
     scale_to_zero_enabled: {{.serving_scale_to_zero_enabled}}
@@ -37,9 +89,13 @@
 {{end -}}
 rollout:
   enabled: false
-  # True only when this serialized job has exclusive endpoint and alias write access.
+  # Set true only when no other job or person changes this endpoint or its champion assignment.
   exclusive_writer: false
   run_id: ""
+  # Use these same values when initializing the rollout; changing them needs a new run.
+  traffic_step_percent: 10
+  stage_minimum_hours: 24.0
+  evidence_max_age_hours: 24.0
   tracking_uri: databricks
   registry_uri: databricks-uc
   comparison_sha256: ""
@@ -55,7 +111,7 @@ rollout:
     max_input_mb: 64
     tracking_uri: databricks
     registry_uri: databricks-uc
-  # Named rows matching the pinned request schema; native smoke calls both versions.
+  # Example requests with the saved model input columns; both model versions are checked.
   smoke_records: []
   health:
     minimum_requests: 100
@@ -82,9 +138,9 @@ rollout:
 online_publication:
   enabled: false
   publish_mode: {{.online_publication_mode}}
-  # True only when source/publication writers share externally enforced exclusive access.
+  # Set true only when other writers cannot change this source or publication while this job runs.
   exclusive_writer: false
-  # Existing latest-value Delta feature table with CDF and NOT NULL primary keys.
+  # Existing Delta feature table with one current row per key, change data feed enabled, and no null keys.
   source_table: ""
   source_table_id: ""
   online_table: ""

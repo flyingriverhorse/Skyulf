@@ -14,8 +14,15 @@ from .....preprocessing.inference_context import get_inference_capability
 from .explanation_report import render_explanation_report
 
 _DEFAULTS = {"max_samples": 100, "max_features": 30, "max_display_samples": 10}
-_LIMITS = {"max_samples": (1, 200), "max_features": (1, 100), "max_display_samples": (0, 50)}
+_LIMITS = {"max_samples": (1, 200), "max_features": (1, None), "max_display_samples": (0, 50)}
 _MIN_EXPLAINED_ROWS_AFTER_EXCLUSIONS = 2
+
+
+def _validate_budget(name: str, value: Any, lower: int, upper: int | None) -> None:
+    """Validate a work budget, allowing an operator-selected feature ceiling."""
+    if type(value) is not int or value < lower or (upper is not None and value > upper):
+        bounds = f"from {lower} to {upper}" if upper is not None else f"at least {lower}"
+        raise ValueError(f"explainability.{name} must be an integer {bounds}.")
 
 
 def validate_explanation_config(pipeline: dict[str, Any]) -> None:
@@ -31,8 +38,7 @@ def validate_explanation_config(pipeline: dict[str, Any]) -> None:
         raise ValueError("explainability.method must be 'shap'.")
     for name, (lower, upper) in _LIMITS.items():
         value = settings.get(name, _DEFAULTS[name])
-        if type(value) is not int or not lower <= value <= upper:
-            raise ValueError(f"explainability.{name} must be an integer from {lower} to {upper}.")
+        _validate_budget(name, value, lower, upper)
     sample_limit = settings.get("max_samples", _DEFAULTS["max_samples"])
     display_limit = settings.get("max_display_samples", min(10, sample_limit))
     if display_limit > sample_limit:

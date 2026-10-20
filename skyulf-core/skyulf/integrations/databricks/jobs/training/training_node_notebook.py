@@ -11,6 +11,11 @@ from ...model_sets.model_set_project import (
 )
 from ...observability.reports.training_node_output import render_training_node
 from ...observability.reports.training_summary import render_final_training_report
+from ..serving_handoff import (
+    active_serving_settings,
+    publish_serving_handoff,
+    require_serving_model,
+)
 from ..shared.job_output import render_lifecycle_output
 from ..shared.job_runtime import (
     lifecycle_widget_context,
@@ -68,7 +73,9 @@ def run_initialize_models_notebook(spark: Any, dbutils: Any, *, display_html: An
     context = LifecycleContext(**lifecycle_widget_context(values))
     action = values.get("lifecycle_action", "train")
     operator_options(action, values)
+    serving = active_serving_settings(values)  # fail before training or alias changes
     settings = load_project_model_set(values)
+    require_serving_model(serving, None if settings is None else settings["model_name"])
     source = ""
     if action == "train":
         configs = load_training_branch_configs(values)
@@ -132,6 +139,7 @@ def run_models_report_notebook(dbutils: Any, *, display_html: Any = None) -> str
     output = dict(store.receipt(phase)["output"])
     output["score_requested"] = _set_score_requested(store.request, output)
     dbutils.jobs.taskValues.set(key="score_requested", value=output["score_requested"])
+    publish_serving_handoff(dbutils, output.get("alias_change", output.get("receipt")), values)
     render = render_model_set_result
     if store.request["action"] == "train":
         render = lambda payload: render_final_training_report(

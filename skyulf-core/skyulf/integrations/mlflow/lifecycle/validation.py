@@ -10,6 +10,7 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ....core.schema import SchemaMismatchError
 from ....inference.fitted_pipeline import ArtifactRuntimeMismatchError, FittedPipelineArtifact
 from ....inference.pipeline_evaluation import evaluate_holdout_comparison
 from ..registration.registry import (
@@ -356,10 +357,68 @@ def _comparison_metrics(
     target_column: str,
     *,
     include_coverage: bool = False,
+    champion_reference: ResolvedModel | None = None,
 ) -> tuple[dict[str, float], dict[str, float] | None]:
     """Evaluate the same labeled rows with both saved pipelines, without fitting."""
-    return evaluate_holdout_comparison(
-        candidate, champion, heldout, target_column=target_column, include_coverage=include_coverage
+    try:
+        return evaluate_holdout_comparison(
+            candidate,
+            champion,
+            heldout,
+            target_column=target_column,
+            include_coverage=include_coverage,
+        )
+    except SchemaMismatchError as exc:
+        migration = _decimal_migration_error(exc, candidate, champion, champion_reference)
+        if migration is exc:
+            raise
+        raise migration from exc
+
+
+def _decimal_migration_columns(
+    error: SchemaMismatchError,
+    candidate: FittedPipelineArtifact,
+    champion: FittedPipelineArtifact,
+) -> list[str]:
+    """Recognize only actual Decimal conversions conflicting with the champion input schema."""
+    saved = dict(zip(champion.manifest.input_columns, champion.manifest.input_dtypes, strict=True))
+    converted = {
+        item.column
+        for item in candidate.manifest.source_column_conversions or ()
+        if saved.get(item.column, "").lower() in {"object", "string"}
+    }
+    return [
+        name
+        for name, (expected, actual) in error.dtype_mismatches.items()
+        if name in converted and saved.get(name) == expected and actual.lower() == "float64"
+    ]
+
+
+def _decimal_migration_error(
+    error: SchemaMismatchError,
+    candidate: FittedPipelineArtifact,
+    champion: FittedPipelineArtifact | None,
+    reference: ResolvedModel | None,
+) -> SchemaMismatchError:
+    """Add a safe migration instruction without converting a schema failure into approval."""
+    if champion is None or reference is None:
+        return error
+    if error.missing or error.unexpected or error.order_mismatch:
+        return error
+    columns = _decimal_migration_columns(error, candidate, champion)
+    if not columns or set(columns) != set(error.dtype_mismatches):
+        return error
+    return SchemaMismatchError(
+        f"{error}. Champion {reference.name} version {reference.version} expects object/string "
+        f"inputs for {', '.join(columns)}; this candidate records Spark DECIMAL -> float64 "
+        "conversion for those columns. Train and approve under new registered model names; "
+        "for model sets use a new set name and new component model names. Validate serving "
+        "and batch consumers before switching them, and preserve the existing champion alias "
+        "and receipts. allow_unloadable_champion applies only to runtime version mismatches.",
+        missing=error.missing,
+        unexpected=error.unexpected,
+        dtype_mismatches=error.dtype_mismatches,
+        order_mismatch=error.order_mismatch,
     )
 
 
@@ -459,6 +518,7 @@ def compare_registered_pipeline_models(
         heldout,
         target_column,
         include_coverage="heldout_scored_fraction" in (quality_gates or {}),
+        champion_reference=champion,
     )
     improvement = _metric_improvement(candidate_metrics, champion_metrics, metric)
     quality_passed = all(

@@ -70,7 +70,10 @@ jobs:
           skyulf-core/tests/integration/platforms/test_batch_contract.py
           skyulf-core/tests/integration/platforms/test_batch_admission.py
           skyulf-core/tests/integration/platforms/test_feature_group_delta.py
-          skyulf-core/tests/integration/platforms/test_delta_publish.py -q -o addopts=
+          skyulf-core/tests/integration/platforms/test_delta_publish.py
+          skyulf-core/tests/integration/platforms/test_decimal_pipeline_contract.py::test_native_spark_decimal_materialization_and_smoke
+          skyulf-core/tests/integration/platforms/test_databricks_decimal_transport.py::test_native_worker_arrow_inputs_are_float64
+          -q -o addopts=
           --cov=skyulf-core/skyulf --cov-branch --cov-report=
       - name: Upload Delta coverage data
         if: ${{ !cancelled() }}

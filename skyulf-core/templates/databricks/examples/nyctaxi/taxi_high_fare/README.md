@@ -1,7 +1,7 @@
 # taxi_high_fare
 
 New here? Read [START_HERE.md](START_HERE.md) first: it lists what to edit, the
-first train and score, and which guide answers which question. This page maps
+first training and prediction delivery, and which guide answers which question. This page maps
 each setting to the file that owns it.
 
 If your source tables already exist, start with the read-only source check in
@@ -10,8 +10,9 @@ and column contract. If tables do not exist yet, choose `include_source_sql: "tr
 during setup to include an editable `config/sources.sql` starter. The default is
 `"false"`; initialization and deployment never create your source tables.
 
-Skyulf 0.9.4 Bundle: **classification** with **polars** training and **local** inference, using **serverless**
-compute. Training and preprocessing fit in one bounded Python process on this compute. Scoring uses a bounded frame in the saved pandas/Polars engine.
+Skyulf 0.9.5 Bundle: **classification** with **polars** training and **batch** prediction delivery, using **serverless**
+compute. Training and preprocessing fit in one bounded Python process on this compute.
+Batch scoring uses a bounded frame in the saved pandas/Polars engine.
 
 ## Where to make a change
 
@@ -27,10 +28,10 @@ compute. Training and preprocessing fit in one bounded Python process on this co
 | Custom feature/scoring callbacks and packaged assets | `src/features/` |
 | Online publication, endpoint setup and rollout | `config/serving.yml`, when generated |
 | Host, namespaces, run identities, compute and schedules | `deployment/targets.yml`, `deployment/variables.yml` |
-| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml` |
+| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `development_monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml`; per-target dashboards and development monitoring in `deployment/monitoring.yml` |
 | Installed Core and optional dependencies | `deployment/*requirements.txt` |
 
-The shared runtime pin is `skyulf-core[mlflow]==0.9.4` in
+The shared runtime pin is `skyulf-core[mlflow]==0.9.5` in
 `deployment/requirements.txt`. Use the Core release matching this template
 ([runtime packaging](https://www.skyulf.com/manual/user_guide/databricks_deployment.html#runtime-packaging)). Changing the pin
 does not migrate saved models or rewrite already generated project files.
@@ -47,7 +48,7 @@ Training defaults to at most **10,000 rows and 64 MiB per Python input read**.
 For a larger source, set `training_sample_rows` in `config/training.yml` to
 sample eligible rows before splitting, or raise `max_rows` and `max_input_mb`
 within your compute's memory budget. Sampling never samples scoring rows.
-Detailed setup asks for the sample limit and optional `preprocessing_probe`.
+Detailed setup asks for the sample limit and optional `save_preprocessing_diagnostics`.
 The probe records diagnostics on at most 256 holdout rows and 8 MiB; Spark and
 endpoint admission checks are a separate requirement.
 
@@ -59,7 +60,8 @@ checkpoint and score only later inserts. Rebuilds preserve that boundary using
 saved prediction keys and recent CDF. CDF-expiry recovery additionally needs the
 original starting snapshot to remain readable.
 The choice cannot be changed on an existing prediction target.
-`python src/tools/preview.py` explains the choice. Scheduled training with a
+`python src/tools/preview.py` explains the choice.
+Scheduled training with a
 `fixed_window` repeatedly reads the same date interval; use `rolling_days` or
 `rolling_calendar` when the interval should advance. Preview also warns about
 this combination; intentional repeated experiments are still allowed.

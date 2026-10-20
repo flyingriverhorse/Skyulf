@@ -2,7 +2,7 @@
   "project_name": "diagnostic_single",
   "training_layout": "single_model",
   "setup_mode": "detailed",
-  "inference_mode": "spark",
+  "batch_compute": "spark",
   "engine": "pandas",
   "task": "classification",
   "catalog": "workspace",
@@ -29,14 +29,14 @@
   "search_tune_threshold": "true",
   "score_model_selection": "pinned_version",
   "promotion_policy": "manual_approval",
-  "score_handoff": "disabled",
+  "score_follow_champion": "false",
   "classification_metric": "heldout_f1",
   "quality_threshold": "0.85",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "diagnostic_single",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
   "shap_max_samples": "32",
   "shap_max_display_samples": "2",
-  "preprocessing_probe": "true"
+  "save_preprocessing_diagnostics": "true"
 }

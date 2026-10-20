@@ -15,7 +15,7 @@ flowchart LR
     B --> C["score_pipeline or predict_local: one Python process"]
     B --> D["predict_spark: native_features"]
     B --> E["predict_spark: python_pipeline"]
-    B --> F["Bundle inference_mode: spark"]
+    B --> F["Bundle batch_compute: spark"]
     D --> G["Spark workers: model on batches"]
     E --> G
     F --> G
@@ -135,7 +135,7 @@ These settings answer different questions:
 | --- | --- | --- |
 | Workflow `runtime` | Platform integration and source/sink availability | `standalone` for a general Python process; `databricks` for Databricks integration and UC Delta publication |
 | `engine` | Saved/local DataFrame execution | `pandas` or `polars`; a fitted artifact records its training engine |
-| Bundle/SDK `inference_mode` | Whole-frame scoring or certified distributed prediction | `local` or `spark`; the certified Spark route requires pandas |
+| Bundle `batch_compute` / SDK `inference_mode` | Whole-frame scoring or certified distributed prediction | Bundle `single_node` or `spark` (SDK `local` or `spark`); the certified Spark route requires pandas |
 | Portable runner `mode` | Where the portable FE executes | `native_features` or `python_pipeline` |
 | `spark_udf_env_manager` / MLflow `env_manager` | How worker Python dependencies are provided | `virtualenv` restores an environment; `local` uses the installed worker environment |
 
@@ -236,7 +236,7 @@ the execution adapter's fitted-state checks are separate requirements.
 | Continued built-in temporal history | `score_pipeline_with_history` | Caller owns history storage and atomic publication |
 | Portable bundle in one process | `predict_local` | Supported portable state, raw or prepared-feature contract |
 | Portable Spark inference | `predict_spark` | Raw input, admitted portable preprocessing, keyed distributed output |
-| Certified fitted pandas model on Spark | Bundle `inference_mode="spark"` | Exact fitted recipe, model and worker environment must pass admission |
+| Certified fitted pandas model on Spark | Bundle `batch_compute: spark` | Exact fitted recipe, model and worker environment must pass admission |
 
 Existing `SkyulfPipeline.save/load` and backend `.joblib` files remain valid for
 their original consumers. A backend artifact dictionary is not an

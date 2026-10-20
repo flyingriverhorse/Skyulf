@@ -2,7 +2,7 @@
   "project_name": "taxi_high_fare",
   "training_layout": "model_competition",
   "setup_mode": "detailed",
-  "inference_mode": "local",
+  "batch_compute": "single_node",
   "engine": "polars",
   "task": "classification",
   "catalog": "workspace",
@@ -41,13 +41,13 @@
   "search_tune_threshold": "true",
   "score_model_selection": "champion",
   "promotion_policy": "manual_approval",
-  "score_handoff": "after_alias_change",
+  "score_follow_champion": "true",
   "classification_metric": "heldout_f1",
   "quality_threshold": "0.5",
-  "monitoring_catalog": "workspace",
+  "monitoring": "true",
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
   "competition_preprocessing_recipe": "zones_and_trips",
-  "preprocessing_probe": "true"
+  "save_preprocessing_diagnostics": "true"
 }

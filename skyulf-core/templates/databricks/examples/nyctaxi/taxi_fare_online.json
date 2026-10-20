@@ -2,7 +2,7 @@
   "project_name": "taxi_fare_online",
   "training_layout": "single_model",
   "setup_mode": "detailed",
-  "inference_mode": "local",
+  "batch_compute": "single_node",
   "engine": "pandas",
   "task": "regression",
   "catalog": "workspace",
@@ -23,13 +23,13 @@
   "regression_search_metric": "rmse",
   "score_model_selection": "champion",
   "promotion_policy": "manual_approval",
-  "score_handoff": "disabled",
+  "score_follow_champion": "false",
   "regression_metric": "heldout_rmse",
   "quality_threshold": "6.0",
-  "monitoring_catalog": "",
+  "monitoring": "false",
   "monitoring_schema": "",
-  "include_online_serving": "true",
+  "include_online_feature_lookup": "true",
   "include_daily_rollout": "false",
   "include_online_publication": "true",
-  "preprocessing_probe": "true"
+  "save_preprocessing_diagnostics": "true"
 }

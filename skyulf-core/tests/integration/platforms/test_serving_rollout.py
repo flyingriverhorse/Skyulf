@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from importlib import import_module
 from importlib.util import find_spec
 from pathlib import Path
@@ -214,6 +215,75 @@ def evidence(state, now, verdict="PASS"):
     )
 
 
+def test_job_uses_yaml_policy_through_durable_controller(api, plan, monkeypatch):
+    """Short YAML stages must drive real receipts and routes across independent job calls."""
+    import yaml
+
+    from skyulf.integrations.databricks.jobs import serving_job
+    from skyulf.integrations.databricks.serving.rollout_evidence import RolloutEvidenceResult
+
+    settings = yaml.safe_load(
+        "enabled: true\nexclusive_writer: true\nrun_id: short-rollout\n"
+        "traffic_step_percent: 20\nstage_minimum_hours: 0.08333333333333333\n"
+        "evidence_max_age_hours: 0.03333333333333333\n"
+    )
+    approval = {
+        "model_name": plan.champion.spec.model_name,
+        "metric": "heldout_rmse",
+        "quality_threshold": 5.0,
+        "tracking_uri": "databricks",
+        "registry_uri": "databricks-uc",
+    }
+    settings.update(approval=approval, comparison_sha256="a" * 64)
+    tracking, client = Tracking(), Endpoint(plan)
+    store = api.MLflowRolloutStore(tracking, settings["run_id"])
+    clock = [datetime(2026, 10, 10, tzinfo=UTC)]
+    start = clock[0]
+    api.initialize_rollout(
+        client,
+        plan,
+        store=store,
+        admission=SingleWriterAdmission(),
+        policy=DailyRolloutPolicy.from_config(settings),
+        rollout_id=settings["run_id"],
+        clock=lambda: clock[0],
+        promotion={
+            "auto_promote": True,
+            "comparison_sha256": settings["comparison_sha256"],
+            "config_sha256": serving_job.approval_config_digest(approval),
+        },
+    )
+    monkeypatch.setattr(
+        serving_job, "reconcile_rollout", partial(api.reconcile_rollout, clock=lambda: clock[0])
+    )
+    monkeypatch.setattr(
+        serving_job, "advance_rollout", partial(api.advance_rollout, clock=lambda: clock[0])
+    )
+    monkeypatch.setattr(
+        serving_job,
+        "_observe",
+        lambda spark, client, registry, settings, record, result, approval: RolloutEvidenceResult(
+            evidence(result.state, clock[0]), {"observed_at": clock[0].isoformat()}
+        ),
+    )
+    for minute, action, percentage in [
+        (4, "HOLD", 0),
+        (5, "ADVANCE", 20),
+        (9, "HOLD", 20),
+        (10, "ADVANCE", 40),
+    ]:
+        clock[0] = start + timedelta(minutes=minute)
+        result = serving_job.run_daily_rollout(
+            None, settings, client=client, registry_client=tracking
+        )
+        assert result["decision"]["action"] == action
+        assert result["state"]["challenger_percentage"] == percentage
+    assert store.load()["policy"] == asdict(DailyRolloutPolicy(20, 5 / 60, 2 / 60))
+    assert [
+        request["traffic_config"]["routes"][1]["traffic_percentage"] for request in client.puts
+    ] == [20, 40]
+
+
 def advance(s, verdict="PASS"):
     """Execute one observed daily interval through the public API."""
     return s.api.advance_rollout(
@@ -223,6 +293,126 @@ def advance(s, verdict="PASS"):
         evidence=evidence(s.result.state, s.clock[0], verdict),
         clock=lambda: s.clock[0],
     )
+
+
+def test_094_plan_without_record_keys_reconciles_and_advances(setup):
+    """A verified pre-record-key receipt must remain usable after a wheel upgrade."""
+    s = setup
+    legacy = s.store.load()
+    for role in ("champion", "challenger"):
+        legacy["plan"][role].pop("record_key_columns")
+    legacy["plan_sha256"] = s.api.finite_json_digest(legacy["plan"])
+    s.store.write(legacy, expected_receipt_id=legacy["receipt_id"])
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.state == s.result.state
+    s.clock[0] += timedelta(days=1)
+    assert advance(s).state.challenger_percentage == 10
+
+
+def test_legacy_plan_digest_is_checked_before_defaults_are_added(setup):
+    """Compatibility defaults cannot hide an altered persisted model selector."""
+    s = setup
+    legacy = s.store.load()
+    for role in ("champion", "challenger"):
+        legacy["plan"][role].pop("record_key_columns")
+    s.store.write(legacy, expected_receipt_id=legacy["receipt_id"])
+    with pytest.raises(ValueError, match="plan digest"):
+        s.api.reconcile_rollout(s.client, store=s.store, admission=s.admission)
+    assert s.client.puts == []
+
+
+def test_prepared_before_submission_resumes_once(setup, monkeypatch):
+    """Process loss before entering transport must not leave an unsubmitted intent stuck."""
+    s = setup
+    original = s.api._apply
+    s.clock[0] += timedelta(days=1)
+
+    def crash_before_submission(*args):
+        """Leave only the durable prepared receipt behind."""
+        raise SystemExit("process lost before submission")
+
+    monkeypatch.setattr(s.api, "_apply", crash_before_submission)
+    with pytest.raises(SystemExit):
+        advance(s)
+    assert s.client.puts == []
+    monkeypatch.setattr(s.api, "_apply", original)
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.status == "COMMITTED"
+    assert result.state.challenger_percentage == 10
+    assert len(s.client.puts) == 1
+
+
+def test_submission_marker_before_transport_stays_uncertain(setup, monkeypatch):
+    """A lost process after dispatch admission must never authorize a second PUT."""
+    s = setup
+    original = s.client.api_client.do
+    s.clock[0] += timedelta(days=1)
+
+    def crash_at_transport(**kwargs):
+        """Simulate the unavoidable gap between durable dispatch and actual transport."""
+        if kwargs["method"] == "PUT":
+            raise SystemExit("process lost at transport")
+        return original(**kwargs)
+
+    monkeypatch.setattr(s.client.api_client, "do", crash_at_transport)
+    with pytest.raises(SystemExit):
+        advance(s)
+    monkeypatch.setattr(s.client.api_client, "do", original)
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.status == "PREPARED"
+    assert s.store.load()["request"]["submission_state"] == "OUTCOME_UNKNOWN"
+    assert s.client.puts == []
+
+
+def test_legacy_prepared_receipt_never_reissues_an_uncertain_request(setup):
+    """Old receipts cannot establish that the original process never reached transport."""
+    s = setup
+    s.clock[0] += timedelta(days=1)
+    s.client.mode = "old"
+    with pytest.raises(s.api.RolloutOutcomeUnknownError):
+        advance(s)
+    legacy = s.store.load()
+    legacy["request"].pop("submission_state")
+    s.store.write(legacy, expected_receipt_id=legacy["receipt_id"])
+    s.client.mode = "ready"
+    for _ in range(3):
+        s.clock[0] += timedelta(days=1)
+        result = s.api.reconcile_rollout(
+            s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+        )
+        assert result.status == "PREPARED"
+    assert len(s.client.puts) == 1
+
+
+def test_submission_marker_failure_before_put_keeps_request_unsent(setup, monkeypatch):
+    """A failed durable dispatch marker must stop transport and remain safely resumable."""
+    s = setup
+    original = s.store.write
+    s.clock[0] += timedelta(days=1)
+
+    def fail_submission(value, **kwargs):
+        """Reject only the second durable checkpoint, before publishing its pointer."""
+        if value.get("request", {}).get("submission_state") == "OUTCOME_UNKNOWN":
+            raise OSError("submission marker unavailable")
+        return original(value, **kwargs)
+
+    monkeypatch.setattr(s.store, "write", fail_submission)
+    with pytest.raises(OSError, match="submission marker"):
+        advance(s)
+    assert s.client.puts == []
+    assert s.store.load()["request"]["submission_state"] == "NOT_SUBMITTED"
+    monkeypatch.setattr(s.store, "write", original)
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.status == "COMMITTED"
+    assert len(s.client.puts) == 1
 
 
 def pending_native_response(s, *, extra=None):

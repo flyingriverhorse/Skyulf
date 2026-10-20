@@ -2,7 +2,6 @@
 
 import json
 import re
-import runpy
 import sqlite3
 from pathlib import Path
 
@@ -360,7 +359,18 @@ def test_history_charts_and_date_filters_use_the_data_window() -> None:
         assert chart["y"] + chart["height"] <= positions["serving_identity"]["y"]
 
 
-def test_bundle_has_one_serial_manual_writer_and_stable_dashboard(tmp_path) -> None:
+def _dashboard_examples() -> dict:
+    """Uncomment the hand-copy examples in deployment/monitoring.yml.tmpl and parse them."""
+    text = (TEMPLATE / "deployment/monitoring.yml.tmpl").read_text(encoding="utf-8")
+    parsed = {}
+    for block in text.split("# Example: ")[1:]:
+        title, _, body = block.partition("\n")
+        lines = [line[1:] for line in body.splitlines() if line.startswith("#  ")]
+        parsed[title.split(" ")[0]] = yaml.safe_load("\n".join(lines))
+    return parsed
+
+
+def test_bundle_has_one_serial_manual_writer_and_stable_dashboard() -> None:
     """One project owns the shared dashboard while existing monitoring jobs stay serialized."""
     job = yaml.safe_load((TEMPLATE / "resources/monitoring.job.yml.tmpl").read_text())
     resource = job["resources"]["jobs"]["monitoring"]
@@ -372,16 +382,7 @@ def test_bundle_has_one_serial_manual_writer_and_stable_dashboard(tmp_path) -> N
         "monitoring_report",
         "evaluate_retraining",
     }
-    (tmp_path / "resources").mkdir()
-    asset = tmp_path / "src/monitoring/monitoring.lvdash.json"
-    asset.parent.mkdir(parents=True)
-    asset.write_bytes((TEMPLATE / "src/monitoring/monitoring.lvdash.json").read_bytes())
-    configure = runpy.run_path(str(TEMPLATE / "src/tools/configure_monitoring_dashboard.py"))[
-        "configure"
-    ]
-    configure(tmp_path, create_dashboard=True, warehouse_id="d047a4d9aa276958")
-    dashboard = yaml.safe_load((tmp_path / "resources/monitoring.dashboard.yml").read_text())
-    dashboards = dashboard["targets"]["test"]["resources"]["dashboards"]
+    dashboards = _dashboard_examples()["create"]["prod"]["resources"]["dashboards"]
     assert list(dashboards) == ["monitoring_dashboard"]
     assert dashboards["monitoring_dashboard"]["dataset_catalog"] == "${var.monitoring_catalog}"
     assert dashboards["monitoring_dashboard"]["dataset_schema"] == "${var.monitoring_schema}"
@@ -787,20 +788,14 @@ def test_performance_checks_explain_results_without_claiming_training_started() 
     assert any(c["displayName"] == "Performance result" for c in history["encodings"]["columns"])
 
 
-def test_shared_dashboard_refresh_waits_for_persisted_observations(tmp_path) -> None:
+def test_shared_dashboard_refresh_waits_for_persisted_observations() -> None:
     """Native refresh follows saved evidence and policy evaluation in the existing job."""
-    (tmp_path / "resources").mkdir()
-    configure = runpy.run_path(str(TEMPLATE / "src/tools/configure_monitoring_dashboard.py"))[
-        "configure"
-    ]
-    path = configure(tmp_path, dashboard_id="01f1c090238e1b6da5d633032ad9960b")
-    tasks = yaml.safe_load(path.read_text())["targets"]["test"]["resources"]["jobs"]["monitoring"][
-        "tasks"
-    ]
-    assert tasks[0]["depends_on"] == [{"task_key": "evaluate_retraining"}]
-    assert tasks[1]["depends_on"] == [{"task_key": "dashboard_refresh_enabled", "outcome": "true"}]
-    assert tasks[1]["dashboard_task"] == {"dashboard_id": "01f1c090238e1b6da5d633032ad9960b"}
-    assert "subscription" not in tasks[1]["dashboard_task"]
+    for example in _dashboard_examples().values():
+        gate, task = example["prod"]["resources"]["jobs"]["monitoring"]["tasks"]
+        assert gate["depends_on"] == [{"task_key": "evaluate_retraining"}]
+        assert gate["condition_task"]["left"] == "${var.monitoring_enabled}"
+        assert task["depends_on"] == [{"task_key": "dashboard_refresh_enabled", "outcome": "true"}]
+        assert "subscription" not in task["dashboard_task"]
 
 
 def test_issue_investigation_paginates_without_truncating_filtered_total() -> None:

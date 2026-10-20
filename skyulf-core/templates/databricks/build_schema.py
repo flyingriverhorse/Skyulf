@@ -72,9 +72,36 @@ def render_schema(source: Path) -> str:
     if "properties" in metadata:
         raise ValueError("metadata.json must not define properties; use topic files.")
     properties = _default_first(_quick_setup(_cli_rules(_source_properties(source))))
+    properties = _removed_answer_guards(properties)
     _validate_prompt_orders(properties)
     metadata["properties"] = dict(sorted(properties.items(), key=lambda item: item[1]["order"]))
     return _format_schema(metadata)
+
+
+def _removed_answer_guards(properties: dict[str, Any]) -> dict[str, Any]:
+    """Make known removed inputs visible to CLI validation instead of silently ignored."""
+    if "setup_mode" not in properties:
+        return properties
+    renamed = {
+        "inference_mode": "batch_compute",
+        "score_handoff": "score_follow_champion",
+        "model_change_mode": "on_model_change",
+        "auto_rebuild_on_cdf_expiry": "rescore_when_history_expires",
+        "preprocessing_probe": "save_preprocessing_diagnostics",
+        "admit_probed_custom_steps": "allow_tested_custom_steps",
+        "monitoring_catalog": "monitoring",
+    }
+    order = max(field["order"] for field in properties.values())
+    for offset, (old, new) in enumerate(renamed.items(), 1):
+        properties[old] = {
+            "order": order + offset,
+            "type": "string",
+            "default": "",
+            "enum": [""],
+            "description": f"Removed answer {old}; use {new} instead.",
+            "skip_prompt_if": {},
+        }
+    return properties
 
 
 def _validate_prompt_orders(properties: dict[str, Any]) -> None:
@@ -232,7 +259,7 @@ def _add_weighted_choice(result: dict[str, Any], name: str, field: dict[str, Any
 
 _QUICK_PROMPTS = re.compile(
     r"training_layout|project_name|setup_mode|task|source_table_name|record_key_columns"
-    r"|input_columns|target_column|branch_count|monitoring_catalog|monitoring_schema"
+    r"|input_columns|target_column|branch_count|monitoring|monitoring_schema"
     r"|label_table_name|label_available_at_column"
     r"|source_layout|score_source_table_name|include_source_sql|initial_scoring"
     r"|branch_[1-8]_(?:task|target_column|input_columns)"

@@ -32,59 +32,110 @@ No separate monitoring template or setup Bundle is required. The first activatio
 scoring registration or scheduled monitoring run bootstraps missing objects.
 Initialize before validating the dashboard SQL, because its queries need the views.
 
-The refresh overlay uses target overrides, adding
-`dashboard_refresh_enabled -> refresh_monitoring_dashboard` after
-`evaluate_retraining`. It preserves existing job schedules, policies and compute.
-Refresh runs only in production deployment mode with monitoring enabled; development
-mode and disabled monitoring skip it. The refresh uses the dashboard's published
-warehouse unless `--warehouse-id <id>` is supplied. No email subscription is created.
-For a dashboard published without shared data permissions, the job's Run as identity
-needs access to its data and warehouse. See the
-[Databricks dashboard task documentation](https://docs.databricks.com/aws/en/jobs/tasks/dashboard).
+Dashboards are set per shared target in `deployment/monitoring.yml`. Each workspace
+has its own dashboard and SQL warehouse, so `test`, `syst` and `prod` are configured
+separately; leave a target out for no dashboard. A configured target adds two tasks
+after `evaluate_retraining` in the monitoring job: `dashboard_refresh_enabled` checks
+that `monitoring_enabled` is `"true"`, then `refresh_monitoring_dashboard` refreshes.
+Existing schedules, policies and compute are unchanged, and no email subscription is
+created. Development targets have no dashboard block unless development monitoring is on; then
+`test_development` can create its own dashboard over the development store. For a dashboard published without shared
+data permissions, the job's Run as identity needs access to its data and warehouse.
+See the [Databricks dashboard task documentation](https://docs.databricks.com/aws/en/jobs/tasks/dashboard).
 
-Setup asks no dashboard questions, and no refresh task exists until this helper
-is run. Use `--dashboard-id <id>` when a URL is unavailable. Re-run it to change the
-dashboard or warehouse; use `--disable`, then validate and redeploy, to remove only
-the generated refresh overlay. The target defaults to `test`; repeat `--target` to
-configure multiple targets for the same dashboard. Commit the configured overlay
-with your project and edit its target overrides when environments use different
-dashboards. Re-running the helper replaces its complete overlay, so include every
-target that should keep the automatic refresh.
+For each target choose one:
 
-The existing template's `src/monitoring/monitoring.lvdash.json` defines SQL,
-shared investigation filters and five content pages, plus the global filter page.
-`src/tools/configure_monitoring_dashboard.py` connects one
-shared dashboard and its native refresh task to the existing project. The normal
-project variables select monitoring storage, and `resources/monitoring.job.yml`
-contains its separate Spark measurement/report/retraining job. No separate
-monitoring Bundle is required.
+| Choice | What to write under the target | Result |
+|---|---|---|
+| `create` | the dashboard (with `warehouse_id`), the link variable and the refresh task | `bundle deploy` creates the dashboard; monitoring refreshes it |
+| `connect` | the published URL as `monitoring_dashboard_url` and its ID in the refresh task | monitoring refreshes the existing dashboard and links it in its output |
+| nothing | omit the target | monitoring still saves its results; no dashboard |
+
+### How the refresh task is added
+
+`deployment/monitoring.yml` does not define a second job. `resources/monitoring.job.yml`
+defines the `monitoring` job for every target, and a target block repeats only its
+name with two extra tasks:
+
+```yaml
+# resources/monitoring.job.yml (every target)
+resources:
+  jobs:
+    monitoring:
+      tasks:
+        - task_key: monitor_model
+        - task_key: monitoring_report
+        - task_key: evaluate_retraining
+
+# deployment/monitoring.yml (only the test target)
+targets:
+  test:
+    resources:
+      jobs:
+        monitoring:            # same job name: merged, not a new job
+          tasks:
+            - task_key: dashboard_refresh_enabled   # skip when monitoring is off
+              depends_on:
+                - task_key: evaluate_retraining
+              condition_task:
+                op: EQUAL_TO
+                left: "${var.monitoring_enabled}"
+                right: "true"
+            - task_key: refresh_monitoring_dashboard
+              depends_on:
+                - task_key: dashboard_refresh_enabled
+                  outcome: "true"
+              dashboard_task:
+                dashboard_id: ${resources.dashboards.monitoring_dashboard.id}
+```
+
+On `bundle deploy -t test`, Bundle merges every included file into one
+configuration. Jobs with the same name become one job, and their tasks are merged
+by `task_key`: a new key is added, an existing key is updated. The deployed `test`
+job therefore runs `monitor_model -> monitoring_report -> evaluate_retraining ->
+dashboard_refresh_enabled -> refresh_monitoring_dashboard`. A target without a block keeps the first three
+tasks. `deployment/targets.yml` uses the same merge to add `run_as` and
+`permissions` to jobs defined in `resources/`. Run
+`databricks bundle validate -t <target> -o json` to see the merged job.
+
+Choose `create` only in the first project that uses a target's monitoring store;
+every other project uses `connect`. The dashboard ID is the 32 characters after
+`/dashboardsv3/` in its URL. The warehouse ID is the 16-character value under
+**SQL Warehouses > your warehouse > Connection details**, also visible in the
+warehouse page URL; syst and prod need IDs from their own workspaces. The file
+contains both blocks as commented examples to copy.
+
+Setup fills the `test` target for you. With a monitoring store, answer
+`monitoring_dashboard`:
+
+| Answer | Also asks | Result |
+|---|---|---|
+| `none` (default) | nothing | no target is configured |
+| `create` | `monitoring_dashboard_warehouse_id` (required) | `test` gets the create block |
+| `connect` | `monitoring_dashboard_url`, optional warehouse ID | `test` gets the connect block, with the ID taken from the URL |
+
+`syst` and `prod` are always set by hand in the same file. `monitoring_catalog` /
+`monitoring_schema` stay in `deployment/variables.yml`; the monitoring job creates
+its tables there on its first run, and the dashboard reads from them.
+
+The template's `src/monitoring/monitoring.lvdash.json` defines SQL, shared
+investigation filters and five content pages, plus the global filter page.
+`resources/monitoring.job.yml` contains the separate Spark measurement, report and
+retraining job. No separate monitoring Bundle is required.
 
 ## The command
 
-For an **existing shared dashboard**, use its URL in each project:
+After editing `deployment/monitoring.yml` for a target, validate and deploy it:
 
 ```powershell
-python src/tools/configure_monitoring_dashboard.py --target test --dashboard-url "https://<workspace-host>/dashboardsv3/<dashboard-id>/published" --warehouse-id <warehouse-id>
 databricks bundle validate --strict -t test --profile <profile>
 databricks bundle deploy -t test --profile <profile>
 ```
 
-For a **new shared dashboard**, run this in only the one owning project/target:
-
-```powershell
-python src/tools/configure_monitoring_dashboard.py --target test --create-dashboard --warehouse-id <warehouse-id>
-# Validate every dashboard dataset against the chosen monitoring store first.
-databricks bundle validate --strict -t test --profile <profile>
-databricks bundle deploy -t test --profile <profile>
-```
-
-The helper generates `resources/monitoring.dashboard.yml` and
-`resources/monitoring_dashboard.job.yml`. The owner URL and refresh task reference
-the same managed `monitoring_dashboard` resource. It accepts one owner target and
-refuses to overwrite operator-managed files or silently move ownership. Other
-projects use the published URL from this deployment, not `--create-dashboard`.
-`--disable` removes only the refresh overlay and preserves the dashboard resource.
-No monitoring-engine question is added to initialization; measurement uses Spark.
+For a new dashboard, validate every dashboard dataset against the chosen monitoring
+store first. Other projects connect with the published URL from this deployment.
+To stop refreshing, remove the target's two refresh tasks. Removing a `create` block
+deletes that dashboard on the next deploy, so move ownership deliberately.
 
 Initialize or upgrade the store using
 [the owner notebook](databricks_monitoring_setup.md#the-command) before validating every dataset SQL

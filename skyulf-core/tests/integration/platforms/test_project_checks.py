@@ -287,8 +287,8 @@ _PUBLICATION = {
 }
 
 
-def _online_serving(**changes):
-    """Return an online_serving section shaped like the generated config/serving.yml."""
+def _online_feature_lookup(**changes):
+    """Return an online_feature_lookup section shaped like the generated config/serving.yml."""
     return {
         "enabled": False,
         "exclusive_writer": False,
@@ -310,7 +310,7 @@ def _serving_project(tmp_path, workflow_config, document):
 def test_smoke_accepts_generated_disabled_serving_sections(tmp_path, workflow_config):
     """An unmodified generated project keeps every serving job paused and must pass smoke."""
     document = {
-        "online_serving": _online_serving(),
+        "online_feature_lookup": _online_feature_lookup(),
         "rollout": {"enabled": False, "exclusive_writer": False, "run_id": ""},
         "online_publication": {"enabled": False, "exclusive_writer": False, "source_table": ""},
     }
@@ -318,7 +318,17 @@ def test_smoke_accepts_generated_disabled_serving_sections(tmp_path, workflow_co
     assert result["status"] == "passed"
 
 
-def test_smoke_accepts_complete_enabled_online_serving_offline(tmp_path, workflow_config):
+@pytest.mark.parametrize("include_new", [False, True])
+def test_smoke_rejects_old_online_serving_section(tmp_path, workflow_config, include_new):
+    """Renamed serving YAML sections must not disappear silently from offline validation."""
+    document = {"online_serving": _online_feature_lookup()}
+    if include_new:
+        document["online_feature_lookup"] = _online_feature_lookup()
+    with pytest.raises(ValueError, match="online_serving.*online_feature_lookup"):
+        check_project(_serving_project(tmp_path, workflow_config, document), _bindings())
+
+
+def test_smoke_accepts_complete_enabled_online_feature_lookup_offline(tmp_path, workflow_config):
     """A complete endpoint pin is checked locally; no endpoint or publication is contacted."""
     endpoint = {
         **_ENDPOINT,
@@ -326,8 +336,10 @@ def test_smoke_accepts_complete_enabled_online_serving_offline(tmp_path, workflo
         "model_name": "workspace.models.risk",
         "model_version": "3",
     }
-    document = {"online_serving": _online_serving(enabled=True, exclusive_writer=True)}
-    document["online_serving"]["endpoint"] = endpoint
+    document = {
+        "online_feature_lookup": _online_feature_lookup(enabled=True, exclusive_writer=True)
+    }
+    document["online_feature_lookup"]["endpoint"] = endpoint
     result = check_project(_serving_project(tmp_path, workflow_config, document), _bindings())
     assert result["remote_operations"] is False
 
@@ -336,16 +348,20 @@ def test_smoke_accepts_complete_enabled_online_serving_offline(tmp_path, workflo
     ("document", "message"),
     [
         (
-            {"online_serving": _online_serving(enabled=True, exclusive_writer=True)},
-            "config/serving.yml: online_serving: ",
+            {"online_feature_lookup": _online_feature_lookup(enabled=True, exclusive_writer=True)},
+            "config/serving.yml: online_feature_lookup: ",
         ),
         (
-            {"online_serving": _online_serving(enabled=True)},
-            "config/serving.yml: online_serving: Serving job requires exclusive_writer=true",
+            {"online_feature_lookup": _online_feature_lookup(enabled=True)},
+            "config/serving.yml: online_feature_lookup: Serving job requires exclusive_writer=true",
         ),
         (
             {"rollout": {"enabled": "false"}},
             "config/serving.yml: rollout: Serving job requires an explicit enabled boolean.",
+        ),
+        (
+            {"rollout": {"enabled": True, "exclusive_writer": True, "stage_minimum_hours": -1}},
+            "config/serving.yml: rollout: Duration hours must be positive and finite.",
         ),
         (
             {

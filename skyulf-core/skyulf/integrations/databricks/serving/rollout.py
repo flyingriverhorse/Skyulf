@@ -129,6 +129,8 @@ def rollout_plan_from_dict(value: dict[str, Any]) -> RolloutEndpointPlan:
             saved[field] = tuple(
                 tuple(item) if isinstance(item, list) else item for item in saved[field]
             )
+        saved["record_key_columns"] = tuple(saved.get("record_key_columns", ()))
+        normalized[role].setdefault("record_key_columns", ())
         plans.append(PinnedEndpointPlan(**saved))
     plan = build_rollout_endpoint(champion=plans[0], challenger=plans[1])
     if finite_json_digest(asdict(plan)) != finite_json_digest(normalized):
@@ -300,7 +302,16 @@ def _pending(
         raise ValueError("Prepared rollout action differs from its policy decision.")
     if not isinstance(request["request_id"], str) or not request["request_id"]:
         raise ValueError("Prepared rollout request identity is missing.")
+    _submission_state(request)
     return request
+
+
+def _submission_state(request: dict[str, Any]) -> str:
+    """Treat legacy receipts as uncertain because they cannot prove an unsent request."""
+    state = request.get("submission_state", "OUTCOME_UNKNOWN")
+    if state not in {"NOT_SUBMITTED", "OUTCOME_UNKNOWN"}:
+        raise ValueError("Prepared rollout submission state is invalid.")
+    return state
 
 
 def _reconcile(
@@ -313,6 +324,8 @@ def _reconcile(
 ) -> RolloutResult:
     """Settle only the exact requested next revision, without another policy step."""
     request = _pending(record, plan, state)
+    if request.get("submission_state") == "NOT_SUBMITTED":
+        return _apply(client, store, record, plan, state, clock)
     endpoint = _request(client, state.endpoint_name)
     revision = endpoint.get("config", {}).get("config_version")
     target = revision == request["target_config_version"]
@@ -359,7 +372,7 @@ def reconcile_rollout(
     admission: PublishAdmission,
     clock: Callable[[], datetime] = _now,
 ) -> RolloutResult:
-    """Resume a prepared write or verify the current state without advancing traffic."""
+    """Resume definitely unsent writes and reconcile uncertain ones without resubmitting."""
     host = _host(client)
     _, initial_state, _ = _validated(store.load(), host)
     with _admission(admission, host, initial_state.endpoint_name):
@@ -427,6 +440,7 @@ def _prepare(
         "target_percentage": decision.target_percentage,
         "action": decision.action,
         "body": body,
+        "submission_state": "NOT_SUBMITTED",
     }
     return record | {
         "status": "PREPARED",
@@ -458,6 +472,10 @@ def _apply(
         return _result(record)
     if endpoint.get("pending_config"):
         raise ValueError("An unowned pending endpoint configuration blocks rollout.")
+    record = store.write(
+        record | {"request": request | {"submission_state": "OUTCOME_UNKNOWN"}},
+        expected_receipt_id=record["receipt_id"],
+    )
     try:
         _request(client, state.endpoint_name, request["body"])
         return _reconcile(client, store, record, plan, state, clock)

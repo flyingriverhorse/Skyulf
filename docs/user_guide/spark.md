@@ -22,7 +22,7 @@ model are reused, with diagrams for local, native Spark and worker FE paths.
 | Fit/apply supported feature engineering on a distributed frame | `FeatureEngineer` with `ExecutionOptions("spark")` and `FrameSpec` | Native Spark expressions and aggregates | SimpleImputer mean/constant and StandardScaler; no model training |
 | Score a portable model with native preprocessing | `predict_spark(..., mode="native_features")`, `InferenceBundle` | Native FE, then Python estimator in workers | Raw input and the portable FE subset |
 | Score portable preprocessing and model together in workers | `predict_spark(..., mode="python_pipeline")`, `InferenceBundle` | Python FE/model per independent worker batch | Same portable FE subset; arbitrary Python nodes are not admitted |
-| Score an inspected fitted pandas pipeline from MLflow | Certified fitted pyfunc / generated Bundle `inference_mode: spark` | Saved Python preprocessing and model in workers | Exact fitted recipe, estimator, source and runtime must pass certification |
+| Score an inspected fitted pandas pipeline from MLflow | Certified fitted pyfunc / generated Bundle `batch_compute: spark` | Saved Python preprocessing and model in workers | Exact fitted recipe, estimator, source and runtime must pass certification |
 
 Choose the certified route when the required fitted recipe is outside the
 portable FE subset and that exact recipe passes its admission checks. Its

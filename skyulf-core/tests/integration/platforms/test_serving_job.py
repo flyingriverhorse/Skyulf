@@ -25,7 +25,10 @@ def api():
 def job(api, monkeypatch):
     """Preserve job orchestration while stubbing SDK and proven controller boundaries."""
     from skyulf.integrations.databricks.serving.rollout import RolloutResult
-    from skyulf.integrations.databricks.serving.rollout_policy import RolloutState
+    from skyulf.integrations.databricks.serving.rollout_policy import (
+        DailyRolloutPolicy,
+        RolloutState,
+    )
 
     now = datetime(2026, 10, 10, tzinfo=UTC).isoformat()
     state = RolloutState(
@@ -55,6 +58,7 @@ def job(api, monkeypatch):
         "state": asdict(state),
         "promotion": pin,
         "plan": {},
+        "policy": asdict(DailyRolloutPolicy()),
     }
     store = Mock()
     store.run_id = "run"
@@ -104,6 +108,32 @@ def test_bootstrap_evidence_is_persisted_before_traffic_mutation(api, job):
     promote.assert_not_called()
 
 
+def test_changed_yaml_policy_rejected_before_reconciliation(api, job):
+    """Editing YAML must not silently shorten an already admitted rollout."""
+    from skyulf.integrations.databricks.serving.rollout_policy import DailyRolloutPolicy
+
+    settings, store, result, producer, advance, promote, persist = job
+    store.load.return_value["policy"] = asdict(DailyRolloutPolicy())
+    settings["stage_minimum_hours"] = 5 / 60
+    with pytest.raises(ValueError, match="policy differs"):
+        api.run_daily_rollout(None, settings, client=Mock(), registry_client=Mock())
+    api.reconcile_rollout.assert_not_called()
+    producer.assert_not_called()
+    advance.assert_not_called()
+
+
+def test_invalid_rollout_yaml_rejected_by_preflight_and_job_before_io(api, job):
+    """Offline checks and scheduled execution must reject the same invalid policy."""
+    settings, store, result, producer, advance, promote, persist = job
+    settings["traffic_step_percent"] = 0
+    with pytest.raises(ValueError):
+        api.validate_serving_section("rollout", settings)
+    with pytest.raises(ValueError):
+        api.run_daily_rollout(None, settings, client=Mock(), registry_client=Mock())
+    store.load.assert_not_called()
+    api.reconcile_rollout.assert_not_called()
+
+
 def test_failed_observation_storage_prevents_traffic_write(api, job):
     """A job cannot mutate traffic when its evidence cannot be retained and verified."""
     settings, store, result, producer, advance, promote, persist = job
@@ -141,6 +171,11 @@ def test_completed_stage_automatically_invokes_guarded_promotion(api, job):
     assert output["promotion"]["new_version"] == "2"
     promote.assert_called_once()
     producer.assert_not_called()
+    replay = api.run_daily_rollout(None, settings, client=Mock(), registry_client=Mock())
+    assert replay["promotion"] == output["promotion"]
+    assert replay["promotion"]["event_id"] == "event"
+    assert promote.call_count == 2
+    advance.assert_not_called()
 
 
 def test_changed_saved_comparison_rejected_before_observation(api, job):
@@ -281,22 +316,23 @@ def test_notebook_entrypoints_return_mappings_for_generated_summary(api, tmp_pat
     """Generated notebook summary and exit serialize the same mapping exactly once."""
     path = tmp_path / "serving.yml"
     path.write_text(
-        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_serving:\n  enabled: false\n"
+        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_feature_lookup:\n  enabled: false\n"
     )
     dbutils = Mock()
     dbutils.widgets.get.return_value = str(path)
+    dbutils.widgets.getAll.return_value = {}
     result = getattr(api, entrypoint)(None, dbutils)
     assert result == {"status": "DISABLED"}
 
 
 @pytest.mark.parametrize(
-    "job_name", ["daily_rollout", "online_publication", "online_serving_setup"]
+    "job_name", ["daily_rollout", "online_publication", "online_feature_lookup_setup"]
 )
 def test_real_disabled_notebook_exits_with_one_json_object(tmp_path, job_name):
     """The actual template and runtime must agree before any remote work is enabled."""
     config = tmp_path / "serving.yml"
     config.write_text(
-        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_serving:\n  enabled: false\n"
+        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_feature_lookup:\n  enabled: false\n"
     )
     dbutils = Mock()
     dbutils.widgets.get.return_value = str(config)
@@ -406,10 +442,24 @@ def test_online_setup_does_not_report_ready_after_timeout(api, monkeypatch):
     create.assert_called_once()
 
 
+@pytest.mark.parametrize("include_new", [False, True])
+def test_online_setup_notebook_rejects_old_yaml_section(api, tmp_path, include_new):
+    """Old configuration must fail clearly instead of silently selecting the renamed feature job."""
+    path = tmp_path / "serving.yml"
+    document = "online_serving:\n  enabled: false\n"
+    if include_new:
+        document += "online_feature_lookup:\n  enabled: false\n"
+    path.write_text(document, encoding="utf-8")
+    dbutils = Mock()
+    dbutils.widgets.get.return_value = str(path)
+    with pytest.raises(ValueError, match="online_serving was renamed to online_feature_lookup"):
+        api.run_online_serving_setup_notebook(None, dbutils)
+
+
 def test_online_setup_refuses_incomplete_config_before_endpoint_mutation(api):
     """An opt-in without operator pins must fail before opening serving writes."""
     workspace = Mock()
-    with pytest.raises(ValueError, match="online_serving"):
+    with pytest.raises(ValueError, match="online_feature_lookup"):
         api.run_online_serving_setup(
             None, {"enabled": True, "exclusive_writer": True}, client=workspace
         )

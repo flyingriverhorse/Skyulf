@@ -9,16 +9,36 @@ the model's input features, including any features produced by upstream joins
 or aggregations. The function returns predictions; your application or SQL job
 owns source selection and destination writes.
 
-There is no extra default Bundle job. Run the steps below deliberately from a
-Databricks Python notebook, or render the DDL and run it in Databricks SQL.
-REST serving works independently of whether you create the SQL function.
+Choose `prediction_delivery: endpoint` or `both` in detailed Bundle setup to
+generate the `serving_endpoint` job. It maintains one endpoint per project and
+target, then checks real REST and SQL predictions against the saved model.
+Quick setup defaults to `batch`. REST serving works independently of the SQL function.
+The [notebook API](#the-command) remains available for explicit, create-only setup.
+
+For a complete endpoint-only project, copy
+[taxi_fare_endpoint](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint).
+It uses the built-in NYC taxi data, automatically updates serving after champion
+promotion, and demonstrates SQL requests plus telemetry monitoring. Its
+[serving walkthrough](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint/SERVING.md)
+ends at the **Online serving** dashboard; no batch prediction table is created.
 
 ### Choose how predictions are produced
 
+| Setup choice | Generated prediction jobs | Monitoring |
+| --- | --- | --- |
+| `batch` (default) | `score` | Batch observations through the monitoring job |
+| `endpoint` | `serving_endpoint`; no batch schedule, prediction table or score handoff | The monitoring job reads logged requests after enrollment |
+| `both` | `score` and `serving_endpoint`, independently | Both sources in the same monitoring store |
+
+The monitoring job is retained in every mode. Changing delivery mode changes
+the generated job graph: regenerate and review the project before deployment.
+Endpoint-only projects retain `config/inference.yml` for the smoke source and,
+for model sets, the registered parent identity and composition settings.
+
 | Path | Runs where | Use it for | Cost model |
 | --- | --- | --- | --- |
-| Batch `score` job, `inference_mode: local` | One Python process on job compute | Scheduled or handoff scoring of a bounded table | Job compute while it runs |
-| Batch `score` job, `inference_mode: spark` | Spark workers via `mlflow.pyfunc.spark_udf`; no endpoint | Large scheduled scoring into Delta | Job compute while it runs |
+| Batch `score` job, `batch_compute: single_node` | One Python process on job compute | Scheduled or handoff scoring of a bounded table | Job compute while it runs |
+| Batch `score` job, `batch_compute: spark` | Spark workers via `mlflow.pyfunc.spark_udf`; no endpoint | Large scheduled scoring into Delta | Job compute while it runs |
 | REST endpoint (this page) | Databricks Model Serving | Applications needing one request at a time | Endpoint compute while provisioned; scale to zero is enabled by default |
 | SQL function with `ai_query` (this page) | Model Serving, called from SQL | Analysts, SQL jobs and dashboards querying the endpoint | Endpoint plus the SQL warehouse or cluster |
 
@@ -31,9 +51,10 @@ and models listed in [Spark scoring support](databricks_spark_scoring.md#what-sp
 Additional built-in models, voting/stacking and eligible preprocessing recipes
 need the training evidence described in
 [built-in recipes and model evidence](databricks_spark_scoring.md#built-in-recipes-and-model-evidence).
-For an endpoint-only project, set `defaults.admit_probed_custom_steps: true`
-in `config/training.yml` before training. Spark and online-feature projects
-already enable it. `prepare_pinned_endpoint` recomputes the certificate from
+Selecting the endpoint job enables `defaults.allow_tested_custom_steps: true`
+in `config/training.yml`. For an existing endpoint-only project, enable it before
+training. Spark and online-feature projects already enable it.
+`prepare_pinned_endpoint` recomputes the certificate from
 the exact registered package; changing a serving setting cannot admit an old
 model without evidence. Missing or changed evidence requires retraining and
 registering a new version. Inspect `partition_probe.json` in that training run:
@@ -62,9 +83,8 @@ preprocessing run inside the model. Callers do not repeat those transformations
 or create a merged feature table. Spark joins and historical feature-table
 calculations performed before that pipeline are not automatically included.
 
-Training does not require a prediction sink. Keep `score_handoff: disabled`
-and `scoring_mode: manual` for endpoint-only use; an output table name in
-configuration does not itself create a table. REST calls and SQL functions
+Training does not require a prediction sink. Choose `prediction_delivery: endpoint`
+to omit the batch job and its output configuration. REST calls and SQL functions
 return results. A separate caller decides whether to publish them with a
 DataFrame write or `CREATE TABLE ... AS SELECT`.
 
@@ -72,16 +92,229 @@ DataFrame write or `CREATE TABLE ... AS SELECT`.
 
 | File or input | Set before running |
 | --- | --- |
-| `deployment/requirements.txt` | The matching producer runtime |
-| `PinnedEndpointSpec` in your notebook | Concrete version, endpoint and logging destination |
-| SQL function name | A new UC function name for this release |
-| `config/serving.yml` for online lookup | `online_serving` endpoint and actual publication identities |
+| `config/serving.yml` → `serving_endpoint` | Enablement, automatic handoff, logging, compute, SQL function, caller grants and sample size |
+| `config/inference.yml` → `score_source_table` | Existing table containing every raw input in the saved model signature |
+| `deployment/requirements.txt` | Runtime matching the registered model's producer |
+| `deployment/variables.yml` / target overrides | Serving job timeout, compute policy, cost attribution and job permissions |
+| `config/serving.yml` → `online_feature_lookup` | Separate online-lookup setup, only when selected |
 
 Use
 [deployment identities and access](databricks_deployment.md#deployment-identity-and-run-identity)
 for the Bundle and the [permissions below](#errors-and-privileges) for REST/SQL.
 
+## Run the Bundle serving job
+
+Detailed setup → `prediction_delivery: endpoint` or `both` supports certified pandas single
+models, competition winners and model sets. Quick setup creates batch scoring; Polars
+training is not admitted. Online lookup and rollout are separate options.
+
+After training and champion approval, run from the generated project. Substitute
+your target and authenticated profile:
+
+```bash
+databricks bundle validate --strict -t test --profile YOUR_PROFILE
+databricks bundle deploy -t test --profile YOUR_PROFILE
+databricks bundle run serving_endpoint -t test --profile YOUR_PROFILE
+# Explicit version instead of resolving champion:
+databricks bundle run serving_endpoint -t test --profile YOUR_PROFILE --params model_version=7
+```
+
+- **Automatic:** completed champion initialization, promotion or rollback,
+  including daily-rollout promotion, submits a separate serving run in every
+  target. Personal development targets do too: their endpoint and SQL function
+  names carry the per-user resource suffix, so each developer gets their own
+  endpoint and never changes a shared one. They need `cost_tag_value` like any
+  target. Pending/rejected/unchanged candidates do not. The receipt pins the
+  numeric version; submission retries are idempotent.
+- **Manual:** `follow_champion: false`, or champion changes made outside the
+  template. Batch `follow_champion` in `config/inference.yml` is independent when `both` is selected.
+- **Check the child run:** training waits only for submission and retains its
+  timeout. Open the returned serving run ID and inspect `serving_result`.
+
+The dispatch tasks exist whenever the endpoint job is generated. Toggle
+`serving_endpoint.follow_champion` in YAML and deploy that file; the toggle does not
+require regenerating the graph and does not compare against a frozen job value.
+
+### Automatic monitoring enrollment
+
+To enroll automatically, set the target's `monitoring_enabled: "true"` and use
+`logging_mode: telemetry` or `ai_gateway`. Configure `monitoring_catalog` and
+`monitoring_schema` before running the job; these are validated before endpoint
+changes when enrollment is enabled. After reference, REST and optional SQL parity passes,
+it enrolls the served concrete version in that existing monitoring store. A
+model set gets one registration per branch, with parent name/version/branch
+attribution. Reruns reuse the same identities; prior registrations for this
+endpoint and project/target are disabled after the new enrollment succeeds.
+Their history, unrelated endpoints and batch registrations are preserved.
+
+The result reports enrollment status. With `monitoring_enabled: "false"` or an
+absent flag, it reports `monitoring_disabled` and skips all monitoring work,
+preserving existing registrations. Endpoint logging and verification still run.
+When monitoring is enabled, `logging_mode: disabled` reports `logging_disabled`.
+The target's paused monitoring schedule still remains paused.
+Enrollment alone does not create observations: send requests, wait for payload
+delivery, then run the monitoring job. The Online serving dashboard reads those
+saved observations. Performance needs matching outcome labels. See
+[serving monitoring](databricks_serving_monitoring.md) for access and label contracts.
+
+### Three caller recipes
+
+Merge **one** recipe into the generated `serving_endpoint` section; retain its
+names and target bindings. Examples assume one `amount` input. For your model,
+copy the job's generated examples with every required field.
+
+#### SQL with ai_query
+
+```yaml
+serving_endpoint:
+  # SQL access without request logging tables.
+  sql_function:
+    enabled: true
+  logging_mode: disabled
+  permissions:
+    - group_name: risk_readers
+      level: CAN_QUERY
+```
+
+The job adds endpoint `CAN_QUERY` and function `EXECUTE`. Callers also need
+`USE CATALOG` and `USE SCHEMA`, which the job does not grant.
+
+```sql
+SELECT main.ml.risk_score(`amount` => s.`amount`) AS result
+FROM main.source.customers AS s;
+```
+
+#### REST for applications
+
+```yaml
+serving_endpoint:
+  # Replace the application ID with your service principal's ID.
+  sql_function:
+    enabled: false
+  logging_mode: disabled
+  permissions:
+    - service_principal_name: APPLICATION_ID
+      level: CAN_QUERY
+```
+
+To capture requests, choose `telemetry` and fill the three logging destination
+keys below before creating the endpoint. Credentials stay in the environment:
+
+```bash
+curl --fail-with-body --request POST \
+  "${DATABRICKS_HOST}/serving-endpoints/risk-test-endpoint/invocations" \
+  --header "Authorization: Bearer ${DATABRICKS_TOKEN}" \
+  --header "Content-Type: application/json" \
+  --data '{"dataframe_records": [{"amount": 12.5}]}'
+```
+
+#### Python SDK for notebooks and jobs
+
+```yaml
+serving_endpoint:
+  # Use the notebook/job caller's group.
+  sql_function:
+    enabled: false
+  logging_mode: disabled
+  permissions:
+    - group_name: risk_readers
+      level: CAN_QUERY
+```
+
+```python
+from databricks.sdk import WorkspaceClient
+
+result = WorkspaceClient().serving_endpoints.query(
+    name="risk-test-endpoint", dataframe_records=[{"amount": 12.5}]
+)
+print(result.predictions)
+```
+
+### Configuration reference
+
+All keys below belong to `config/serving.yml` → `serving_endpoint`.
+
+| Key | Generated default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` when selected | Enable the job's work |
+| `follow_champion` | `true` | Automatically update after a completed champion change in production; `false` means manual runs only |
+| `endpoint_name` | Project + target + suffix | Stable endpoint; personal suffixes use hyphens |
+| `model_name` | Target's model or model-set name | Concrete UC registered model identity |
+| `tracking_uri` / `registry_uri` | `databricks` / `databricks-uc` | Package lookup |
+| `workload_type` / `workload_size` | `CPU` / `Small` | Endpoint compute, independent of job compute |
+| `scale_to_zero_enabled` | `true` | Reduce idle compute; cold starts remain possible |
+| `ready_timeout_s` | `3600` | Endpoint readiness deadline |
+| `logging_mode` | `disabled` | No inference tables or captured-request monitoring; alternatives: `telemetry`, `ai_gateway` |
+| `logging_catalog` / `logging_schema` / `logging_table_prefix` | Empty when disabled | Separate payload sink, required for logged modes |
+| `sql_function.enabled` / `sql_function.name` | `true` / target's score function | Create and smoke-test SQL; `false` leaves REST/SDK only |
+| `permissions` | `[]` | Additive caller grants; one user, group or service principal per entry. A list applies to every target; a mapping keyed by target (`test:`, `prod:` ...) grants each target its own principals, and an unlisted target grants nothing |
+| `verification.sample_rows` | `20` | Collected sample size, from 1 to 1000 |
+
+Use `verification: {sample_rows: 20}` to set how many source rows the job checks.
+Older `smoke.rows` and `selection` keys are rejected. The job uses the current
+champion unless you pass `--params model_version=<version>` for that run.
+
+To change automatic updates, edit `serving_endpoint.follow_champion` in YAML and deploy the updated
+file. The endpoint job's existing dispatch tasks remain in place in either mode.
+
+### Operational rules
+
+- **Input and proof:** `config/inference.yml` → `score_source_table` must already
+  contain the saved raw inputs after any upstream joins. Hash ordering spreads
+  the bounded sample but still scans the source. Empty samples and infinite
+  reference predictions fail before endpoint changes. The same records run
+  through the saved pyfunc, REST and enabled SQL path. Counts, fields and discrete
+  values match exactly; floats allow `rtol=1e-10`, `atol=1e-12` for rounding.
+  Null transport follows the saved package. No batch scoring or Delta write occurs.
+- **Result:** action, concrete model URI, logging destination, SQL action,
+  comparison counts under `verification` and runnable examples. Output includes one sampled input
+  record. This smoke check does not replace holdout evaluation or monitoring.
+- **Ownership:** one entity at 100% traffic; foreign names, pending updates,
+  conflicting logging/runtime settings and rollout/online endpoints are refused.
+  Reserve tags `project`, `target`, `suffix`, `managed_by`; use one deployment
+  writer. SQL ownership comes from its managed comment. Only schema/transport
+  changes replace its definition; caller arguments may then need updating.
+- **Identity and grants:** the job needs model/table read access, endpoint
+  management and function create/update rights. Shared targets use the shared SP
+  or, with separate identities, scoring SP. Preserve training's `CAN_MANAGE_RUN`
+  in `serving_permissions`. Removing a caller from YAML does not revoke access;
+  change endpoint permissions and explicitly `REVOKE EXECUTE` when needed.
+  When groups differ per workspace, key `permissions` by target so each
+  deployment grants only groups that exist there:
+
+  ```yaml
+  permissions:
+    test:
+      - group_name: test-callers
+    prod:
+      - group_name: prod-callers
+      - service_principal_name: <application-id>
+  ```
+
+  Every entry is validated in every target, and the project smoke check rejects
+  a key that is not a target in `deployment/targets.yml`. SQL callers also need
+  `USE CATALOG`/`USE SCHEMA` on the function's schema and a SQL warehouse; the job
+  grants only `EXECUTE` and endpoint `CAN_QUERY`.
+- **Compute and cost:** job compute follows serverless/`policy_cluster` settings.
+  Set `cost_tag_value` before serving, including serverless targets; its placeholder
+  is rejected. Do not use an ownership key as `cost_tag_key`. Set Bundle
+  `serving_timeout_seconds` (default 7200) to at least `ready_timeout_s + 300` and
+  redeploy. Endpoint, maintenance and SQL-call costs are separate from logging.
+- **Logging and retirement:** existing notebook/online APIs retain telemetry
+  defaults. This job refuses changing an existing endpoint's logging mode; use a
+  separately named endpoint. Before retirement, set `follow_champion: false`, deliberately
+  delete the endpoint and drop its function. Bundle job removal does not delete
+  these resources; retain logs according to your policy.
+- **Recovery:** a failed smoke can leave the new version serving. Rerun with
+  `--params model_version=<previous_version>` from the deployment result or
+  endpoint configuration history (failed runs may have no final summary).
+  Recovery is explicit and leaves champion unchanged.
+
+
 ## The command
+
+This advanced path creates a new endpoint and SQL function explicitly. It keeps
+the create-only behavior; use the Bundle job above for managed version updates.
 
 ### 1. Inspect the model and prepare the endpoint
 
@@ -153,7 +386,7 @@ and
 Logging belongs to the endpoint, not to the caller: every request that reaches it
 is logged the same way, whether it comes from REST or from an `ai_query` SQL call.
 Choose it with `logging_mode` on `PinnedEndpointSpec`, or with
-`online_serving.endpoint.logging_mode` in `config/serving.yml`; setup does not ask.
+`online_feature_lookup.endpoint.logging_mode` in `config/serving.yml`; setup does not ask.
 
 | `logging_mode` | What Databricks creates in `<logging_catalog>.<logging_schema>` | When to choose it | Rollout and serving monitoring |
 | --- | --- | --- | --- |
@@ -328,13 +561,13 @@ the same SQL API; the saved output schema determines the returned fields.
 First complete
 [online Bundle training](databricks_online_features.md#generate-train-and-set-up-an-online-bundle)
 and publication. This endpoint setup job exists only when initialization selected
-`include_online_serving: "true"`. It is unscheduled and never creates a publication.
+`include_online_feature_lookup: "true"`. It is unscheduled and never creates a publication.
 
 Take the **concrete registered version** from the training result and complete
-`online_serving` in `config/serving.yml`:
+`online_feature_lookup` in `config/serving.yml`:
 
 ```yaml
-online_serving:
+online_feature_lookup:
   enabled: true
   exclusive_writer: true
   tracking_uri: databricks
@@ -372,7 +605,7 @@ validation error while the first sync is incomplete; it does not poll or republi
 
 ```bash
 databricks bundle deploy -t test
-databricks bundle run online_serving_setup -t test
+databricks bundle run online_feature_lookup_setup -t test
 ```
 
 The setup result reports `READY`, `model_uri`, `input_schema` and a typed
@@ -400,7 +633,7 @@ checks the received values and does not attest their source.
 
 #### Endpoint compute and setup timeout
 
-These settings belong to `online_serving.endpoint`. They are also keyword
+These settings belong to `online_feature_lookup.endpoint`. They are also keyword
 arguments of `PinnedEndpointSpec` for a regular endpoint without online lookup.
 
 | Setting | Default | Supported values and effect |
@@ -419,7 +652,7 @@ scale_to_zero_enabled: false
 ready_timeout_s: 1800
 ```
 
-Place those four lines under `online_serving.endpoint`. A changed YAML file
+Place those four lines under `online_feature_lookup.endpoint`. A changed YAML file
 does not update an existing endpoint. Setup is create-only: use a new endpoint
 name and explicitly move your callers after verifying it. A daily rollout must
 use the same workload type, size and scale-to-zero setting for champion and
@@ -440,7 +673,7 @@ for the platform's compute and readiness behavior.
 
 ### Admit and query the registered package
 
-The following SDK route is an alternative to the Bundle's `online_serving_setup`
+The following SDK route is an alternative to the Bundle's `online_feature_lookup_setup`
 job. Register the native outer package, then inspect a concrete version:
 
 ```python
@@ -494,6 +727,13 @@ application boundary if your application must prohibit caller overrides.
 
 ### Validate your endpoint
 
+The serving smoke reader converts Spark DECIMAL model values using the same
+float64 rule as training and batch prediction. The saved signature determines
+JSON numbers and SQL `DOUBLE` arguments. See
+[conversion evidence and precision](databricks_training_data.md#spark-decimal-model-values).
+`deployment/serving-requirements.txt` pins the tested Databricks SDK; install this
+job environment rather than relying on the SDK preinstalled in a compute runtime.
+
 Compare direct saved-model, REST and SQL predictions using the same representative
 inputs. Include nulls, reordered named columns, integer limits and keys, and all
 component/composition outputs used by your application. Check strict and captured
@@ -505,7 +745,7 @@ scale-to-zero behavior and sustained load. Recipe admission does not establish
 these endpoint-specific properties. Keep the concrete model version and request
 schema fixed during the comparison.
 
-Online monitoring enrollment is documented in
+Automatic enrollment for the Bundle job and manual enrollment for other endpoints are documented in
 [serving observations and enrollment](databricks_serving_monitoring.md).
 
 ## Common errors and fixes

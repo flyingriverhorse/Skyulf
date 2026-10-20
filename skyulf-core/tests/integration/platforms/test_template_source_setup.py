@@ -49,7 +49,7 @@ def test_performance_policy_covers_each_component_with_matching_metric(tmp_path,
     project = _generate_project(
         tmp_path,
         training_layout=layout,
-        monitoring_catalog="cat",
+        monitoring="true",
         monitoring_schema="monitoring",
         label_table_name="outcomes",
         label_available_at_column="known_at",

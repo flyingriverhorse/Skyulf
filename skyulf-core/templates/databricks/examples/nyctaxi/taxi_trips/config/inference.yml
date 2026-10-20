@@ -1,21 +1,23 @@
 # Scoring controls and output destinations. No model is trained by this file.
 version: 1
-inference_mode: local
-# from_now checkpoints without predictions on the first run; rebuilds keep that boundary.
+prediction_delivery: batch
+batch_compute: single_node
+# full_snapshot predicts existing rows. from_now skips them on the first run and
+# predicts later inserts only, including after model changes or recovery.
 initial_scoring: full_snapshot
 score_source_table: "{catalog}.{input_schema}.trips_score"
 prediction_table: "{catalog}.{output_schema}.taxi_trips_predictions{resource_suffix}"
 score_model_selection: pinned_version
 model_version: "1"
-model_change_mode: incremental_append
-auto_rebuild_on_cdf_expiry: false
-score_handoff: disabled
+on_model_change: score_new_rows
+rescore_when_history_expires: false
+follow_champion: false
 model_set:
   model_name: "{catalog}.{metadata_schema}.trips_set{resource_suffix}"
   prediction_table: "{catalog}.{output_schema}.trips_set_predictions{resource_suffix}"
   promotion_policy: manual_approval
   combined_rules_path: ../features
-  source_change_policy: reject
+  on_source_change: stop
   publication:
     mode: all
 

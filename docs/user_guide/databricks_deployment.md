@@ -86,7 +86,7 @@ Monitoring reuses the scoring identity in separate mode. Arrange its monitoring
 source reads and evidence-store writes explicitly; this does not require model
 ownership. There is no additional monitoring principal to configure.
 
-The optional `online_serving_setup`, `online_publication` and `daily_rollout`
+The optional `online_feature_lookup_setup`, `online_publication` and `daily_rollout`
 jobs get no `run_as` override in any mode. They run as the deploying identity,
 even with `shared_service_principal`. Add a job-level `run_as` under the target
 in `targets.yml` if they must run as a service principal.
@@ -274,7 +274,7 @@ in `resources/score.job.yml`. The root `databricks.yml` includes them through
 `resources/*.yml`. Each job has its own schedule and compute settings. Training
 calls scoring through `${resources.jobs.score.id}` when handoff is enabled.
 `resources/monitoring.job.yml` holds the monitoring job. Optional selections add
-`online_serving_setup.job.yml`, `online_publication.job.yml` and
+`online_feature_lookup_setup.job.yml`, `online_publication.job.yml` and
 `daily_rollout.job.yml`; local tools can add `features.job.yml` and dashboard
 overlays.
 
@@ -288,9 +288,9 @@ independent Spark/serverless path in every layout.
 
 | Generated choice | Score execution | Environment manager |
 | --- | --- | --- |
-| `inference_mode: local` | Local pandas/Polars under row and byte bounds | Project task environment |
-| `inference_mode: spark`, serverless | `mlflow.pyfunc.spark_udf` | `local`, using the declared environment |
-| `inference_mode: spark`, policy cluster | `mlflow.pyfunc.spark_udf` | `virtualenv`, installing the recorded wheel and pins |
+| `batch_compute: single_node` | Local pandas/Polars under row and byte bounds | Project task environment |
+| `batch_compute: spark`, serverless | `mlflow.pyfunc.spark_udf` | `local`, using the declared environment |
+| `batch_compute: spark`, policy cluster | `mlflow.pyfunc.spark_udf` | `virtualenv`, installing the recorded wheel and pins |
 
 The Spark default prediction batch size is 10000. A manager failure stops
 scoring without silently changing managers. For certificates, admitted fitted
@@ -450,7 +450,7 @@ automatic optimization remains disabled so it cannot add hidden attempts. See
 
 Train and score notebook tasks default to `max_retries: 0`; their serverless
 tasks also set `disable_auto_optimization: true`. The optional
-`online_serving_setup`, `online_publication` and `daily_rollout` tasks always use
+`online_feature_lookup_setup`, `online_publication` and `daily_rollout` tasks always use
 `max_retries: 0` with automatic optimization disabled. Monitoring tasks are the
 exception: they retry once by default through `monitoring_max_retries`. A
 retried monitoring attempt does not duplicate saved observations, because exact
@@ -459,7 +459,7 @@ candidate version. Inspect run evidence and registry state before rerunning;
 these guards do not promise exactly-once training. See
 [Databricks serverless retry behavior](https://docs.databricks.com/aws/en/jobs/run-serverless-jobs).
 
-When `auto_rebuild_on_cdf_expiry=true` was selected during initialization, the
+When `rescore_when_history_expires: true` was selected during initialization, the
 same notebook timeout and retry settings also apply to `recover_predictions`
 and `scoring_report`. These tasks use the existing score job's identity,
 single-run queue, compute and notifications. The `recovery_needed` condition

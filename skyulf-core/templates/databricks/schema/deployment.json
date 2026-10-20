@@ -54,6 +54,7 @@
     "default": "CostCenter",
     "description": "5. Compute | Approved cluster cost tag key, for example CostCenter or PayingRegNo",
     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+    "not": {"enum": ["project", "target", "suffix", "managed_by"]},
     "skip_prompt_if": {
       "properties": {
         "compute_mode": {

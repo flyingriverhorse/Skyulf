@@ -86,6 +86,7 @@ def test_feature_snapshot_drift_rejected(change, monkeypatch):
 
     snapshot = _binding()["lookup_evidence"]["feature_tables"][0] | change
     monkeypatch.setattr(scoring.snapshots, "snapshot_table", lambda *args: snapshot)
+    monkeypatch.setattr(scoring.snapshots, "_unchanged_data", lambda *args: False)
     with pytest.raises(ValueError, match="changed.*retrain"):
         scoring.validate_feature_snapshot(None, _artifact())
 

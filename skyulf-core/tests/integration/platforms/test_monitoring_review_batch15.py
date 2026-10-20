@@ -27,6 +27,7 @@ def _selected(records):
     def limited(count):
         """Honor max_rows plus one instead of silently bypassing the transfer bound."""
         result = Mock()
+        result.schema.fields = []
         result.toLocalIterator.return_value = [
             Mock(asDict=Mock(return_value=row)) for row in records[:count]
         ]

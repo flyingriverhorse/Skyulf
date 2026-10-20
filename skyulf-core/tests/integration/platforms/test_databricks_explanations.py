@@ -192,7 +192,11 @@ def test_too_few_survivors_keeps_exclusion_evidence(tmp_path, monkeypatch, survi
         {"method": "shap", "max_samples": True},
         {"method": "shap", "max_samples": 201},
         {"method": "shap", "max_features": 0},
-        {"method": "shap", "max_features": 101},
+        {"method": "shap", "max_features": -1},
+        {"method": "shap", "max_features": True},
+        {"method": "shap", "max_features": 115.0},
+        {"method": "shap", "max_features": "115"},
+        {"method": "shap", "max_features": None},
         {"method": "shap", "max_display_samples": 51},
         {"method": "shap", "max_samples": 2, "max_display_samples": 3},
         {"method": "shap", "unknown": 1},
@@ -323,9 +327,43 @@ def test_explanation_failures_preserve_evidence(tmp_path, monkeypatch, failure) 
         assert result["detail"] == "inference blocked"
 
 
-def test_wide_feature_budget_up_to_100_is_accepted() -> None:
-    """Models with 51-100 transformed features (e.g. fixed one-hot sets) can be explained."""
-    validate_explanation_config({"explainability": {"method": "shap", "max_features": 100}})
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("feature_budget", [115, 1000])
+def test_wide_artifact_uses_the_configured_shap_feature_budget(
+    tmp_path, engine, feature_budget
+) -> None:
+    """A saved model wider than 100 columns must use the user's feature budget for real SHAP."""
+    pytest.importorskip("shap")
+    frame = pd.DataFrame(
+        np.random.default_rng(42).normal(size=(40, 115)),
+        columns=[f"feature_{index}" for index in range(115)],
+    )
+    frame["target"] = 3 * frame["feature_0"] + frame["feature_1"]
+    pipeline = SkyulfPipeline(
+        {
+            "modeling": {
+                "type": "random_forest_regressor",
+                "params": {"n_estimators": 3, "max_depth": 3},
+            }
+        }
+    )
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(native, target_column="target")
+    cast(dict[str, Any], pipeline.config)["explainability"] = {
+        "method": "shap",
+        "max_samples": 4,
+        "max_features": feature_budget,
+        "max_display_samples": 2,
+    }
+    path = tmp_path / "wide_artifact"
+    save_pipeline(pipeline, path)
+    result = explain_training_artifact(load_pipeline(path), native)
+    assert result is not None and result["status"] == "completed"
+    assert result["limits"]["max_features"] == feature_budget
+    assert result["feature_count"] == 115 and result["sample_count"] == 4
+    importance = result["shap"]["mean_abs_importance"]
+    assert set(importance) == set(frame.columns) - {"target"}
+    assert all(np.isfinite(value) for value in importance.values())
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

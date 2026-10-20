@@ -55,6 +55,80 @@ def test_group_split_ordinals():
     assert _metadata_train_ordinals(frame, spec) == train["_ordinal"].tolist()
 
 
+def test_freshness_enriches_saved_features_before_projection(monkeypatch):
+    """Lookup-only inputs must reach freshness comparison under the frozen training binding."""
+    import json
+
+    from skyulf.integrations.databricks.data.training import spark_retraining_data as module
+    from skyulf.integrations.databricks.feature_store import training
+    from skyulf.integrations.databricks.feature_store.lifecycle_config import (
+        binding_json,
+        serialize_feature_spec,
+    )
+
+    source = MagicMock()
+    source.columns = ["id", "y"]
+
+    def project(*columns):
+        """Expose the actual missing-column failure on an unenriched raw source."""
+        if missing := set(columns).difference(source.columns):
+            raise ValueError(f"Missing raw columns: {missing}")
+        return source
+
+    source.select.side_effect = project
+    source.limit.return_value.count.return_value = 2
+    source.agg.return_value.first.return_value = {"bytes": 64}
+    spark = MagicMock()
+    spark.read.format.return_value.option.return_value.table.return_value = source
+    spec = _spec(
+        feature_lookup_json=json.dumps(
+            {
+                "label": "y",
+                "lookups": [
+                    {"table_name": "a.b.features", "lookup_key": ["id"], "feature_names": ["x"]}
+                ],
+            }
+        )
+    )
+    lookup = training.training_lookup(spec)
+    assert lookup is not None
+    binding = {
+        "version": 1,
+        "lookup_spec": serialize_feature_spec(lookup),
+        "lookup_evidence": {
+            "policy": "training_snapshot",
+            "feature_tables": [{"table_name": "a.b.features", "table_id": "fixed", "version": 4}],
+        },
+    }
+    spec = replace(spec, feature_binding_json=binding_json(binding))
+    enrichments = []
+
+    def enrich(raw, lookup, actual_binding, *, spark):
+        """Represent the native lookup boundary while retaining its supplied frozen spec."""
+        assert raw is source and actual_binding == binding and lookup.exclude_columns == ()
+        enrichments.append(actual_binding)
+        source.columns.append("x")
+        return SimpleNamespace(load_df=lambda: source)
+
+    from skyulf.integrations.databricks.feature_store import snapshots
+
+    rechecks = []
+    monkeypatch.setattr(training, "create_checked_training_set", enrich)
+    monkeypatch.setattr(
+        snapshots, "validate_snapshots", lambda spark, records: rechecks.append(records)
+    )
+    monkeypatch.setattr(module, "_functions", MagicMock)
+    monkeypatch.setattr(module, "join_training_labels", lambda *args: source)
+    monkeypatch.setattr(module, "normalize_training_dates", lambda *args, **kwargs: source)
+    monkeypatch.setattr(module, "require_unique_keys", lambda *args: None)
+    monkeypatch.setattr(module, "normalize_spark_decimals", lambda *args, **kwargs: (source, []))
+    monkeypatch.setattr(module, "_pandas_source_types", lambda *args: source)
+    monkeypatch.setattr(module, "validate_label_identity", lambda *args: None)
+    result = module._read_source(spark, spec)
+    assert result is source and enrichments == [binding]
+    assert rechecks == [binding["lookup_evidence"]["feature_tables"]]
+
+
 def test_small_split_fails_closed():
     """An ineligible fit population cannot become a ready freshness request."""
     with pytest.raises(ValueError, match="at least two"):

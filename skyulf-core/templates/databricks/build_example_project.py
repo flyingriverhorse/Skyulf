@@ -67,6 +67,23 @@ PROJECTS = {
             ),
         ),
     },
+    "taxi_fare_endpoint": {
+        "sources": (
+            "README.md",
+            "SERVING.md",
+            "config/pre_split.yml",
+            "config/preprocessing.yml",
+            "config/scoring.yml",
+            "src/features/scoring.py",
+        ),
+        "removed": (*SAMPLES, "src/features/pre_split.py", "src/features/preprocessing.py"),
+        "training_edits": (
+            (
+                "  quality_threshold: 6.0\n",
+                "  quality_threshold: 6.0\n  preprocessing_recipe: endpoint_safe\n",
+            ),
+        ),
+    },
     "taxi_fare_online": {
         "readme_note": (
             "\n## Legacy Python-only scoring policy\n\n"

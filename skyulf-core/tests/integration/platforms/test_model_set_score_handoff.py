@@ -88,7 +88,7 @@ def test_schema_offers_multi_model_handoff():
     values["setup_mode"] = "detailed"
     values["training_layout"] = "multi_target"
     # Detailed setup exposes this choice; quick setup accepts the disabled default.
-    rule = schema["properties"]["score_handoff"]["skip_prompt_if"]
+    rule = schema["properties"]["score_follow_champion"]["skip_prompt_if"]
     assert not Draft7Validator(rule).is_valid(values)
 
 

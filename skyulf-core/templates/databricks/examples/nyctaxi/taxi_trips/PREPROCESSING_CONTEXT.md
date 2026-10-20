@@ -10,7 +10,7 @@ Set this field in the existing `config/training.yml` defaults:
 
 ```yaml
 defaults:
-  preprocessing_probe: true
+  save_preprocessing_diagnostics: true
 ```
 
 It defaults to false. Each fitting run probes the saved/reloaded artifact on at

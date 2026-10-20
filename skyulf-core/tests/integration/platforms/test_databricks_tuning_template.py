@@ -33,7 +33,14 @@ def test_shap_prompts_are_opt_in_and_bounded():
     assert Draft7Validator(properties["shap_max_samples"]).is_valid("200")
     assert not Draft7Validator(properties["shap_max_samples"]).is_valid("201")
     assert Draft7Validator(properties["shap_max_features"]).is_valid("100")
-    assert not Draft7Validator(properties["shap_max_features"]).is_valid("101")
+    assert all(
+        Draft7Validator(properties["shap_max_features"]).is_valid(value)
+        for value in ("101", "115", "1000")
+    )
+    assert all(
+        not Draft7Validator(properties["shap_max_features"]).is_valid(value)
+        for value in ("0", "-1", "1.5", "true", "", " 115 ")
+    )
     assert Draft7Validator(properties["shap_max_display_samples"]).is_valid("0")
 
 

@@ -98,7 +98,7 @@ each row, including rows that cannot receive a prediction.
 - **Scoring:** reuses the distance rule, skips the fare rule because the target
   is not available in a request. Excluded rows keep their place and carry an
   empty prediction, `scoring_status` and `exclusion_reason`.
-- **Admission:** automatic for `inference_mode: spark`. Training checks the
+- **Admission:** automatic for `batch_compute: spark`. Training checks the
   saved rules, fitted steps and model before registration. The separate
   diagnostic probe is enabled too; it does not itself grant admission.
 - **Serving:** raw inputs, no feature lookup. The `src/serve.py` helper, called

@@ -77,7 +77,7 @@ def _native_columns(native: Any) -> tuple[dict[str, Any], list[str], dict[str, A
     excluded = []
     for column in native.column_infos:
         if column.include:
-            included[column.output_name] = SPARK_MLFLOW_TYPES.get(column.data_type)
+            included[column.output_name] = _feature_dtype(column.output_name, column.data_type)
         else:
             excluded.append(column.output_name)
         info = column.info
@@ -91,6 +91,17 @@ def _native_columns(native: Any) -> tuple[dict[str, Any], list[str], dict[str, A
                 tuple(info.timestamp_lookup_key),
             )
     return included, excluded, features
+
+
+def _feature_dtype(name: str, dtype: Any) -> str | None:
+    """Explain unsupported Decimal storage at the native SDK lookup boundary."""
+    if isinstance(dtype, str) and dtype.lower().startswith("decimal"):
+        raise ValueError(
+            f"Native Feature Engineering column {name!r} has DECIMAL storage. "
+            "Persist the model value as DOUBLE in its source/feature table and retrain; "
+            "the SDK's lookup does not replay Skyulf's bounded input conversion."
+        )
+    return SPARK_MLFLOW_TYPES.get(dtype)
 
 
 def _check_columns(
@@ -133,7 +144,7 @@ def _yaml_columns(value: Any) -> tuple[dict[str, Any], list[str], dict[str, Any]
         if type(data.get("include", True)) is not bool:
             raise ValueError("Feature spec include must be boolean.")
         if data.get("include", True):
-            included[name] = SPARK_MLFLOW_TYPES.get(data.get("data_type"))
+            included[name] = _feature_dtype(name, data.get("data_type"))
         else:
             excluded.append(name)
         source = data.get("source")

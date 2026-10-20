@@ -74,6 +74,12 @@ For basic or nested cross-validation, see
 
 ## Monitoring and serving
 
+Detailed setup asks `prediction_delivery`: `batch` creates the score job,
+`endpoint` creates only the serving job, and `both` creates both. Quick setup
+defaults to `batch`. All choices keep monitoring. Logged endpoints created by
+the serving job enroll automatically after verification; observations still
+require requests and a monitoring run. See [delivery choices and setup](databricks_serving.md#choose-how-predictions-are-produced).
+
 | Task | Detailed guide |
 | --- | --- |
 | Understand how monitoring runs and what to read first | [Monitoring overview](databricks_monitoring.md) |

@@ -383,7 +383,11 @@ def test_fresh_scheduled_project_creates_empty_store_without_models():
 
 
 @pytest.mark.parametrize(
-    "changes", [{"monitoring_deployment_mode": "development"}, {"monitoring_enabled": "false"}]
+    "changes",
+    [
+        {"monitoring_deployment_mode": "development", "monitoring_enabled": "false"},
+        {"monitoring_enabled": "false"},
+    ],
 )
 def test_inactive_schedule_does_not_bootstrap(changes):
     """A paused schedule or development target must never create shared infrastructure."""

@@ -28,7 +28,9 @@ pytestmark = pytest.mark.skipif(
     not CLI or not (PROFILE or OFFLINE_CLI), reason="Requires opt-in installed CLI."
 )
 
-EXAMPLES = sorted(path.name for path in (TEMPLATE_ROOT / "examples").glob("*.example.json"))
+EXAMPLES = sorted(path.name for path in (TEMPLATE_ROOT / "examples").glob("*.example.json")) + [
+    "nyctaxi/taxi_fare_endpoint.json"
+]
 
 
 def _digests(project: Path) -> dict[str, str]:
@@ -47,7 +49,7 @@ def test_rendered_project_matches_snapshot(tmp_path, answers, snapshot):
     """A template change that alters a common project must arrive with a refreshed snapshot."""
     overrides = {}
     if answers == "shared-monitoring":
-        overrides = {"monitoring_catalog": "ops"}
+        overrides = {"monitoring": "true"}
     elif answers != "defaults":
         overrides = json.loads((TEMPLATE_ROOT / "examples" / answers).read_text(encoding="utf-8"))
         overrides.pop("project_name", None)

@@ -59,6 +59,7 @@ def _evaluate(spark: Any, store: PhaseStore) -> dict:
         expected_champion_version=baseline,
         max_rows=config["max_rows"],
         max_bytes=input_budget_bytes(config.get("max_input_mb")),
+        allow_unloadable_champion=False,
         **endpoints,
     )
     persist_decision(

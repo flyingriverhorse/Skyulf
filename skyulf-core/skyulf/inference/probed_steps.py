@@ -383,7 +383,7 @@ def require_flag(config: Mapping[str, Any]) -> None:
         raise ValueError(
             "Custom steps and scoring rules run on Spark or endpoints only with training "
             "probe evidence. Spark and online-feature projects create it automatically; "
-            "other projects set admit_probed_custom_steps: true in config/training.yml."
+            "other projects set allow_tested_custom_steps: true in config/training.yml."
         )
 
 
@@ -397,7 +397,7 @@ def require_probed_step(
         raise ValueError(
             f"This step declares inference_context={context!r}, so it needs other rows and "
             "cannot run on independent Spark batches; keep the project on "
-            "inference_mode: local."
+            "batch_compute: single_node."
         )
     entry = evidence_entry(
         config.get(PROBE_KEY), project_sha, "steps", {"name": name, "node_type": node}

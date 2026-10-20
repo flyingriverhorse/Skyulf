@@ -1,0 +1,98 @@
+# Monitoring for each target.
+#
+# Where monitoring writes:
+# - test, syst and prod write to monitoring_catalog.monitoring_schema. Both are in
+#   deployment/variables.yml; monitoring_catalog defaults to each target's own
+#   catalog. To use another name in one target, set it under that target here, for
+#   example `prod: variables: monitoring_schema: mlops_monitoring`.
+# - Development targets write to monitoring_catalog.development_monitoring_schema
+#   (variables.yml) only when their block below sets monitoring_enabled: "true".
+#   That schema must differ from monitoring_schema; dev models never enter the
+#   shared store. Development never retrains or runs scheduled monitoring.
+# All monitoring tables and views (inventory, observations, references and the
+# views the dashboard reads) are created in that one schema on first use.
+#
+# Dashboards (optional): one dashboard per workspace shows every model in a
+# monitoring store. For each target choose one, then deploy that target:
+#   create  - only in the FIRST project that uses this target's monitoring store.
+#             Deploy creates the dashboard. Every other project connects to it.
+#   connect - paste the dashboard's published URL and its ID (the 32 characters
+#             after /dashboardsv3/ in that URL).
+#   nothing - leave the dashboard out.
+# warehouse_id is the SQL warehouse that runs the dashboard queries:
+# SQL Warehouses > your warehouse > Connection details (16 hexadecimal
+# characters); it is also in the warehouse page URL, .../sql/warehouses/<id>.
+# Each workspace has its own warehouses, so syst and prod need their own ID.
+# A development target can only create its own dashboard over the development
+# store; never connect it to a shared dashboard.
+#
+# How the refresh task reaches the monitoring job:
+# resources/monitoring.job.yml defines the `monitoring` job for every target:
+#   monitor_model -> monitoring_report -> evaluate_retraining
+# A target block below repeats the same job name, `monitoring`, so Bundle does not
+# create a second job. On `bundle deploy -t <target>` it merges all files and adds
+# each task_key it does not know yet to that job. dashboard_refresh_enabled and
+# refresh_monitoring_dashboard then run after evaluate_retraining, but only in the
+# targets configured here (and only while monitoring_enabled is "true"); every
+# other target keeps the three tasks. targets.yml uses the same merge to add
+# run_as and permissions to jobs defined in resources/.
+#
+# Copy a commented example below under `targets:` and replace the target name.
+targets: {}
+
+# Example: create (first project for this target's monitoring store)
+#  prod:
+#    variables:
+#      monitoring_dashboard_url: ${workspace.host}/dashboardsv3/${resources.dashboards.monitoring_dashboard.id}/published
+#    resources:
+#      dashboards:
+#        monitoring_dashboard:
+#          display_name: "${bundle.name} monitoring"
+#          file_path: ../src/monitoring/monitoring.lvdash.json
+#          warehouse_id: "REPLACE_WITH_WAREHOUSE_ID"
+#          dataset_catalog: ${var.monitoring_catalog}
+#          dataset_schema: ${var.monitoring_schema}
+#          embed_credentials: false
+#      jobs:
+#        monitoring:
+#          tasks:
+#            - task_key: dashboard_refresh_enabled
+#              description: Refresh only when monitoring is enabled
+#              depends_on:
+#                - task_key: evaluate_retraining
+#              condition_task:
+#                op: EQUAL_TO
+#                left: "${var.monitoring_enabled}"
+#                right: "true"
+#            - task_key: refresh_monitoring_dashboard
+#              depends_on:
+#                - task_key: dashboard_refresh_enabled
+#                  outcome: "true"
+#              timeout_seconds: ${var.monitoring_task_timeout_seconds}
+#              dashboard_task:
+#                dashboard_id: ${resources.dashboards.monitoring_dashboard.id}
+#
+# Example: connect (every other project)
+#  prod:
+#    variables:
+#      monitoring_dashboard_url: "https://REPLACE_WORKSPACE/dashboardsv3/REPLACE_DASHBOARD_ID/published"
+#    resources:
+#      jobs:
+#        monitoring:
+#          tasks:
+#            - task_key: dashboard_refresh_enabled
+#              description: Refresh only when monitoring is enabled
+#              depends_on:
+#                - task_key: evaluate_retraining
+#              condition_task:
+#                op: EQUAL_TO
+#                left: "${var.monitoring_enabled}"
+#                right: "true"
+#            - task_key: refresh_monitoring_dashboard
+#              depends_on:
+#                - task_key: dashboard_refresh_enabled
+#                  outcome: "true"
+#              timeout_seconds: ${var.monitoring_task_timeout_seconds}
+#              dashboard_task:
+#                dashboard_id: "REPLACE_DASHBOARD_ID"
+#                # Optional: warehouse_id: "REPLACE_WITH_WAREHOUSE_ID" (default: the dashboard's own)
