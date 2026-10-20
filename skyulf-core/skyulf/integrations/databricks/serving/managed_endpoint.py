@@ -20,6 +20,7 @@ from .sql_functions import ServingSQLFunctionPlan, build_serving_sql_function
 _OWNER_KEYS = {"project", "target", "suffix", "managed_by"}
 _COMMENT_PREFIX = "Managed serving function "
 _PRINCIPAL_KEYS = {"user_name", "group_name", "service_principal_name"}
+_FAILED_UPDATES = {"UPDATE_FAILED", "UPDATE_CANCELED"}
 _ZERO_CAPACITY_FIELDS = {
     "min_provisioned_throughput",
     "max_provisioned_throughput",
@@ -102,9 +103,21 @@ def _require_route(config: dict[str, Any], entity_name: str) -> None:
 
 def _require_owned_config(endpoint: dict[str, Any], plan: PinnedEndpointPlan) -> dict[str, Any]:
     """Reject pending work, foreign models and runtime settings before replacing config."""
-    state = endpoint.get("state") or {}
-    if endpoint.get("pending_config") or state.get("config_update") != "NOT_UPDATING":
+    update = (endpoint.get("state") or {}).get("config_update")
+    pending = endpoint.get("pending_config")
+    if update not in _FAILED_UPDATES | {"NOT_UPDATING"}:
         raise RuntimeError("Serving endpoint has a pending or unsettled config update.")
+    if pending and update not in _FAILED_UPDATES:
+        raise RuntimeError("Serving endpoint has a pending or unsettled config update.")
+    if pending:
+        _require_owned_model_config({**endpoint, "config": pending}, plan)
+    return _require_owned_model_config(endpoint, plan)
+
+
+def _require_owned_model_config(
+    endpoint: dict[str, Any], plan: PinnedEndpointPlan
+) -> dict[str, Any]:
+    """Admit only this model's single route and supported runtime/logging settings."""
     config = endpoint.get("config") or {}
     entities = config.get("served_entities") or []
     if endpoint.get("name") != plan.spec.endpoint_name or len(entities) != 1:
@@ -226,7 +239,8 @@ def ensure_owned_endpoint(
         desired = wanted.config["config"]["served_entities"][0]
         tags_updated = _reconcile_tags(client, endpoint, extra_tags)
         action = "updated" if tags_updated else "unchanged"
-        if any(entity.get(key) != value for key, value in desired.items()):
+        failed = (endpoint.get("state") or {}).get("config_update") in _FAILED_UPDATES
+        if failed or any(entity.get(key) != value for key, value in desired.items()):
             client.serving_endpoints.update_config(
                 plan.spec.endpoint_name,
                 served_entities=[serving.ServedEntityInput.from_dict(desired)],

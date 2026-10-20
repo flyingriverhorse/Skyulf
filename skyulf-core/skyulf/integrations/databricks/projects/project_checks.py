@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 from typing import Any
 
+from ..jobs.serving_endpoint_job import read_serving_endpoint_settings
 from ..jobs.serving_job import validate_serving_section
 from ..lifecycle.workflow import resolve_target_config
 from ..training.tuning.cv import CVSpec
@@ -59,7 +60,7 @@ def _check_config(root: Path, bindings: dict[str, str]) -> dict:
         raise ValueError(f"config/{path.name}: {exc}") from exc
 
 
-def _check_serving(root: Path) -> None:
+def _check_serving(root: Path, bindings: dict[str, str]) -> None:
     """Validate optional serving jobs' settings offline, as each job does before remote work."""
     path = root / "config" / "serving.yml"
     if not path.exists():
@@ -69,6 +70,17 @@ def _check_serving(root: Path) -> None:
         document = read_yaml_mapping(path)
         if "online_serving" in document:
             raise ValueError("online_serving was renamed to online_feature_lookup.")
+        if "serving_endpoint" in document:
+            read_serving_endpoint_settings(
+                {
+                    **bindings,
+                    "serving_config_path": str(path),
+                    "bundle_project": "static_preview",
+                    "bundle_target": bindings.get("bundle_target", "static_preview"),
+                    "cost_tag_key": "CostCenter",
+                    "cost_tag_value": "static_preview",
+                }
+            )
     except (OSError, ValueError) as exc:
         raise ValueError(f"{label}: {exc}") from exc
     for section in _SERVING_SECTIONS:
@@ -115,7 +127,7 @@ def check_project(project_path: str | Path, bindings: dict[str, str]) -> dict[st
     """
     root = Path(project_path).resolve(strict=True)
     config = _check_config(root, bindings)
-    _check_serving(root)
+    _check_serving(root, bindings)
     sources = sorted((root / "src").rglob("*.py"))
     if not sources:
         raise ValueError("Project src must contain Python source files.")

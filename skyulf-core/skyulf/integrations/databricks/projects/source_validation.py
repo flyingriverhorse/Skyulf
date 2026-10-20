@@ -160,6 +160,48 @@ def _conversion_preview(
     return []
 
 
+def _source_key_sets(config: dict, name: str, monitoring: str | None) -> list[list[str]]:
+    """Keep request identity separate from business identity across overlapping table roles."""
+    business = list(config["record_key_columns"])
+    delivery = config.get("prediction_delivery", "batch")
+    if name != monitoring or delivery == "batch":
+        return [business]
+    request = ["databricks_request_id", "request_row_index"]
+    business_tables = {
+        config["training_table"],
+        config["score_source_table"],
+        config.get("training_label_table"),
+    }
+    return [business, request] if delivery == "both" or name in business_tables else [request]
+
+
+def _source_tables(config: dict, query: Query, names: list[str], monitoring: str | None) -> dict:
+    """Validate each table's actual identity contracts before inspecting feature columns."""
+    tables = {}
+    for name in names:
+        schema, cdf = _table_schema(query, name)
+        for keys in _source_key_sets(config, name, monitoring):
+            if keys == ["databricks_request_id", "request_row_index"]:
+                _require_request_key_types(schema, name)
+            _keys(query, name, schema, keys)
+        tables[name] = {"columns": schema, "change_data_feed": cdf}
+    return tables
+
+
+def _require_request_key_types(schema: dict[str, str], name: str) -> None:
+    """Require serving outcomes to preserve their request ID and integral request-row index."""
+    if schema.get("databricks_request_id") != "string" or schema.get("request_row_index") not in {
+        "tinyint",
+        "smallint",
+        "int",
+        "bigint",
+    }:
+        raise ValueError(
+            f"Serving outcomes {name} require databricks_request_id STRING and "
+            "request_row_index integral columns."
+        )
+
+
 def validate_project_sources(
     config: dict[str, Any],
     query: Query,
@@ -180,12 +222,11 @@ def validate_project_sources(
         table_name(name)
     keys = list(config["record_key_columns"])
     inputs, warnings, lookup_controls = _raw_inputs(config)
-    tables: dict[str, Any] = {}
-    for name in names:
-        schema, cdf = _table_schema(query, name)
-        _keys(query, name, schema, keys)
-        tables[name] = {"columns": schema, "change_data_feed": cdf}
-    if not tables[scoring]["change_data_feed"]:
+    tables = _source_tables(config, query, names, label_table)
+    if (
+        config.get("prediction_delivery", "batch") != "endpoint"
+        and not tables[scoring]["change_data_feed"]
+    ):
         raise ValueError(f"Enable Delta change data feed before incremental scoring: {scoring}.")
     train_schema, score_schema = tables[training]["columns"], tables[scoring]["columns"]
     _require_columns(train_schema, keys + inputs, training)
@@ -232,8 +273,14 @@ def _check_outcome_columns(
         if not timestamp:
             raise ValueError("An outcomes table requires an availability timestamp column.")
         schema = tables[name]["columns"]
-        _require_columns(schema, [*keys, target, timestamp], name)
-        _compatible(train_schema, schema, keys)
+        label_keys = (
+            keys
+            if is_training
+            else [key for group in _source_key_sets(config, name, monitoring) for key in group]
+        )
+        _require_columns(schema, [*label_keys, target, timestamp], name)
+        if is_training or config.get("prediction_delivery", "batch") != "endpoint":
+            _compatible(train_schema, schema, keys)
         if is_training:
             warnings += _training_availability(
                 schema[timestamp], f"{name}.{timestamp}", config.get("result_time_parsing")

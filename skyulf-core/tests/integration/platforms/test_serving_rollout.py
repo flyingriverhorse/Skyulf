@@ -295,6 +295,126 @@ def advance(s, verdict="PASS"):
     )
 
 
+def test_094_plan_without_record_keys_reconciles_and_advances(setup):
+    """A verified pre-record-key receipt must remain usable after a wheel upgrade."""
+    s = setup
+    legacy = s.store.load()
+    for role in ("champion", "challenger"):
+        legacy["plan"][role].pop("record_key_columns")
+    legacy["plan_sha256"] = s.api.finite_json_digest(legacy["plan"])
+    s.store.write(legacy, expected_receipt_id=legacy["receipt_id"])
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.state == s.result.state
+    s.clock[0] += timedelta(days=1)
+    assert advance(s).state.challenger_percentage == 10
+
+
+def test_legacy_plan_digest_is_checked_before_defaults_are_added(setup):
+    """Compatibility defaults cannot hide an altered persisted model selector."""
+    s = setup
+    legacy = s.store.load()
+    for role in ("champion", "challenger"):
+        legacy["plan"][role].pop("record_key_columns")
+    s.store.write(legacy, expected_receipt_id=legacy["receipt_id"])
+    with pytest.raises(ValueError, match="plan digest"):
+        s.api.reconcile_rollout(s.client, store=s.store, admission=s.admission)
+    assert s.client.puts == []
+
+
+def test_prepared_before_submission_resumes_once(setup, monkeypatch):
+    """Process loss before entering transport must not leave an unsubmitted intent stuck."""
+    s = setup
+    original = s.api._apply
+    s.clock[0] += timedelta(days=1)
+
+    def crash_before_submission(*args):
+        """Leave only the durable prepared receipt behind."""
+        raise SystemExit("process lost before submission")
+
+    monkeypatch.setattr(s.api, "_apply", crash_before_submission)
+    with pytest.raises(SystemExit):
+        advance(s)
+    assert s.client.puts == []
+    monkeypatch.setattr(s.api, "_apply", original)
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.status == "COMMITTED"
+    assert result.state.challenger_percentage == 10
+    assert len(s.client.puts) == 1
+
+
+def test_submission_marker_before_transport_stays_uncertain(setup, monkeypatch):
+    """A lost process after dispatch admission must never authorize a second PUT."""
+    s = setup
+    original = s.client.api_client.do
+    s.clock[0] += timedelta(days=1)
+
+    def crash_at_transport(**kwargs):
+        """Simulate the unavoidable gap between durable dispatch and actual transport."""
+        if kwargs["method"] == "PUT":
+            raise SystemExit("process lost at transport")
+        return original(**kwargs)
+
+    monkeypatch.setattr(s.client.api_client, "do", crash_at_transport)
+    with pytest.raises(SystemExit):
+        advance(s)
+    monkeypatch.setattr(s.client.api_client, "do", original)
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.status == "PREPARED"
+    assert s.store.load()["request"]["submission_state"] == "OUTCOME_UNKNOWN"
+    assert s.client.puts == []
+
+
+def test_legacy_prepared_receipt_never_reissues_an_uncertain_request(setup):
+    """Old receipts cannot establish that the original process never reached transport."""
+    s = setup
+    s.clock[0] += timedelta(days=1)
+    s.client.mode = "old"
+    with pytest.raises(s.api.RolloutOutcomeUnknownError):
+        advance(s)
+    legacy = s.store.load()
+    legacy["request"].pop("submission_state")
+    s.store.write(legacy, expected_receipt_id=legacy["receipt_id"])
+    s.client.mode = "ready"
+    for _ in range(3):
+        s.clock[0] += timedelta(days=1)
+        result = s.api.reconcile_rollout(
+            s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+        )
+        assert result.status == "PREPARED"
+    assert len(s.client.puts) == 1
+
+
+def test_submission_marker_failure_before_put_keeps_request_unsent(setup, monkeypatch):
+    """A failed durable dispatch marker must stop transport and remain safely resumable."""
+    s = setup
+    original = s.store.write
+    s.clock[0] += timedelta(days=1)
+
+    def fail_submission(value, **kwargs):
+        """Reject only the second durable checkpoint, before publishing its pointer."""
+        if value.get("request", {}).get("submission_state") == "OUTCOME_UNKNOWN":
+            raise OSError("submission marker unavailable")
+        return original(value, **kwargs)
+
+    monkeypatch.setattr(s.store, "write", fail_submission)
+    with pytest.raises(OSError, match="submission marker"):
+        advance(s)
+    assert s.client.puts == []
+    assert s.store.load()["request"]["submission_state"] == "NOT_SUBMITTED"
+    monkeypatch.setattr(s.store, "write", original)
+    result = s.api.reconcile_rollout(
+        s.client, store=s.store, admission=s.admission, clock=lambda: s.clock[0]
+    )
+    assert result.status == "COMMITTED"
+    assert len(s.client.puts) == 1
+
+
 def pending_native_response(s, *, extra=None):
     """Keep the old active config while native deployment exposes the requested pending one."""
     previous = deepcopy(s.client.value["config"])

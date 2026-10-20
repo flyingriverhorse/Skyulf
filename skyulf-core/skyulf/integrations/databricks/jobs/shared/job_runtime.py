@@ -356,7 +356,7 @@ def _prepared_notebook_request(
         )
     config = validate_workflow_config(config, action=action)
     validate_monitoring_settings(values, config)
-    active_serving_settings(values)  # fail before training or alias changes
+    active_serving_settings(values, model_name=config.get("model_name"))
     if action == "train" and "competition" in config:
         from ..training.training_node_notebook import validate_model_task_names  # noqa: PLC0415
 

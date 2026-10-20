@@ -11,6 +11,12 @@ import yaml
 pytest.importorskip("mlflow")
 
 from skyulf.integrations.databricks.jobs.serving_endpoint_job import (  # noqa: E402
+    _sql_input_frame as real_sql_input_frame,
+)
+from skyulf.integrations.databricks.jobs.serving_endpoint_job import (
+    _sql_predictions as real_sql_predictions,
+)
+from skyulf.integrations.databricks.jobs.serving_endpoint_job import (
     sample_serving_rows as real_sample_serving_rows,
 )
 
@@ -273,6 +279,7 @@ def test_handoff_follows_yaml_in_every_target_and_keeps_score_independent(
         "model_name": "main.ml.sample_model_alice",
         "new_version": "2",
         "prior_version": None,
+        "event_id": "a" * 32,
     }
     saved = {}
     dbutils = SimpleNamespace(
@@ -281,7 +288,11 @@ def test_handoff_follows_yaml_in_every_target_and_keeps_score_independent(
         )
     )
     handoff.publish_serving_handoff(dbutils, receipt, values)
-    assert saved == {"serving_requested": enabled, "serving_model_version": "2" if enabled else ""}
+    assert saved == {
+        "serving_requested": enabled,
+        "serving_model_version": "2" if enabled else "",
+        "serving_event_id": "a" * 32 if enabled else "",
+    }
 
 
 @pytest.mark.parametrize(
@@ -314,7 +325,11 @@ def test_inactive_handoff_ignores_unused_endpoint_bindings(
         )
     )
     handoff.publish_serving_handoff(dbutils, receipt, values)
-    assert saved == {"serving_requested": False, "serving_model_version": ""}
+    assert saved == {
+        "serving_requested": False,
+        "serving_model_version": "",
+        "serving_event_id": "",
+    }
 
 
 def test_active_handoff_still_requires_valid_endpoint_bindings(endpoint_project, handoff):
@@ -490,6 +505,40 @@ def test_dispatch_validates_identity_before_submitting(handoff, key, value):
     client.jobs.run_now.assert_not_called()
 
 
+def test_dispatch_reuses_promotion_event_across_daily_parent_runs(handoff):
+    """Replaying a completed promotion must not undo a later manual endpoint pin."""
+    client = Mock()
+    client.jobs.run_now.return_value.response.run_id = 99
+    values = {
+        "serving_job_id": "123",
+        "job_run_id": "456",
+        "model_version": "7",
+        "serving_event_id": "a" * 32,
+    }
+    handoff.submit_serving_run(client, values)
+    first = client.jobs.run_now.call_args.kwargs["idempotency_token"]
+    handoff.submit_serving_run(client, {**values, "job_run_id": "789"})
+    repeated = client.jobs.run_now.call_args.kwargs["idempotency_token"]
+    handoff.submit_serving_run(client, {**values, "serving_event_id": "b" * 32})
+    later = client.jobs.run_now.call_args.kwargs["idempotency_token"]
+    assert first == repeated and later != first
+
+
+@pytest.mark.parametrize("event", ["{{tasks.rollout.values.event}}", "\n", 1, "a" * 257])
+def test_dispatch_rejects_unresolved_event_identity(handoff, event):
+    """Malformed task bindings cannot silently fall back to a fresh deployment."""
+    client = Mock()
+    values = {
+        "serving_job_id": "123",
+        "job_run_id": "456",
+        "model_version": "7",
+        "serving_event_id": event,
+    }
+    with pytest.raises(ValueError, match="serving_event_id"):
+        handoff.submit_serving_run(client, values)
+    client.jobs.run_now.assert_not_called()
+
+
 @pytest.fixture
 def prepared_job(endpoint_project, monkeypatch):
     """Fake only cloud boundaries while retaining actual job preflight and parity logic."""
@@ -519,6 +568,7 @@ def prepared_job(endpoint_project, monkeypatch):
     monkeypatch.setattr(api, "prepare_pinned_endpoint", prepare)
     raw = [{"value": 2.0}, {"value": 3.0}]
     monkeypatch.setattr(api, "sample_serving_rows", Mock(return_value=raw))
+    monkeypatch.setattr(api, "_sql_input_frame", Mock(return_value=(Mock(), "ordinal")))
     predictor = SimpleNamespace(
         predict=lambda frame: pd.DataFrame({"prediction": frame["value"] * 2})
     )
@@ -623,6 +673,134 @@ def test_job_refuses_decimal_identity_without_rounding_or_endpoint_writes(
         )
     ensure.assert_not_called()
     assert events == []
+
+
+def test_sql_smoke_normalizes_integers_to_fitted_float_schema(prepared_job, monkeypatch):
+    """Raw Spark integers must follow the same fitted float contract as REST inputs."""
+    types = pytest.importorskip("pyspark.sql.types")
+    api, settings, registry, _, _, _ = prepared_job
+    api.sample_serving_rows.return_value = [{"value": 2}, {"value": 3}]
+    monkeypatch.setattr(api, "_sql_predictions", real_sql_predictions)
+    monkeypatch.setattr(api, "_sql_input_frame", real_sql_input_frame)
+    received = []
+
+    def create_frame(rows, schema):
+        """Keep Spark's real scalar checks at the external frame boundary."""
+        verifier = types._make_type_verifier(
+            types.StructType(
+                [
+                    types.StructField("ordinal", types.LongType()),
+                    types.StructField("value", types.DoubleType()),
+                ]
+            )
+        )
+        for row in rows:
+            verifier(row)
+        received.extend(rows)
+        frame = Mock()
+        frame.selectExpr.return_value.orderBy.return_value.collect.return_value = [
+            {
+                "response": SimpleNamespace(
+                    asDict=lambda recursive, value=row[1]: {"prediction": value * 2}
+                )
+            }
+            for row in rows
+        ]
+        return frame
+
+    result = api.run_serving_endpoint(
+        SimpleNamespace(createDataFrame=create_frame),
+        settings,
+        source_table="main.source.inputs",
+        client=Mock(),
+        registry_client=registry,
+    )
+    assert result["verification"]["sql_compared"] == 2
+    assert received == [(0, 2.0), (1, 3.0)]
+    assert all(type(row[1]) is float for row in received)
+
+
+@pytest.mark.parametrize(
+    "dtype,values,encoded",
+    [
+        (
+            "Int64",
+            [9007199254740993, None, 9223372036854775807],
+            ["9007199254740993", None, "9223372036854775807"],
+        ),
+        ("boolean", [True, None, False], ["true", None, "false"]),
+    ],
+)
+def test_sql_smoke_preserves_nullable_native_values(prepared_job, dtype, values, encoded):
+    """SQL must retain exact integers and nullable booleans while REST uses its wire codec."""
+    from dataclasses import replace
+
+    types = pytest.importorskip("pyspark.sql.types")
+    api, _, _, prepare, _, _ = prepared_job
+    plan = replace(prepare.return_value, input_schema=(("value", dtype),))
+    function = api.build_serving_sql_function(plan, "main.ml.nullable_score")
+    raw = [{"value": value} for value in values]
+    _, records = api._smoke_inputs(raw, plan)
+    native_type = types.LongType() if dtype == "Int64" else types.BooleanType()
+    observed = []
+
+    def create_frame(rows, schema):
+        """Use the real native scalar validator without starting a Spark session."""
+        verifier = types._make_type_verifier(
+            types.StructType(
+                [
+                    types.StructField("ordinal", types.LongType()),
+                    types.StructField("value", native_type),
+                ]
+            )
+        )
+        for row in rows:
+            verifier(row)
+        observed.extend(rows)
+        return rows
+
+    real_sql_input_frame(SimpleNamespace(createDataFrame=create_frame), function, raw)
+    assert observed == list(enumerate(values))
+    assert records == [{"value": value} for value in encoded]
+
+
+def test_sql_sample_failure_precedes_endpoint_mutation(prepared_job, monkeypatch):
+    """A sample that Spark cannot represent must not leave a newly updated endpoint."""
+    api, settings, registry, _, ensure, events = prepared_job
+    monkeypatch.setattr(api, "_sql_predictions", real_sql_predictions)
+    monkeypatch.setattr(api, "_sql_input_frame", real_sql_input_frame)
+    spark = SimpleNamespace(createDataFrame=Mock(side_effect=ValueError("sample rejected")))
+    with pytest.raises(ValueError, match="sample rejected"):
+        api.run_serving_endpoint(
+            spark,
+            settings,
+            source_table="main.source.inputs",
+            client=Mock(),
+            registry_client=registry,
+        )
+    assert events == []
+    ensure.assert_not_called()
+
+
+@pytest.mark.parametrize("missing", [None, float("nan")])
+def test_smoke_rejects_null_for_nonnullable_boolean(prepared_job, missing):
+    """Native bool must not silently replace absent smoke inputs with False or True."""
+    from dataclasses import replace
+
+    api, _, _, prepare, _, _ = prepared_job
+    plan = replace(prepare.return_value, input_schema=(("value", "bool"),))
+    with pytest.raises(ValueError, match="nonnullable boolean"):
+        api._smoke_inputs([{"value": missing}, {"value": True}], plan)
+
+
+def test_smoke_preserves_nullable_boolean_inputs(prepared_job):
+    """A declared nullable boolean still carries its original null through the wire codec."""
+    from dataclasses import replace
+
+    api, _, _, prepare, _, _ = prepared_job
+    plan = replace(prepare.return_value, input_schema=(("value", "boolean"),))
+    _, records = api._smoke_inputs([{"value": None}, {"value": True}], plan)
+    assert records == [{"value": None}, {"value": "true"}]
 
 
 def test_generated_python_request_example_runs_without_hidden_variables(prepared_job, monkeypatch):

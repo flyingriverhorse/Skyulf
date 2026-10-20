@@ -26,7 +26,9 @@ def _automatic_serving_enabled(values: dict[str, str]) -> bool:
     return True
 
 
-def active_serving_settings(values: dict[str, str]) -> dict[str, Any] | None:
+def active_serving_settings(
+    values: dict[str, str], *, model_name: str | None = None
+) -> dict[str, Any] | None:
     """Return validated endpoint settings only when this run hands off to serving.
 
     Initialization calls this too, so a bad config/serving.yml stops the run
@@ -36,7 +38,15 @@ def active_serving_settings(values: dict[str, str]) -> dict[str, Any] | None:
         return None
     from .serving_endpoint_job import read_serving_endpoint_settings  # noqa: PLC0415
 
-    return read_serving_endpoint_settings(values)
+    settings = read_serving_endpoint_settings(values)
+    require_serving_model(settings, model_name)
+    return settings
+
+
+def require_serving_model(settings: dict[str, Any] | None, model_name: str | None) -> None:
+    """Reject a mismatched endpoint identity before any lifecycle mutation."""
+    if settings is not None and model_name is not None and settings["model_name"] != model_name:
+        raise ValueError("serving_endpoint.model_name must match the lifecycle model_name.")
 
 
 def serving_transition(receipt: dict[str, Any] | None, *, model_name: str) -> str:
@@ -69,15 +79,21 @@ def publish_serving_handoff(
     )
     dbutils.jobs.taskValues.set(key="serving_requested", value=bool(version))
     dbutils.jobs.taskValues.set(key="serving_model_version", value=version)
+    event_id = receipt.get("event_id", "") if version and receipt is not None else ""
+    dbutils.jobs.taskValues.set(key="serving_event_id", value=event_id)
 
 
 def submit_serving_run(client: Any, values: dict[str, str]) -> dict[str, Any]:
-    """Submit a concrete version once per parent run without waiting for endpoint readiness."""
+    """Submit once per promotion event, with a parent-run fallback for older projects."""
     for key in ("serving_job_id", "job_run_id", "model_version"):
         value = values.get(key)
         if not isinstance(value, str) or not re.fullmatch(r"[1-9][0-9]*", value):
             raise ValueError(f"{key} must be a resolved positive integer.")
-    identity = ":".join(values[key] for key in ("serving_job_id", "job_run_id", "model_version"))
+    event_id = values.get("serving_event_id", "")
+    if not isinstance(event_id, str) or (event_id and not re.fullmatch(r"[\w-]{1,256}", event_id)):
+        raise ValueError("serving_event_id must be a resolved event identity or empty.")
+    origin = f"event:{event_id}" if event_id else values["job_run_id"]
+    identity = ":".join((values["serving_job_id"], origin, values["model_version"]))
     submitted = client.jobs.run_now(
         job_id=int(values["serving_job_id"]),
         job_parameters={"model_version": values["model_version"]},

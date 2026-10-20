@@ -144,6 +144,7 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
             model_set_output_schema(self._artifact),
             spark_output,
             nullable=nullable_outputs(self._artifact),
+            record_key_columns=self._artifact.manifest.record_key_columns,
         )
 
 

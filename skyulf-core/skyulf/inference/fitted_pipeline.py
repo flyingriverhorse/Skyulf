@@ -107,6 +107,35 @@ class FittedPipelineManifest(BaseModel):
         return document
 
 
+def _expand_source_conversion(item: Any) -> dict[str, str]:
+    """Restore each exact column and Decimal dtype without accepting extra tuple fields."""
+    if type(item) is not list or len(item) != 2 or any(type(value) is not str for value in item):
+        raise ValueError("Invalid compact source column conversion item.")
+    return {"column": item[0], "source_dtype": item[1], "target_dtype": "float64"}
+
+
+def _expanded_manifest_json(metadata: bytes, document: dict[str, Any]) -> bytes:
+    """Expand versioned wire evidence before strict JSON validation of the public schema."""
+    if "source_column_conversions_compact" not in document:
+        return metadata
+    document = dict(document)
+    compact = document.pop("source_column_conversions_compact")
+    if (
+        "source_column_conversions" in document
+        or type(compact) is not dict
+        or set(compact) != {"version", "items"}
+    ):
+        raise ValueError("Invalid compact source column conversions.")
+    if type(compact["version"]) is not int or compact["version"] != 1:
+        raise ValueError("Unsupported compact source column conversions version.")
+    if type(compact["items"]) is not list:
+        raise ValueError("Compact source column conversions require ordered items.")
+    document["source_column_conversions"] = [
+        _expand_source_conversion(item) for item in compact["items"]
+    ]
+    return json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
 @dataclass(frozen=True)
 class FittedPipelineArtifact:
     """A validated manifest and fitted pandas/Polars pipeline loaded from one directory."""
@@ -235,7 +264,7 @@ def save_pipeline(
     if len(payload) > _MAX_PIPELINE_BYTES:
         raise ValueError("Local pipeline payload exceeds the size limit.")
     manifest = _manifest(pipeline, payload, use_tuned_thresholds)
-    metadata = manifest.model_dump_json().encode("utf-8")
+    metadata = _manifest_bytes(manifest)
     if len(metadata) > _MAX_MANIFEST_BYTES:
         raise ValueError("Local pipeline manifest exceeds the size limit.")
     destination = Path(path)
@@ -246,6 +275,20 @@ def save_pipeline(
         (destination / "preprocessing.py").write_text(
             pipeline.config["project_python_source"], encoding="utf-8", newline="\n"
         )
+
+
+def _manifest_bytes(manifest: FittedPipelineManifest) -> bytes:
+    """Compact repeated conversion fields only when needed to retain the manifest bound."""
+    metadata = manifest.model_dump_json().encode("utf-8")
+    if len(metadata) <= _MAX_MANIFEST_BYTES or not manifest.source_column_conversions:
+        return metadata
+    document = manifest.model_dump(mode="json")
+    conversions = document.pop("source_column_conversions")
+    document["source_column_conversions_compact"] = {
+        "version": 1,
+        "items": [[item["column"], item["source_dtype"]] for item in conversions],
+    }
+    return json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 def read_bounded_artifact(path: Path, limit: int) -> bytes:
@@ -272,7 +315,9 @@ def load_pipeline(path: str | Path) -> FittedPipelineArtifact:
     )
     if type(document) is not dict or type(document.get("format_version")) is not int:
         raise ValueError("Invalid local artifact format_version.")
-    manifest = FittedPipelineManifest.model_validate_json(metadata)
+    manifest = FittedPipelineManifest.model_validate_json(
+        _expanded_manifest_json(metadata, document)
+    )
     _validate_manifest_schema(manifest)
     _check_runtime(manifest)
     payload = read_bounded_artifact(source / "pipeline.pkl", _MAX_PIPELINE_BYTES)

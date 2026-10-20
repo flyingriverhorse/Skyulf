@@ -113,7 +113,12 @@ def spark_transport_dtype(dtype: str, nullable: bool) -> str:
 
 
 def prepare_spark_output(
-    frame: pd.DataFrame, schema: tuple, enabled: bool, *, nullable: bool = False
+    frame: pd.DataFrame,
+    schema: tuple,
+    enabled: bool,
+    *,
+    nullable: bool = False,
+    record_key_columns: tuple[str, ...] = (),
 ) -> pd.DataFrame:
     """Preserve absent outcomes across MLflow's Spark struct conversion.
 
@@ -123,11 +128,15 @@ def prepare_spark_output(
     into SQL nulls. Rule float outputs and predictions are always finite, so NaN
     only ever means null. A real string equal to ``SPARK_NULL_TEXT`` is rejected,
     because the driver would read it as null.
+    Model-set record keys are nonnull identities and retain their native dtype;
+    excluded predictions do not make those keys nullable.
     """
     if not enabled:
         return frame
     result = frame.copy()
     for column in schema:
+        if column.name in record_key_columns:
+            continue
         values = result[column.name]
         missing = values.isna()
         if column.dtype == "string":

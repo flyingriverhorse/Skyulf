@@ -289,6 +289,7 @@ def _assert_approved_handoffs(case, output, monkeypatch):
         "score_requested": True,
         "serving_requested": True,
         "serving_model_version": "2",
+        "serving_event_id": output["receipt"]["event_id"],
     }
 
 

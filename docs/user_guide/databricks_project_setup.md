@@ -297,6 +297,17 @@ apply to the chosen layout and earlier answers:
 Most answer-file values are strings, including `"true"`, `"42"` and `"null"`;
 `min_improvement` is a JSON number. The generated `config/training.yml` uses
 native YAML booleans and numbers, and omits keys whose value is null.
+Nonempty values under known removed answer names, including `inference_mode`, `score_handoff`,
+`model_change_mode`, `auto_rebuild_on_cdf_expiry`, `preprocessing_probe`,
+`admit_probed_custom_steps` and `monitoring_catalog`, now fail initialization
+instead of silently selecting defaults. Use the current names in the examples
+and generated schema.
+For monitoring, initialize with `monitoring: "true"`; `monitoring_catalog`
+remains an editable deployment variable.
+The Databricks CLI can still discard other unknown answer keys before the template
+sees them, so check the generated configuration when editing an answer file.
+This is an upstream CLI behavior, not a general unknown-key validation guarantee.
+
 For fixed dates, start from
 `random-window-init.example.json` or `temporal-delayed-results-init.example.json`.
 For stratified CV and sampling, use `guided-classification-init.example.json`.

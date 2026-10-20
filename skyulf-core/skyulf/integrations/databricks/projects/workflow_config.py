@@ -480,7 +480,7 @@ def _preview_training_source(checked: dict[str, Any], training_status: str) -> l
         f"timezone={checked.get('window_timezone')}",
         "Job clocks and pause settings live in Bundle variables, independently of data selection. "
         "The same train action runs manually or at any cron frequency; "
-        "training_version=null pins the latest snapshot once per invocation.",
+        "training_table_version=null pins the latest snapshot once per invocation.",
         "PAUSED stops clock triggers; an unchanged score can finish as a no-op. "
         "Overlapping runs queue behind the same job's single active run; "
         "scheduled scoring and lifecycle handoff share that score job.",

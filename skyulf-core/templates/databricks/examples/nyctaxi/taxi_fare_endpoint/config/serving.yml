@@ -1,11 +1,11 @@
 # Stable endpoint setup is ready to run when selected at initialization.
 # Enable rollout and online-feature jobs only after completing their settings.
 # The rollout must already be initialized; the daily job never creates endpoints.
-
 serving_endpoint:
   enabled: true
   follow_champion: true  # false = manual runs only
   # Target substitutions are resolved by the job; development gets a per-user suffix.
+  # Generated names over 63 characters keep a stable hash of the complete bound name.
   endpoint_name: "taxi-fare-endpoint-{bundle_target}-endpoint{resource_suffix}"
   model_name: "{catalog}.{metadata_schema}.taxi_fare_endpoint_model{resource_suffix}"
   tracking_uri: databricks

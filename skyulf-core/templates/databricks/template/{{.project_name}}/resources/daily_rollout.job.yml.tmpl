@@ -70,6 +70,7 @@ resources:
               serving_job_id: ${resources.jobs.serving_endpoint.id}
               job_run_id: '{{"{{job.run_id}}"}}'
               model_version: '{{"{{tasks.daily_rollout.values.serving_model_version}}"}}'
+              serving_event_id: '{{"{{tasks.daily_rollout.values.serving_event_id}}"}}'
 {{end}}
       environments:
         - environment_key: serving

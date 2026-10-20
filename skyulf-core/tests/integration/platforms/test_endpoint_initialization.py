@@ -132,3 +132,21 @@ def test_inactive_serving_does_not_block_training(endpoint_initialization, gate)
     with pytest.raises(InitializationReached):
         _initialize(endpoint_initialization)
     execute.assert_called_once()
+
+
+@pytest.mark.parametrize("action", ["train", "approve"])
+def test_serving_model_mismatch_precedes_lifecycle_mutation(endpoint_initialization, action):
+    """A wrong serving model cannot be discovered only after changing the trained alias."""
+    _, values, _, execute = endpoint_initialization
+    values["lifecycle_action"] = action
+    if action == "approve":
+        values.update(
+            candidate_version="2", expected_champion_version="1", comparison_sha256="a" * 64
+        )
+    path = Path(values["serving_config_path"])
+    document = yaml.safe_load(path.read_text())
+    document["serving_endpoint"]["model_name"] = "{catalog}.{metadata_schema}.other_model"
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    with pytest.raises(ValueError, match="serving_endpoint.model_name"):
+        _initialize(endpoint_initialization)
+    execute.assert_not_called()

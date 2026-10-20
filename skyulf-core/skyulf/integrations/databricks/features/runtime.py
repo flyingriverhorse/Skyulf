@@ -2,12 +2,21 @@
 
 import hashlib
 import json
+import re
+import uuid
 from pathlib import Path
 from typing import Any
 
 from ..projects._project_files import read_source
 from .config import FeatureGroup, FeaturePlan, validate_feature_plan
-from .delta import current_version, publish_feature_table, read_version
+from .delta import (
+    current_version,
+    publication_state,
+    publish_feature_table,
+    read_version,
+    require_publication_head,
+    validate_output_head,
+)
 from .graph import plan_digest
 from .joins import join_feature_groups
 
@@ -44,6 +53,33 @@ def snapshot_digest(snapshot: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()
 
 
+def _initialize_publication(spark: Any, plan: FeaturePlan) -> dict[str, Any]:
+    """Advance the generation even when only transform code changed."""
+    outputs = {
+        table: publication_state(spark, table)
+        for table in sorted({plan.output_table, *(g.output_table for g in plan.groups)})
+    }
+    generation = (
+        max(
+            (
+                state["intent"]["generation"]
+                for state in outputs.values()
+                if state and state["intent"]
+            ),
+            default=0,
+        )
+        + 1
+    )
+    return {
+        "generation": generation,
+        "snapshot_id": uuid.uuid4().hex,
+        "outputs": {
+            table: {key: state[key] if state else None for key in ("table_id", "version")}
+            for table, state in outputs.items()
+        },
+    }
+
+
 def initialize_features(
     spark: Any,
     project: Path,
@@ -65,7 +101,42 @@ def initialize_features(
         "source_versions": {table: current_version(spark, table) for table in sorted(sources)},
         "reused_versions": reused,
         "transform_sha256": {g.name: transform_source(project, g)[1] for g in plan.groups},
+        "publication": _initialize_publication(spark, plan),
     }
+
+
+def _publication_intent(plan: FeaturePlan, snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Refuse legacy or malformed mutation snapshots before touching any output."""
+    publication = snapshot.get("publication")
+    if type(publication) is not dict or set(publication) != {
+        "generation",
+        "snapshot_id",
+        "outputs",
+    }:
+        raise ValueError("Feature publication requires a fresh initialized snapshot.")
+    identity, outputs = publication["snapshot_id"], publication["outputs"]
+    if type(identity) is not str or re.fullmatch(r"[0-9a-f]{32}", identity) is None:
+        raise ValueError("Invalid feature publication snapshot identity.")
+    tables = {plan.output_table, *(group.output_table for group in plan.groups)}
+    if type(outputs) is not dict or set(outputs) != tables:
+        raise ValueError("Feature publication output heads do not match the plan.")
+    for head in outputs.values():
+        validate_output_head(head)
+    return {
+        "generation": publication["generation"],
+        "snapshot_sha256": snapshot_digest(snapshot),
+    }
+
+
+def _check_publication(
+    spark: Any, plan: FeaturePlan, snapshot: dict[str, Any], table: str
+) -> dict[str, Any]:
+    """Fence every output against newer partial runs before either publication phase."""
+    intent = _publication_intent(plan, snapshot)
+    outputs = snapshot["publication"]["outputs"]
+    for output, expected in outputs.items():
+        require_publication_head(publication_state(spark, output), expected, intent, output)
+    return {**intent, "expected": outputs[table]}
 
 
 def _require_snapshot(plan: FeaturePlan, snapshot: dict[str, Any]) -> None:
@@ -103,6 +174,7 @@ def build_feature_group(
             "reused": True,
         }
     else:
+        _check_publication(spark, plan, snapshot, group.output_table)
         namespace: dict[str, Any] = {"__name__": "skyulf_feature_transform"}
         # Trusted project code only: contained bounded source and pinned digest checked above.
         # This runs with job-owner privileges; it is not a sandbox for untrusted Python.
@@ -123,7 +195,12 @@ def build_feature_group(
                 f"Feature transform must return exactly keys, time and columns: {name}."
             )
         receipt = publish_feature_table(
-            spark, result, group.output_table, plan.keys, plan.timestamp
+            spark,
+            result,
+            group.output_table,
+            plan.keys,
+            plan.timestamp,
+            publication=_check_publication(spark, plan, snapshot, group.output_table),
         )
         receipt["reused"] = False
     return {**receipt, "snapshot_sha256": snapshot_digest(snapshot)}
@@ -137,6 +214,7 @@ def merge_feature_groups(
 ) -> dict[str, Any]:
     """Join the exact group commits from this run and publish its checked observations."""
     _require_snapshot(plan, snapshot)
+    _check_publication(spark, plan, snapshot, plan.output_table)
     if set(receipts) != {g.name for g in plan.groups}:
         raise ValueError("Feature merge requires one receipt from every configured group.")
     frames = {}
@@ -149,4 +227,11 @@ def merge_feature_groups(
         frames[group.name] = read_version(spark, group.output_table, receipt["version"])
     base = read_version(spark, plan.base_table, snapshot["source_versions"][plan.base_table])
     merged = join_feature_groups(base, frames, plan)
-    return publish_feature_table(spark, merged, plan.output_table, plan.keys, plan.timestamp)
+    return publish_feature_table(
+        spark,
+        merged,
+        plan.output_table,
+        plan.keys,
+        plan.timestamp,
+        publication=_check_publication(spark, plan, snapshot, plan.output_table),
+    )

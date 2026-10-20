@@ -171,6 +171,11 @@ def test_completed_stage_automatically_invokes_guarded_promotion(api, job):
     assert output["promotion"]["new_version"] == "2"
     promote.assert_called_once()
     producer.assert_not_called()
+    replay = api.run_daily_rollout(None, settings, client=Mock(), registry_client=Mock())
+    assert replay["promotion"] == output["promotion"]
+    assert replay["promotion"]["event_id"] == "event"
+    assert promote.call_count == 2
+    advance.assert_not_called()
 
 
 def test_changed_saved_comparison_rejected_before_observation(api, job):

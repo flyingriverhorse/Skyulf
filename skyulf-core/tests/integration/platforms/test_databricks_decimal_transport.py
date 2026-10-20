@@ -16,6 +16,7 @@ from skyulf.integrations.databricks.serving.endpoints import validate_json_rows
 from skyulf.integrations.databricks.training.fitting.candidate import (
     TrainingSpec,
     _materialize_training_rows,
+    apply_pre_split_step,
 )
 
 
@@ -137,6 +138,78 @@ def test_training_decimal_features_targets_weights_preserve_group_identity():
         {"column": "target", "source_dtype": "decimal(17,6)", "target_dtype": "float64"},
         {"column": "weight", "source_dtype": "decimal(10,4)", "target_dtype": "float64"},
     )
+
+
+@pytest.mark.parametrize("identity_is_input", [False, True])
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_training_decimal_deduplicate_identity_keeps_distinct_rows(identity_is_input, engine):
+    """Pre-split duplicate filtering must compare exact identities before numeric modeling."""
+    import polars as pl
+
+    identities = [Decimal("9007199254740992"), Decimal("9007199254740993")]
+    step = {
+        "name": "dedup",
+        "transformer": "Deduplicate",
+        "params": {"subset": ["business_id"]},
+    }
+    spec = TrainingSpec(
+        table="main.data.amounts",
+        version=0,
+        record_key_columns=("id",),
+        input_columns=("amount", "business_id") if identity_is_input else ("amount",),
+        target_column="target",
+        max_rows=5,
+        max_bytes=10000,
+        pre_split_steps=(step,),
+    )
+    source = _source(
+        [
+            {"id": str(index), "amount": Decimal("1.25"), "target": 2.0, "business_id": key}
+            for index, key in enumerate(identities)
+        ],
+        {
+            "id": "string",
+            "amount": "decimal(17,6)",
+            "target": "double",
+            "business_id": "decimal(20,0)",
+        },
+    )
+    frame = _materialize_training_rows(source, spec, spec.source_columns)
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    filtered = apply_pre_split_step(native, step, keys=["id"], target_column="target")
+
+    assert filtered["business_id"].to_list() == identities
+    assert filtered["id"].to_list() == ["0", "1"]
+    assert frame.attrs["source_column_conversions"] == (
+        {"column": "amount", "source_dtype": "decimal(17,6)", "target_dtype": "float64"},
+    )
+
+
+@pytest.mark.parametrize("identity_is_input", [False, True])
+def test_native_training_decimal_deduplicate_keeps_exact_identity(delta_spark, identity_is_input):
+    """Native Spark projection must not collapse duplicate keys before local eligibility."""
+    identities = [Decimal("9007199254740992"), Decimal("9007199254740993")]
+    step = {"name": "dedup", "transformer": "Deduplicate", "params": {"subset": ["business_id"]}}
+    spec = TrainingSpec(
+        table="main.data.amounts",
+        version=0,
+        record_key_columns=("id",),
+        input_columns=("amount", "business_id") if identity_is_input else ("amount",),
+        target_column="target",
+        max_rows=5,
+        max_bytes=10000,
+        pre_split_steps=(step,),
+    )
+    source = delta_spark.createDataFrame(
+        [(str(index), Decimal("1.25"), 2.0, identity) for index, identity in enumerate(identities)],
+        "id string, amount decimal(17,6), target double, business_id decimal(20,0)",
+    )
+    frame = _materialize_training_rows(source, spec, spec.source_columns)
+    filtered = apply_pre_split_step(frame, step, keys=["id"], target_column="target")
+
+    assert filtered["business_id"].to_list() == identities
+    assert filtered["id"].to_list() == ["0", "1"]
+    assert str(frame.amount.dtype) == "float64"
 
 
 def test_incremental_decimal_features_preserve_exact_keys():

@@ -5,7 +5,7 @@ import html
 import json
 import tempfile
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,7 @@ from ...mlflow.registration.registry import (
     unwrap_feature_package,
 )
 from ..data.admission import SingleWriterAdmission
-from ..feature_store.lifecycle_config import deserialize_feature_spec
+from ..feature_store.lifecycle_config import binding_json, deserialize_feature_spec
 from ..feature_store.model_sets import (
     enrich_approval_source,
     model_set_training_set,
@@ -415,16 +415,17 @@ def package_training_model_set(
         composition = dict(config["composition_config"] or {"outputs": []})
         composition.pop("partition_probe", None)  # only training writes the evidence
         saved = save("set", composition)
-        if probed_admission(config) and requires_composition_probe(load_model_set(saved.directory)):
-            # Include arithmetic that can amplify tolerated component prediction noise.
-            sample = _composition_sample(source, saved.manifest)
-            sealed = sealed_composition_config(load_model_set(saved.directory), sample)
-            saved = save("sealed", sealed)
-        path = saved.directory
         binding = union_feature_binding(
             component_artifacts,
             tuple(column.name for column in saved.manifest.input_schema),
         )
+        if probed_admission(config) and requires_composition_probe(load_model_set(saved.directory)):
+            # Include arithmetic that can amplify tolerated component prediction noise.
+            bound = replace(saved, feature_lookup_json=binding_json(binding)) if binding else saved
+            sample = _composition_sample(spark, source, bound)
+            sealed = sealed_composition_config(load_model_set(saved.directory), sample)
+            saved = save("sealed", sealed)
+        path = saved.directory
         uri = _log_training_set_package(
             spark,
             source,
@@ -450,19 +451,23 @@ def package_training_model_set(
     )
 
 
-def _composition_sample(source: Any, manifest: Any) -> Any:
+def _composition_sample(spark: Any, source: Any, artifact: Any) -> Any:
     """Collect up to 256 source rows with the set's keys and inputs for the probe."""
     from skyulf.engines.spark_engine import (  # noqa: PLC0415
         normalize_spark_decimals,
         restore_spark_decimal_dtypes,
     )
 
-    names = list(dict.fromkeys(column.name for column in manifest.input_schema))
-    keys = list(manifest.record_key_columns)
+    names = list(dict.fromkeys(column.name for column in artifact.manifest.input_schema))
+    keys = list(artifact.manifest.record_key_columns)
     # Ordered by record keys so retrying the same training run probes the same rows.
-    selected = source.select(*names).orderBy(*keys).limit(256)
+    source = source.orderBy(*keys).limit(256)
+    source = enrich_approval_source(spark, source, artifact)
+    selected = source.select(*names).orderBy(*keys)
     selected, conversions = normalize_spark_decimals(selected, columns=set(names).difference(keys))
-    return restore_spark_decimal_dtypes(selected.toPandas(), conversions)
+    result = restore_spark_decimal_dtypes(selected.toPandas(), conversions)
+    validate_feature_snapshot(spark, artifact)
+    return result
 
 
 def _log_training_set_package(
@@ -508,11 +513,14 @@ def project_endpoints(config: dict[str, Any]) -> dict[str, str]:
 
 
 def approval_frame(spark: Any, artifact: Any, config: dict[str, Any]) -> Any:
-    """Read a bounded functional probe; Spark checks all keys before sampling.
+    """Sample certified row-local sets after validating all source record keys.
 
     Saved holdout quality gates still use their complete training evidence.
-    The probe exercises each component; distributed publication scores all rows.
+    The probe exercises each component. Uncertified local sets retain their
+    complete group/window context and reject a population exceeding max_rows.
     """
+    from ...mlflow.spark.spark_model import optional_partition_certificate  # noqa: PLC0415
+
     distributed = config.get("inference_mode", "local") == "spark"
     if distributed:
         from ....inference.model_set_partition_safety import (  # noqa: PLC0415
@@ -520,6 +528,7 @@ def approval_frame(spark: Any, artifact: Any, config: dict[str, Any]) -> Any:
         )
 
         require_partition_safe_model_set(artifact)
+    sampled = distributed or optional_partition_certificate(artifact) is not None
     table = config["score_source_table"]
     source = spark.read.option(
         "versionAsOf", int(latest_source_version(spark, table)["version"])
@@ -528,7 +537,7 @@ def approval_frame(spark: Any, artifact: Any, config: dict[str, Any]) -> Any:
     source_columns = feature_source_columns(artifact) if feature_binding(artifact) else columns
     validate_feature_source(source, artifact)
     keys = artifact.manifest.record_key_columns
-    if distributed:
+    if sampled:
         from ..scoring.batch.spark_scoring import read_distributed_rows  # noqa: PLC0415
 
         source = read_distributed_rows(source, source_columns, keys).frame

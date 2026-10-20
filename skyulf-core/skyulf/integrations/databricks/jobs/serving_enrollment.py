@@ -14,6 +14,7 @@ from ..observability.monitoring.monitoring_config import (
 )
 from ..observability.monitoring.monitoring_registration import monitoring_store_schema
 from ..observability.monitoring.serving import serving_registration
+from ..observability.monitoring.serving.serving_payloads import REQUEST_KEY, ROW_KEY
 from ..serving.contracts import PinnedEndpointSpec
 from .shared import reference_mutations
 
@@ -105,6 +106,33 @@ def _served_identities(spec: PinnedEndpointSpec, settings: dict, metadata: dict)
         }
         for component in manifest.components
     ]
+
+
+def validate_serving_label_sources(spark: Any, configs: list[MonitorConfig]) -> None:
+    """Require request-key outcomes before endpoint mutation, without reading label rows."""
+    sources = {
+        (config.label_table, config.result_available_at_column)
+        for config in configs
+        if config.label_table is not None
+    }
+    for table, available in sources:
+        types = {
+            field.name: field.dataType.typeName() for field in spark.table(table).schema.fields
+        }
+        if types.get(REQUEST_KEY) != "string" or types.get(ROW_KEY) not in {
+            "byte",
+            "short",
+            "integer",
+            "long",
+        }:
+            raise ValueError(
+                f"Serving label table {table} requires databricks_request_id STRING and "
+                "request_row_index integral; business record keys alone cannot identify requests."
+            )
+        if types.get(available) not in {"timestamp", "string"}:
+            raise ValueError(
+                f"Serving label availability {available!r} requires a UTC timestamp or aware ISO string."
+            )
 
 
 def enroll_verified_serving(

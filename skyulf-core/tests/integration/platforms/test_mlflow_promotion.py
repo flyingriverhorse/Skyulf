@@ -1139,6 +1139,33 @@ def test_partial_promotion_reports_unknown_outcome(case, monkeypatch) -> None:
     assert str(client.get_model_version_by_alias(name, "challenger").version) == "2"
 
 
+@pytest.mark.parametrize("reject_write", [1, 2])
+def test_alias_guard_refusal_aborts_only_before_first_mutation(case, monkeypatch, reject_write):
+    """A definite guard refusal releases only an intent whose aliases were never changed."""
+    from skyulf.integrations.mlflow.lifecycle import promotion
+
+    client, _, name, _, _, _ = case
+    _stage(case)
+    writes = Mock(wraps=client.set_registered_model_alias)
+    monkeypatch.setattr(client, "set_registered_model_alias", writes)
+    monkeypatch.setattr(promotion, "make_registry_client", lambda *args: client)
+    checks = 0
+
+    def refuse():
+        """Reject at the selected pre-network checkpoint."""
+        nonlocal checks
+        checks += 1
+        if checks == reject_write:
+            raise ValueError("guard refused mutation")
+
+    expected_error = ValueError if reject_write == 1 else AliasOutcomeUnknownError
+    with promotion.guard_alias_mutations(refuse), pytest.raises(expected_error):
+        _promote(case)
+    pending = client.get_registered_model(name).tags.get("pending_alias_event")
+    assert bool(pending) is (reject_write > 1)
+    assert writes.call_count == reject_write - 1
+
+
 def test_stale_alias_and_modified_report_cannot_promote(case) -> None:
     """The lock path must reject stale alias state and forged comparison fields."""
     client, _, name, _, report, _ = case

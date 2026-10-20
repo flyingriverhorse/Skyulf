@@ -385,12 +385,50 @@ reconciliation run does not immediately apply another traffic increase. The
 stage clock advances only after the expected endpoint revision and routes are
 verified.
 
-If the request remains `PREPARED` while the endpoint still shows its old
-configuration, the controller holds. It cannot tell whether an uncertain request
-will still apply. Inspect the recorded intent and native endpoint operation
-before resolving the rollout; do not edit receipt tags or blindly resend the
-request. An unexpected endpoint ID, revision, model or routing setting stops
-automation rather than overwriting another writer's change.
+New `PREPARED` receipts distinguish two submission states:
+
+| `request.submission_state` | Recovery on the next invocation |
+| --- | --- |
+| `NOT_SUBMITTED` | Revalidate the endpoint and send the saved request once. |
+| `OUTCOME_UNKNOWN`, or absent in an older receipt | Inspect the endpoint without resending. Commit the receipt only when the exact target revision, model pair and routes are ready. |
+
+The controller persists `OUTCOME_UNKNOWN` immediately before sending the
+request. A crash between those operations is therefore ambiguous even if the
+endpoint still has its old configuration. Repeated invocations hold that
+receipt; elapsed time alone does not prove that an update cannot still apply.
+
+Inspect the saved intent and endpoint using the same clients and store as
+initialization:
+
+```python
+receipt = store.load()
+request = receipt.get("request", {})
+endpoint = workspace.api_client.do(
+    "GET", f"/api/2.0/serving-endpoints/{receipt['state']['endpoint_name']}"
+)
+print({
+    "receipt_status": receipt["status"],
+    "submission_state": request.get("submission_state", "OUTCOME_UNKNOWN"),
+    "prior_revision": request.get("prior_config_version"),
+    "target_revision": request.get("target_config_version"),
+    "current_revision": endpoint.get("config", {}).get("config_version"),
+    "pending_config": endpoint.get("pending_config"),
+    "endpoint_state": endpoint.get("state"),
+})
+```
+
+If the exact requested configuration has settled, rerun `daily_rollout` to
+reconcile it. A pending update must settle before proceeding. An unexpected
+endpoint ID, revision, model or routing setting stops automation rather than
+overwriting another writer's change.
+
+There is no force-abort API for an ambiguous receipt. If the request cannot be
+resolved, pause the job, establish exclusive ownership and inspect the native
+endpoint operation with your workspace administrator. Retain the old run as
+evidence. Once no old update can still apply, explicitly restore an admitted,
+ready 100/0 endpoint and initialize a new rollout run using the sequence above;
+update `rollout.run_id` before resuming. Do not edit receipt artifacts or tags,
+reset the submission marker, or blindly resend an uncertain request.
 
 Pause the scheduled job to stop further decisions. A verified regression rollback
 is terminal for that rollout; starting again requires a new explicit rollout.

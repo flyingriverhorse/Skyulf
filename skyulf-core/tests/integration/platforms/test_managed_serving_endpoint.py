@@ -116,6 +116,98 @@ def test_identical_owned_endpoint_is_unchanged(plan, ownership):
     client.serving_endpoints.update_config.assert_not_called()
 
 
+@pytest.mark.parametrize("state", ["UPDATE_FAILED", "UPDATE_CANCELED"])
+@pytest.mark.parametrize("pending", [False, True])
+@pytest.mark.parametrize("version", ["7", "8"])
+def test_terminal_failed_update_can_retry_owned_config(plan, ownership, state, pending, version):
+    """Terminal deployment failures must allow retry, including the same requested version."""
+    previous = remote(plan, ownership, version)
+    previous["state"]["config_update"] = state
+    if pending:
+        previous["pending_config"] = deepcopy(remote(plan, ownership)["config"])
+    client = Mock()
+    client.serving_endpoints.get.side_effect = [previous, remote(plan, ownership)]
+    result = managed.ensure_owned_endpoint(client, plan, ownership=ownership)
+    assert result["action"] == "updated"
+    assert result["previous_version"] == version
+    assert (
+        client.serving_endpoints.update_config.call_args.kwargs["served_entities"][0].entity_version
+        == "8"
+    )
+
+
+def test_failed_foreign_pending_config_is_not_discarded(plan, ownership):
+    """Failure cannot authorize replacing another model's pending deployment."""
+    endpoint = remote(plan, ownership)
+    endpoint["state"]["config_update"] = "UPDATE_FAILED"
+    pending = deepcopy(endpoint["config"])
+    pending["served_entities"][0]["entity_name"] = "main.ml.foreign"
+    endpoint["pending_config"] = pending
+    client = Mock()
+    client.serving_endpoints.get.return_value = endpoint
+    with pytest.raises((RuntimeError, ValueError)):
+        managed.ensure_owned_endpoint(client, plan, ownership=ownership)
+    client.serving_endpoints.update_config.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["runtime", "route", "legacy_logging", "gateway_logging"])
+def test_failed_pending_config_preserves_runtime_route_and_logging_guards(plan, ownership, change):
+    """A terminal failure must not bypass admission for pending settings or payload sinks."""
+    endpoint = remote(plan, ownership)
+    endpoint["state"]["config_update"] = "UPDATE_FAILED"
+    pending = deepcopy(endpoint["config"])
+    endpoint["pending_config"] = pending
+    if change == "runtime":
+        pending["served_entities"][0]["environment_vars"] = {"UNDECLARED": "value"}
+    elif change == "route":
+        pending["traffic_config"]["routes"][0]["traffic_percentage"] = 50
+    elif change == "legacy_logging":
+        pending["auto_capture_config"] = {"enabled": True}
+    else:
+        endpoint["ai_gateway"] = {"inference_table_config": {"enabled": True}}
+    client = Mock()
+    client.serving_endpoints.get.return_value = endpoint
+    with pytest.raises(ValueError):
+        managed.ensure_owned_endpoint(client, plan, ownership=ownership)
+    client.serving_endpoints.update_config.assert_not_called()
+    client.serving_endpoints.patch.assert_not_called()
+
+
+@pytest.mark.parametrize("foreign_sink", [False, True])
+def test_failed_pending_telemetry_retry_preserves_admitted_sink(plan, ownership, foreign_sink):
+    """Owned failed telemetry updates may retry only while their exact logging sink agrees."""
+    spec = replace(
+        plan.spec,
+        logging_mode="telemetry",
+        logging_catalog="main",
+        logging_schema="logs",
+        logging_table_prefix="risk",
+    )
+    telemetry = {
+        "table_names": {"logs_table": spec.telemetry_logs_table},
+        "inference_table_config": {"name": spec.inference_table, "sampling_fraction": 1.0},
+        "enabled_telemetry_features": ["TELEMETRY_FEATURE_INFERENCE_TABLE"],
+    }
+    plan = replace(plan, spec=spec, config=plan.config | {"telemetry_config": telemetry})
+    previous = remote(plan, ownership, "7")
+    previous["state"]["config_update"] = "UPDATE_FAILED"
+    previous["pending_config"] = deepcopy(previous["config"])
+    previous["telemetry_config"] = deepcopy(telemetry)
+    final = remote(plan, ownership)
+    final["telemetry_config"] = deepcopy(telemetry)
+    client = Mock()
+    client.api_client.do.side_effect = [previous, final]
+    if foreign_sink:
+        previous["telemetry_config"]["table_names"]["logs_table"] = "main.logs.foreign"
+        with pytest.raises(ValueError, match="pinned plan"):
+            managed.ensure_owned_endpoint(client, plan, ownership=ownership)
+        client.serving_endpoints.update_config.assert_not_called()
+    else:
+        result = managed.ensure_owned_endpoint(client, plan, ownership=ownership)
+        assert result["action"] == "updated"
+        client.serving_endpoints.update_config.assert_called_once()
+
+
 @pytest.mark.parametrize("operation", ["create", "update"])
 def test_sdk_serializes_named_route_in_request_body(plan, ownership, operation, monkeypatch):
     """SDK serialization must retain route identity for runtime-provided older SDKs."""

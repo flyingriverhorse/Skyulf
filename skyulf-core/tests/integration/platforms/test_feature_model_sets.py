@@ -169,3 +169,37 @@ def test_approval_enrichment_retains_lookup_controls_and_record_keys(monkeypatch
     source.select.assert_called_once_with("id", "entity", "event_time")
     assert create.call_args.args[1].exclude_columns == ()
     assert result == "enriched"
+
+
+def test_composition_probe_enriches_bound_features_before_selecting(monkeypatch):
+    """Lookup-backed composition probes must materialize the same frozen inputs as packaging."""
+    import pandas as pd
+
+    from skyulf.engines import spark_engine
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
+
+    artifact = SimpleNamespace(
+        manifest=SimpleNamespace(
+            input_schema=[SimpleNamespace(name="id"), SimpleNamespace(name="amount")],
+            record_key_columns=("id",),
+        ),
+        feature_lookup_json=json.dumps(_binding()),
+    )
+    raw = Mock()
+    raw.select.side_effect = ValueError("amount is not a raw source column")
+    raw.orderBy.return_value.limit.return_value = raw
+    enriched = Mock()
+    enriched.select.return_value.orderBy.return_value = enriched
+    enriched.toPandas.return_value = pd.DataFrame({"id": [1, 2], "amount": [4.0, 5.0]})
+    calls = []
+    monkeypatch.setattr(
+        module,
+        "enrich_approval_source",
+        lambda spark, source, bound: calls.append((source, bound)) or enriched,
+    )
+    monkeypatch.setattr(spark_engine, "normalize_spark_decimals", lambda frame, **kw: (frame, []))
+    monkeypatch.setattr(spark_engine, "restore_spark_decimal_dtypes", lambda frame, conv: frame)
+    monkeypatch.setattr(module, "validate_feature_snapshot", lambda *args: calls.append("recheck"))
+    result = module._composition_sample(None, raw, artifact)
+    pd.testing.assert_frame_equal(result, enriched.toPandas.return_value)
+    assert calls == [(raw, artifact), "recheck"]

@@ -1,5 +1,7 @@
 """Create or update a target-owned endpoint and prove SQL/REST prediction parity."""
 
+import hashlib
+import re
 from dataclasses import fields
 from typing import Any
 from uuid import uuid4
@@ -25,6 +27,7 @@ from .serving_enrollment import (
     build_serving_monitoring_configs,
     enroll_verified_serving,
     serving_monitoring_namespace,
+    validate_serving_label_sources,
 )
 
 _SPEC_FIELDS = {field.name for field in fields(PinnedEndpointSpec)} - {"model_version"}
@@ -78,7 +81,7 @@ def _bound_settings(settings: dict, values: dict[str, str]) -> dict:
     settings["model_name"] = bind_target_name(
         "model_name", settings["model_name"], bindings, suffix
     )
-    settings["endpoint_name"] = _substitute(
+    settings["endpoint_name"] = _bound_endpoint_name(
         settings["endpoint_name"],
         {
             **bindings,
@@ -95,6 +98,15 @@ def _bound_settings(settings: dict, values: dict[str, str]) -> dict:
     settings["ownership"] = _owner(values, suffix)
     settings["tags"] = _cost_tags(values)
     return settings
+
+
+def _bound_endpoint_name(template: str, bindings: dict[str, str]) -> str:
+    """Bound generated personal names while preserving explicit operator-selected names."""
+    name = _substitute(template, bindings)
+    generated = template.endswith("-{bundle_target}-endpoint{resource_suffix}")
+    if len(name) > 63 and generated and re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", name):
+        return name[:46] + "-" + hashlib.sha256(name.encode()).hexdigest()[:16]
+    return name
 
 
 def _cost_tags(values: dict[str, str]) -> dict[str, str]:
@@ -205,14 +217,22 @@ def sample_serving_rows(
     return [row.asDict(recursive=True) for row in sample]
 
 
+def _smoke_frame(raw: list[dict], plan: PinnedEndpointPlan) -> pd.DataFrame:
+    """Restore saved dtypes without turning missing boolean inputs into real values."""
+    columns = {}
+    for name, dtype in plan.input_schema:
+        values = [row[name] for row in raw]
+        if dtype == "bool" and any(pd.isna(value) for value in values):
+            raise ValueError(
+                f"Serving sample contains null in nonnullable boolean column {name!r}."
+            )
+        columns[name] = pd.Series(values, dtype=dtype)
+    return pd.DataFrame(columns)
+
+
 def _smoke_inputs(raw: list[dict], plan: PinnedEndpointPlan) -> tuple[pd.DataFrame, list[dict]]:
     """Use saved native dtypes before the existing lossless nullable transport encoder."""
-    frame = pd.DataFrame(
-        {
-            name: pd.Series([row[name] for row in raw], dtype=dtype)
-            for name, dtype in plan.input_schema
-        }
-    )
+    frame = _smoke_frame(raw, plan)
     encoded = encode_frame(frame, transport_spec(plan.input_schema))
     records = [
         {name: row[name] for name in plan.input_columns}
@@ -302,8 +322,10 @@ def _load_pyfunc(settings: dict, spec: PinnedEndpointSpec, registry: Any) -> Any
     return mlflow.pyfunc.load_model(package)
 
 
-def _sql_predictions(spark: Any, function: ServingSQLFunctionPlan, raw: list[dict]) -> list[dict]:
-    """Call the UC function on the identical in-memory sample, retaining row order."""
+def _sql_input_frame(
+    spark: Any, function: ServingSQLFunctionPlan, raw: list[dict]
+) -> tuple[Any, str]:
+    """Validate native SQL values before changing endpoint or function resources."""
     ordinal = "_serving_row_" + uuid4().hex
     schema = ", ".join(
         [
@@ -311,15 +333,36 @@ def _sql_predictions(spark: Any, function: ServingSQLFunctionPlan, raw: list[dic
             *(f"{name} {dtype}" for name, dtype in function.schema_contract["inputs"]),
         ]
     )
+    native = _smoke_frame(raw, function.endpoint)
+    rows = native.astype(object).where(pd.notna(native), None).to_dict("records")
     data = [
         (index, *(row[name] for name in function.endpoint.input_columns))
-        for index, row in enumerate(raw)
+        for index, row in enumerate(rows)
     ]
     frame = spark.createDataFrame(data, schema=schema)
+    return frame, ordinal
+
+
+def _sql_predictions(function: ServingSQLFunctionPlan, sample: tuple[Any, str]) -> list[dict]:
+    """Call the UC function on the validated in-memory sample, retaining row order."""
+    frame, ordinal = sample
     result = (
         frame.selectExpr(ordinal, f"{function.call_sql()} AS response").orderBy(ordinal).collect()
     )
     return [row["response"].asDict(recursive=True) for row in result]
+
+
+def _verify_sql_predictions(
+    function: ServingSQLFunctionPlan | None,
+    sample: tuple[Any, str] | None,
+    expected: pd.DataFrame,
+) -> int:
+    """Verify the enabled SQL path using only its prevalidated input sample."""
+    if function is None:
+        return 0
+    if sample is None:
+        raise ValueError("SQL verification requires its prepared input sample.")
+    return verify_serving_predictions(expected, _sql_predictions(function, sample), channel="SQL")
 
 
 def _request_examples(
@@ -378,6 +421,7 @@ def run_serving_endpoint(
         record_key_columns=plan.record_key_columns,
     )
     frame, records = _smoke_inputs(raw, plan)
+    sql_sample = _sql_input_frame(spark, function, raw) if function is not None else None
     model = _load_pyfunc(settings, spec, registry_client)
     expected = model.predict(frame)
     # Validate the reference too, before a mutation can leave an untestable endpoint.
@@ -389,6 +433,7 @@ def run_serving_endpoint(
         monitoring_values,
         {} if namespace is None else model.metadata.metadata,
     )
+    validate_serving_label_sources(spark, configs)
     owner = settings["ownership"]
     result = ensure_owned_endpoint(client, plan, ownership=owner, tags=settings["tags"])
     sql_result = (
@@ -405,12 +450,8 @@ def run_serving_endpoint(
     counts = {
         "sampled": len(raw),
         "rest_compared": verify_serving_predictions(expected, rest.predictions, channel="REST"),
-        "sql_compared": 0,
+        "sql_compared": _verify_sql_predictions(function, sql_sample, expected),
     }
-    if function is not None:
-        counts["sql_compared"] = verify_serving_predictions(
-            expected, _sql_predictions(spark, function, raw), channel="SQL"
-        )
     return {
         **result,
         "status": "READY",

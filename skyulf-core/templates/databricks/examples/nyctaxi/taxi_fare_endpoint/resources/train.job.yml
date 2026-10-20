@@ -231,6 +231,7 @@ resources:
               serving_job_id: ${resources.jobs.serving_endpoint.id}
               job_run_id: '{{job.run_id}}'
               model_version: '{{tasks.training_report.values.serving_model_version}}'
+              serving_event_id: '{{tasks.training_report.values.serving_event_id}}'
 
           environment_key: skyulf
           disable_auto_optimization: true

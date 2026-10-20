@@ -63,6 +63,7 @@ def delivery(monkeypatch):
     monkeypatch.setattr(job, "prepare_pinned_endpoint", prepare)
     monkeypatch.setattr(job, "_load_pyfunc", lambda *args: model)
     monkeypatch.setattr(job, "sample_serving_rows", lambda *args, **kwargs: [{"value": 2.0}])
+    monkeypatch.setattr(job, "_sql_input_frame", lambda *args: (Mock(), "ordinal"))
     endpoint = Mock(side_effect=lambda *args, **kwargs: events.append("endpoint") or {})
     monkeypatch.setattr(job, "ensure_owned_endpoint", endpoint)
     monkeypatch.setattr(job, "ensure_owned_sql_function", lambda *args, **kwargs: {})
@@ -311,6 +312,45 @@ def test_invalid_monitoring_settings_fail_before_paid_writes(delivery, key, valu
         _run(delivery, monitoring_values=delivery.values)
     delivery.endpoint.assert_not_called()
     assert delivery.inventory == {}
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"id": "long", "available_at": "timestamp"},
+        {"databricks_request_id": "long", "request_row_index": "long", "available_at": "timestamp"},
+        {
+            "databricks_request_id": "string",
+            "request_row_index": "double",
+            "available_at": "timestamp",
+        },
+        {"databricks_request_id": "string", "request_row_index": "long", "available_at": "long"},
+    ],
+)
+def test_serving_labels_require_request_identity_before_endpoint_changes(delivery, fields):
+    """A business-key-only label table must not break monitoring after a paid deployment."""
+    delivery.values.update(
+        monitoring_label_table="main.labels.events",
+        monitoring_result_available_at_column="available_at",
+    )
+    schema = SimpleNamespace(
+        fields=[
+            SimpleNamespace(name=name, dataType=SimpleNamespace(typeName=lambda dtype=dtype: dtype))
+            for name, dtype in fields.items()
+        ]
+    )
+    spark = SimpleNamespace(table=lambda name: SimpleNamespace(schema=schema))
+    with pytest.raises(ValueError, match="Serving label"):
+        job.run_serving_endpoint(
+            spark,
+            delivery.settings,
+            source_table="main.source.features",
+            client=Mock(),
+            registry_client=delivery.registry,
+            monitoring_values=delivery.values,
+        )
+    delivery.endpoint.assert_not_called()
+    assert delivery.inventory == {} and delivery.events == []
 
 
 def test_disabled_logging_ignores_unused_monitoring_configuration(delivery):

@@ -12,6 +12,7 @@ import pandas as pd
 
 from skyulf.engines.spark_engine import normalize_spark_decimals
 
+from ...feature_store.training import enrich_training_source, pin_training_lookup
 from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
 from ...lifecycle.workflow import resolve_training_spec
 from ...observability.monitoring.spark.spark_monitoring_reference import (
@@ -282,6 +283,7 @@ def _read_source(spark: Any, spec: TrainingSpec) -> Any:
     functions = _functions()
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
     source = join_training_labels(spark, source, spec)
+    source = enrich_training_source(spark, source, spec)
     source = normalize_training_dates(
         source.select(*spec.source_columns),
         event_column=spec.event_column,
@@ -308,6 +310,8 @@ def _read_source(spark: Any, spec: TrainingSpec) -> Any:
         raise spec.byte_limit_error(int(total["bytes"] or 0) + 132, estimate=True)
     source = _pandas_source_types(source, spec)
     validate_label_identity(spark, spec)
+    if spec.feature_binding_json is not None:
+        pin_training_lookup(spark, spec)
     return source
 
 
@@ -437,6 +441,8 @@ def assess_spark_training_data(spark: Any, monitor: Any, workflow: dict, now: da
     )
     if table_identity(spark, current.table) != identity:
         raise ValueError("Training source table was replaced during freshness assessment.")
+    if current.feature_binding_json is not None:
+        pin_training_lookup(spark, current)
     return result | {
         "source_table": current.table,
         "source_version": current.version,

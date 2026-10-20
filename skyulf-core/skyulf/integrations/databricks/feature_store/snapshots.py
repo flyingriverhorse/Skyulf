@@ -28,12 +28,35 @@ def snapshot_tables(spark: Any, spec: FeatureTrainingSpec) -> list[dict[str, Any
 
 
 def validate_snapshots(spark: Any, records: list[dict[str, Any]]) -> None:
-    """Reject feature-only changes under the explicit training-snapshot policy."""
+    """Reject logical changes while admitting proven data-preserving Delta maintenance.
+
+    A changed version requires exact schema and multiset equality against the
+    retained training version. The distributed comparison can scan both full
+    snapshots; only a bounded mismatch count reaches the driver. Missing history
+    fails closed, and an operation name never substitutes for this proof.
+    """
     if type(records) is not list or not records:
         raise ValueError("Feature snapshot records must be a nonempty list.")
     for expected in records:
-        if snapshot_table(spark, expected["table_name"]) != expected:
+        current = snapshot_table(spark, expected["table_name"])
+        if current == expected:
+            continue
+        if not _unchanged_data(spark, expected, current):
             raise ValueError(
                 f"Feature table {expected['table_name']!r} changed since training; "
                 "retrain and register a refreshed feature package before scoring."
             )
+
+
+def _unchanged_data(spark: Any, expected: dict[str, Any], current: dict[str, Any]) -> bool:
+    """Prove retained snapshots agree without accepting table replacement or a moving head."""
+    if current["table_id"] != expected["table_id"] or current["version"] <= expected["version"]:
+        return False
+    name = expected["table_name"]
+    previous = spark.read.format("delta").option("versionAsOf", expected["version"]).table(name)
+    latest = spark.read.format("delta").option("versionAsOf", current["version"]).table(name)
+    if previous.schema != latest.schema:
+        return False
+    if previous.exceptAll(latest).limit(1).count() or latest.exceptAll(previous).limit(1).count():
+        return False
+    return snapshot_table(spark, name) == current

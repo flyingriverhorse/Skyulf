@@ -192,14 +192,28 @@ def _validate_smoke_response(response: Any, role: str, count: int, schema: tuple
 
 
 def _validate_smoke_rows(rows: list, schema: tuple) -> None:
-    """Require every saved output field to be present, finite and available."""
+    """Require predictions while allowing null explanations for predicted outcomes."""
     names = {name for name, _ in schema}
     if any(not isinstance(row, dict) or set(row) != names for row in rows):
         raise ValueError("Smoke response predictions differ from the saved output schema.")
-    if any(value is None for row in rows for value in row.values()):
-        raise ValueError("Smoke response predictions are unavailable.")
+    for row in rows:
+        _validate_smoke_outcomes(row)
     validate_json_rows(rows)
     validate_schema_rows(rows, schema)
+
+
+def _validate_smoke_outcomes(row: dict[str, Any]) -> None:
+    """Keep pipeline and component status/reason pairs consistent with usable predictions."""
+    for name, value in row.items():
+        if name == "exclusion_reason" or name.endswith("__exclusion_reason"):
+            status = name.removesuffix("exclusion_reason") + "scoring_status"
+            if value is not None or row.get(status) != "predicted":
+                raise ValueError("Smoke response scoring outcomes are unavailable or inconsistent.")
+        elif name == "scoring_status" or name.endswith("__scoring_status"):
+            if value != "predicted":
+                raise ValueError("Smoke response scoring outcomes are unavailable or inconsistent.")
+        elif value is None:
+            raise ValueError("Smoke response predictions are unavailable.")
 
 
 def observe_bootstrap_rollout(

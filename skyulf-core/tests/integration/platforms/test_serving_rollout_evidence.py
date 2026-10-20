@@ -118,6 +118,49 @@ def test_bootstrap_uses_saved_gates_and_both_targeted_responses(bootstrap):
     assert result.details["comparison_sha256"] == comparison_digest(report)
 
 
+@pytest.mark.parametrize("prefix", ["", "branch__"])
+def test_smoke_accepts_nullable_exclusion_for_predicted_rows(prefix):
+    """Successful pipeline and model-set outputs carry a null exclusion explanation."""
+    schema = tuple(
+        (prefix + name, dtype)
+        for name, dtype in (
+            ("prediction", "float64"),
+            ("scoring_status", "string"),
+            ("exclusion_reason", "string"),
+        )
+    )
+    row = {
+        prefix + "prediction": 1.5,
+        prefix + "scoring_status": "predicted",
+        prefix + "exclusion_reason": None,
+    }
+    _api()._validate_smoke_rows([row], schema)
+    assert row[prefix + "prediction"] == 1.5
+
+
+@pytest.mark.parametrize(
+    "prediction,status,reason",
+    [
+        (None, "predicted", None),
+        (1.5, None, None),
+        (1.5, "predicted", "inconsistent"),
+        (1.5, "unknown", None),
+        (None, "excluded", "filtered"),
+        (1.5, "excluded", None),
+    ],
+)
+def test_smoke_rejects_unavailable_or_inconsistent_scoring_outcomes(prediction, status, reason):
+    """Exclusion metadata cannot hide unavailable predictions or invalid outcome semantics."""
+    schema = (
+        ("prediction", "float64"),
+        ("scoring_status", "string"),
+        ("exclusion_reason", "string"),
+    )
+    row = {"prediction": prediction, "scoring_status": status, "exclusion_reason": reason}
+    with pytest.raises(ValueError):
+        _api()._validate_smoke_rows([row], schema)
+
+
 @pytest.mark.parametrize(
     "change,expected",
     [

@@ -360,7 +360,7 @@ def predict_spark_pyfunc(
     import mlflow  # noqa: PLC0415  # ty: ignore[unresolved-import]
     from pyspark.sql import types  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
-    result_type = _result_type(types, outputs, _nullable(artifact))
+    result_type = _result_type(types, outputs, _nullable(artifact), keys)
     named = _named_inputs(frame, inputs)
     udf = mlflow.pyfunc.spark_udf(
         spark,
@@ -388,7 +388,7 @@ def _predict_feature_frame(
     from pyspark.sql import functions, types  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     validate_feature_snapshot(spark, artifact)
-    result_type = _result_type(types, outputs, _nullable(artifact))
+    result_type = _result_type(types, outputs, _nullable(artifact), keys)
     scored = native_feature_score(
         frame,
         model_uri=model_uri,
@@ -426,12 +426,16 @@ def _nullable(artifact: Any) -> bool:
     return nullable_outputs(artifact)
 
 
-def _result_type(types: Any, outputs: tuple, nullable: bool) -> Any:
+def _result_type(types: Any, outputs: tuple, nullable: bool, keys: tuple[str, ...] = ()) -> Any:
     """Declare each field with the dtype it travels in from the workers."""
     return types.StructType(
         [
             types.StructField(
-                column.name, _spark_type(spark_transport_dtype(column.dtype, nullable)), True
+                column.name,
+                _spark_type(
+                    spark_transport_dtype(column.dtype, nullable and column.name not in keys)
+                ),
+                True,
             )
             for column in outputs
         ]
@@ -460,7 +464,7 @@ def _keyed_result(
     prediction = "__skyulf_pyfunc_result"
     while prediction.casefold() in {key.casefold() for key in keys}:
         prediction += "_"
-    scored = frame.select(*(functions.col(_quoted(key)) for key in keys), result.alias(prediction))
+    scored = frame.select(*_record_keys(frame, keys, outputs), result.alias(prediction))
     return scored.select(
         *(functions.col(_quoted(key)) for key in keys),
         *(
@@ -471,3 +475,26 @@ def _keyed_result(
             if column.name not in keys
         ),
     )
+
+
+def _record_keys(frame: Any, keys: tuple[str, ...], outputs: tuple) -> list[Any]:
+    """Widen native integer set identities to their declared BIGINT publication contract."""
+    from pyspark.sql import functions  # noqa: PLC0415  # ty: ignore[unresolved-import]
+
+    declared = {column.name: column.dtype for column in outputs}
+    result = []
+    for key in keys:
+        value = functions.col(_quoted(key))
+        if declared.get(key) == "int64":
+            if frame.schema[key].dataType.simpleString() not in {
+                "tinyint",
+                "smallint",
+                "int",
+                "bigint",
+            }:
+                raise ValueError(
+                    f"Model-set integer record key {key!r} requires native integer storage."
+                )
+            value = value.cast("bigint").alias(key)
+        result.append(value)
+    return result

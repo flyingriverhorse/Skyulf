@@ -1132,7 +1132,7 @@ def fit_candidate(
     )
     train_frame, sample_weight = extract_training_weights(train_frame, spec.weight_column)
     train_frame = _candidate_training_frame(train_frame, spec, temporal_cv)
-    pipeline_config = _fit_data_config(pipeline_config, frame, holdout, spec)
+    pipeline_config = _fit_data_config(pipeline_config, train_frame, holdout, spec)
     native_train = pl.from_pandas(train_frame) if engine == "polars" else train_frame
     native_holdout = pl.from_pandas(holdout) if engine == "polars" else holdout
     search = pipeline_config["modeling"]["type"] == "hyperparameter_tuner"
@@ -1297,7 +1297,7 @@ def log_fitted_candidate(
     run.set_tags(tags)
     run.client.log_dict(
         run.run_id,
-        {"dataset_id": spec.dataset_id, **tags, **_source_conversion_evidence(frame)},
+        {"dataset_id": spec.dataset_id, **tags, **_source_conversion_evidence(holdout)},
         "training_data.json",
     )
     run.client.log_dict(
@@ -1651,16 +1651,48 @@ def _pre_split_step_identity(step: Any, index: int) -> tuple[str, dict[str, Any]
     return step_type, params
 
 
-def training_numeric_columns(spec: TrainingSpec) -> tuple[str, ...]:
-    """Select model values while preserving record, grouping and time identities."""
-    protected = {
+def _training_identity_columns(spec: TrainingSpec) -> set[str | None]:
+    """Keep record, grouping, time and lookup controls exact at every training stage."""
+    return {
         *spec.record_key_columns,
         spec.group_column,
         spec.event_column,
         spec.result_available_at_column,
         *lookup_controls(spec),
     }
+
+
+def training_numeric_columns(spec: TrainingSpec) -> tuple[str, ...]:
+    """Normalize model values while preserving exact source and duplicate identities."""
+    protected = _training_identity_columns(spec)
+    for step in spec.pre_split_steps:
+        if step["transformer"] == "Deduplicate":
+            protected.update(deduplicate_columns(step))
     return tuple(name for name in spec.source_columns if name not in protected)
+
+
+def _deferred_model_columns(spec: TrainingSpec) -> set[str]:
+    """Select model inputs protected only until exact pre-split deduplication finishes."""
+    return set(spec.input_columns).difference(
+        _training_identity_columns(spec), training_numeric_columns(spec)
+    )
+
+
+def _normalize_model_partition(frame: pd.DataFrame, spec: TrainingSpec) -> pd.DataFrame:
+    """Apply recorded Decimal model casts after survivor and split membership are fixed."""
+    deferred = tuple(frame.attrs.get("deferred_source_column_conversions", ()))
+    if not deferred:
+        return frame
+    allowed = _deferred_model_columns(spec)
+    if any(item["column"] not in allowed or item["target_dtype"] != "float64" for item in deferred):
+        raise ValueError("Deferred source conversions differ from the admitted model inputs.")
+    result = frame.astype({item["column"]: "float64" for item in deferred})
+    result.attrs["source_column_conversions"] = (
+        *frame.attrs.get("source_column_conversions", ()),
+        *deferred,
+    )
+    result.attrs.pop("deferred_source_column_conversions", None)
+    return result
 
 
 def _materialize_training_rows(
@@ -1672,6 +1704,7 @@ def _materialize_training_rows(
         restore_spark_decimal_dtypes,
     )
 
+    _, deferred = normalize_spark_decimals(selected, columns=_deferred_model_columns(spec))
     selected, conversions = normalize_spark_decimals(
         selected, columns=training_numeric_columns(spec)
     )
@@ -1691,6 +1724,8 @@ def _materialize_training_rows(
     frame = restore_spark_decimal_dtypes(
         pd.DataFrame.from_records(records, columns=names), conversions
     )
+    if deferred:
+        frame.attrs["deferred_source_column_conversions"] = deferred
     if frame_bytes(frame) > spec.max_bytes:
         raise spec.byte_limit_error(frame_bytes(frame))
     return frame
@@ -2026,7 +2061,9 @@ def _raw_model_partitions(
     else:
         train_frame = train.loc[:, train_columns].reset_index(drop=True)
         holdout_frame = heldout.loc[:, columns].reset_index(drop=True)
-    return train_frame, holdout_frame
+    return _normalize_model_partition(train_frame, spec), _normalize_model_partition(
+        holdout_frame, spec
+    )
 
 
 def _validate_candidate_metadata(risk_category: str | None, min_improvement: float) -> None:

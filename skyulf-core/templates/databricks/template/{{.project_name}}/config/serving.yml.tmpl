@@ -1,16 +1,15 @@
 # Stable endpoint setup is ready to run when selected at initialization.
 # Enable rollout and online-feature jobs only after completing their settings.
 # The rollout must already be initialized; the daily job never creates endpoints.
-{{if ne .prediction_delivery "batch" -}}
-{{- $endpoint := (regexp "_").ReplaceAllString .project_name "-" -}}
-{{- $endpoint = printf "%s-endpoint" $endpoint -}}
-{{- if not ((regexp "^[A-Za-z][A-Za-z0-9_-]{0,62}$").MatchString $endpoint) -}}
-{{- template "ERROR_project_name_requires_safe_serving_endpoint_name_of_at_most_63_characters" . -}}
+{{- if or (eq .cost_tag_key "project") (eq .cost_tag_key "target") (eq .cost_tag_key "suffix") (eq .cost_tag_key "managed_by") }}
+{{- fail (printf "cost_tag_key %q is reserved for serving endpoint ownership" .cost_tag_key) }}
 {{- end }}
+{{if ne .prediction_delivery "batch" -}}
 serving_endpoint:
   enabled: true
   follow_champion: {{.serving_follow_champion}}  # false = manual runs only
   # Target substitutions are resolved by the job; development gets a per-user suffix.
+  # Generated names over 63 characters keep a stable hash of the complete bound name.
   endpoint_name: "{{(regexp "_").ReplaceAllString .project_name "-"}}-{bundle_target}-endpoint{resource_suffix}"
   model_name: "{catalog}.{metadata_schema}.{{if eq .training_layout "multi_target"}}{{if .model_set_name}}{{.model_set_name}}{{else}}{{.project_name}}_set{{end}}{{else}}{{.project_name}}_model{{end}}{resource_suffix}"
   tracking_uri: databricks

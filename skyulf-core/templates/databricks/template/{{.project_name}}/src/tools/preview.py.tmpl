@@ -111,7 +111,11 @@ def _source_preview(config, path, bindings, args):
 def main():
     """Show the selected pipeline or discover installed Core model/node metadata."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--action", choices=["score", "train", "sources"], default="score")
+    parser.add_argument(
+        "--action",
+        choices=["score", "train", "approve", "sources"],
+        help="Preview scoring, training, saved-model approval, or source contracts; default uses approval for endpoint-only delivery and scoring otherwise.",
+    )
     parser.add_argument("--profile")
     parser.add_argument("--warehouse-id")
     parser.add_argument("--label-table", default={{printf "%q" .label_table_name}})
@@ -129,6 +133,8 @@ def main():
         config = read_workflow_config(path)
     except ValueError as exc:
         parser.exit(2, f"Configuration error: {exc}\n")
+    if args.action is None:
+        args.action = "approve" if config.get("prediction_delivery") == "endpoint" else "score"
     if args.list_models or args.list_preprocessors:
         for node_id, meta in sorted(NodeRegistry.get_all_metadata().items()):
             calculator = NodeRegistry.get_calculator(node_id)
