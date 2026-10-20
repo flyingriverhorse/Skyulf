@@ -130,6 +130,27 @@ def _owner(values: dict[str, str], suffix: str) -> dict[str, str]:
     }
 
 
+def target_permissions(permissions: Any, target: str) -> list[dict[str, str]]:
+    """Return this target's grants; a list applies to every target.
+
+    A mapping keyed by Bundle target lets each environment grant its own groups.
+    Every target's entries are validated, so a malformed prod entry fails in test
+    too. An unlisted target, such as a personal development target, grants nothing.
+    """
+    if not isinstance(permissions, dict):
+        return validate_serving_principals(permissions)
+    selected: list[dict[str, str]] = []
+    for name, entries in permissions.items():
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            raise ValueError("permissions keys must be Bundle target names.")
+        if not isinstance(entries, list):
+            raise ValueError(f"permissions.{name} must be a list of principal dictionaries.")
+        validated = validate_serving_principals(entries)
+        if name == target:
+            selected = validated
+    return selected
+
+
 def _validate_settings(settings: dict[str, Any]) -> None:
     """Check behavioral controls and compute before downloading a model or mutating resources."""
     _boolean(settings.get("enabled"), "serving_endpoint.enabled")
@@ -143,7 +164,9 @@ def _validate_settings(settings: dict[str, Any]) -> None:
     ):
         raise ValueError("verification.sample_rows must be an integer from 1 to 1000.")
     settings["verification"] = verification
-    settings["permissions"] = validate_serving_principals(settings.get("permissions", []))
+    settings["permissions"] = target_permissions(
+        settings.get("permissions", []), settings["ownership"]["target"]
+    )
     settings["tags"] = validate_serving_tags(settings.get("tags"))
     _spec(settings, "1")
 

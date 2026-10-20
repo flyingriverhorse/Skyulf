@@ -247,7 +247,7 @@ All keys below belong to `config/serving.yml` → `serving_endpoint`.
 | `logging_mode` | `disabled` | No inference tables or captured-request monitoring; alternatives: `telemetry`, `ai_gateway` |
 | `logging_catalog` / `logging_schema` / `logging_table_prefix` | Empty when disabled | Separate payload sink, required for logged modes |
 | `sql_function.enabled` / `sql_function.name` | `true` / target's score function | Create and smoke-test SQL; `false` leaves REST/SDK only |
-| `permissions` | `[]` | Additive caller grants; one user, group or service principal per entry |
+| `permissions` | `[]` | Additive caller grants; one user, group or service principal per entry. A list applies to every target; a mapping keyed by target (`test:`, `prod:` ...) grants each target its own principals, and an unlisted target grants nothing |
 | `verification.sample_rows` | `20` | Collected sample size, from 1 to 1000 |
 
 Use `verification: {sample_rows: 20}` to set how many source rows the job checks.
@@ -279,6 +279,22 @@ file. The endpoint job's existing dispatch tasks remain in place in either mode.
   or, with separate identities, scoring SP. Preserve training's `CAN_MANAGE_RUN`
   in `serving_permissions`. Removing a caller from YAML does not revoke access;
   change endpoint permissions and explicitly `REVOKE EXECUTE` when needed.
+  When groups differ per workspace, key `permissions` by target so each
+  deployment grants only groups that exist there:
+
+  ```yaml
+  permissions:
+    test:
+      - group_name: test-callers
+    prod:
+      - group_name: prod-callers
+      - service_principal_name: <application-id>
+  ```
+
+  Every entry is validated in every target, and the project smoke check rejects
+  a key that is not a target in `deployment/targets.yml`. SQL callers also need
+  `USE CATALOG`/`USE SCHEMA` on the function's schema and a SQL warehouse; the job
+  grants only `EXECUTE` and endpoint `CAN_QUERY`.
 - **Compute and cost:** job compute follows serverless/`policy_cluster` settings.
   Set `cost_tag_value` before serving, including serverless targets; its placeholder
   is rejected. Do not use an ownership key as `cost_tag_key`. Set Bundle

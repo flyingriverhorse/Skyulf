@@ -249,4 +249,6 @@ def test_quick_setup_asks_for_the_monitoring_schema_once_monitoring_is_on():
     """Turning monitoring on in quick setup must still ask where the shared store lives."""
     asked = _asked(setup_mode="quick", monitoring="true")
     assert "monitoring_schema" in asked
-    assert "monitoring_catalog" not in PROPERTIES
+    # The old catalog answer remains only as a removed-answer guard that accepts blank.
+    assert PROPERTIES["monitoring_catalog"]["enum"] == [""]
+    assert "monitoring_catalog" not in asked

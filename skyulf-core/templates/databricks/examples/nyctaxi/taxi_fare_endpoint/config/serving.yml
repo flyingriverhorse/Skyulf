@@ -21,8 +21,26 @@ serving_endpoint:
   sql_function:
     enabled: true
     name: "{catalog}.{metadata_schema}.taxi_fare_endpoint_score{resource_suffix}"
-  # Additive grants only. Removing an entry does not revoke access.
-  permissions: [] # e.g. [{group_name: data_products, level: CAN_QUERY}]
+  # Who may call the endpoint: each entry gets endpoint CAN_QUERY and SQL function
+  # EXECUTE. Grants are additive; removing an entry does not revoke access.
+  #
+  # Same callers in every target:
+  #   permissions:
+  #     - group_name: xx-team
+  #       level: CAN_QUERY
+  #
+  # Different callers per target (groups differ per workspace). A target that is
+  # not listed, such as a personal development target, grants nothing:
+  #   permissions:
+  #     test:
+  #       - group_name: xx-team
+  #     syst:
+  #       - group_name: yy-team
+  #     prod:
+  #       - group_name: zz-team
+  #       - service_principal_name: <application-id>
+  #       - user_name: someone@example.com
+  permissions: []
   verification:
     sample_rows: 20 # Bounded sample from config/inference.yml score_source_table; zero rows fails.
 

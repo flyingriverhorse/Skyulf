@@ -60,6 +60,17 @@ def _check_config(root: Path, bindings: dict[str, str]) -> dict:
         raise ValueError(f"config/{path.name}: {exc}") from exc
 
 
+def _check_permission_targets(root: Path, settings: Any) -> None:
+    """Catch mistyped target keys, which would otherwise silently grant nothing."""
+    permissions = settings.get("permissions") if isinstance(settings, dict) else None
+    if not isinstance(permissions, dict):
+        return
+    targets = read_yaml_mapping(root / "deployment" / "targets.yml").get("targets") or {}
+    unknown = sorted(str(name) for name in set(permissions) - set(targets))
+    if unknown:
+        raise ValueError(f"serving_endpoint.permissions names unknown targets: {unknown}.")
+
+
 def _check_serving(root: Path, bindings: dict[str, str]) -> None:
     """Validate optional serving jobs' settings offline, as each job does before remote work."""
     path = root / "config" / "serving.yml"
@@ -71,6 +82,7 @@ def _check_serving(root: Path, bindings: dict[str, str]) -> None:
         if "online_serving" in document:
             raise ValueError("online_serving was renamed to online_feature_lookup.")
         if "serving_endpoint" in document:
+            _check_permission_targets(root, document["serving_endpoint"])
             read_serving_endpoint_settings(
                 {
                     **bindings,
