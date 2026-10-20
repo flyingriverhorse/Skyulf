@@ -132,6 +132,97 @@ def test_wheel_rejects_native_distribution(core_installation):
         bundled_core_wheel()
 
 
+@pytest.mark.parametrize("suffix", [".so", ".pyd", ".dll", ".dylib"])
+def test_wheel_rejects_native_package_content(core_installation, suffix):
+    """Pure-Python metadata cannot hide platform binaries in package resources."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    package, _ = core_installation
+    (package / f"native{suffix}").write_bytes(b"native library")
+    with pytest.raises(ValueError, match="pure-Python"):
+        bundled_core_wheel()
+
+
+def test_wheel_rejects_missing_package_source(core_installation):
+    """A broken installation must not produce a wheel containing only resources."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    package, _ = core_installation
+    (package / "__init__.py").unlink()
+    with pytest.raises(ValueError, match="missing its Python source"):
+        bundled_core_wheel()
+
+
+@pytest.mark.parametrize("license_path", ["../private.txt", r"nested\license"])
+def test_wheel_rejects_unsafe_license_metadata(core_installation, license_path):
+    """Distribution metadata cannot add server files through license paths."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    _, metadata = core_installation
+    path = metadata / "METADATA"
+    path.write_text(
+        path.read_text().replace("License-File: LICENSE", f"License-File: {license_path}")
+    )
+    with pytest.raises(ValueError, match="unsafe relative path"):
+        bundled_core_wheel()
+
+
+def test_wheel_rejects_absolute_license_metadata(core_installation):
+    """Absolute license paths cannot copy real files outside distribution metadata."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    _, metadata = core_installation
+    private = metadata.parent / "private.txt"
+    private.write_text("PRIVATE")
+    path = metadata / "METADATA"
+    path.write_text(
+        path.read_text().replace("License-File: LICENSE", f"License-File: {private.as_posix()}")
+    )
+    with pytest.raises(ValueError, match="unsafe relative path"):
+        bundled_core_wheel()
+
+
+def test_wheel_rejects_missing_declared_license(core_installation):
+    """A declared license must be included rather than silently omitted from exports."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    _, metadata = core_installation
+    (metadata / "licenses" / "LICENSE").unlink()
+    with pytest.raises(ValueError, match="metadata is missing LICENSE"):
+        bundled_core_wheel()
+
+
+def test_wheel_rejects_missing_distribution_record(core_installation):
+    """Incomplete installation metadata must stop export before creating an archive."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    _, metadata = core_installation
+    (metadata / "RECORD").unlink()
+    with pytest.raises(ValueError, match="requires installed .dist-info metadata"):
+        bundled_core_wheel()
+
+
+def test_wheel_rejects_additional_top_level_package(core_installation):
+    """Export must refuse distributions whose additional packages would be lost."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    _, metadata = core_installation
+    (metadata / "top_level.txt").write_text("skyulf\nextra_package\n")
+    with pytest.raises(ValueError, match="pure-Python"):
+        bundled_core_wheel()
+
+
+def test_wheel_rejects_unsafe_distribution_version(core_installation):
+    """Installed metadata must not inject path separators into wheel member names."""
+    from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
+
+    _, metadata = core_installation
+    path = metadata / "METADATA"
+    path.write_text(path.read_text().replace("Version: 0.9.5", "Version: ../0.9.5"))
+    with pytest.raises(ValueError, match="cannot be represented in a wheel filename"):
+        bundled_core_wheel()
+
+
 def test_wheel_rejects_package_symlink_escape(core_installation, tmp_path):
     """Package data links cannot copy server files outside the authorized package root."""
     from backend.ml_pipeline.project_export.core_wheel import bundled_core_wheel
