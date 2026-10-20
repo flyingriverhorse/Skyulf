@@ -444,7 +444,7 @@ def test_preview_cli_exposes_one_training_action(tmp_path, monkeypatch, capsys):
         runpy.run_path(str(project / "src/tools/preview.py"), run_name="__main__")
     assert stopped.value.code == 0
     output = capsys.readouterr().out
-    assert "{score,train,sources}" in output
+    assert "{score,train,approve,sources}" in output
     assert "train_monthly" not in output
 
 
