@@ -1,7 +1,9 @@
 # Skyulf
 
 <p align="center">
-  <img src="static/img/logo.png" alt="Skyulf Logo" width="200">
+  <img src="static/img/app_logo/logo.png" alt="Kayra logo" width="96"><br/>
+  <strong>Kayra — the self-hosted visual MLOps builder, by Skyulf.</strong><br/>
+  From a raw file to a trained, served and monitored model, without leaving one workspace.
 </p>
 
 <p align="center">
@@ -11,230 +13,314 @@
   <a href="https://www.skyulf.com">
     <img src="https://img.shields.io/badge/Website-skyulf.com-f2c025?style=for-the-badge&logo=globe&logoColor=white" alt="Website">
   </a>
-  <br/>
-  <sub>🟢&nbsp;no signup required</sub>
-  <br/>
-  <br/>
-  <a href="https://pepy.tech/projects/skyulf-core">
-    <img src="https://img.shields.io/pepy/dt/skyulf-core?style=for-the-badge&label=Total%20Downloads&color=green" alt="PyPI Total Downloads">
+  <a href="https://www.skyulf.com/manual/">
+    <img src="https://img.shields.io/badge/Docs-manual-8b5cf6?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation">
   </a>
+  <br/>
+  <sub>🟢&nbsp;live demo, no signup required</sub>
 </p>
 
-[![Backend License](https://img.shields.io/badge/backend-AGPLv3-blue)](LICENSE)
-[![Frontend License](https://img.shields.io/badge/frontend-AGPLv3-blue)](frontend/ml-canvas/LICENSE)
-[![Core License](https://img.shields.io/badge/skyulf--core-Apache--2.0-green)](skyulf-core/LICENSE)
-[![Python](https://img.shields.io/badge/python-3.12-blue)](#quick-start)
-[![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml)
-[![Docs](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml)
-[![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/format.json)](https://github.com/astral-sh/ruff)
-[![Type check: Ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![codecov](https://codecov.io/github/flyingriverhorse/Skyulf/graph/badge.svg?token=47ED2R6ZHC)](https://codecov.io/github/flyingriverhorse/Skyulf)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/51e3ad3ce18e41b2922cf62a6dd6ce99)](https://app.codacy.com/gh/flyingriverhorse/Skyulf/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/skyulf-core?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads%2Fmonth)](https://pepy.tech/projects/skyulf-core)
-[![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues)
+<p align="center">
+  <a href="https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml"><img src="https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/github/flyingriverhorse/Skyulf"><img src="https://codecov.io/github/flyingriverhorse/Skyulf/graph/badge.svg?token=47ED2R6ZHC" alt="codecov"></a>
+  <a href="https://app.codacy.com/gh/flyingriverhorse/Skyulf/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/51e3ad3ce18e41b2922cf62a6dd6ce99" alt="Codacy Badge"></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12"></a>
+  <a href="https://pepy.tech/projects/skyulf-core"><img src="https://img.shields.io/pepy/dt/skyulf-core?label=skyulf-core%20downloads&color=green" alt="PyPI downloads"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-AGPLv3%20%2B%20Apache--2.0-blue" alt="License"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
+</p>
 
-> **Kayra:** The Visual MLOps Builder — by Skyulf
+<p align="center">
+  <img src="static/img/canvas.jpg" alt="Kayra visual pipeline canvas with connected preprocessing and model nodes" width="900">
+</p>
 
-Kayra is Skyulf’s self-hosted, privacy-first MLOps application. Its backend API and visual canvas share the standalone `skyulf-core` Python library. It is designed to be the "glue" that holds your data science workflow together (with export notebook option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
+Skyulf has two parts that share one engine:
 
-## What is the meaning of Skyulf?
+- **Kayra** — a self-hosted web application. Upload data, explore it, build a pipeline on a
+  node-based canvas, train and tune models in the background, compare runs, serve the best one
+  and watch it for drift. Your data stays on your machine or server.
+- **`skyulf-core`** — the standalone Python library behind Kayra (Apache 2.0, on PyPI). Use the
+  same pipelines, EDA and models from your own scripts and notebooks.
 
-I named it Skyulf after two ideas. Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and helpful to community.
+A model you train does not have to stay inside Skyulf: export it as a
+[standalone API and batch project](#take-a-model-anywhere-project-export), or run the whole
+lifecycle [directly on Databricks with MLflow](#run-ml-on-databricks-with-mlflow).
 
-## Table of Contents
+## Contents
 
+- [Features](#features)
 - [Quick Start](#quick-start)
-- [Using Skyulf as a Library](#using-skyulf-as-a-library)
-- [Key Features](#key-features)
-- [Version History](#version-history)
-- [Workflow Overview](#workflow-overview)
+- [Take a model anywhere: project export](#take-a-model-anywhere-project-export)
+- [Run ML on Databricks with MLflow](#run-ml-on-databricks-with-mlflow)
+- [Use skyulf-core as a library](#use-skyulf-core-as-a-library)
+- [Screenshots](#screenshots)
+- [Documentation](#documentation)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
 
+## Features
+
+| Area | What you get |
+| --- | --- |
+| **Data** | Ingest CSV, Excel, JSON, Parquet or S3 (AWS, MinIO). Metadata starts in SQLite with zero config and scales to PostgreSQL. |
+| **Exploratory analysis** | One-click profiling with interactive charts, statistical alerts, correlations, outliers, segmentation, decision-tree rule extraction, time-series, geospatial views and causal discovery (DAGs). |
+| **Visual pipeline canvas** | Drag-and-drop nodes for cleaning, imputation, encoding, scaling, outlier handling, feature generation, text vectorizers and feature selection. Multi-branch canvases run as parallel jobs. |
+| **Training & tuning** | 34 model types: scikit-learn classifiers, regressors and clustering, plus XGBoost and LightGBM. Grid, random and successive-halving search built in, Optuna optional. Voting and stacking ensembles. Jobs run in the background (Celery + Redis, or threads). |
+| **Experiments** | Compare runs side by side with metrics, confusion matrices and ROC curves; tune decision thresholds; optional SHAP explanations. |
+| **Registry & serving** | Versioned model registry. Promote a version and it is served behind a REST endpoint; the full deployment history is kept. |
+| **Project export** | Download any completed version as a standalone project: a FastAPI service and CSV/Parquet batch scoring that run without Kayra. [More below](#take-a-model-anywhere-project-export). |
+| **Notebook export** | Turn any canvas pipeline into a self-contained Jupyter notebook, in full (one cell per node) or compact mode, including tuning. |
+| **Monitoring** | Data and model drift reports, error log, slow-node profiling and an audit log of every pipeline change. |
+| **Databricks & MLflow** | Databricks Asset Bundle template for training, approval, batch and Spark scoring, Model Serving and monitoring; MLflow tracking and registry. [More below](#run-ml-on-databricks-with-mlflow). |
+| **Performance** | FastAPI + Polars for ETL; Arrow-based conversion to NumPy for model nodes via `SklearnBridge`. |
+
 ## Quick Start
 
-Prerequisites: **Python 3.12**
+Prerequisites: **Python 3.12** (or Docker).
 
-### Fastest Path (One Command)
+### 1. One command
 
-**Windows:** Double-click `start.bat`
-**macOS/Linux:** Run `./start.sh`or bash `start.sh`
+- **Windows:** double-click `start.bat`
+- **macOS / Linux:** `./start.sh` (or `bash start.sh`)
 
-These scripts auto-create a virtualenv, install deps, generate a `.env` with safe defaults (SQLite, no Redis), and launch the server. Open http://127.0.0.1:8000 when ready.
+The script creates a virtual environment, installs dependencies, writes a `.env` with safe defaults
+(SQLite, no Redis) and starts the server. Open <http://127.0.0.1:8000> when it is ready.
 
-For Docker Compose, manual setup, and a guided first pipeline, see [QUICKSTART.md](QUICKSTART.md).
+### 2. Docker Compose
 
-### On Windows PowerShell (Manual)
+```bash
+docker compose up --pull=always --build
+```
+
+This starts the FastAPI backend (port 8000), Redis (port 6379) and a Celery worker. Check
+<http://127.0.0.1:8000/health>; in development mode the API docs are at <http://127.0.0.1:8000/docs>.
+
+### 3. Manual setup
+
+<details>
+<summary>pip or uv, step by step</summary>
+
+**Using uv (faster):**
+
+```bash
+uv venv
+# Windows: .\.venv\Scripts\Activate.ps1   macOS/Linux: source .venv/bin/activate
+uv pip install -r requirements.txt
+python run_skyulf.py
+```
 
 **Using pip:**
-```powershell
+
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+# Windows: .\.venv\Scripts\Activate.ps1   macOS/Linux: source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 python run_skyulf.py
 ```
 
-**Using uv (Faster):**
-```powershell
-uv venv
-.\.venv\Scripts\Activate.ps1
-uv pip install -r requirements.txt
-python run_skyulf.py
-```
+`run_skyulf.py` starts the FastAPI server.
 
-The `run_skyulf.py` script will automatically start the FastAPI server.
+</details>
 
-**Optional: Celery & Redis**
-By default, Kayra uses Celery and Redis for robust background task management. However, for simple local testing or environments where you cannot run Redis, you can disable this dependency.
+<details>
+<summary>Optional: run without Celery and Redis</summary>
 
-Add this to your `.env` file:
+By default Kayra uses Celery and Redis for background jobs. For simple local use, or where you
+cannot run Redis, add this to `.env`:
+
 ```ini
 USE_CELERY=false
 ```
-When disabled, background tasks (training, ingestion) will run in background threads within the main application process instead of a separate worker.
 
-### S3 Configuration (Optional)
-To enable S3 integration for data and artifacts, add these to your `.env`:
+Training and ingestion then run in background threads inside the main process.
+
+</details>
+
+<details>
+<summary>Optional: S3 storage</summary>
+
+To use S3 for data and artifacts, add these to `.env`:
+
 ```ini
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
 AWS_DEFAULT_REGION=us-east-1
 AWS_BUCKET_NAME=your-bucket
-# Optional: Upload local training artifacts to S3
+# Optional: upload local training artifacts to S3
 UPLOAD_TO_S3_FOR_LOCAL_FILES=true
-# Optional: Force local storage even for S3 data
+# Optional: force local storage even for S3 data
 SAVE_S3_ARTIFACTS_LOCALLY=false
 ```
 
-`AWS_BUCKET_NAME` is the canonical default data-bucket setting and is read
-from `.env` or the process environment. The legacy `S3_BUCKET_NAME` name is
-also accepted. Environment values override `.env`; when both names are set
-in the same source, `AWS_BUCKET_NAME` takes precedence.
+`AWS_BUCKET_NAME` is the canonical default data-bucket setting and is read from `.env` or the
+process environment. The legacy `S3_BUCKET_NAME` name is also accepted. Environment values
+override `.env`; when both names are set in the same source, `AWS_BUCKET_NAME` takes precedence.
 
-### With Docker Compose (Recommended)
+</details>
 
-```powershell
-docker compose up --pull=always --build
+For a guided first pipeline, see [QUICKSTART.md](QUICKSTART.md).
+
+## Take a model anywhere: project export
+
+In **Model Registry**, pick a completed version and click **Export project**. You get a ZIP that
+runs on any machine with Python, without Kayra, a database or a scheduler:
+
+```text
+model.pkl          fitted model + fitted preprocessing (imputers, encoders, scalers, outlier filters)
+scoring.py         one prediction path shared by the API and batch
+app.py             FastAPI service: /predict, /health, /schema, /docs with typed inputs
+batch.py           CSV/Parquet scoring in chunks, original rows and columns kept
+wheels/            the matching skyulf-core wheel, so installation never depends on PyPI
+requirements.txt   pinned versions · Dockerfile · smoke_test.py · README.md
 ```
-
-This will start the full stack:
-- **FastAPI Backend** (Port 8000)
-- **Redis** (Port 6379)
-- **Celery Worker** (Background jobs)
-
-**Open:**
-- API health — http://127.0.0.1:8000/health
-- Docs (dev mode) — http://127.0.0.1:8000/docs
-
-## Skyulf Core Library
-
-The core machine learning logic of Skyulf (preprocessing, modeling, tuning) is available as a standalone library on PyPI. You can use it to build reproducible pipelines in your own scripts or notebooks, independent of the web platform.
 
 ```bash
-# Base (lightweight)
-pip install skyulf-core
+uv venv && uv pip install -r requirements.txt
 
-# EDA-focused (recommended for profiling + charts)
-pip install skyulf-core[eda,viz]
+# HTTP API, docs at http://127.0.0.1:8000/docs
+uv run --no-project uvicorn app:app --port 8000
 
-# Full optional feature set
-pip install skyulf-core[eda,viz,tuning,preprocessing-imbalanced,modeling-xgboost]
-
-# or
-uv add skyulf-core
-
-# EDA-focused with uv
-uv add "skyulf-core[eda,viz]"
-
-# Full optional feature set with uv
-uv add "skyulf-core[eda,viz,tuning,preprocessing-imbalanced,modeling-xgboost]"
+# batch scoring of a file
+uv run --no-project python batch.py --input data.parquet --output scored.parquet
 ```
 
-## Using Skyulf as a Library
+Send raw columns as they were in your training data; the saved preprocessing runs before the
+model. Classifiers return labels and class probabilities. Rows rejected by a fitted outlier
+filter are kept in place and marked `excluded` instead of silently disappearing. See the
+[project export quickstart](docs/user_guide/model_project_export_quickstart.md) for the full
+flow and what can and cannot be exported.
 
-`skyulf-core` is Skyulf's standalone Python library and powers Kayra. You can use it in your own scripts or Jupyter notebooks for powerful EDA and pipeline building. Using EDA is a great way to get started and it is really easy to use.
+## Run ML on Databricks with MLflow
 
-### Example: Automated EDA
+Skyulf ships a Databricks Asset Bundle template, so the same preprocessing and models run as
+Databricks jobs on your own workspace, with MLflow and Unity Catalog as the model registry:
+
+```bash
+databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
+```
+
+The generated project covers the full lifecycle, configured in YAML instead of notebooks:
+
+- **Train** one model, a competition of 2-8 candidate algorithms, or a multi-target model set,
+  with grid, random, halving or Optuna search and holdout quality gates.
+- **Register and approve** versions in MLflow / Unity Catalog with champion and challenger
+  aliases and rollback.
+- **Score** on a schedule into Delta tables, on a single node or on Spark workers for large tables.
+- **Serve** through a Model Serving REST endpoint, call it from SQL with `ai_query`, or look up
+  online features by key.
+- **Monitor** drift, performance and serving health with Databricks dashboards.
+
+MLflow also works without Databricks: track runs, package models and manage a local registry.
+Start with the [integrations index](docs/user_guide/integrations.md) or follow the
+[end-to-end Databricks walkthrough](docs/user_guide/databricks_bundle_walkthrough.md).
+
+## Use skyulf-core as a library
+
+```bash
+pip install skyulf-core                  # base
+pip install "skyulf-core[eda,viz]"       # profiling and charts
+pip install "skyulf-core[eda,viz,tuning,preprocessing-imbalanced,modeling-xgboost]"   # full set
+# or with uv: uv add "skyulf-core[eda,viz]"
+```
+
+### Train, save and reuse a pipeline
+
+```python
+import polars as pl
+from skyulf import SkyulfPipeline
+
+df = pl.DataFrame({
+    "age": [43, 38, None, 52, 61, 29, 47, 55],
+    "income": [52000, 61000, 48000, None, 73000, 41000, 58000, 66000],
+    "city": ["NY", "LDN", "LDN", "PAR", "NY", "PAR", "NY", "LDN"],
+    "purchased": [1, 0, 0, 1, 1, 0, 0, 1],
+})
+
+pipeline = SkyulfPipeline({
+    "preprocessing": [
+        {"name": "split", "transformer": "TrainTestSplitter",
+         "params": {"target_column": "purchased", "test_size": 0.25, "random_state": 42}},
+        {"name": "impute", "transformer": "SimpleImputer",
+         "params": {"columns": ["age", "income"], "strategy": "median"}},
+        {"name": "encode", "transformer": "OneHotEncoder",
+         "params": {"columns": ["city"], "handle_unknown": "ignore"}},
+    ],
+    "modeling": {"type": "random_forest_classifier", "params": {"random_state": 42}},
+})
+
+metrics = pipeline.fit(df, target_column="purchased")
+pipeline.save("model.pkl")
+predictions = SkyulfPipeline.load("model.pkl").predict(df.drop("purchased"))
+```
+
+Imputation, encoding and the model are fitted on the training split only, so the test split stays
+untouched. See [`skyulf-core/README.md`](skyulf-core/README.md) and the
+[quickstart notebook](skyulf-core/examples/00_quickstart.ipynb).
+
+### Automated EDA
 
 ```python
 import polars as pl
 from skyulf import EDAAnalyzer, EDAVisualizer
 
-# 1. Load Data
 df = pl.read_csv("your_dataset.csv")
-
-# 2. Run Analysis
-analyzer = EDAAnalyzer(df)
-profile = analyzer.analyze(
+profile = EDAAnalyzer(df).analyze(
     target_col="target",
-    task_type="Classification", # Optional: Force "Classification" or "Regression"
-    date_col="timestamp",       # Optional: Manually specify if auto-detection fails
-    lat_col="latitude",         # Optional
-    lon_col="longitude"         # Optional
+    task_type="Classification",  # optional: "Classification" or "Regression"
+    date_col="timestamp",        # optional, if auto-detection fails
 )
 
-# 3. Visualize Results (The Easy Way)
-# This single class handles all the rich terminal output and matplotlib plots
 viz = EDAVisualizer(profile, df)
-
-# Print the dashboard
-viz.summary()
-
-# Show the plots
-viz.plot()
+viz.summary()  # rich terminal dashboard
+viz.plot()     # matplotlib charts
 ```
 
-For detailed examples including **Time Series**, **Geospatial Analysis**, and **Causal Inference**, see the [EDA User Guide](docs/user_guide/eda_profiling.md).
+Time-series, geospatial and causal examples are in the [EDA guide](docs/user_guide/eda_profiling.md).
 
-## Key Features
+## Screenshots
 
-*   **🎨 Visual Feature Canvas:** A node-based editor to clean, transform, and engineer features without writing spaghetti code. (25+ built-in nodes).
-*   **Automated EDA:** Professional-grade Exploratory Data Analysis with interactive charts, causal discovery (DAGs), decision trees for rule extraction, segmentation, outlier detection, and statistical alerts.
-*   **Drift Analysis** Built on the EDA engine to monitor data and model drift over time with statistical tests and visualizations.
-*   **High-Performance Dual Engine:** Built on **FastAPI** and **Polars** for lightning-fast ETL (Extract/Transform/Load) operations. Data strictly bypasses Pandas overhead by using zero-copy Apache Arrow conversions directly to NumPy via our `SklearnBridge` for advanced ML nodes.
-*   **⚡ Async by Default:** Heavy training jobs run in the background via Celery & Redis (or background threads)—your UI never freezes.
-*   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or S3. Backend storage starts with SQLite (zero-config) and scales to PostgreSQL.
-*   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
-*   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
-*   **📝 Text & NLP:** Turn raw text into model-ready features with Count / TF-IDF / Hashing vectorizers, a configurable Tokenizer, and text-friendly Multinomial / Bernoulli Naive Bayes nodes. Optional dense **Sentence Embeddings** via `skyulf-core[nlp]`. See the [Text & NLP guide](https://flyingriverhorse.github.io/Skyulf/user_guide/text_nlp.html) and the runnable `skyulf-core/examples/07_text_nlp_real_data.ipynb` tutorial.
-*   **🤝 Ensemble Models:** Combine several base learners into one estimator with dedicated **Voting** and **Stacking** nodes (classification & regression). Supports per-model fixed hyperparameters, nested tuning, optional base-model calibration, and parallel fitting.
-*   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
-*   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
-*   **📓 Notebook Export:** Export any canvas pipeline to a fully self-contained Jupyter notebook with one click — two modes available:
-    *   **Full mode** — one cell per preprocessing node so you can tweak parameters, inspect intermediate state, and understand every transformation.
-    *   **Compact mode** — single `SkyulfPipeline.fit()` call per branch, ideal for sharing reproducible results or running in CI. Multi-branch canvases get a coloured `(branch × split)` comparison table.
-    *   **Training nodes in Advanced mode** (Classification / Regression / Text Classification, `run_mode: "advanced"`) are properly wired with `TuningCalculator`/`TuningApplier` wrappers so Optuna/grid/random search actually runs in the notebook — with per-trial progress printed to cell output.
+<table>
+  <tr>
+    <td align="center"><img src="static/img/jobs.jpg" alt="Jobs list with background training runs" width="430"><br/><sub><b>Background training and tuning</b></sub></td>
+    <td align="center"><img src="static/img/registry.jpg" alt="Model registry with versions" width="430"><br/><sub><b>Versioned model registry</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="static/img/deployments.jpg" alt="Deployments screen with the active model and history" width="430"><br/><sub><b>One-click deployment with history</b></sub></td>
+    <td align="center"><img src="static/img/export/exported_api.jpg" alt="Exported model API answering a prediction request" width="430"><br/><sub><b>Standalone exported model API</b></sub></td>
+  </tr>
+</table>
 
-## Version History
+## Documentation
 
-We maintain a detailed changelog of all major updates, new features, and architectural changes.
+The full manual is at **[skyulf.com/manual](https://www.skyulf.com/manual/)**. Good starting points:
 
-👉 **[View the full CHANGELOG.md](./CHANGELOG.md)** for the version index, or browse the detailed series files in [`changelog/`](./changelog/).
-
-## Workflow Overview
-
-The high-level flow from dataset to model training inside Kayra:
-
-<p align="center">
-	<img src="static/img/image.png" alt="Dataset → Train/Val/Test split → Celery-driven model trainer" width="520">
-	<br />
-	<em>Dataset source → train/val/test split → background model training (Celery)</em>
-</p>
+| Topic | Guide |
+| --- | --- |
+| First pipeline in Kayra | [QUICKSTART.md](QUICKSTART.md) |
+| EDA and profiling | [EDA guide](docs/user_guide/eda_profiling.md) |
+| Text and NLP nodes | [Text & NLP](docs/user_guide/text_nlp.md) |
+| Drift monitoring | [Drift monitoring](docs/user_guide/drift_monitoring.md) |
+| Standalone model projects | [Project export quickstart](docs/user_guide/model_project_export_quickstart.md) |
+| SHAP explanations | [SHAP](docs/user_guide/shap_explainability.md) |
+| MLflow and Databricks | [Integrations](docs/user_guide/integrations.md) |
+| What changed | [CHANGELOG.md](CHANGELOG.md) and [`changelog/`](changelog/) |
 
 ## Development
-- Configuration via `backend/config/` package with domain mixins (SQLite, dev CORS)
-- Lifespan hooks initialize the async DB engine automatically
-- Tests under `tests/` cover core feature engineering and training helpers
-- `docker-compose.yml` to run API + Redis (+ Celery worker)
-- **Command cheatsheet:** [`skyulf-commands.md`](skyulf-commands.md) collects the common local dev, quality-check, test, build, and release commands (Ruff + `ty` toolchain).
-- **Release guide:** [`RELEASING.md`](RELEASING.md) — how to cut an app release (GitHub Release draft) and a `skyulf-core` library release (PyPI).
+
+- Configuration lives in the `backend/config/` package (domain mixins: SQLite, dev CORS, Celery, S3).
+- Lifespan hooks initialize the async database engine automatically.
+- Tests: `tests/` (backend and integration) and `skyulf-core/tests/` (library).
+- [`skyulf-commands.md`](skyulf-commands.md) collects the common dev, quality-check (Ruff + `ty`),
+  test, build and release commands.
+- [`RELEASING.md`](RELEASING.md) explains the app release (GitHub Release) and the `skyulf-core`
+  release (PyPI).
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow guidance, and read our [Code of Conduct](CODE_OF_CONDUCT.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, and read
+the [Code of Conduct](CODE_OF_CONDUCT.md). Bug reports, feature ideas and documentation fixes all help.
 
 ## License
 
@@ -250,18 +336,21 @@ See [`COMMERCIAL-LICENSE.md`](COMMERCIAL-LICENSE.md) for partnership options.
 
 **Existing versions:** Releases v0.5.15 and earlier were published under Apache 2.0. Those versions remain under their original license. AGPLv3 applies from v0.5.16 onwards.
 
----
-
 If you'd like to contribute, sponsor, or request a commercial license, please star the repo, open a Discussion or issue, or see `.github/FUNDING.yml` for sponsorship options.
 
----
+## About the name
+
+Sky is the open space above Earth, where the sun, moon, stars and clouds live. Ulf means "wolf",
+with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the
+project: independent and built for the community.
 
 ## 🤝 Join the Journey
 
 I'm building this because I love it, but I can't do it alone forever.
-*   **Try it out:** Clone the repo, run it, break it.
-*   **Give Feedback:** Tell me what sucks. Tell me what you love.
-*   **Contribute:** Even a typo fix in the README helps.
+
+*   **Try it out:** clone the repo, run it, break it.
+*   **Give feedback:** tell me what sucks and what you love.
+*   **Contribute:** even a typo fix in the README helps.
 
 Let's build the simplest, most powerful MLOps hub together.
 
