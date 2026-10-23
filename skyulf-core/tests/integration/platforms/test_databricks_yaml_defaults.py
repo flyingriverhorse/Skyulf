@@ -131,3 +131,28 @@ def test_yaml_generation_preserves_selected_scoring_environment(tmp_path, infere
         )
     else:
         assert "spark_udf_env_manager" not in config
+
+
+def test_generated_single_model_skips_rows_with_an_empty_target(tmp_path):
+    """skip_missing_targets in the generated YAML must reach training and drop empty targets."""
+    import pandas as pd
+
+    from skyulf.integrations.databricks.lifecycle.workflow import training_spec
+    from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+    from skyulf.integrations.databricks.training.fitting.candidate import split_labeled_snapshot
+
+    project = _generate_project(tmp_path)
+    config = read_workflow_config(project / "config/training.yml")
+    assert config["drop_missing_labels"] is True
+    spec = training_spec({**config, "training_table": "a.b.c", "training_version": 1})
+    assert spec.drop_missing_labels is True
+    frame = pd.DataFrame(
+        {
+            "entity_id": [str(i) for i in range(10)],
+            "feature_value": [float(i) for i in range(10)],
+            "target": [float(i) for i in range(9)] + [None],
+        }
+    )
+    train, holdout, unavailable = split_labeled_snapshot(frame, spec)
+    assert unavailable == 1
+    assert len(train) + len(holdout) == 9

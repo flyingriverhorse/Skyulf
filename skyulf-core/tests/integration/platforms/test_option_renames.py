@@ -301,3 +301,19 @@ def test_model_set_old_source_change_name_is_rejected(tmp_path):
     _inference(path, _MODEL_SET + "  source_change_policy: rebuild_on_change\n")
     with pytest.raises(ValueError, match="source_change_policy"):
         read_inference_config(path.parent)
+
+
+def test_single_model_can_skip_rows_with_an_empty_target(tmp_path):
+    """Rows whose target is empty are skipped without needing a result-date column."""
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+
+    path = _project(tmp_path)
+    path.with_name("training.yml").write_text(
+        "version: 1\ndefaults:\n  skip_missing_targets: true\nmodels:\n  main:\n"
+        "    model: {type: linear_regression}\n",
+        encoding="utf-8",
+    )
+    training = read_training_config(path.parent)
+    assert training is not None
+    assert training["defaults"]["drop_missing_labels"] is True
+    assert "skip_missing_targets" not in training["defaults"]

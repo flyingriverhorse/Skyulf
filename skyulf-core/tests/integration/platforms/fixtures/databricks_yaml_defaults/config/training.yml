@@ -20,6 +20,7 @@ defaults:
   stratify: false
   cv_enabled: false
   filter_unavailable_results: false
+  skip_missing_targets: true
   max_rows: 10000
   max_input_mb: 64
   metric: heldout_rmse

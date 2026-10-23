@@ -94,6 +94,7 @@ answers use the same question name with a `branch_N_` prefix.
 | `training_sample_rows` | Integer or null | Omitted/null | At least 4 and at most `max_rows` | Seeded bounded Spark-side selection before local transfer and splitting; does not sample predictions. | `training_sample_rows` |
 | `training_sample_seed` | Integer | `42` | 0 through 2**32-1 | Reproduces requested sample membership; saved evidence pins it for approval. | `training_sample_seed` |
 | `max_rows` | Integer | `10000` | Positive; aggregate fit/holdout input must fit | Rejects a larger local training population instead of silently truncating it. Rows dropped by `filter_unavailable_results` (and missing branch targets in `multi_target`) are removed first and do not count. | `max_rows` |
+| `skip_missing_targets` | Boolean | `false` when omitted; new projects write `true` | true, false | Skip rows whose target is empty instead of failing; they do not count toward `max_rows` and appear in the unavailable-label count. `multi_target` always skips empty branch targets. | `skip_missing_targets` |
 | `max_input_mb` | Integer | `64` | Positive whole MiB; one unit is 1,048,576 bytes | Bounds decoded/local training data, not Spark wire buffers or total process memory. | `max_input_mb` |
 
 ### Source windows and result availability

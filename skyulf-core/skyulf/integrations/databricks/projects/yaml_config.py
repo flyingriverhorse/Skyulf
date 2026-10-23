@@ -26,6 +26,8 @@ TRAINING_OPTIONS = {
     "probe_pipeline_for_serving": ("admit_probed_custom_steps", None),
     # Old name of probe_pipeline_for_serving; still accepted.
     "allow_tested_custom_steps": ("admit_probed_custom_steps", None),
+    # Skip rows with an empty target (multi_target always does, per branch).
+    "skip_missing_targets": ("drop_missing_labels", None),
 }
 TRAINING_RENAMES = {
     "training_table_version": "training_version",
