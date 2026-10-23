@@ -665,7 +665,7 @@ def _preview_explanations(pipeline: dict[str, Any]) -> list[str]:
     )
     if expanding:
         lines.append(
-            f"Explanations warning: {', '.join(expanding)} add columns, and max_features counts "
+            f"Explanations warning: {', '.join(expanding)} can add columns, and max_features counts "
             "model features after encoding. SHAP is skipped (feature_limit_exceeded) above the "
             "limit; the training report shows the real width."
         )
