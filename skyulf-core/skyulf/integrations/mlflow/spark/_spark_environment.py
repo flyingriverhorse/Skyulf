@@ -13,6 +13,8 @@ from typing import Any
 
 import skyulf
 
+from ._package_sources import apply_package_sources
+
 
 def pyfunc_environment(
     directory: Path, requirements: list[str], *, spark_certified: bool
@@ -29,6 +31,11 @@ def pyfunc_environment(
             directory, requirements
         )
         options["code_paths"] = code_paths
+    options["pip_requirements"], wheel_paths = apply_package_sources(
+        directory, options["pip_requirements"]
+    )
+    if wheel_paths:
+        options["code_paths"] = [*options.get("code_paths", []), *wheel_paths]
     return options, source_sha256
 
 

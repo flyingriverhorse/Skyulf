@@ -320,7 +320,29 @@ file. The endpoint job's existing dispatch tasks remain in place in either mode.
 - **Recovery:** a failed smoke can leave the new version serving. Rerun with
   `--params model_version=<previous_version>` from the deployment result or
   endpoint configuration history (failed runs may have no final summary).
-  Recovery is explicit and leaves champion unchanged.
+  Recovery is explicit and leaves champion unchanged. If the very first deploy
+  fails (`UPDATE_FAILED`, nothing served), the next run retries the same owned
+  endpoint; there is no need to delete it.
+- **Private package index:** Model Serving installs the model's own
+  requirements, not the job's `--index-url` lines. When public PyPI is blocked,
+  set environment variables on the job that logs the model; on policy clusters,
+  add `spark_env_vars` to the `job_cluster` variable in `deployment/variables.yml`:
+
+  ```yaml
+      spark_env_vars:
+        SKYULF_MODEL_PIP_INDEX_URL: https://<your-index>/simple
+        # Use this when the serving build cannot reach any index:
+        SKYULF_MODEL_PIP_BUNDLE_WHEELS: "true"
+  ```
+
+  `SKYULF_MODEL_PIP_INDEX_URL` and `SKYULF_MODEL_PIP_EXTRA_INDEX_URLS`
+  (space-separated) are written into the model's requirements; URLs with
+  credentials are rejected. `SKYULF_MODEL_PIP_BUNDLE_WHEELS: "true"` downloads
+  every dependency wheel for Linux x86_64 and the job's Python into the model
+  (`code/wheels`, at most 2 GiB) and installs with `--no-index`; the index
+  variables are then used only for that download. Only models trained after the
+  change are affected. Serverless jobs cannot set these variables; ask a workspace
+  admin to set the workspace default package repository instead.
 
 
 ## The command
