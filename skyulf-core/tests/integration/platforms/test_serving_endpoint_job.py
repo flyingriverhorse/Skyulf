@@ -1044,3 +1044,20 @@ def test_smoke_codec_works_with_a_fitted_saved_and_reloaded_pyfunc(tmp_path):
     assert isinstance(overflow, pd.DataFrame)
     with pytest.raises(ValueError, match="Reference"):
         api.verify_serving_predictions(overflow, overflow.to_dict("records"), channel="Reference")
+
+
+@pytest.mark.parametrize("configured", [False, True])
+def test_function_grants_can_differ_from_endpoint_callers(prepared_job, configured):
+    """Workspace-local groups valid for CAN_QUERY must not be forced into a UC GRANT."""
+    api, settings, registry, *_ = prepared_job
+    settings["permissions"] = [{"group_name": "users"}]
+    settings.pop("function_permissions", None)  # the fixture's settings were read once already
+    if configured:
+        settings["function_permissions"] = {settings["ownership"]["target"]: [{"group_name": "uc"}]}
+    api.run_serving_endpoint(
+        None, settings, source_table="main.source.inputs", client=Mock(), registry_client=registry
+    )
+    kwargs = api.grant_serving_access.call_args.kwargs
+    assert kwargs["principals"] == [{"group_name": "users", "level": "CAN_QUERY"}]
+    expected = "uc" if configured else "users"
+    assert kwargs["function_principals"] == [{"group_name": expected, "level": "CAN_QUERY"}]

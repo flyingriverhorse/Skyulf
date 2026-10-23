@@ -179,6 +179,18 @@ serving_endpoint:
 The job adds endpoint `CAN_QUERY` and function `EXECUTE`. Callers also need
 `USE CATALOG` and `USE SCHEMA`, which the job does not grant.
 
+`permissions` get both grants by default. Unity Catalog rejects workspace-local
+groups such as `users` in `GRANT`, while the endpoint accepts them. In that case,
+list the UC grantees separately in `function_permissions` (same format, a list or
+a per-target mapping). An empty list grants no `EXECUTE`:
+
+```yaml
+  permissions:
+    - group_name: users          # endpoint CAN_QUERY only
+  function_permissions:
+    - group_name: risk_readers   # function EXECUTE
+```
+
 ```sql
 SELECT main.ml.risk_score(`amount` => s.`amount`) AS result
 FROM main.source.customers AS s;

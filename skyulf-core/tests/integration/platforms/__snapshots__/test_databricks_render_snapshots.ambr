@@ -321,7 +321,7 @@
     'config/pre_split.yml': '8dda2c847c6ddcf2',
     'config/preprocessing.yml': '08e58f3379e12fc5',
     'config/scoring.yml': '1b5dc783ecb2828d',
-    'config/serving.yml': '7776e7e0d1a2ada7',
+    'config/serving.yml': 'b0124f0dfb65ebb0',
     'config/training.yml': '75f18cbc2057c9c3',
     'databricks.yml': '0ddaab6e185e89b5',
     'deployment/README.md': '865fe3eaf08c3ef7',

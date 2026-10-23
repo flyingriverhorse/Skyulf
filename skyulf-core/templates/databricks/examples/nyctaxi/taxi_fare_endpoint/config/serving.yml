@@ -41,6 +41,9 @@ serving_endpoint:
   #       - service_principal_name: <application-id>
   #       - user_name: someone@example.com
   permissions: []
+  # Optional: UC grantees for function EXECUTE when they differ from the endpoint
+  # callers above (UC rejects workspace-local groups such as users). Same format.
+  # function_permissions: []
   verification:
     sample_rows: 20 # Bounded sample from config/inference.yml score_source_table; zero rows fails.
 
