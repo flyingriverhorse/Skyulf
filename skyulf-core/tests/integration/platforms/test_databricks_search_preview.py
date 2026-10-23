@@ -81,3 +81,17 @@ def test_preview_describes_optuna_soft_timeout_and_shap_bounds(workflow_config):
     assert "Optuna" in report and "30" in report and "in-flight fit" in report
     assert "SHAP" in report and "max_samples=20" in report
     assert "max_features=10" in report and "max_display_samples=5" in report
+
+
+def test_preview_warns_when_encoders_can_exceed_the_shap_feature_budget(workflow_config):
+    """One-hot columns are counted after encoding, so SHAP can be skipped without notice."""
+    config = deepcopy(workflow_config)
+    config["pipeline"]["explainability"] = {"method": "shap", "max_features": 30}
+    report = preview_workflow_config(config, action="train")
+    assert "after encoding" not in report
+    config["pipeline"]["preprocessing"] = [
+        {"name": "encode", "transformer": "OneHotEncoder", "params": {"columns": ["x"]}},
+        *config["pipeline"].get("preprocessing", []),
+    ]
+    report = preview_workflow_config(config, action="train")
+    assert "OneHotEncoder" in report and "after encoding" in report

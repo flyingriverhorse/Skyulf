@@ -628,6 +628,22 @@ def _append_search_cv_preview(lines: list[str], cv: CVSpec) -> None:
         )
 
 
+# Steps whose output can be wider than their input columns (counted by SHAP max_features).
+_EXPANDING_TRANSFORMERS = frozenset(
+    {
+        "OneHotEncoder",
+        "DummyEncoder",
+        "HashEncoder",
+        "PolynomialFeatures",
+        "FeatureInteraction",
+        "count_vectorizer",
+        "hashing_vectorizer",
+        "tfidf_vectorizer",
+        "sentence_embedder",
+    }
+)
+
+
 def _preview_explanations(pipeline: dict[str, Any]) -> list[str]:
     """Report the opted-in SHAP sample, feature and display budgets."""
     settings = pipeline.get("explainability")
@@ -636,10 +652,24 @@ def _preview_explanations(pipeline: dict[str, Any]) -> list[str]:
     samples = settings.get("max_samples", 100)
     features = settings.get("max_features", 30)
     display = settings.get("max_display_samples", min(10, samples))
-    return [
+    lines = [
         f"Explanations: SHAP, max_samples={samples}, max_features={features}, "
         f"max_display_samples={display}; computed from the fitted training artifact when available."
     ]
+    expanding = sorted(
+        {
+            step["transformer"]
+            for step in pipeline.get("preprocessing", [])
+            if step.get("transformer") in _EXPANDING_TRANSFORMERS
+        }
+    )
+    if expanding:
+        lines.append(
+            f"Explanations warning: {', '.join(expanding)} add columns, and max_features counts "
+            "model features after encoding. SHAP is skipped (feature_limit_exceeded) above the "
+            "limit; the training report shows the real width."
+        )
+    return lines
 
 
 def preview_workflow_config(config: dict[str, Any], *, action: str = "score") -> str:
