@@ -303,6 +303,8 @@ running preview:
 | `min_improvement` | `0.0` |
 | `risk_category` | Empty: the key is omitted from `config/training.yml` |
 | `catalog`, `schema` | `REPLACE_TEST_CATALOG`, `REPLACE_TEST_SCHEMA`; prefill the `test` bindings in `deployment/variables.yml` and the preview/smoke defaults |
+| `output_schema`, `metadata_schema` | Blank: reuse `schema` for the `test` output and model bindings and the preview/smoke defaults |
+| `include_examples` | `true`. `false` leaves out the `example_*` recipes, the example `src/features/preprocessing.py`, `pre_split.py` and `scoring.py` callbacks, `src/features/groups/*.py` and their commented references; create those files when you add your own steps |
 
 Quick setup also skips the settings below. Detailed setup asks them when they
 apply to the chosen layout and earlier answers:

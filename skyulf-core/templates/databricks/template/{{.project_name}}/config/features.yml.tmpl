@@ -31,7 +31,7 @@ groups: {}
 # transform is a file:function reference; group and file names need not match.
 # exact matches key AND time; asof chooses the latest feature at/before that time.
 # allow_missing=false rejects absent matches; null values in matched rows survive.
-#
+{{if eq .include_examples "true"}}#
 # Copyable example (inactive until you replace the active configuration above):
 # version: 1
 # base_table: workspace.demo.company_observations
@@ -53,3 +53,4 @@ groups: {}
 #     columns: [monthly_amount, transaction_count]
 #     lookup: asof
 #     allow_missing: false
+{{end -}}

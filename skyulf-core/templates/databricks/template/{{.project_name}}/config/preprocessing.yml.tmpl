@@ -1,12 +1,12 @@
 # Ordered model transformations, fitted on training rows after the split.
 # Select a recipe with preprocessing_recipe in config/training.yml (default: default).
 # Built-ins use transformer + params. Custom factories live in src/features/preprocessing.py.
-# Example recipes remain inactive until selected. Adapt their columns to your inputs.
-version: 1
+{{if eq .include_examples "true"}}# Example recipes remain inactive until selected. Adapt their columns to your inputs.
+{{end}}version: 1
 recipes:
   default: []
   none: []
-  example_frequency:
+{{if eq .include_examples "true"}}  example_frequency:
     - custom: preprocessing.frequency_encoding
       params: {columns: [category]}
   example_imputer:
@@ -29,7 +29,7 @@ recipes:
       params: {column: category}
     - custom: preprocessing.frequency_encoding
       params: {columns: [category]}
-
+{{end}}
 # More built-ins to add to a selected list (never enabled by these comments):
 # - name: scale
 #   transformer: StandardScaler
@@ -66,5 +66,6 @@ recipes:
 # - name: drop_clock
 #   transformer: DropMissingColumns
 #   params: {columns: [observation_time], missing_threshold: null}
-# Asset example: enable Example 4 in src/features/preprocessing.py first.
+{{if eq .include_examples "true"}}# Asset example: enable Example 4 in src/features/preprocessing.py first.
 # - custom: preprocessing.city_region
+{{end -}}

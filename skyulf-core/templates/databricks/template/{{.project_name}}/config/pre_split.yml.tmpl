@@ -1,12 +1,12 @@
 # Fixed row eligibility before the training split; never learn statistics here.
 # Select with pre_split_recipe in config/training.yml (default: default).
 # Competition shares its pre-split recipe. Scoring can reuse the saved filters.
-# Custom factories live in src/features/pre_split.py. Examples are inactive until selected.
+# Custom factories live in src/features/pre_split.py.{{if eq .include_examples "true"}} Examples are inactive until selected.{{end}}
 version: 1
 recipes:
   default: []
   none: []
-  example_complete_inputs:
+{{if eq .include_examples "true"}}  example_complete_inputs:
     - custom: pre_split.minimum_completeness
       params: {columns: [feature_value, category], min_present: 1}
   example_all:
@@ -14,12 +14,12 @@ recipes:
       params: {columns: [feature_value, category], min_present: 1}
     - custom: pre_split.value_range
       params: {column: feature_value, minimum: 0, maximum: 1000000}
-
+{{end}}
 # Examples to add to a selected list; use your actual column names:
 # - name: known_target
 #   transformer: DropMissingRows
 #   params: {subset: [target], how: any}
-# - custom: pre_split.minimum_completeness
+{{if eq .include_examples "true"}}# - custom: pre_split.minimum_completeness
 #   params: {columns: [field_a, field_b, field_c], min_present: 2}
 # - custom: pre_split.value_range
 #   params: {column: age, minimum: 0, maximum: 120}
@@ -27,4 +27,4 @@ recipes:
 #   params: {column: country, values: [NL, DE, BE]}
 # Asset example: enable Example 4 in src/features/pre_split.py first.
 # - custom: pre_split.allowed_countries
-# A target-reading filter requires skip_target_pre_split_steps: true in config/scoring.yml.
+{{end}}# A target-reading filter requires skip_target_pre_split_steps: true in config/scoring.yml.

@@ -3,7 +3,6 @@
 import ast
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from template_sources import copy_template
 
 yaml = pytest.importorskip("yaml")
 pytest.importorskip("polars")
@@ -39,7 +39,7 @@ def _example(name, language):
 def _project(tmp_path, kind):
     """Install the documented callbacks and recipe into a real generated feature package."""
     features = tmp_path / "src/features"
-    shutil.copytree(TEMPLATE / "src/features", features)
+    copy_template(TEMPLATE / "src/features", features)
     locations = {"budget": "budget.py", "target-mean": "target_mean.py"}
     module = features / locations.get(kind, "preprocessing.py")
     code = _example(f"{kind}-code", "python")
@@ -49,7 +49,7 @@ def _project(tmp_path, kind):
     declaration = yaml.safe_load(_example(f"{kind}-recipe", "yaml"))
     config = tmp_path / "config"
     config.mkdir()
-    shutil.copyfile(TEMPLATE / "config/scoring.yml", config / "scoring.yml")
+    copy_template(TEMPLATE / "config/scoring.yml", config / "scoring.yml")
     (config / "preprocessing.yml").write_text(yaml.safe_dump(declaration), encoding="utf-8")
     (config / "pre_split.yml").write_text("version: 1\nrecipes:\n  default: []\n", encoding="utf-8")
     selected = next(name for name in declaration["recipes"] if name != "default")
@@ -185,7 +185,7 @@ def test_shipped_function_excerpts_match_the_generated_callbacks():
 def test_local_feature_engineer_example_executes_actual_callbacks(tmp_path):
     """The local trial must learn from its training frame before transforming unseen/null rows."""
     features = tmp_path / "src/features"
-    shutil.copytree(TEMPLATE / "src/features", features)
+    copy_template(TEMPLATE / "src/features", features)
     (features / "income_rules.py").write_text(_example("clipping-code", "python"), encoding="utf-8")
     code = _example("local-try", "python")
     completed = subprocess.run(

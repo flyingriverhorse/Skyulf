@@ -91,13 +91,13 @@ outputs: []
 #     required_components: [revenue, cost]
 #     params: {inputs: [revenue__prediction, cost__prediction], weights: [0.7, 0.3]}
 #     columns: [{name: blended, dtype: float64}]
-# Example: profit = revenue - cost, with profit() in src/features/scoring.py.
+{{if eq .include_examples "true"}}# Example: profit = revenue - cost, with profit() in src/features/scoring.py.
 # combined:
 #   - name: profit
 #     custom: scoring.profit
 #     required_components: [revenue, cost]
 #     columns: [{name: profit, dtype: float64}]
-combined: []
+{{end}}combined: []
 
 # Any rule can use custom: scoring.<function> (a function in src/features/scoring.py)
 # instead of a built-in. params and version are optional; version defaults to "1".

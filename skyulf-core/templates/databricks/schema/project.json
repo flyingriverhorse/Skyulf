@@ -114,6 +114,14 @@
     "skip_prompt_if": {},
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
   },
+  "include_examples": {
+    "order": 6.3,
+    "type": "string",
+    "default": "true",
+    "enum": ["true", "false"],
+    "description": "Optional init-file setting: false leaves out example recipes, custom step files and feature group examples",
+    "skip_prompt_if": {}
+  },
   "source_table_name": {
     "order": 7,
     "type": "string",

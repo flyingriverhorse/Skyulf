@@ -439,3 +439,48 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
     assert ("recover_predictions" in score_tasks) is (recovery == "true")
     if recovery == "true":
         assert score_tasks["scoring_report"]["run_if"] == "NONE_FAILED"
+
+
+def test_projects_without_examples_still_validate(tmp_path, offline_workspace):
+    """include_examples=false must drop example code and recipes yet leave a valid project."""
+    from skyulf.integrations.databricks.projects.project_checks import (
+        check_project,  # noqa: PLC0415
+    )
+
+    project = _generate_project(tmp_path, include_examples="false")
+    for name in ("preprocessing", "pre_split"):
+        recipes = yaml.safe_load((project / f"config/{name}.yml").read_text())["recipes"]
+        assert recipes == {"default": [], "none": []}
+    for relative in (
+        "src/features/preprocessing.py",
+        "src/features/pre_split.py",
+        "src/features/scoring.py",
+        "src/features/groups/company.py",
+        "src/features/groups/activity.py",
+    ):
+        assert not (project / relative).exists(), relative
+    assert "groups/company.py" not in (project / "config/features.yml").read_text()
+    assets = (project / "src/features/assets.json").read_text()
+    assert json.loads(assets)["files"] == [] and "Example 4" not in assets
+    bindings = {
+        "catalog": "workspace",
+        "input_schema": "test",
+        "output_schema": "test",
+        "metadata_schema": "test",
+        "resource_suffix": "",
+    }
+    assert check_project(project, bindings)["status"] == "passed"
+    _resolve(project, "test", offline_workspace)
+
+
+@pytest.mark.parametrize("answer", ["branch_1_preprocessing_recipe", "branch_1_pre_split_recipe"])
+def test_projects_without_examples_reject_example_recipes(tmp_path, answer):
+    """Selecting a removed example recipe must fail at init, not at the first training run."""
+    from test_databricks_bundle_generation import _initialize_project  # noqa: PLC0415
+
+    recipe = "example_imputer" if "preprocessing" in answer else "example_all"
+    result, _ = _initialize_project(tmp_path, include_examples="false", **{answer: recipe})
+    assert result.returncode != 0
+    assert "ERROR_include_examples_false_cannot_select_example_recipes" in (
+        result.stderr + result.stdout
+    )

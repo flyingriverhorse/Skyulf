@@ -353,8 +353,8 @@ Setup does not ask for the model and data catalog/schema names. It generates
 editable bindings for test/syst/prod in `variables.yml` with `REPLACE_*`
 placeholders. The separate monitoring store catalog and schema are asked in both
 setup modes; see [monitoring store setup](databricks_monitoring_setup.md).
-An initialization JSON file may still provide `catalog` and `schema` to prefill
-shared test values. These settings reference existing UC objects; they do not
+An initialization JSON file may still provide `catalog` and `schema` (input), and
+optionally `output_schema` and `metadata_schema`, to prefill shared test values. These settings reference existing UC objects; they do not
 create them.
 
 1. Set the same workspace `host` in each shared/personal environment pair in
