@@ -353,6 +353,30 @@ def test_managed_sql_is_stable_across_model_versions_and_replaced_for_wire_chang
     assert "CAST(`x` AS STRING)" in spark.sql.call_args.args[0]
 
 
+def test_existing_sql_gets_the_null_guard_once(plan, ownership):
+    """Functions created before the integer NULL guard must be replaced, not kept forever."""
+    import hashlib
+    import json
+
+    guarded = replace(plan, input_schema=(("x", "int64"),))
+    client, spark = Mock(), Mock()
+    client.serving_endpoints.get.return_value = remote(guarded, ownership)
+    function = build_serving_sql_function(guarded, "main.ml.score")
+    # The comment an older release wrote: same contract, without the guard entry.
+    contract = {k: v for k, v in function.schema_contract.items() if k != "null_guard"}
+    digest = hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(",", ":")).encode())
+    metadata = {
+        "ownership": managed._ownership(ownership),
+        "endpoint_name": "risk-prod",
+        "schema_sha256": digest.hexdigest(),
+    }
+    comment = managed._COMMENT_PREFIX + json.dumps(metadata, sort_keys=True, separators=(",", ":"))
+    client.functions.get.return_value = {"comment": comment}
+    result = managed.ensure_owned_sql_function(spark, client, function, ownership=ownership)
+    assert result["action"] == "updated"
+    assert "raise_error(" in spark.sql.call_args.args[0]
+
+
 def test_foreign_function_is_never_replaced(plan, ownership):
     """A shared UC schema must not let deployment erase unrelated functions."""
     client, spark = Mock(), Mock()

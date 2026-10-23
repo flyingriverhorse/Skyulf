@@ -18,6 +18,10 @@ _SQL_TYPES = {
 }
 
 
+# Types without a nullable wire form whose SQL NULL ai_query would send as 0/false.
+_NULL_GUARDED = frozenset({"int32", "int64", "bool"})
+
+
 def _identifier(value: str, label: str) -> str:
     """Quote a supported identifier without accepting SQL expressions or fragments."""
     if not is_uc_identifier(value):
@@ -62,6 +66,17 @@ def _request_fields(endpoint: PinnedEndpointPlan) -> str:
     return ",\n".join(fields)
 
 
+def _null_guarded(endpoint: PinnedEndpointPlan) -> list[str]:
+    """Return inputs whose SQL NULL the request stops instead of sending as 0/false."""
+    transport = transport_spec(endpoint.input_schema)
+    encoded = transport["columns"] if transport else {}
+    return [
+        name
+        for name, dtype in endpoint.input_schema
+        if name not in encoded and normalized_dtype(dtype) in _NULL_GUARDED
+    ]
+
+
 def _request_expression(name: str, dtype: str, encoded: bool) -> str:
     """Keep ai_query numeric null conversion from bypassing fitted imputation."""
     if encoded:
@@ -70,7 +85,7 @@ def _request_expression(name: str, dtype: str, encoded: bool) -> str:
     if normalized in {"float32", "float64"}:
         sql_type = _SQL_TYPES[normalized]
         return f"COALESCE(`{name}`, CAST('NaN' AS {sql_type}))"
-    if normalized in {"int32", "int64", "bool"}:
+    if normalized in _NULL_GUARDED:
         # ai_query would send 0/false for NULL here; stop instead of predicting on it.
         message = (
             f"Input {name} is NULL, but the model was trained without missing values in this "
@@ -162,12 +177,16 @@ class ServingSQLFunctionPlan:
     @property
     def schema_contract(self) -> dict[str, Any]:
         """Describe SQL declarations and the distinct nullable wire encoding."""
-        return {
+        contract = {
             "inputs": _sql_schema(self.endpoint.input_schema),
             "outputs": _sql_schema(self.endpoint.output_schema),
             "transport": transport_spec(self.endpoint.input_schema),
             "fail_on_error": self.fail_on_error,
         }
+        # Listed only when present, so functions without guarded inputs keep their hash
+        # while older functions with them are replaced once.
+        guarded = _null_guarded(self.endpoint)
+        return contract | ({"null_guard": guarded} if guarded else {})
 
 
 def build_serving_sql_function(
