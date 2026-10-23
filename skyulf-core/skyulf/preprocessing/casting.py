@@ -151,6 +151,18 @@ def _polars_float_to_integer_expr(X: Any, col: str, pl_dtype: Any, coerce_on_err
     return src.cast(pl_dtype, strict=True).alias(col)
 
 
+# Floats below 2**53 hold integers exactly, so they can be written without ".0".
+_EXACT_FLOAT_INTEGERS = 2**53
+
+
+def _polars_integral_text_expr(col: str) -> Any:
+    """Write integral floats as integers ("81", not "81.0"); other values as before."""
+    src = pl.col(col)
+    integral = src.is_finite() & (src == src.floor()) & (src.abs() < _EXACT_FLOAT_INTEGERS)
+    whole = src.cast(pl.Int64, strict=False).cast(pl.String)
+    return pl.when(integral).then(whole).otherwise(src.cast(pl.String)).alias(col)
+
+
 def _polars_cast_expr(X: Any, col: str, pl_dtype: Any, coerce_on_error: bool) -> tuple[Any, bool]:
     """Build a supported cast and report whether strict boolean validation is needed."""
     if pl_dtype == pl.Datetime and X.schema[col] in (pl.String, pl.Utf8):
@@ -182,11 +194,33 @@ def _polars_cast_expr(X: Any, col: str, pl_dtype: Any, coerce_on_error: bool) ->
     return pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col), False
 
 
+def _polars_saved_state_expr(
+    X: Any,
+    col: str,
+    pl_dtype: Any,
+    categories: dict[str, list[Any]] | None,
+    integral_text: bool,
+) -> Any:
+    """Return the cast fixed by fitted state (vocabulary or integral text), else None."""
+    if pl_dtype == pl.Categorical and categories is not None and col in categories:
+        values = category_key_expr(col)
+        allowed = {category_key(value): str(value) for value in categories[col]}
+        return (
+            values.replace_strict(allowed, default=None, return_dtype=pl.String)
+            .cast(pl.Categorical)
+            .alias(col)
+        )
+    if integral_text and pl_dtype == pl.String and X.schema[col].is_float():
+        return _polars_integral_text_expr(col)
+    return None
+
+
 def _build_polars_cast_exprs(
     X: Any,
     type_map: dict[str, Any],
     coerce_on_error: bool,
     categories: dict[str, list[Any]] | None = None,
+    integral_text: bool = False,
 ) -> tuple[list[Any], list[str]]:
     """Build the list of Polars cast expressions and track string->bool columns.
 
@@ -198,14 +232,9 @@ def _build_polars_cast_exprs(
         if col not in X.columns:
             continue
         pl_dtype = _resolve_polars_dtype(str(target_dtype).lower())
-        if pl_dtype == pl.Categorical and categories is not None and col in categories:
-            values = category_key_expr(col)
-            allowed = {category_key(value): str(value) for value in categories[col]}
-            exprs.append(
-                values.replace_strict(allowed, default=None, return_dtype=pl.String)
-                .cast(pl.Categorical)
-                .alias(col)
-            )
+        special = _polars_saved_state_expr(X, col, pl_dtype, categories, integral_text)
+        if special is not None:
+            exprs.append(special)
             continue
         if pl_dtype is None:
             # In strict mode (coerce_on_error=False), an unsupported dtype
@@ -245,7 +274,11 @@ def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     coerce_on_error = params.get("coerce_on_error", True)
 
     exprs, string_bool_cols = _build_polars_cast_exprs(
-        X, type_map, coerce_on_error, params.get("categories")
+        X,
+        type_map,
+        coerce_on_error,
+        params.get("categories"),
+        params.get("integral_floats_as_int", False),
     )
 
     if not exprs:
@@ -439,11 +472,31 @@ def _cast_datetime(series: pd.Series, coerce_on_error: bool) -> pd.Series:
     return pd.to_datetime(series, format="mixed", errors="coerce" if coerce_on_error else "raise")
 
 
+def _cast_integral_text(series: pd.Series, target_dtype: Any) -> pd.Series:
+    """Write integral floats as integers ("81", not "81.0"); other values as before."""
+    text = series.astype(target_dtype)
+    values = series.to_numpy(dtype="float64", na_value=np.nan)
+    integral = (
+        np.isfinite(values)
+        & (values == np.floor(values))
+        & (np.abs(values) < _EXACT_FLOAT_INTEGERS)
+    )
+    if integral.any():
+        text[integral] = [str(int(value)) for value in values[integral]]
+    return text
+
+
 def _cast_one_column(
-    series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool
+    series: pd.Series,
+    col: str,
+    target_dtype: Any,
+    coerce_on_error: bool,
+    integral_text: bool = False,
 ) -> pd.Series:
     """Dispatch a single column to the right family caster."""
     dtype_str = str(target_dtype).lower()
+    if integral_text and dtype_str == "string" and pd.api.types.is_float_dtype(series):
+        return _cast_integral_text(series, target_dtype)
     if dtype_str.startswith("float"):
         return _cast_float(series, target_dtype, coerce_on_error)
     if dtype_str.startswith(("int", "uint")):
@@ -461,6 +514,7 @@ def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
         return X, y
     coerce_on_error = params.get("coerce_on_error", True)
     categories = params.get("categories", {})
+    integral_text = params.get("integral_floats_as_int", False)
 
     df_out = X.copy()
     for col, target_dtype in type_map.items():
@@ -469,7 +523,9 @@ def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
         try:
             if col in categories:
                 target_dtype = pd.CategoricalDtype(categories=categories[col])
-            df_out[col] = _cast_one_column(df_out[col], col, target_dtype, coerce_on_error)
+            df_out[col] = _cast_one_column(
+                df_out[col], col, target_dtype, coerce_on_error, integral_text
+            )
         except Exception:
             if not coerce_on_error:
                 raise
@@ -550,11 +606,15 @@ class CastingApplier(BaseApplier):
     def validate_inference_state(raw: dict) -> dict:
         """Inspect local dtype/vocabulary state without converting or relearning it."""
         fields = {"type", "type_map", "coerce_on_error"}
-        if isinstance(raw, dict) and "categories" in raw:
-            fields.add("categories")
+        # Optional fields: older artifacts predate them and keep their behavior.
+        fields |= {"categories", "integral_floats_as_int"} & set(
+            raw if isinstance(raw, dict) else ()
+        )
         local_state_fields(raw, "casting", fields)
         _validate_casting_types(raw["type_map"])
         local_boolean(raw["coerce_on_error"], "coerce_on_error")
+        if "integral_floats_as_int" in raw:
+            local_boolean(raw["integral_floats_as_int"], "integral_floats_as_int")
         _validate_casting_categories(raw)
         return raw
 
@@ -646,6 +706,8 @@ class CastingCalculator(BaseCalculator):
             "type_map": final_map,
             "coerce_on_error": config.get("coerce_on_error", True),
             "categories": categories,
+            # New fits write 81.0 as "81" when casting to string; saved models replay as fitted.
+            "integral_floats_as_int": True,
         }
 
     @staticmethod

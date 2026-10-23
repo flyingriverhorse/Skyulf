@@ -316,6 +316,7 @@ class CastingArtifact(TypedDict, total=False):
     type_map: dict[str, str]
     coerce_on_error: bool
     categories: dict[str, list[Any]]
+    integral_floats_as_int: bool
 
 
 # ── Bucketing ────────────────────────────────────────────────────────────────

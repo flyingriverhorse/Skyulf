@@ -496,6 +496,13 @@ coercion enabled.
 
 **Common mistake:** Category casts learn a vocabulary and are not admitted in pre_split.
 
+A nullable integer column usually arrives as floats, so casting it to `string`
+used to give `"81.0"`, which no longer matched one-hot `categories: ["81"]`.
+Newly fitted casts write integral floats without the decimal (`"81"`; `7.5`
+stays `"7.5"`), per value and identically on pandas and Polars. Models fitted
+before this keep their saved text. `OneHotEncoder` also warns at fit time when a
+column matches none of its fixed categories.
+
 Category values follow native engine semantics: numeric pandas categories keep
 numeric labels, while Polars categories are strings. For matching text labels
 across engines, cast to string first, then category, and refit; an existing
