@@ -34,7 +34,7 @@ defaults:
   cv_type: k_fold
   cv_shuffle: true
   cv_random_state: 42
-  filter_unavailable_results: false
+  filter_unavailable_results: false # true: skip rows with no result date (or after result_cutoff); they do not count toward max_rows. multi_target skips empty branch targets automatically
   max_rows: 25000
   max_input_mb: 64
   metric: heldout_rmse
