@@ -269,6 +269,28 @@ to reach the configured training feature source upstream. Model-set branches
 may share one outcome table with multiple targets; each branch keeps its own
 target and availability policy.
 
+### Rows without a target
+
+Training needs a target on every row it uses. What happens to rows whose target
+is empty depends on the layout and on whether results arrive later:
+
+| Situation | What to do |
+| --- | --- |
+| Every row has a target | Nothing; keep `filter_unavailable_results: false`. |
+| `multi_target`, some branch targets empty | Nothing; each branch skips rows whose own target is empty. |
+| The result is known only later (for example churn after 3 months) | Set `filter_unavailable_results: true` with a `result_available_at_column` that is empty until the result is known. Those rows are skipped. |
+| `single_model`, some targets empty, no result date | Train from a table without those rows: filter them upstream, or in a feature [`base_transform`](databricks_features.md#derive-labels-and-keys-with-base_transform) with `.where("target IS NOT NULL")`. |
+
+`filter_unavailable_results` is only for results that arrive later; without a
+date involved it is not needed. If one table is both the training source and the
+scoring source, filtering out empty-target rows also removes them from scoring,
+and those are often the rows you want predictions for. In that case use two
+tables: a training table with labeled rows only (`training_table`) and a scoring
+table with all rows (`score_source_table`).
+
+Skipped rows do not count toward `max_rows` and appear in the reported
+unavailable-label count.
+
 ### Local input limits
 
 `max_rows` bounds the rows read into the local process before train/test splitting.
