@@ -4,7 +4,7 @@ defaults:
   training_layout: single_model
   engine: pandas
   save_preprocessing_diagnostics: false
-  allow_tested_custom_steps: false
+  probe_pipeline_for_serving: false
   training_table: "{catalog}.{input_schema}.sm33_generated_source"
   record_key_columns: [entity_id]
   model_name: "{catalog}.{metadata_schema}.sm33_generated_model{resource_suffix}"

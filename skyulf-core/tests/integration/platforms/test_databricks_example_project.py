@@ -80,7 +80,7 @@ def test_normal_generation_excludes_the_prepared_examples(tmp_path, layout):
     assert not (project / "examples").exists()
     assert not list(project.rglob("trip_rules.py"))
     training = yaml.safe_load((project / "config/training.yml").read_text())
-    assert training["defaults"]["allow_tested_custom_steps"] is False
+    assert training["defaults"]["probe_pipeline_for_serving"] is False
     for entry in training["models"].values():
         config = training["defaults"] | entry
         assert config.get("preprocessing_recipe", "default") == "default"

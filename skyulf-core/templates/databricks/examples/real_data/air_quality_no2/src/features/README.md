@@ -83,7 +83,7 @@ passed the training checks. Reused pre-split filters count as scoring rules;
 training-only filters do not run at prediction time.
 
 Spark and online-feature projects run admission checks automatically, including
-when `defaults.allow_tested_custom_steps` is `false`. Set it to `true` in
+when `defaults.probe_pipeline_for_serving` is `false`. Set it to `true` in
 `config/training.yml` for an endpoint-only project. Training lints custom code
 and probes the fitted recipe on bounded holdout rows before sealing evidence
 with its saved code and state. The separate diagnostics report

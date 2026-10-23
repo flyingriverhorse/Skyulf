@@ -14,7 +14,7 @@ defaults:
   # Spark and online-feature projects check admission automatically, even when false below.
   # Set true to check preprocessing during training and save the results needed for endpoint deployment.
   # Details: https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html
-  allow_tested_custom_steps: false
+  probe_pipeline_for_serving: false
   training_table: "{catalog}.{input_schema}.trips_train"
   record_key_columns: ["trip_id"]
   model_name: "{catalog}.{metadata_schema}.taxi_fare_robust_model{resource_suffix}"

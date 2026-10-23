@@ -189,6 +189,38 @@ def test_public_training_options_reach_defaults_and_model_overrides(tmp_path):
     assert "save_preprocessing_diagnostics" not in training["defaults"]
 
 
+@pytest.mark.parametrize("name", ["probe_pipeline_for_serving", "allow_tested_custom_steps"])
+def test_serving_probe_option_keeps_its_old_name(tmp_path, name):
+    """The clearer name and the old name must both turn on the same pipeline probe."""
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+
+    path = _project(tmp_path)
+    path.with_name("training.yml").write_text(
+        f"version: 1\ndefaults:\n  {name}: true\nmodels:\n  main:\n"
+        "    model: {type: linear_regression}\n",
+        encoding="utf-8",
+    )
+    training = read_training_config(path.parent)
+    assert training is not None
+    assert training["defaults"]["admit_probed_custom_steps"] is True
+    assert name not in training["defaults"]
+
+
+def test_serving_probe_option_rejects_both_names(tmp_path):
+    """Setting the old and the new name together is ambiguous and must fail."""
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+
+    path = _project(tmp_path)
+    path.with_name("training.yml").write_text(
+        "version: 1\ndefaults:\n  probe_pipeline_for_serving: true\n"
+        "  allow_tested_custom_steps: false\nmodels:\n  main:\n"
+        "    model: {type: linear_regression}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="probe_pipeline_for_serving"):
+        read_training_config(path.parent)
+
+
 @pytest.mark.parametrize(
     "public,internal",
     [

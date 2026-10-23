@@ -51,7 +51,7 @@ and models listed in [Spark scoring support](databricks_spark_scoring.md#what-sp
 Additional built-in models, voting/stacking and eligible preprocessing recipes
 need the training evidence described in
 [built-in recipes and model evidence](databricks_spark_scoring.md#built-in-recipes-and-model-evidence).
-Selecting the endpoint job enables `defaults.allow_tested_custom_steps: true`
+Selecting the endpoint job enables `defaults.probe_pipeline_for_serving: true`
 in `config/training.yml`. For an existing endpoint-only project, enable it before
 training. Spark and online-feature projects already enable it.
 `prepare_pinned_endpoint` recomputes the certificate from

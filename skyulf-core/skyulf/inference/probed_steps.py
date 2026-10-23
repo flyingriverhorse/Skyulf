@@ -383,7 +383,7 @@ def require_flag(config: Mapping[str, Any]) -> None:
         raise ValueError(
             "Custom steps and scoring rules run on Spark or endpoints only with training "
             "probe evidence. Spark and online-feature projects create it automatically; "
-            "other projects set allow_tested_custom_steps: true in config/training.yml."
+            "other projects set probe_pipeline_for_serving: true in config/training.yml."
         )
 
 
