@@ -378,6 +378,30 @@ def test_catalog_and_schema_generate_without_questions(tmp_path, prefill):
     assert bundle["targets"]["test"]["variables"]["catalog"] == "${var.test_catalog}"
 
 
+def test_output_and_metadata_schemas_can_differ_from_input(tmp_path):
+    """Local tools must not resolve outputs and models in the input schema when they differ."""
+    project = _generate_project(
+        tmp_path,
+        schema="bronze",
+        output_schema="gold",
+        metadata_schema="models",
+        prediction_delivery="both",
+        include_online_feature_lookup="true",
+    )
+    variables = _read_bundle(project)["variables"]
+    assert variables["test_input_schema"]["default"] == "bronze"
+    assert variables["test_output_schema"]["default"] == "gold"
+    assert variables["test_metadata_schema"]["default"] == "models"
+    for tool in ("preview", "smoke"):
+        text = (project / f"src/tools/{tool}.py").read_text(encoding="utf-8")
+        assert '"--input-schema", default="bronze"' in text
+        assert '"--output-schema", default="gold"' in text
+        assert '"--metadata-schema", default="models"' in text
+    serving = yaml.safe_load((project / "config/serving.yml").read_text(encoding="utf-8"))
+    # Same schema as the main endpoint's inference tables ({metadata_schema}).
+    assert serving["online_feature_lookup"]["endpoint"]["logging_schema"] == "models"
+
+
 @pytest.mark.parametrize(
     "identity", ["deployer", "shared_service_principal", "separate_service_principals"]
 )

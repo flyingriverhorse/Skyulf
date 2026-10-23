@@ -194,6 +194,29 @@ Initialize a project from a Skyulf checkout:
 databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
+Rendering is local, but the CLI still loads a profile first, so an expired login
+fails init with errors such as "refresh token is invalid". To initialize without
+credentials, hide the config file and pass a placeholder token. Use your
+workspace URL as the host; init only reads its public metadata:
+
+```powershell
+$env:DATABRICKS_CONFIG_FILE = "NUL"
+$env:DATABRICKS_HOST = "https://<your-workspace-host>"
+$env:DATABRICKS_TOKEN = "placeholder"
+databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
+Remove-Item Env:DATABRICKS_CONFIG_FILE, Env:DATABRICKS_HOST, Env:DATABRICKS_TOKEN
+```
+
+```bash
+DATABRICKS_CONFIG_FILE=/dev/null DATABRICKS_HOST=https://<your-workspace-host> \
+  DATABRICKS_TOKEN=placeholder \
+  databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
+```
+
+Answer files can also prefill `catalog` and `schema` (the test input schema),
+plus `output_schema` and `metadata_schema` when outputs or registered models live
+in other schemas. Blank values reuse `schema`.
+
 ### Guided setup and offline preview
 
 Setup follows your answers; it does not inspect source tables or sample rows.

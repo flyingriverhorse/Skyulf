@@ -222,10 +222,10 @@ variables:
     default: {{.schema}}
   output_schema:
     description: Prediction output schema
-    default: {{.schema}}
+    default: {{or .output_schema .schema}}
   metadata_schema:
     description: Registered model schema
-    default: {{.schema}}
+    default: {{or .metadata_schema .schema}}
   resource_suffix:
     description: Optional namespace suffix for shared development targets
     default: ""
@@ -268,10 +268,10 @@ variables:
     default: "{{.schema}}"
   test_output_schema:
     description: "test output_schema for the shared target"
-    default: "{{.schema}}"
+    default: "{{or .output_schema .schema}}"
   test_metadata_schema:
     description: "test metadata_schema for the shared target"
-    default: "{{.schema}}"
+    default: "{{or .metadata_schema .schema}}"
 {{if eq .personal_development_targets "true"}}
   test_development_input_schema:
     description: Existing input_schema for personal work in test

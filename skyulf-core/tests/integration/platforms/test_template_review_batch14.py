@@ -104,5 +104,6 @@ def test_policy_cluster_answers_round_trip_as_yaml_strings(tmp_path, policy, key
     jobs = _read_jobs(project)
     assert "job_clusters" not in jobs["monitoring"]
     for job in (jobs["train"], jobs["score"]):
-        cluster = job["job_clusters"][0]["new_cluster"]
-        assert cluster["custom_tags"] == {key: "${var.cost_tag_value}"}
+        assert job["job_clusters"][0]["new_cluster"] == "${var.job_cluster}"
+    cluster = variables["job_cluster"]["default"]
+    assert cluster["custom_tags"] == {key: "${var.cost_tag_value}"}

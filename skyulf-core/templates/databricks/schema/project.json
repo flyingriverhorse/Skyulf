@@ -94,9 +94,25 @@
     "order": 6,
     "type": "string",
     "default": "REPLACE_TEST_SCHEMA",
-    "description": "Optional init-file test schema; otherwise configure deployment/variables.yml",
+    "description": "Optional init-file test input schema; otherwise configure deployment/variables.yml",
     "skip_prompt_if": {},
     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+  },
+  "output_schema": {
+    "order": 6.1,
+    "type": "string",
+    "default": "",
+    "description": "Optional init-file test prediction output schema; blank uses schema",
+    "skip_prompt_if": {},
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+  },
+  "metadata_schema": {
+    "order": 6.2,
+    "type": "string",
+    "default": "",
+    "description": "Optional init-file test registered model schema; blank uses schema",
+    "skip_prompt_if": {},
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
   },
   "source_table_name": {
     "order": 7,
