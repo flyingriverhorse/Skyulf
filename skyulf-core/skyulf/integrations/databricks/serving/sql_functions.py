@@ -70,6 +70,14 @@ def _request_expression(name: str, dtype: str, encoded: bool) -> str:
     if normalized in {"float32", "float64"}:
         sql_type = _SQL_TYPES[normalized]
         return f"COALESCE(`{name}`, CAST('NaN' AS {sql_type}))"
+    if normalized in {"int32", "int64", "bool"}:
+        # ai_query would send 0/false for NULL here; stop instead of predicting on it.
+        message = (
+            f"Input {name} is NULL, but the model was trained without missing values in this "
+            "column, so the endpoint cannot receive NULL. Fill it before scoring, or retrain "
+            "with missing values present."
+        )
+        return f"CASE WHEN `{name}` IS NULL THEN raise_error('{message}') ELSE `{name}` END"
     return f"`{name}`"
 
 

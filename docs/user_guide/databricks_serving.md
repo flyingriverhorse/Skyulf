@@ -560,6 +560,11 @@ For floating-point inputs, the wrapper represents SQL nulls as a same-width
 `NaN` before calling `ai_query`, so the saved preprocessing handles missing
 values. This prevents the numeric-null-to-zero behavior reproduced in native
 testing. It does not fill values with a new SQL-side mean or constant.
+Integer and boolean inputs that had no missing values in training have no
+nullable wire form, and `ai_query` would send their NULL as `0` or `false`. For
+them the wrapper raises an error naming the column instead, so the query stops
+rather than scoring a wrong value. Fill the column, or retrain with missing
+values present so it gets the nullable form.
 Use matching source types: SQL's argument coercion is not a data validation layer.
 
 `result` is the named per-row prediction struct, not the REST `predictions` array.
