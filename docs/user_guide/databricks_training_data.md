@@ -272,9 +272,11 @@ target and availability policy.
 ### Local input limits
 
 `max_rows` bounds the rows read into the local process before train/test splitting.
-Without sampling it applies after any observation-window selection, but before
-result-availability filtering. An overflow fails; the reader never silently
-truncates data. Explicit sampling is available as described below.
+Without sampling it applies after any observation-window selection and after
+rows without a usable label are dropped on Spark (`drop_missing_labels`,
+`filter_unavailable_results`), so unlabeled rows do not count toward it. Those
+rows still appear in the reported unavailable-label count. An overflow fails;
+the reader never silently truncates data. Explicit sampling is available as described below.
 
 Quick setup uses `max_rows: 10000` and `max_input_mb: 64`. Detailed setup also
 asks for `training_sample_rows`; null means no sampling. Overflow errors show

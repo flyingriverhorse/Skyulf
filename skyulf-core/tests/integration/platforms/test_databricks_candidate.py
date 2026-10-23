@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -100,6 +101,7 @@ def test_reader_pins_projects_and_limits_before_collecting(monkeypatch, native):
     source.select.return_value = source
     source.orderBy.return_value = source
     source.limit.return_value = source
+    source.count.return_value = 0  # no label before its event; nothing dropped on Spark
     row = _frame().iloc[0].to_dict()
     row["event_time"] = int(row["event_time"].value // 1000)
     row["label_at"] = int(row["label_at"].value // 1000)
@@ -116,9 +118,10 @@ def test_reader_pins_projects_and_limits_before_collecting(monkeypatch, native):
     monkeypatch.setattr(retraining, "normalize_training_dates", lambda frame, **kwargs: frame)
     frame = retraining.read_training_snapshot(source, _spec())
     source.read.option.assert_called_once_with("versionAsOf", 4)
-    source.where.assert_called_once()
+    source.where.assert_called()
     source.select.assert_called_once_with("id", "event_time", "label_at", "x", "target")
-    source.limit.assert_called_once_with(11)
+    # The collected read is bounded last; earlier limit(1) calls are label checks.
+    assert source.limit.call_args_list[-1].args == (11,)
     assert len(frame) == 1
     assert frame.iloc[0]["event_time"] == _frame().iloc[0]["event_time"]
     assert frame.attrs["source_table_id"] == "original-delta-id"
@@ -725,3 +728,57 @@ def test_snapshot_replay_uses_original_config_without_duplicate_fixed_steps(
     assert (
         client.get_run(replay.run_id).data.metrics == client.get_run(original.run_id).data.metrics
     )
+
+
+def test_labels_filtered_on_spark_keep_the_saved_evidence():
+    """Dropping unlabeled rows before max_rows must not change replayed training evidence."""
+    from skyulf.integrations.databricks.training.shared.training_evidence import (
+        build_training_evidence,
+    )
+
+    spec = _spec()
+    full = _frame()
+    _, holdout, unavailable = retraining.split_labeled_snapshot(full, spec)
+    # id 4 has a result after the cutoff; Spark now drops it before the limit.
+    prefiltered = full[full["id"] != 4].reset_index(drop=True)
+    prefiltered.attrs[retraining.PREFILTERED_ROWS] = 1
+    _, replayed, replayed_unavailable = retraining.split_labeled_snapshot(prefiltered, spec)
+    assert replayed_unavailable == unavailable == 1
+    evidence = build_training_evidence(spec, holdout, project_source_sha256=None)
+    assert build_training_evidence(spec, replayed, project_source_sha256=None) == evidence
+
+
+class _Source:
+    """Just enough of a Spark DataFrame to count rows through string filters."""
+
+    def __init__(self, rows):
+        """Keep rows as dictionaries with a float label."""
+        self.rows = rows
+        field = SimpleNamespace(name="target", dataType=SimpleNamespace(typeName=lambda: "double"))
+        self.schema = SimpleNamespace(fields=[field])
+
+    def where(self, condition):
+        """Apply the missing-label condition the eligibility filter writes."""
+        assert "IS NOT NULL" in condition and "isnan" in condition
+        return _Source([row for row in self.rows if row["target"] == row["target"]])
+
+    def count(self):
+        """Return the number of rows."""
+        return len(self.rows)
+
+
+def test_unlabeled_rows_do_not_count_toward_max_rows():
+    """A source with more unlabeled rows than max_rows must still train on its labels."""
+    rows = [{"target": 1.0}] * 3 + [{"target": float("nan")}] * 50
+    spec = _spec(
+        filter_unavailable_results=False,
+        result_cutoff=None,
+        result_available_at_column=None,
+        drop_missing_labels=True,
+        max_rows=5,
+    )
+    labeled, dropped = retraining._labeled_rows_before_limit(_Source(rows), spec)
+    assert (labeled.count(), dropped) == (3, 50)
+    source = _Source(rows)
+    unfiltered = replace(spec, drop_missing_labels=False)
+    assert retraining._labeled_rows_before_limit(source, unfiltered) == (source, 0)

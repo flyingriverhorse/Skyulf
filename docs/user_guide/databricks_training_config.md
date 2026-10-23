@@ -93,7 +93,7 @@ answers use the same question name with a `branch_N_` prefix.
 | `stratify` | Boolean or null | `false` | True only for random classification; group holdout requires false | Retains class proportions where supported. | `stratify` |
 | `training_sample_rows` | Integer or null | Omitted/null | At least 4 and at most `max_rows` | Seeded bounded Spark-side selection before local transfer and splitting; does not sample predictions. | `training_sample_rows` |
 | `training_sample_seed` | Integer | `42` | 0 through 2**32-1 | Reproduces requested sample membership; saved evidence pins it for approval. | `training_sample_seed` |
-| `max_rows` | Integer | `10000` | Positive; aggregate fit/holdout input must fit | Rejects a larger local training population instead of silently truncating it. | `max_rows` |
+| `max_rows` | Integer | `10000` | Positive; aggregate fit/holdout input must fit | Rejects a larger local training population instead of silently truncating it. Rows without a usable label are dropped first and do not count. | `max_rows` |
 | `max_input_mb` | Integer | `64` | Positive whole MiB; one unit is 1,048,576 bytes | Bounds decoded/local training data, not Spark wire buffers or total process memory. | `max_input_mb` |
 
 ### Source windows and result availability
