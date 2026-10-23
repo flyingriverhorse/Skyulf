@@ -32,7 +32,7 @@ databricks bundle run monitoring -t test --profile YOUR_PROFILE
 ```
 
 To create or connect a dashboard, edit the target's block in
-`deployment/monitoring.yml` before validating and deploying; the file explains
+`deployment/targets.yml` before validating and deploying; the file explains
 both choices and where to find the warehouse ID.
 
 ## Rules that matter

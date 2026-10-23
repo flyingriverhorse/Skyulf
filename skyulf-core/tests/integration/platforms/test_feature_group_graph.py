@@ -10,7 +10,13 @@ import pytest
 import yaml
 
 from skyulf.integrations.databricks.features.config import parse_feature_config
-from skyulf.integrations.databricks.features.graph import build_feature_job, refresh_feature_graph
+from skyulf.integrations.databricks.features.graph import (
+    build_feature_job,
+    feature_targets_snippet,
+    missing_feature_controls,
+    refresh_feature_graph,
+    stale_feature_targets,
+)
 
 
 def test_refresh_creates_and_removes_only_optional_feature_files(tmp_path):
@@ -75,19 +81,29 @@ def test_refresh_creates_and_removes_only_optional_feature_files(tmp_path):
     assert (tmp_path / "src/jobs/feature_task.py").is_file()
     assert (tmp_path / "resources/features.job.yml").is_file()
     generated = yaml.safe_load((tmp_path / "resources/features.job.yml").read_text())
-    target_jobs = generated["targets"]
-    assert target_jobs["prod"]["resources"]["jobs"]["features"]["run_as"] == {
-        "service_principal_name": "${var.train_service_principal}"
+    # Company CI accepts `targets:` only in deployment/targets.yml.
+    assert "targets" not in generated
+    missing = missing_feature_controls(tmp_path)
+    assert missing == {
+        "prod": {
+            "run_as": {"service_principal_name": "${var.train_service_principal}"},
+            "permissions": "${var.train_permissions}",
+        }
     }
-    assert (
-        target_jobs["prod"]["resources"]["jobs"]["features"]["permissions"]
-        == "${var.train_permissions}"
+    snippet = yaml.safe_load(feature_targets_snippet(missing))
+    targets_path = tmp_path / "deployment/targets.yml"
+    document = yaml.safe_load(targets_path.read_text())
+    document["targets"]["prod"]["resources"]["jobs"].update(
+        snippet["targets"]["prod"]["resources"]["jobs"]
     )
-    assert target_jobs["test_development"]["resources"]["jobs"]["features"]["name"] == "features"
+    targets_path.write_text(yaml.safe_dump(document))
+    assert missing_feature_controls(tmp_path) == {}
     path.write_text("version: 1\ngroups: {}\n")
     assert refresh_feature_graph(tmp_path) == []
     assert not (tmp_path / "src/jobs/feature_task.py").exists()
     assert not (tmp_path / "resources/features.job.yml").exists()
+    # A leftover override would make Bundle create an empty "Untitled" job.
+    assert stale_feature_targets(tmp_path) == ["prod"]
 
 
 def _plan():

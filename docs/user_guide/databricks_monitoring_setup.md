@@ -50,7 +50,7 @@ never moved or migrated. The catalog is not asked: `monitoring_catalog` defaults
 each target's own `catalog`. Setup writes both to `deployment/variables.yml`; see
 [the setup questions](databricks_project_setup.md#monitoring-destination). To
 use other names in one target, put this excerpt under
-`targets.<target>.variables` in `deployment/monitoring.yml`. The values are
+`targets.<target>.variables` in `deployment/targets.yml`. The values are
 examples; use your existing catalog and a schema reserved for the shared store.
 
 ```yaml
@@ -209,8 +209,10 @@ monitoring store. Nothing is cleaned during ordinary observation.
 Projects initialized with a monitoring catalog include a separate
 `monitoring_cleanup` job. It runs Sundays at 04:00 UTC with confirmation enabled
 and a 90-day minimum reference age. This schedule is independent of monitoring
-and retraining; personal development targets keep it paused. Override these
-variables in `deployment/targets.yml`:
+and retraining; personal development targets keep it paused. A run before the
+monitoring store exists (no model enrolled yet on that target) finishes with status
+`store_not_initialized` and changes nothing, so the schedule can stay on from the first
+deploy. Override these variables in `deployment/targets.yml`:
 
 ```yaml
 monitoring_cleanup_cron: "0 0 4 ? * SUN"

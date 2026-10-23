@@ -135,7 +135,8 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
         jobs = bundle["resources"]["jobs"]
         assert set(jobs) == {"train", "score", "monitoring"}
         for key, job in jobs.items():
-            assert job["name"] == f"dev_alice_{key}"
+            # Databricks development prefix, project name kept (two projects stay distinct).
+            assert job["name"] == f"[dev alice] sm33_generated_{key}"
             assert job["schedule"]["pause_status"] == "PAUSED"
             assert not job.get("run_as", {}).get("service_principal_name")
             # Deployer and the default pipeline_owner are the same user: one owner entry.
@@ -369,12 +370,10 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
         assert variables[f"{role}_task_timeout_seconds"]["default"] == 0
         assert variables[f"{role}_email_notifications"]["default"] == {}
         assert variables[f"{role}_webhook_notifications"]["default"] == {}
-        assert variables[f"{role}_health_rules"]["default"] == []
+        # An empty health block fails Terraform-engine deploys; rules are per-target overrides.
+        assert f"{role}_health_rules" not in variables
         variables[f"{role}_timeout_seconds"]["default"] = 7200
         variables[f"{role}_task_timeout_seconds"]["default"] = 1800
-        variables[f"{role}_health_rules"]["default"] = [
-            {"metric": "RUN_DURATION_SECONDS", "op": "GREATER_THAN", "value": 3600}
-        ]
         variables[f"{role}_email_notifications"]["default"] = {
             "on_failure": ["operator@example.invalid"],
             "on_duration_warning_threshold_exceeded": ["operator@example.invalid"],
@@ -386,6 +385,16 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
     variables["score_max_retries"]["default"] = 2
     variables["score_min_retry_interval_millis"]["default"] = 60000
     path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
+    default_jobs = _resolve(project, "test", offline_workspace)["resources"]["jobs"]
+    assert not [name for name, job in default_jobs.items() if "health" in job]
+    targets_path = project / "deployment/targets.yml"
+    targets = yaml.safe_load(targets_path.read_text())
+    jobs = targets["targets"]["test"].setdefault("resources", {}).setdefault("jobs", {})
+    for role in ("train", "score"):
+        rule = {"metric": "RUN_DURATION_SECONDS", "op": "GREATER_THAN", "value": 3600}
+        jobs[role] = jobs.get(role) or {}  # an empty YAML job key loads as None
+        jobs[role]["health"] = {"rules": [rule]}
+    targets_path.write_text(yaml.safe_dump(targets, sort_keys=False), encoding="utf-8")
     bundle = _resolve(project, "test", offline_workspace)
     for role in ("train", "score"):
         job = bundle["resources"]["jobs"][role]

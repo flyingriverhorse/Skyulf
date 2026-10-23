@@ -71,14 +71,14 @@ def test_generated_projects_bind_independent_monitoring_destination(
     assert not retired.intersection(path.name for path in (project / "src/jobs").glob("*.py"))
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
     targets = yaml.safe_load((project / "deployment/targets.yml").read_text())["targets"]
-    # Development monitoring settings live in deployment/monitoring.yml.
-    monitoring = yaml.safe_load((project / "deployment/monitoring.yml").read_text())["targets"]
-    for name, target in targets.items():
-        assert "monitoring_enabled" not in target["variables"]
+    # Development monitoring settings live in each development target of targets.yml.
+    for target in targets.values():
         if target["mode"] == "development":
-            assert monitoring[name]["variables"]["monitoring_enabled"] == "false"
-            assert monitoring[name]["variables"]["on_drift"] == "disabled"
-            assert monitoring[name]["variables"]["monitoring_performance_policies"] == "{}"
+            assert target["variables"]["monitoring_enabled"] == "false"
+            assert target["variables"]["on_drift"] == "disabled"
+            assert target["variables"]["monitoring_performance_policies"] == "{}"
+        else:
+            assert "monitoring_enabled" not in target["variables"]
     assert variables["monitoring_enabled"]["default"] == ("true" if catalog else "false")
     assert "monitoring_execution_engine" not in variables
     assert variables["monitoring_catalog"]["default"] == ("${var.catalog}" if catalog else "")
@@ -215,9 +215,10 @@ def test_source_templates_propagate_performance_mapping_to_every_monitoring_task
         assert text.count(
             "monitoring_performance_policies: ${var.monitoring_performance_policies}"
         ) == (text.count("monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}"))
-    # One development block, rendered once for each personal development target.
-    monitoring = (project / "deployment/monitoring.yml.tmpl").read_text()
-    assert monitoring.count("monitoring_performance_policies: '{}'") == 1
+    # One development block per personal development target, all in targets.yml.
+    assert not (project / "deployment/monitoring.yml.tmpl").exists()
+    targets = (project / "deployment/targets.yml.tmpl").read_text()
+    assert targets.count("monitoring_performance_policies: '{}'") == 3
     variables = (project / "deployment/variables.yml.tmpl").read_text()
     assert "  monitoring_performance_policies:" in variables
     assert "    default: '{}'" in variables

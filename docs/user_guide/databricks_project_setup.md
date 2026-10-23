@@ -230,9 +230,9 @@ Both setup modes ask the monitoring questions after the deployment questions:
 | --- | --- | --- |
 | `monitoring` | `true` or `false` | `monitoring_enabled`; `monitoring_catalog` defaults to each target's `catalog` (`deployment/variables.yml`) |
 | `monitoring_schema` | Shared schema; omitted or blank uses `skyulf_monitoring` | `monitoring_schema` in `deployment/variables.yml` |
-| `development_monitoring` (with personal development targets) | `true` or `false` | Development targets monitor into their own schema (`deployment/monitoring.yml`) |
+| `development_monitoring` (with personal development targets) | `true` or `false` | Development targets monitor into their own schema (`deployment/targets.yml`) |
 | `development_monitoring_schema` | Any schema except the shared one | `development_monitoring_schema` in `deployment/variables.yml` |
-| `monitoring_dashboard` | `none`, `create` or `connect` | The `test` dashboard block in `deployment/monitoring.yml` |
+| `monitoring_dashboard` | `none`, `create` or `connect` | The `test` dashboard block in `deployment/targets.yml` |
 
 Give every project the same schema, reserved for monitoring (for example
 `skyulf_monitoring`), not the project's own schema: all models then appear in one
@@ -247,7 +247,7 @@ enroll models and run monitoring. `monitoring: "false"` sets it to `"false"`:
 train and score run without monitoring. A user-selected schema is preserved,
 including an existing store. To use a central catalog instead of each target's
 own, set `monitoring_catalog` in `deployment/variables.yml` or per target in
-`deployment/monitoring.yml`. The schema is created
+`deployment/targets.yml`. The schema is created
 on first use if the run-as identity may
 create schemas. Personal development targets set `monitoring_enabled` to
 `"false"` unless `development_monitoring` is `"true"`; then they monitor into

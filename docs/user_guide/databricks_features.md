@@ -228,7 +228,12 @@ databricks bundle run features -t test --profile YOUR_PROFILE
 
 Replace `YOUR_PROFILE` with your configured profile. Refresh is local: it reads
 and validates `config/features.yml`, then creates `resources/features.job.yml`
-and its thin notebook. Smoke does not read `config/features.yml`; it checks the
+and its thin notebook. That file defines no `targets:`. When the train job has a
+per-target `run_as` or `permissions` in `deployment/targets.yml`, refresh prints the
+matching `features` entries to merge into the same targets, and smoke fails until
+they are there (or, after feature groups are turned off, until leftover `features`
+entries are removed, because Bundle would otherwise create an empty job).
+Smoke does not read `config/features.yml`; it checks the
 training configuration and the Python syntax of `src/`, including the group
 modules. Neither reads Delta data or executes Spark transformations.
 Refresh after changing feature configuration or inherited deployment controls,

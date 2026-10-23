@@ -8,7 +8,11 @@ from test_databricks_bundle_generation import CLI, OFFLINE_CLI, _generate_projec
 from test_databricks_deployment import _resolve, offline_workspace  # noqa: F401 - pytest fixture
 
 from skyulf.integrations.databricks.features.config import parse_feature_config
-from skyulf.integrations.databricks.features.graph import refresh_feature_graph
+from skyulf.integrations.databricks.features.graph import (
+    feature_targets_snippet,
+    missing_feature_controls,
+    refresh_feature_graph,
+)
 from skyulf.integrations.databricks.features.runtime import transform_source
 from skyulf.integrations.databricks.projects.project_checks import check_project
 
@@ -55,6 +59,23 @@ def test_feature_job_resolves_for_each_layout_and_identity(tmp_path, layout, off
     assert smoke["status"] == "passed"
     (project / "config/features.yml").write_text(yaml.safe_dump(config))
     assert refresh_feature_graph(project) == ["activity", "company"]
+    bindings = {
+        "catalog": "workspace",
+        "input_schema": "test",
+        "output_schema": "test",
+        "metadata_schema": "test",
+        "resource_suffix": "",
+    }
+    missing = missing_feature_controls(project)
+    assert set(missing) == {"test", "syst", "prod"}  # personal targets keep no run_as/ACL
+    with pytest.raises(ValueError, match="deployment/targets.yml"):
+        check_project(project, bindings)
+    targets_path = project / "deployment/targets.yml"
+    document = yaml.safe_load(targets_path.read_text())
+    for name, target in yaml.safe_load(feature_targets_snippet(missing))["targets"].items():
+        document["targets"][name]["resources"]["jobs"].update(target["resources"]["jobs"])
+    targets_path.write_text(yaml.safe_dump(document, sort_keys=False))
+    assert check_project(project, bindings)["status"] == "passed"
     shared = _resolve(project, "test", offline_workspace)
     personal = _resolve(project, "test_development", offline_workspace)
     for resolved in (shared, personal):
@@ -76,4 +97,6 @@ def test_feature_job_resolves_for_each_layout_and_identity(tmp_path, layout, off
             "feature_company",
         }
         assert (project / "src/jobs/feature_task.py").is_file()
-    assert personal["resources"]["jobs"]["features"]["name"] == "dev_alice_features"
+    assert (
+        personal["resources"]["jobs"]["features"]["name"] == "[dev alice] sm33_generated_features"
+    )

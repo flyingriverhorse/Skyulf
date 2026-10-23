@@ -214,18 +214,13 @@ def test_optional_runtime_pins_are_unique_across_selected_models(tmp_path, layou
 def _read_bundle(project):
     """Read the root and deployment includes without emulating CLI variable resolution.
 
-    deployment/monitoring.yml repeats target keys; its target variables are merged
-    into targets.yml's, as the CLI merges them (its dashboard resources are not).
+    Every target is defined in deployment/targets.yml only.
     """
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     for name in ("variables", "targets"):
         path = project / "deployment" / f"{name}.yml"
         if path.is_file():
             bundle.update(yaml.safe_load(path.read_text()))
-    monitoring = project / "deployment/monitoring.yml"
-    if monitoring.is_file():
-        for name, target in (yaml.safe_load(monitoring.read_text())["targets"] or {}).items():
-            bundle["targets"][name].setdefault("variables", {}).update(target.get("variables", {}))
     return bundle
 
 
@@ -429,9 +424,9 @@ def test_personal_targets_keep_outputs_and_identity_separate(tmp_path, identity)
         assert personal["variables"]["scoring_pause_status"] == "PAUSED"
         assert personal["variables"]["monitoring_pause_status"] == "PAUSED"
         assert personal["variables"]["monitoring_enabled"] == "false"
-        assert personal["resources"]["jobs"] == {
-            job: {"name": job} for job in ("train", "score", "monitoring")
-        }
+        # No short-name overrides: the development prefix keeps the project in job names.
+        assert "resources" not in personal
+        assert "name_prefix" not in personal.get("presets", {})
         assert "run_as" not in personal
         for job in ("train", "score", "monitoring"):
             resource = shared["resources"]["jobs"][job]

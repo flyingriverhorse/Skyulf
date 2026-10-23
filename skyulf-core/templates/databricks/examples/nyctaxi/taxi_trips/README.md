@@ -28,7 +28,7 @@ Batch scoring uses a bounded frame in the saved pandas/Polars engine.
 | Custom feature/scoring callbacks and packaged assets | `src/features/` |
 | Online publication, endpoint setup and rollout | `config/serving.yml`, when generated |
 | Host, namespaces, run identities, compute and schedules | `deployment/targets.yml`, `deployment/variables.yml` |
-| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `development_monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml`; per-target dashboards and development monitoring in `deployment/monitoring.yml` |
+| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `development_monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml`; per-target dashboards and development monitoring in `deployment/targets.yml` |
 | Installed Core and optional dependencies | `deployment/*requirements.txt` |
 
 The shared runtime pin is `skyulf-core[mlflow]==0.9.5` in
@@ -66,8 +66,10 @@ Scheduled training with a
 `rolling_calendar` when the interval should advance. Preview also warns about
 this combination; intentional repeated experiments are still allowed.
 
-Monitoring job failures can notify through `monitoring_email_notifications`,
-`monitoring_webhook_notifications` and `monitoring_health_rules`. Measured drift
+Monitoring job failures can notify through `monitoring_email_notifications` and
+`monitoring_webhook_notifications`. Add duration warnings as `health.rules` on the job
+under a target in `deployment/targets.yml`; jobs have no `health` block by default
+because an empty one fails Terraform-engine deploys. Measured drift
 does not fail the job; use a separate SQL alert over `monitoring_issues` for it.
 See [notifications](https://www.skyulf.com/manual/user_guide/databricks_drift.html#notifications).
 The separate `monitoring_cleanup` job runs Sundays at 04:00 UTC with

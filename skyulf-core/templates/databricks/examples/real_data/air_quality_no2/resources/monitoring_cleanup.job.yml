@@ -10,8 +10,6 @@ resources:
       timeout_seconds: ${var.monitoring_timeout_seconds}
       email_notifications: ${var.monitoring_email_notifications}
       webhook_notifications: ${var.monitoring_webhook_notifications}
-      health:
-        rules: ${var.monitoring_health_rules}
       schedule:
         quartz_cron_expression: ${var.monitoring_cleanup_cron}
         timezone_id: UTC
