@@ -248,6 +248,28 @@ Override `job_tags` through target variables. For train and score, configure
 `serverless_environment_version` and `serverless_budget_policy_id`, or
 policy-cluster `spark_version`, `node_type_id`, `min_workers` and `max_workers`.
 
+All policy-cluster jobs (train, score, serving and the optional feature job) use
+one `new_cluster` spec: the complex `job_cluster` variable in
+`deployment/variables.yml`. When your cluster policy requires more fields, add
+them there once:
+
+```yaml
+  job_cluster:
+    type: complex
+    default:
+      spark_version: ${var.spark_version}
+      node_type_id: ${var.node_type_id}
+      policy_id: ${var.cluster_policy_id}
+      # ... generated tags and autoscale stay as they are ...
+      data_security_mode: SINGLE_USER
+      runtime_engine: STANDARD
+      use_ml_runtime: true
+```
+
+A target that sets `job_cluster` under `variables:` replaces the whole spec, so
+copy every field there. To change one value per target, override the scalar
+variables (`spark_version`, `node_type_id`, ...) instead.
+
 Monitoring always uses an independent serverless environment, including when
 train/score use policy clusters. Configure `monitoring_environment_version`
 (default `4`) and `monitoring_budget_policy_id` (default blank) separately.

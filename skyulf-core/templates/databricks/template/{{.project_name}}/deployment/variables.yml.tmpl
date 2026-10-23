@@ -69,6 +69,21 @@ variables:
   max_workers:
     description: Policy cluster autoscaling maximum
     default: 4
+  job_cluster:
+    description: >-
+      new_cluster spec shared by the train, score, serving and feature jobs. Add the fields your
+      cluster policy requires here, for example data_security_mode: SINGLE_USER,
+      runtime_engine: STANDARD or use_ml_runtime: true. A target override replaces the whole spec.
+    type: complex
+    default:
+      spark_version: ${var.spark_version}
+      node_type_id: ${var.node_type_id}
+      policy_id: ${var.cluster_policy_id}
+      custom_tags:
+        {{printf "%q" .cost_tag_key}}: ${var.cost_tag_value}
+      autoscale:
+        min_workers: ${var.min_workers}
+        max_workers: ${var.max_workers}
 {{end}}
   monitoring_environment_version:
     description: Independent serverless environment version for monitoring in either compute mode

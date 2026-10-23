@@ -348,6 +348,30 @@ def test_personal_policy_compute_resolves_without_changing_job_identity(
     assert monitoring["tags"]["cost_center"] == "ml-test"
 
 
+def test_policy_cluster_fields_are_set_once_for_every_job(tmp_path, offline_workspace):
+    """Fields a cluster policy requires must reach every job cluster from one variable."""
+    project = _generate_project(
+        tmp_path, compute_mode="policy_cluster", cluster_policy_name="local-policy"
+    )
+    path = project / "deployment/variables.yml"
+    contents = yaml.safe_load(path.read_text())
+    cluster = contents["variables"]["job_cluster"]
+    assert cluster["type"] == "complex"
+    cluster["default"].update(
+        data_security_mode="SINGLE_USER", runtime_engine="STANDARD", use_ml_runtime=True
+    )
+    path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
+    result = _resolve(project, "test", offline_workspace)
+    for role in ("train", "score"):
+        spec = result["resources"]["jobs"][role]["job_clusters"][0]["new_cluster"]
+        assert spec["policy_id"] == "local-policy-id"
+        assert spec["spark_version"] == "17.3.x-cpu-ml-scala2.13"
+        assert spec["autoscale"] == {"min_workers": 2, "max_workers": 4}
+        assert spec["data_security_mode"] == "SINGLE_USER"
+        assert spec["runtime_engine"] == "STANDARD"
+        assert spec["use_ml_runtime"] is True
+
+
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 @pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
 @pytest.mark.parametrize("recovery", ["false", "true"])

@@ -112,7 +112,8 @@ def test_serving_job_respects_compute_and_cost_attribution(tmp_path, compute_mod
     else:
         assert "environment_key" not in task and "environments" not in job
         assert task["job_cluster_key"] == "serving"
-        cluster = job["job_clusters"][0]["new_cluster"]
+        assert job["job_clusters"][0]["new_cluster"] == "${var.job_cluster}"
+        cluster = variables["job_cluster"]["default"]
         assert cluster["policy_id"] == "${var.cluster_policy_id}"
         assert cluster["custom_tags"] == {"team": "${var.cost_tag_value}"}
         assert cluster["spark_version"] == "${var.spark_version}"
