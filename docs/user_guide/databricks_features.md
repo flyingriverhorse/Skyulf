@@ -218,7 +218,10 @@ and unique, and publishes `output_table`. With no groups the job has only these
 two tasks. Point `training_table` at `output_table` and use
 `record_key_columns: [entity_id, observed_on]`. Keep `prepare()` free of learned
 statistics (means, encodings); those belong in `preprocessing.yml`. Run
-`python src/tools/refresh_feature_graph.py` after enabling it.
+`python src/tools/refresh_feature_graph.py` after enabling it. Adding or removing
+a column in `prepare()` changes the output schema, which the job refuses to
+migrate silently ("Feature table schema differs"); drop or migrate
+`output_table` deliberately, then rerun the job.
 
 An asof match has no built-in maximum age in this group-merge implementation.
 Use explicit source rules when old feature values must expire. A matching row

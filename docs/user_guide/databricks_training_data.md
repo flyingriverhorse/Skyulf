@@ -273,8 +273,10 @@ target and availability policy.
 
 `max_rows` bounds the rows read into the local process before train/test splitting.
 Without sampling it applies after any observation-window selection and after
-rows without a usable label are dropped on Spark (`drop_missing_labels`,
-`filter_unavailable_results`), so unlabeled rows do not count toward it. Those
+rows without a usable label are dropped on Spark, so they do not count toward
+it: rows outside `filter_unavailable_results`, and in `multi_target` rows whose
+branch target is missing. Single-model sources still need a label on every
+eligible row. Those
 rows still appear in the reported unavailable-label count. An overflow fails;
 the reader never silently truncates data. Explicit sampling is available as described below.
 
