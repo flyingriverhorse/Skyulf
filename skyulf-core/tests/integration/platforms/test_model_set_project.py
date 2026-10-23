@@ -292,6 +292,9 @@ def test_set_key_schema_accepts_only_portable_types():
     assert [column.dtype for column in schema] == ["int64", "string", "bool"]
     with pytest.raises(ValueError, match="record key"):
         _record_key_schema(SimpleNamespace(dtypes=[("id", "double")]), ("id",))
+    # A DATE key is a common natural key; the error must say how to store it instead.
+    with pytest.raises(ValueError, match="observed_on.*yyyy-MM-dd"):
+        _record_key_schema(SimpleNamespace(dtypes=[("observed_on", "date")]), ("observed_on",))
 
 
 def test_approval_frame_pins_integer_version_and_saved_columns(monkeypatch):

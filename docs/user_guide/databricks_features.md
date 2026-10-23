@@ -29,6 +29,28 @@ another workflow registers or publishes. Producing an ordinary Delta table does
 not declare UC primary keys, provision an online store, publish it, or deploy an
 endpoint. See [online features](databricks_online_features.md) for that workflow.
 
+### Ready training table (no feature groups)
+
+When an upstream pipeline already writes one regular Delta table with the target,
+the raw inputs and a record key, use it directly and leave `config/features.yml`
+disabled; no feature job is generated. Keep inputs raw (imputation and encoding
+are fitted by the model), and point both `training_table` and
+`score_source_table` at the table. Their placeholders vary the table per target:
+
+```yaml
+# config/training.yml
+defaults:
+  training_table: "{catalog}.{input_schema}.observations{resource_suffix}"
+  record_key_columns: [entity_id, observed_on]
+```
+
+A natural composite key works as long as every part is a non-null `STRING` or
+`BIGINT` and the parts are unique together. Store a date part as a string or
+integer when writing the table, for example
+`date_format(observed_on, 'yyyy-MM-dd') AS observed_on`. A separate
+`observation_id` is needed only when feature-group joins require the date as a
+`DATE` column while the model needs a string or integer key.
+
 Keep learned imputers, scalers, category statistics and selectors in
 [preprocessing.yml](preprocessing_recipes.md), where fitting occurs inside the
 training partition/fold. Use upstream groups for fixed formulas, domain

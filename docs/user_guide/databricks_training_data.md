@@ -17,7 +17,7 @@ training run, make sure the training and scoring sources meet these rules:
 | --- | --- |
 | Unity Catalog Delta table | Training pins a Delta snapshot version; scoring reads Delta changes. |
 | Change Data Feed on the scoring source, before new rows arrive | Incremental scoring reads new rows from the change feed. The default first score processes existing rows; `initial_scoring: from_now` checkpoints without predictions. [Scoring](databricks_scoring.md) explains the starting choice, updates and deletes. |
-| Record key columns of type `STRING` or `BIGINT`, nonnull and unique | Keys identify each prediction. Date or timestamp keys are not supported. |
+| Record key columns of type `STRING` or `BIGINT`, nonnull and unique | Keys identify each prediction. Date or timestamp keys are not supported; store a date key as `date_format(observed_on, 'yyyy-MM-dd')` (STRING) or `yyyyMMdd` (BIGINT). |
 | Keys kept out of `input_columns` | Keys are copied to the output, not learned from. |
 | A nonnull target for every eligible training row | Skyulf does not create labels. Use [result availability](#record-identity-and-result-availability) for delayed outcomes. |
 | The same key and input columns, with the same types, in training and scoring sources | The saved pipeline expects the training input schema. The scoring source needs no target. |
