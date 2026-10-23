@@ -166,8 +166,9 @@ from every input and other output, with one owning producer.
 | Field | Type / default | What you configure |
 | --- | --- | --- |
 | `version` | Integer, required `1` | Feature configuration format. |
-| `groups` | Mapping, required; `{}` disables production | Up to 20 groups. Disabled configuration contains only version and groups. |
-| `base_table` | String, required when enabled | Existing observations and labels; no transform is applied to the base. |
+| `groups` | Mapping, required; `{}` disables production unless `base_transform` is set | Up to 20 groups. Disabled configuration contains only version and groups. |
+| `base_table` | String, required when enabled | Existing observations and labels, used as they are unless `base_transform` is set. |
+| `base_transform` | Optional `src/features/module.py:function` | Runs on the pinned base before the joins and may derive the target and record keys; see [Derive labels and keys](#derive-labels-and-keys-with-base_transform). |
 | `output_table` | String, required when enabled | Destination for the merged base and features. |
 | `keys` | Nonempty distinct string list | Entity keys used by every group join. |
 | `timestamp` | String, required when enabled | A separate date/timestamp column, already typed consistently across inputs. |
@@ -177,6 +178,47 @@ from every input and other output, with one owning producer.
 | `columns` | Required nonempty distinct string list | Features only; exclude keys, timestamp and labels. |
 | `lookup` | `exact` default, or `asof` | Exact matches key and time; asof selects the latest feature time at or before the base time. |
 | `allow_missing` | Boolean, default `false` | Permit unmatched observations with null features, or fail the merge. |
+
+### Derive labels and keys with base_transform
+
+When the raw source has no ready target or record key, for example a birth date
+instead of an age, or a `DATE` that the model cannot use as a key, add one
+project function instead of a separate preparation job:
+
+```yaml
+version: 1
+base_table: "workspace.demo.raw_observations"
+base_transform: src/features/base.py:prepare
+output_table: "workspace.demo.observations"
+keys: [entity_id, observed_on]   # observed_on: a yyyy-MM-dd string made by prepare()
+timestamp: observed_date         # stays DATE for the feature grain and group joins
+groups: {}                       # optional; groups still join on keys + timestamp
+```
+
+```python
+# src/features/base.py
+from pyspark.sql import functions as F
+
+
+def prepare(frame):
+    """Derive the target and a string date key from the pinned raw rows."""
+    return frame.select(
+        F.col("entity_id").cast("string").alias("entity_id"),
+        F.date_format("observed_date", "yyyy-MM-dd").alias("observed_on"),
+        "observed_date",
+        F.round(F.months_between("observed_date", "birth_date") / 12, 2).alias("age"),
+        "region_code",
+        "employee_count",
+    )
+```
+
+The job pins the base version and the function's code at `initialize_features`,
+runs `prepare()` in `merge_features`, checks that keys plus timestamp are non-null
+and unique, and publishes `output_table`. With no groups the job has only these
+two tasks. Point `training_table` at `output_table` and use
+`record_key_columns: [entity_id, observed_on]`. Keep `prepare()` free of learned
+statistics (means, encodings); those belong in `preprocessing.yml`. Run
+`python src/tools/refresh_feature_graph.py` after enabling it.
 
 An asof match has no built-in maximum age in this group-merge implementation.
 Use explicit source rules when old feature values must expire. A matching row

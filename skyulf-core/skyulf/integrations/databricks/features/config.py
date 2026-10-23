@@ -29,6 +29,8 @@ class FeaturePlan:
     keys: tuple[str, ...]
     timestamp: str
     groups: tuple[FeatureGroup, ...]
+    # Optional src/features/<module>.py:<function> run on the pinned base before joins.
+    base_transform: str | None = None
 
     @property
     def record_keys(self) -> tuple[str, ...]:
@@ -96,6 +98,17 @@ def _group(name: str, value: Any) -> FeatureGroup:
     )
 
 
+def _base_transform(value: Any) -> str | None:
+    """Accept an optional project function that derives labels and keys from the base."""
+    if value is None:
+        return None
+    if type(value) is not str or not re.fullmatch(
+        r"src/features/[A-Za-z_]\w*\.py:[A-Za-z_]\w*", value
+    ):
+        raise ValueError("base_transform must be src/features/<module>.py:<function>.")
+    return value
+
+
 def _validate_domains(plan: FeaturePlan) -> None:
     """Keep writes away from inputs and reject overlapping feature ownership."""
     inputs = {plan.base_table.lower(), *(g.source_table.lower() for g in plan.groups)}
@@ -115,25 +128,25 @@ def _validate_domains(plan: FeaturePlan) -> None:
 def _config_header(value: Any) -> dict:
     """Validate the version and require no dormant settings for disabled features."""
     required = {"version", "groups"}
-    allowed = required | {"base_table", "output_table", "keys", "timestamp"}
+    allowed = required | {"base_table", "output_table", "keys", "timestamp", "base_transform"}
     data = _fields(value, allowed, required, "features")
     if type(data["version"]) is not int or data["version"] != 1:
         raise ValueError("Feature config version must be 1.")
     groups = data["groups"]
     if type(groups) is not dict or len(groups) > 20:
         raise ValueError("Feature groups must be a mapping of at most 20 domains.")
-    if not groups:
+    if not groups and data.get("base_transform") is None:
         if set(data) != required:
             raise ValueError("Disabled features must contain only version and empty groups.")
         return data
-    _fields(data, allowed, allowed, "features")
+    _fields(data, allowed, allowed - {"base_transform"}, "features")
     return data
 
 
 def parse_feature_config(value: Any) -> FeaturePlan | None:
     """Return no plan for ready-table projects; otherwise require a complete graph."""
     data = _config_header(value)
-    if not data["groups"]:
+    if not data["groups"] and data.get("base_transform") is None:
         return None
     for name in ("base_table", "output_table"):
         _feature_table(data[name])
@@ -147,6 +160,7 @@ def parse_feature_config(value: Any) -> FeaturePlan | None:
         keys,
         data["timestamp"],
         tuple(_group(name, group) for name, group in data["groups"].items()),
+        _base_transform(data.get("base_transform")),
     )
     _validate_domains(plan)
     return plan
@@ -156,8 +170,8 @@ def _validate_plan_containers(plan: FeaturePlan) -> None:
     """Require immutable column and domain lists before serializing a direct plan."""
     if type(plan.keys) is not tuple:
         raise ValueError("Feature plan keys must be an immutable tuple.")
-    if type(plan.groups) is not tuple or not plan.groups:
-        raise ValueError("Feature plan groups must be a nonempty immutable tuple.")
+    if type(plan.groups) is not tuple or not (plan.groups or plan.base_transform):
+        raise ValueError("Feature plan needs groups or a base_transform, as an immutable tuple.")
     if any(type(group.columns) is not tuple for group in plan.groups):
         raise ValueError("Feature group columns must be an immutable tuple.")
 

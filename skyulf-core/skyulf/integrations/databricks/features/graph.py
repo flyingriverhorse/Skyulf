@@ -78,7 +78,9 @@ def build_feature_job(plan: FeaturePlan, training_job: dict[str, Any]) -> dict[s
         for g in plan.groups
     }
     merge = _task("merge_features", "merge", prototype, {**params, **receipts})
-    merge["depends_on"] = [{"task_key": f"feature_{g.name}"} for g in plan.groups]
+    merge["depends_on"] = [{"task_key": f"feature_{g.name}"} for g in plan.groups] or [
+        {"task_key": "initialize_features"}  # base_transform only: no group tasks
+    ]
     tasks.append(merge)
     job["tasks"] = tasks
     return job

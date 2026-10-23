@@ -12,7 +12,10 @@ from skyulf.integrations.databricks.features.graph import (
 if __name__ == "__main__":
     project = Path(__file__).resolve().parents[2]
     groups = refresh_feature_graph(project)
-    print("Feature groups:", ", ".join(groups) or "disabled (ready-table workflow)")
+    if (project / "resources/features.job.yml").is_file():
+        print("Feature groups:", ", ".join(groups) or "none (base_transform only)")
+    else:
+        print("Feature job: disabled (ready-table workflow)")
     missing = missing_feature_controls(project)
     if missing:
         print("\nAdd the feature job's run_as/permissions to deployment/targets.yml,")

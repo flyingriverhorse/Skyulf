@@ -34,7 +34,12 @@ def selected_groups(plan: FeaturePlan, selection: str) -> set[str]:
 
 def transform_source(project: Path, group: FeatureGroup) -> tuple[str, str]:
     """Read a bounded project-contained Spark transform without importing it."""
-    relative = group.transform.split(":", 1)[0]
+    return project_function_source(project, group.transform)
+
+
+def project_function_source(project: Path, reference: str) -> tuple[str, str]:
+    """Read ``path.py:function`` source inside the project and return it with its digest."""
+    relative = reference.split(":", 1)[0]
     path = project / relative
     if not path.resolve().is_relative_to(project.resolve()):
         raise ValueError("Feature transform must remain inside the project.")
@@ -102,6 +107,11 @@ def initialize_features(
         "reused_versions": reused,
         "transform_sha256": {g.name: transform_source(project, g)[1] for g in plan.groups},
         "publication": _initialize_publication(spark, plan),
+        **(
+            {"base_transform_sha256": project_function_source(project, plan.base_transform)[1]}
+            if plan.base_transform
+            else {}
+        ),
     }
 
 
@@ -152,6 +162,34 @@ def _require_snapshot(plan: FeaturePlan, snapshot: dict[str, Any]) -> None:
         raise ValueError("Feature snapshot has invalid selected groups.")
 
 
+def _project_function(source: str, reference: str) -> Any:
+    """Load one function from pinned, project-contained source."""
+    namespace: dict[str, Any] = {"__name__": "skyulf_feature_transform"}
+    # Trusted project code only: contained bounded source and pinned digest checked by callers.
+    # This runs with job-owner privileges; it is not a sandbox for untrusted Python.
+    # nosemgrep: python.lang.security.audit.exec-detected.exec-detected, python_exec_rule-exec-used
+    exec(  # nosec B102 # noqa: S102 # pylint: disable=exec-used
+        compile(source, reference.split(":")[0], "exec"), namespace
+    )
+    function = namespace.get(reference.split(":")[1])
+    if not callable(function):
+        raise ValueError(f"Feature transform function is missing: {reference}.")
+    return function
+
+
+def _prepared_base(spark: Any, project: Path | None, plan: FeaturePlan, snapshot: dict) -> Any:
+    """Read the pinned base and apply the optional base_transform from this run's code."""
+    base = read_version(spark, plan.base_table, snapshot["source_versions"][plan.base_table])
+    if plan.base_transform is None:
+        return base
+    if project is None:
+        raise ValueError("base_transform requires the project directory.")
+    source, digest = project_function_source(project, plan.base_transform)
+    if snapshot.get("base_transform_sha256") != digest:
+        raise ValueError("base_transform changed during this run; start a new run.")
+    return _project_function(source, plan.base_transform)(base)
+
+
 def build_feature_group(
     spark: Any,
     project: Path,
@@ -175,16 +213,7 @@ def build_feature_group(
         }
     else:
         _check_publication(spark, plan, snapshot, group.output_table)
-        namespace: dict[str, Any] = {"__name__": "skyulf_feature_transform"}
-        # Trusted project code only: contained bounded source and pinned digest checked above.
-        # This runs with job-owner privileges; it is not a sandbox for untrusted Python.
-        # nosemgrep: python.lang.security.audit.exec-detected.exec-detected, python_exec_rule-exec-used
-        exec(  # nosec B102 # noqa: S102 # pylint: disable=exec-used
-            compile(source, group.transform.split(":")[0], "exec"), namespace
-        )
-        transform = namespace.get(group.transform.split(":")[1])
-        if not callable(transform):
-            raise ValueError(f"Feature transform function is missing: {group.transform}.")
+        transform = _project_function(source, group.transform)
         frame = read_version(
             spark, group.source_table, snapshot["source_versions"][group.source_table]
         )
@@ -211,8 +240,13 @@ def merge_feature_groups(
     plan: FeaturePlan,
     snapshot: dict[str, Any],
     receipts: dict[str, dict[str, Any]],
+    project: Path | None = None,
 ) -> dict[str, Any]:
-    """Join the exact group commits from this run and publish its checked observations."""
+    """Join the exact group commits from this run and publish its checked observations.
+
+    With ``base_transform``, the base passes through that project function first, so
+    labels and record keys can be derived from a raw source.
+    """
     _require_snapshot(plan, snapshot)
     _check_publication(spark, plan, snapshot, plan.output_table)
     if set(receipts) != {g.name for g in plan.groups}:
@@ -225,7 +259,7 @@ def merge_feature_groups(
         ) != snapshot_digest(snapshot):
             raise ValueError(f"Feature receipt does not belong to this run: {group.name}.")
         frames[group.name] = read_version(spark, group.output_table, receipt["version"])
-    base = read_version(spark, plan.base_table, snapshot["source_versions"][plan.base_table])
+    base = _prepared_base(spark, project, plan, snapshot)
     merged = join_feature_groups(base, frames, plan)
     return publish_feature_table(
         spark,

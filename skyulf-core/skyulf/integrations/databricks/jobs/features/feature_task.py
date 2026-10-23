@@ -51,7 +51,9 @@ def run_feature_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         receipts = {
             group.name: _evidence(get(f"receipt_{group.name}_json")) for group in plan.groups
         }
-        result = merge_feature_groups(spark, plan, _evidence(get("snapshot_json")), receipts)
+        result = merge_feature_groups(
+            spark, plan, _evidence(get("snapshot_json")), receipts, config_path.parent.parent
+        )
         key = "receipt_json"
     else:
         raise ValueError(f"Unknown feature task phase: {phase}.")

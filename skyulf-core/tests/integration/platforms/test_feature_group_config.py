@@ -86,3 +86,46 @@ def test_invalid_group_is_rejected(feature_config, field, value, reason):
     feature_config["groups"]["activity"][field] = value
     with pytest.raises(ValueError, match=reason):
         parse_feature_config(feature_config)
+
+
+def _base_only(**changes):
+    """A raw source whose labels and keys are derived by one project function."""
+    config = {
+        "version": 1,
+        "base_table": "workspace.demo.raw_observations",
+        "base_transform": "src/features/base.py:prepare",
+        "output_table": "workspace.demo.observations",
+        "keys": ["entity_id", "observed_on"],
+        "timestamp": "observed_date",
+        "groups": {},
+    }
+    return config | changes
+
+
+def test_base_transform_needs_no_feature_groups():
+    """Deriving the target and key from one raw table must not need a dummy group."""
+    plan = parse_feature_config(_base_only())
+    assert plan is not None
+    assert plan.groups == ()
+    assert plan.base_transform == "src/features/base.py:prepare"
+
+
+def test_base_transform_can_be_combined_with_groups(feature_config):
+    """A derived base still joins regular feature groups on its keys."""
+    plan = parse_feature_config(feature_config | {"base_transform": "src/features/base.py:run"})
+    assert plan is not None and len(plan.groups) == 2
+
+
+@pytest.mark.parametrize(
+    "value", ["src/features/groups/base.py:prepare", "../base.py:prepare", "base.py", 3]
+)
+def test_base_transform_path_is_a_project_function(value):
+    """Only a function in src/features/<module>.py may run on the pinned base."""
+    with pytest.raises(ValueError, match="base_transform"):
+        parse_feature_config(_base_only(base_transform=value))
+
+
+def test_groups_and_base_transform_both_empty_stay_disabled():
+    """Without groups or a base transform the project keeps its ready table."""
+    with pytest.raises(ValueError, match="Disabled features"):
+        parse_feature_config({"version": 1, "groups": {}, "base_table": "a.b.c"})

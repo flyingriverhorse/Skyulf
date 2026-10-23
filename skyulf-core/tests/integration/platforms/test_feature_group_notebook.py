@@ -228,7 +228,10 @@ def test_merge_routes_named_receipts_without_swapping_groups(notebook, operation
             "company": {"table": "catalog.demo.company_features", "version": 8},
             "activity": {"table": "catalog.demo.activity_features", "version": 13},
         },
+        operations.merge.call_args.args[4],
     )
+    # The project root is passed so an optional base_transform can be read.
+    assert (operations.merge.call_args.args[4] / "config").is_dir()
     operations.initialize.assert_not_called()
     operations.build.assert_not_called()
     assert result == {"table": "catalog.demo.training_features", "version": 9}
