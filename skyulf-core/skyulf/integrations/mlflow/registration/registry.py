@@ -115,7 +115,7 @@ def _artifact_uri(package_uri: str, relative: str) -> str:
 def _download_registered_entry(
     mlflow: Any,
     client: Any,
-    resolved: ResolvedModel,
+    identity: tuple[str, str],
     tracking_uri: str | None,
     uri: str,
     destination: Path,
@@ -131,33 +131,29 @@ def _download_registered_entry(
             )
         )
     except Exception as exc:  # noqa: BLE001 - artifact transport boundary
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+        raise translate_error(exc, name=identity[0], version=identity[1]) from exc
 
 
 def _registered_metadata(
     mlflow: Any,
     client: Any,
-    resolved: ResolvedModel,
+    identity: tuple[str, str],
     tracking_uri: str | None,
     root: Path,
 ) -> tuple[str, Any]:
-    """Read pinned MLmodel metadata with the existing typed registry failures."""
+    """Read pinned MLmodel metadata for (name, version) with typed registry failures."""
+    name, version = identity
     try:
-        package_uri = _registered_package_uri(client, resolved.name, resolved.version)
+        package_uri = _registered_package_uri(client, name, version)
     except Exception as exc:  # noqa: BLE001 - explicit OSS registry lookup boundary
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+        raise translate_error(exc, name=name, version=version) from exc
     metadata_path = _download_registered_entry(
-        mlflow,
-        client,
-        resolved,
-        tracking_uri,
-        _artifact_uri(package_uri, "MLmodel"),
-        root,
+        mlflow, client, identity, tracking_uri, _artifact_uri(package_uri, "MLmodel"), root
     )
     try:
         return package_uri, mlflow.models.Model.load(metadata_path)
     except Exception as exc:  # noqa: BLE001 - preserve metadata error translation
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+        raise translate_error(exc, name=name, version=version) from exc
 
 
 def _payload_metadata(model: Any, key: str, digest: str | None) -> dict[str, Any]:
@@ -192,11 +188,13 @@ def downloaded_registered_payload(
     """
     root = Path(tempfile.mkdtemp(prefix="skyulf-registry-payload-")).resolve()
     try:
-        package_uri, model = _registered_metadata(mlflow, client, resolved, tracking_uri, root)
+        package_uri, model = _registered_metadata(
+            mlflow, client, (resolved.name, resolved.version), tracking_uri, root
+        )
         _payload_metadata(model, key, resolved.digest)
         if "skyulf_feature_store" in (model.metadata or {}):
             local = _download_registered_entry(
-                mlflow, client, resolved, tracking_uri, package_uri, root
+                mlflow, client, (resolved.name, resolved.version), tracking_uri, package_uri, root
             )
             from ..models.feature_model import feature_package_models  # noqa: PLC0415
 
@@ -235,7 +233,7 @@ def _download_payload_directory(
         downloaded = _download_registered_entry(
             mlflow,
             client,
-            resolved,
+            (resolved.name, resolved.version),
             tracking_uri,
             _artifact_uri(package_uri, relative),
             download_root,
@@ -426,17 +424,10 @@ def resolve_model(
 
     concrete_version = str(model_version.version)
     model_uri = f"models:/{name}/{concrete_version}"
-    try:
-        package_uri = urlparse(_registered_package_uri(client, name, concrete_version))
-        metadata_uri = package_uri._replace(path=package_uri.path.rstrip("/") + "/MLmodel").geturl()
-        local_path = mlflow.artifacts.download_artifacts(
-            artifact_uri=metadata_uri,
-            tracking_uri=tracking_uri,
-            registry_uri=client._registry_uri,
+    with tempfile.TemporaryDirectory(prefix="skyulf-registry-metadata-") as root:
+        _, model = _registered_metadata(
+            mlflow, client, (name, concrete_version), tracking_uri, Path(root)
         )
-        model = mlflow.models.Model.load(Path(local_path))
-    except Exception as exc:  # noqa: BLE001 - artifact metadata is another registry boundary
-        raise translate_error(exc, name=name, version=concrete_version) from exc
     metadata = digest_metadata(model.metadata or {})
     digest = (
         metadata.get("bundle_digest")

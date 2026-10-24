@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 import pytest
 
@@ -56,6 +56,7 @@ def test_resolution_downloads_only_pinned_metadata(
     assert resolved.signature == signature
     download.assert_called_once_with(
         artifact_uri=package_uri.rstrip("/") + "/MLmodel",
+        dst_path=ANY,  # a temporary folder removed after reading MLmodel
         tracking_uri="https://tracking.example",
         registry_uri=registry_uri,
     )
@@ -110,6 +111,7 @@ def test_signed_metadata_uri_preserves_query_and_fragment(tmp_path: Path, monkey
     assert resolved.digest == "signed-digest"
     download.assert_called_once_with(
         artifact_uri="https://artifacts.example/model/MLmodel?token=a%2Fb&mode=read#revision",
+        dst_path=ANY,
         tracking_uri=None,
         registry_uri="https://registry.example",
     )
