@@ -73,7 +73,11 @@ def build_feature_job(plan: FeaturePlan, training_job: dict[str, Any]) -> dict[s
         name="${bundle.name}_features",
         max_concurrent_runs=1,
         queue={"enabled": True},
-        parameters=[{"name": "selected_groups", "default": "*"}],
+        parameters=[
+            {"name": "selected_groups", "default": "*"},
+            # true makes this job the single scheduled entry point: features -> train -> score.
+            {"name": "start_training", "default": "${var.features_start_training}"},
+        ],
     )
     prototype = next(task for task in training_job["tasks"] if "notebook_task" in task)
     params = {
@@ -98,6 +102,24 @@ def build_feature_job(plan: FeaturePlan, training_job: dict[str, Any]) -> dict[s
         {"task_key": "initialize_features"}  # base_transform only: no group tasks
     ]
     tasks.append(merge)
+    tasks.append(
+        {
+            "task_key": "training_requested",
+            "depends_on": [{"task_key": "merge_features"}],
+            "condition_task": {
+                "op": "EQUAL_TO",
+                "left": "{{job.parameters.start_training}}",
+                "right": "true",
+            },
+        }
+    )
+    tasks.append(
+        {
+            "task_key": "start_training",
+            "depends_on": [{"task_key": "training_requested", "outcome": "true"}],
+            "run_job_task": {"job_id": "${resources.jobs.train.id}"},
+        }
+    )
     job["tasks"] = tasks
     return job
 

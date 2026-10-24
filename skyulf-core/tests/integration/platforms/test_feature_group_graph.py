@@ -167,8 +167,8 @@ def test_parallel_tasks_preserve_compute_and_permissions(compute):
         {"task_key": "feature_company"},
         {"task_key": "feature_activity"},
     ]
-    for task in tasks.values():
-        # Each task receives the target values that bind {catalog}-style table names.
+    for task in (task for task in tasks.values() if "notebook_task" in task):
+        # Each notebook task receives the target values that bind {catalog}-style names.
         parameters = task["notebook_task"]["base_parameters"]
         assert parameters["catalog"] == "${var.catalog}"
         assert parameters["resource_suffix"] == "${var.resource_suffix}"
@@ -218,3 +218,24 @@ groups:
     with pytest.raises(ValueError, match="within|outside|project"):
         refresh_feature_graph(root)
     assert target.read_text(encoding="utf-8") == original
+
+
+def test_feature_job_can_start_training_after_merge():
+    """One scheduled features job must be able to drive train, which hands off to scoring."""
+    plan = _plan()
+    assert plan is not None
+    source: dict[str, Any] = {
+        "name": "example_train",
+        "tasks": [{"task_key": "initialize_run", "notebook_task": {"base_parameters": {}}}],
+    }
+    job = build_feature_job(plan, source)
+    assert {"name": "start_training", "default": "${var.features_start_training}"} in job[
+        "parameters"
+    ]
+    tasks = {task["task_key"]: task for task in job["tasks"]}
+    gate = tasks["training_requested"]
+    assert gate["depends_on"] == [{"task_key": "merge_features"}]
+    assert gate["condition_task"]["left"] == "{{job.parameters.start_training}}"
+    start = tasks["start_training"]
+    assert start["depends_on"] == [{"task_key": "training_requested", "outcome": "true"}]
+    assert start["run_job_task"] == {"job_id": "${resources.jobs.train.id}"}

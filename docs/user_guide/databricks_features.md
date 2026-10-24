@@ -423,6 +423,14 @@ prediction_table: "{catalog}.{output_schema}.company_predictions{resource_suffix
 
 Once there are enough representative rows for the configured split/CV, run the
 normal training workflow and approve/select a saved version before scoring.
+
+To run everything from one schedule, set `features_start_training: "true"` for
+the target in `deployment/targets.yml` (variable default `"false"`) and schedule
+only the features job. After `merge_features` succeeds, its `start_training`
+task runs the train job, whose usual handoff starts scoring after an alias
+change; scoring then starts monitoring. A pinned scorer is not started by
+training, so keep its own schedule. Run `refresh_feature_graph.py` once so an
+existing feature job gains the two tasks.
 For independent-target layouts, check model-level input/target overrides as
 well as defaults. The merged table may contain labels; labels are not model
 inputs. A separate unlabeled observation/merge table can be the scoring source.

@@ -209,6 +209,9 @@ returns unique keys/time plus exactly the declared features; no YAML `params`.
 Keep reads/collection/writes outside transforms and learned statistics in preprocessing.
 
 Run `refresh_feature_graph.py`, validate/deploy, then the `features` job.
+`features_start_training: "true"` (a Bundle variable) makes it start the train job
+after the merge, so one scheduled features job drives features, training and the
+training's score handoff.
 Inspect `initialize_features`, `feature_<group>` and `merge_features` receipts.
 Point training/scoring at the merged table explicitly. `selected_groups=*`
 recomputes all; an empty selection reuses existing outputs and only merges.

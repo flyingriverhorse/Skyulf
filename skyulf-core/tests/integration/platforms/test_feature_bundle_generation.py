@@ -89,7 +89,13 @@ def test_feature_job_resolves_for_each_layout_and_identity(tmp_path, layout, off
             "feature_activity",
             "feature_company",
             "merge_features",
+            "training_requested",
+            "start_training",
         }
+        # Training starts after the merge only when the target opts in.
+        parameters = {item["name"]: item["default"] for item in features["parameters"]}
+        assert parameters["start_training"] == "false"
+        assert "run_job_task" in tasks["start_training"]
         for name in ("activity", "company"):
             assert tasks[f"feature_{name}"]["depends_on"] == [{"task_key": "initialize_features"}]
         assert {item["task_key"] for item in tasks["merge_features"]["depends_on"]} == {

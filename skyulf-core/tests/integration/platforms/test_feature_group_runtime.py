@@ -438,5 +438,10 @@ def test_base_only_feature_job_merges_after_initialize():
     training = {"tasks": [{"task_key": "t", "notebook_task": {}, "environment_key": "skyulf"}]}
     job = build_feature_job(_base_plan(), training)
     tasks = {task["task_key"]: task for task in job["tasks"]}
-    assert set(tasks) == {"initialize_features", "merge_features"}
+    assert set(tasks) == {
+        "initialize_features",
+        "merge_features",
+        "training_requested",
+        "start_training",
+    }
     assert tasks["merge_features"]["depends_on"] == [{"task_key": "initialize_features"}]

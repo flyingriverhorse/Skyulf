@@ -20,6 +20,8 @@ resources:
       parameters:
       - name: selected_groups
         default: '*'
+      - name: start_training
+        default: ${var.features_start_training}
       tasks:
       - environment_key: skyulf
         timeout_seconds: ${var.train_task_timeout_seconds}
@@ -60,3 +62,16 @@ resources:
             phase: merge
         depends_on:
         - task_key: initialize_features
+      - task_key: training_requested
+        depends_on:
+        - task_key: merge_features
+        condition_task:
+          op: EQUAL_TO
+          left: '{{job.parameters.start_training}}'
+          right: 'true'
+      - task_key: start_training
+        depends_on:
+        - task_key: training_requested
+          outcome: 'true'
+        run_job_task:
+          job_id: ${resources.jobs.train.id}

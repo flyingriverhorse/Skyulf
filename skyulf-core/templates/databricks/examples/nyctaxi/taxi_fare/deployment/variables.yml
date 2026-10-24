@@ -22,6 +22,9 @@ variables:
   monitoring_budget_policy_id:
     description: Optional existing monitoring serverless budget policy; blank uses workspace defaults
     default: ""
+  features_start_training:
+    description: "true starts the train job after the optional features job merges, so one scheduled features job drives features, training and the training's score handoff"
+    default: "false"
   on_drift:
     description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
     default: "disabled"
