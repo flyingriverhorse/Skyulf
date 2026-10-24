@@ -51,7 +51,7 @@ More terms: [glossary](https://www.skyulf.com/manual/user_guide/databricks_gloss
 
 | Change | Owner |
 | --- | --- |
-| Training source, keys, inputs/target, split, model, tuning, weights, quality | `config/training.yml` |
+| Training source (`training_table`), keys (`record_key_columns`), inputs (`input_columns`), target (`target_column`), split, model, tuning, quality | `config/training.yml` |
 | Fixed cleanup and training eligibility | `config/pre_split.yml` |
 | Transformations fitted on training rows | `config/preprocessing.yml` |
 | Saved-model selection, prediction source/output and change policy | `config/inference.yml` |
@@ -62,6 +62,13 @@ More terms: [glossary](https://www.skyulf.com/manual/user_guide/databricks_gloss
 | Hosts, namespaces, run identities, compute, schedules and monitoring | `deployment/targets.yml`, `deployment/variables.yml` |
 | Installed Core and optional dependencies | `deployment/*requirements.txt` |
 | Generated tasks and local graph refresh tools | `resources/*.job.yml`, `src/tools/` |
+
+### After you change a file
+
+| You changed | Then |
+| --- | --- |
+| `config/training.yml`, `pre_split.yml`, `preprocessing.yml`, `scoring.yml` or `src/features/` | `preview.py --action train`, validate and deploy, then train. Only the new version uses the change; trained versions keep what they were trained with. |
+| `config/inference.yml`, `config/serving.yml` or `deployment/` | Validate and deploy. The next run uses it. |
 
 Change models/recipes without editing job notebooks. Training captures selected
 preprocessing, scoring rules and code; later edits do not alter saved versions.
@@ -102,7 +109,8 @@ installing the local dependencies from README:
 python src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id YOUR_EXISTING_WAREHOUSE --catalog YOUR_CATALOG --input-schema YOUR_INPUT_SCHEMA --output-schema YOUR_OUTPUT_SCHEMA --metadata-schema YOUR_METADATA_SCHEMA
 ```
 
-This is read-only, but uniqueness checks can scan tables. It checks the supplied
+`--warehouse-id` is a SQL warehouse ID (SQL Warehouses > your warehouse > Connection
+details). This is read-only, but uniqueness checks can scan tables. It checks the supplied
 profile's access, not another run identity or future data. Add the target's
 `--resource-suffix` when needed.
 
@@ -117,8 +125,10 @@ replace every namespace/type placeholder before running it yourself.
 The order is source selection → fixed cleanup/eligibility → final split →
 fold-local preprocessing/model fit. Keep learned means, quantiles and categories
 after splitting. Both phase YAML files have `version: 1`, `recipes`, and a
-`default` recipe; empty recipes do nothing. Example recipes run only when selected.
-Select `pre_split_recipe` and `preprocessing_recipe` in training settings.
+`default` recipe. The `default` recipe runs unless `config/training.yml` picks
+another under `defaults:` with `pre_split_recipe: <name>` or
+`preprocessing_recipe: <name>`; other recipes run only when picked. An empty
+recipe does nothing.
 
 A typical recipe, with your own column names:
 
@@ -175,6 +185,9 @@ Select it in a recipe; `params` become the factory's keyword arguments:
       params: {column: income}
 ```
 
+The new `log_income` column goes to the model automatically: the model receives every
+column left after preprocessing except the target.
+
 A step that learns from training rows (a mean, a mapping) uses `fitted_step` with a
 `learn(df, y, params)` and an `apply(df, state, params)` function{{if eq .include_examples "true"}};
 `src/features/preprocessing.py` shows both kinds with comments{{end}}.
@@ -196,8 +209,8 @@ read them with `read_project_asset`, and declare exact package pins in
 `src/features/requirements.txt`. New code, assets or dependencies require a new fit.
 
 Spark workers and endpoints require admission for the exact saved recipe.
-Eligible built-ins and custom steps/rules undergo training checks; declaring
-row-local context alone is not certification. Avoid index-dependent behavior
+Training checks every step and rule that Spark workers or an endpoint will run; a
+step is admitted only when that check passes, not because its code says it is row-local. Avoid index-dependent behavior
 and mutable global caches. Group/window/global context cannot be treated as
 independent prediction rows. `probe_pipeline_for_serving: true` requests the
 training admission checks; Spark/online-feature routes already require them.
@@ -242,7 +255,9 @@ For example, a fixed model with a quality bar in `config/training.yml`:
 {{end}}    # no tuning block: these values are used as given
 ```
 
-Choose the threshold from what the business needs, before training. The
+The threshold is compared with the `metric` in the same `defaults` block (for example
+`heldout_accuracy`): error metrics such as RMSE must stay at or below it, scores such as
+accuracy must reach it. Choose it from what the business needs, before training. The
 [training field reference](https://www.skyulf.com/manual/user_guide/databricks_training_config.html)
 lists every model, its parameters and the tuning options.
 
@@ -321,7 +336,9 @@ exclusion reason. Target-reading filters require explicit
 so separate target and feature filters when feature checks must remain.
 Built-ins include `required_values`, `value_range` and `prediction_band`.
 Custom rules use `custom: scoring.<function>` and declared output columns/dtypes.
-The `combined` list is cross-model arithmetic, not the eligibility mode. Do not
+`mode: combined` runs the `pre_split.yml` filters first, then these rules. (A model
+set's separate `combined:` section computes one value from several models; it is not
+this mode.) Do not
 add Python builders beside YAML; legacy builders remain valid without YAML.
 For example, to score only rows with a known, adult age:
 
@@ -339,7 +356,7 @@ eligibility:
     params: {column: age, minimum: 18.0, maximum: 120.0}
 ```
 
-A failing row is not deleted: it stays in the output with `scoring_status: excluded`,
+`value_range` bounds are inclusive. A failing row is not deleted: it stays in the output with `scoring_status: excluded`,
 its `exclusion_reason` and an empty prediction. See [scoring and publication](https://www.skyulf.com/manual/user_guide/databricks_scoring.html).
 
 ## Serving requests
@@ -347,10 +364,17 @@ its `exclusion_reason` and an empty prediction. See [scoring and publication](ht
 {{if eq .prediction_delivery "batch"}}This batch project has no `serving_endpoint` job. To add an endpoint:
 
 1. Generate a new project in another folder with the same answers and
-   `prediction_delivery: "both"`.
+   `prediction_delivery: "both"`. From a Skyulf checkout:
+
+   ```powershell
+   databricks bundle init skyulf-core/templates/databricks --output-dir ../serving_copy
+   ```
+
+   Add `--config-file answers.json` to reuse a saved answer file.
 2. Copy its new files: `config/serving.yml`, `resources/serving_endpoint.job.yml`,
    `src/jobs/serving_endpoint.py`, `src/jobs/dispatch_serving.py` and
-   `deployment/serving-requirements.txt`.
+   `deployment/serving-requirements.txt`. Copying generated files is fine; only do
+   not hand-edit `src/jobs/*.py`.
 3. Compare and merge its `config/training.yml`, `config/inference.yml`,
    `deployment/variables.yml` and `resources/train.job.yml` into yours.
 4. Train a new version: models trained before the change have no serving checks.
@@ -497,7 +521,7 @@ Start from the first failed task and record its run ID.
 | --- | --- |
 | Training (any train-job task) | Fix the cause and start a **new** train run. Repairing or retrying the failed run is rejected. |
 | Scoring, after an approval or promotion succeeded | Run the score job again; do not retrain or approve again. |
-| Monitoring, after predictions were written | Predictions stay. Prepare references if asked, then run the **same** score request again; it writes nothing new and finishes the measurement. |
+| Monitoring, after predictions were written (for example `Spark reference is not prepared`) | Predictions stay. Prepare the reference ([Monitoring](#monitoring) step 4) if that is the error, then run the **same** score request again; it writes nothing new and finishes the measurement. |
 | An alias change whose outcome is unknown | Stop jobs that change aliases and follow alias recovery below; do not roll back instead. |
 
 **Upgrading Core** (`deployment/requirements.txt`): a model loads only with the
