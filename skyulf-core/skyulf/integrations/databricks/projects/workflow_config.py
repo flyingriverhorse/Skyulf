@@ -487,9 +487,16 @@ def preview_summary(config: dict[str, Any], *, action: str = "score") -> str:
         f"  Final holdout: {checked.get('split_strategy', 'random')}",
         f"  Activation: {activation}",
         f"  Scoring: {scoring}",
-        "  Not checked: source data, permissions and workspace; next run "
-        "src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id ID",
     ]
+    if checked.get("prediction_delivery") in {"endpoint", "both"}:
+        lines.append(
+            "  Serving: champion alias; serving_endpoint --params model_version=N serves one "
+            "registered version; its run output shows model_uri and REST/SQL verification"
+        )
+    lines.append(
+        "  Not checked: source data, permissions and workspace; next run "
+        "src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id ID"
+    )
     return "\n".join(lines)
 
 

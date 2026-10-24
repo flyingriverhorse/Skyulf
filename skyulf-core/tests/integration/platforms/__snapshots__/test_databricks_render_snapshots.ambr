@@ -248,7 +248,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': '5d94d67ecf2d8a70',
-    'README.md': 'c63c9941e29ce42d',
+    'README.md': 'a56109f1146982d2',
     'config/features.yml': 'f87626394b477021',
     'config/inference.yml': '432d7b43d515bce5',
     'config/pre_split.yml': '8dda2c847c6ddcf2',

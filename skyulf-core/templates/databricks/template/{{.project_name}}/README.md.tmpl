@@ -123,16 +123,31 @@ Replace `YOUR_PROFILE` in every command.
    [reference](https://www.skyulf.com/manual/user_guide/databricks_monitoring_enrollment.html){{end}}.
 
 {{end}}{{end}}{{if ne .prediction_delivery "batch"}}
-## Serve the approved model
+## Serve the model
 
-Run `serving_endpoint` manually on personal development targets. In production
-Bundle mode, `serving_endpoint.follow_champion: true` submits a separate
-serving run when champion changes. Inspect that child run's verification result;
-training success only confirms submission. See [serving instructions](GUIDE.md#serving-requests) for the
-command, caller permissions, SQL/REST examples, costs and logging choices.
-With target `monitoring_enabled: "true"`, payload logging enabled and a monitoring
-store configured, successful verification automatically enrolls the endpoint. Run the monitoring job after
-requests arrive to populate the dashboard; no batch score run is needed.
+1. **Publish a version.** Without parameters the job serves the champion. To try a
+   registered version before approving it, name it for this run:
+
+   ```powershell
+   databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE serving_endpoint --params model_version=N
+   ```
+
+   Personal development targets always run it manually. In production Bundle mode,
+   `serving_endpoint.follow_champion: true` submits this run after a champion
+   change; training success only confirms that submission, so open that child run.
+2. **Check what is live.** In the `serving_endpoint` run output, `model_uri` is the
+   version the endpoint now serves and `verification` counts the sample rows whose
+   REST (`rest_compared`) and SQL (`sql_compared`) predictions matched the saved model.
+   `status: READY` alone does not prove the new version is serving.
+3. **Call it.** Copy `examples` from the same output: `rest_path` with `rest_body`,
+   the `sql` query and the `python` SDK call. Callers need `CAN_QUERY` on the
+   endpoint and `EXECUTE` on the SQL function: add them to `permissions` (and
+   `function_permissions` if they differ) in `config/serving.yml`.
+4. **Monitor requests.** With target `monitoring_enabled: "true"`, payload logging and a
+   monitoring store, successful verification enrolls the endpoint. Run the monitoring
+   job after real requests arrive; no batch score run is needed.
+
+See [serving requests](GUIDE.md#serving-requests) for costs, logging choices and rollout.
 
 {{end}}## Learn by making one change
 

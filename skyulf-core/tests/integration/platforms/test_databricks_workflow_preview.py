@@ -101,3 +101,13 @@ def test_preview_summary_names_missing_decisions_before_details(
     assert scoring in summary
     assert "Not checked: source data, permissions and workspace" in summary
     assert "Summary:" not in preview_workflow_config(workflow_config)
+
+
+@pytest.mark.parametrize(("delivery", "serving"), [("batch", False), ("both", True)])
+def test_preview_summary_names_the_serving_route_only_when_generated(
+    workflow_config, delivery, serving
+):
+    """Endpoint projects must see how to serve one version and where its proof is."""
+    workflow_config.update(prediction_delivery=delivery, engine="pandas")
+    summary = preview_summary(workflow_config)
+    assert ("serving_endpoint --params model_version=N" in summary) is serving
