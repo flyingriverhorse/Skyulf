@@ -1,4 +1,7 @@
 site_name: Skyulf
+site_description: >-
+  Skyulf documentation: Kayra, the self-hosted visual MLOps app, and skyulf-core,
+  the Python ML library with Spark, MLflow and Databricks integrations.
 site_url: https://www.skyulf.com/manual/
 repo_url: https://github.com/flyingriverhorse/Skyulf
 repo_name: flyingriverhorse/Skyulf
@@ -25,7 +28,6 @@ theme:
   features:
     - navigation.tabs
     - navigation.sections
-    - navigation.expand
     - toc.integrate
     - content.code.copy
     - content.tabs.link
@@ -49,63 +51,63 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
-  - Home: index.md
-  - Backend:
+  - Home:
+    - Home: index.md
+    - FAQ & Comparison: guides/faq.md
+  - Kayra App:
     - Platform Setup: guides/platform_setup.md
     - Platform Walkthrough: guides/platform_walkthrough.md
-    - API Reference: guides/backend_api.md
-    - Configuration Reference: guides/backend_configuration.md
-    - Job Idempotency: guides/job_idempotency.md
-  - Guides:
-    - Getting Started: guides/getting_started.md
-    - Core Release Process: guides/core-release.md
     - Multi-Path Pipelines: guides/multi_path_pipelines.md
-    - FAQ & Comparison: guides/faq.md
-    - Recipes: guides/recipes.md
-    - Migrating from scikit-learn: guides/sklearn_migration.md
-    - Skyulf vs. YData vs. Sweetviz: guides/profiling_comparison.md
-    - Architecture: architecture.md
-    - Data Architecture: data_architecture.md
-    - Performance: performance.md
-    - Adding New Engine: guides/adding_new_engine.md
-    - Engine Mechanics: guides/engine_mechanics.md
-    - Engine Data Paths: guides/engine_data_paths.md
-    - Data Drift Roadmap: guides/data_drift_roadmap.md
-  - Examples:
-    - Quickstart: examples/quickstart.md
-    - Leakage Proof (pandas): examples/leakage_proof_pandas.md
-    - Leakage Proof (polars): examples/leakage_proof_polars.md
-  - Contributing:
-    - Writing Docs: contributing/writing_docs.md
-  - User Guide:
-    - Overview: user_guide/overview.md
-    - Installation: user_guide/installation.md
-    - Preprocessing Diagnostics and Context: user_guide/preprocessing_context.md
-    - Pipeline Quickstart: user_guide/pipeline_quickstart.md
-    - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
-    - Automated EDA: user_guide/eda_profiling.md
-    - PII Detection: user_guide/pii_detection.md
-    - Text & NLP: user_guide/text_nlp.md
-    - Validation vs scikit-learn: user_guide/validation_vs_sklearn.md
-    - skyulf-core Configuration: user_guide/configuration.md
-    - Weighted Training & Support: user_guide/weighted_training.md
-    - Verify Sampling and Weights: user_guide/sampling_weight_acceptance.md
-    - Hyperparameter Tuning: user_guide/hyperparameter_tuning.md
-    - SHAP Explainability: user_guide/shap_explainability.md
-    - Cross-Validation: user_guide/cross_validation.md
-    - Threshold Tuning: user_guide/threshold_tuning.md
-    - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md
-    - Leakage Safety - Core & Backend: user_guide/leakage_core_backend.md
-    - Preprocessing Leakage Audit: user_guide/preprocessing_leakage_audit.md
-    - Preprocessing Placement: user_guide/preprocessing_placement.md
-    - Drift Monitoring: user_guide/drift_monitoring.md
-    - Serialization: user_guide/serialization.md
+    - Backend API Reference: guides/backend_api.md
+    - Backend Configuration: guides/backend_configuration.md
+    - Job Idempotency: guides/job_idempotency.md
     - Project Export Quickstart: user_guide/model_project_export_quickstart.md
     - Export a Model Project: user_guide/model_project_export.md
-    - Extending Skyulf-Core: user_guide/extending_custom_nodes.md
+  - skyulf-core:
+    - Start Here:
+      - Getting Started: guides/getting_started.md
+      - Installation: user_guide/installation.md
+      - Overview: user_guide/overview.md
+      - Pipeline Quickstart: user_guide/pipeline_quickstart.md
+      - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
+      - Examples:
+        - Quickstart: examples/quickstart.md
+        - Leakage Proof (pandas): examples/leakage_proof_pandas.md
+        - Leakage Proof (polars): examples/leakage_proof_polars.md
+      - Migrating from scikit-learn: guides/sklearn_migration.md
+    - Pipelines & Nodes:
+      - skyulf-core Configuration: user_guide/configuration.md
+      - Preprocessing Nodes: reference/preprocessing_nodes.md
+      - Modeling Nodes: reference/modeling_nodes.md
+      - Data Validation: reference/data_validation.md
+      - Preprocessing Diagnostics and Context: user_guide/preprocessing_context.md
+      - Recipes: guides/recipes.md
+      - Extending Skyulf-Core: user_guide/extending_custom_nodes.md
+    - Data Exploration:
+      - Automated EDA: user_guide/eda_profiling.md
+      - Skyulf vs. YData vs. Sweetviz: guides/profiling_comparison.md
+      - PII Detection: user_guide/pii_detection.md
+      - Text & NLP: user_guide/text_nlp.md
+    - Training & Tuning:
+      - Weighted Training & Support: user_guide/weighted_training.md
+      - Verify Sampling and Weights: user_guide/sampling_weight_acceptance.md
+      - Hyperparameter Tuning: user_guide/hyperparameter_tuning.md
+      - Cross-Validation: user_guide/cross_validation.md
+      - Threshold Tuning: user_guide/threshold_tuning.md
+      - Segmentation (Clustering): user_guide/segmentation.md
+      - SHAP Explainability: user_guide/shap_explainability.md
+    - Leakage Safety:
+      - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md
+      - Leakage Safety - Core & Backend: user_guide/leakage_core_backend.md
+      - Preprocessing Leakage Audit: user_guide/preprocessing_leakage_audit.md
+      - Preprocessing Placement: user_guide/preprocessing_placement.md
+      - Validation vs scikit-learn: user_guide/validation_vs_sklearn.md
+    - Save & Monitor:
+      - Drift Monitoring: user_guide/drift_monitoring.md
+      - Serialization: user_guide/serialization.md
     - Troubleshooting: user_guide/troubleshooting.md
-  - Integrations:
-    - Documentation Index: user_guide/integrations.md
+  - Databricks, MLflow & Spark:
+    - Overview: user_guide/integrations.md
     - Databricks:
       - Get Started:
         - End-to-End Project Guide: user_guide/databricks_bundle_walkthrough.md
@@ -178,38 +180,44 @@ nav:
       - Execution and Inference: user_guide/spark.md
       - Measure Inference Capacity: user_guide/spark_benchmark.md
       - Portable Inference Bundles: user_guide/inference_bundles.md
-  - Reference:
-    - Preprocessing Nodes: reference/preprocessing_nodes.md
-    - Modeling Nodes: reference/modeling_nodes.md
-    - Data Validation: reference/data_validation.md
+  - API Reference:
+    - Pipeline: reference/api/pipeline.md
+    - Data:
+      - SplitDataset: reference/api/data/dataset.md
+    - Preprocessing:
+      - Overview: reference/api/preprocessing/index.md
+      - base: reference/api/preprocessing/base.md
+      - pipeline: reference/api/preprocessing/pipeline.md
+      - split: reference/api/preprocessing/split.md
+      - cleaning: reference/api/preprocessing/cleaning.md
+      - drop_and_missing: reference/api/preprocessing/drop_and_missing.md
+      - imputation: reference/api/preprocessing/imputation.md
+      - encoding: reference/api/preprocessing/encoding.md
+      - scaling: reference/api/preprocessing/scaling.md
+      - outliers: reference/api/preprocessing/outliers.md
+      - transformations: reference/api/preprocessing/transformations.md
+      - bucketing: reference/api/preprocessing/bucketing.md
+      - casting: reference/api/preprocessing/casting.md
+      - feature_generation: reference/api/preprocessing/feature_generation.md
+      - feature_selection: reference/api/preprocessing/feature_selection.md
+      - resampling: reference/api/preprocessing/resampling.md
+      - inspection: reference/api/preprocessing/inspection.md
+    - Modeling:
+      - Overview: reference/api/modeling/index.md
+      - base: reference/api/modeling/base.md
+      - sklearn_wrapper: reference/api/modeling/sklearn_wrapper.md
+      - classification: reference/api/modeling/classification.md
+      - regression: reference/api/modeling/regression.md
+      - cross_validation: reference/api/modeling/cross_validation.md
+      - tuning/engine: reference/api/modeling/tuning_engine.md
+  - Development:
+    - Writing Docs: contributing/writing_docs.md
+    - Core Release Process: guides/core-release.md
     - Deprecation Policy: reference/deprecation.md
-    - API:
-      - Pipeline: reference/api/pipeline.md
-      - Data:
-        - SplitDataset: reference/api/data/dataset.md
-      - Preprocessing:
-        - Overview: reference/api/preprocessing/index.md
-        - base: reference/api/preprocessing/base.md
-        - pipeline: reference/api/preprocessing/pipeline.md
-        - split: reference/api/preprocessing/split.md
-        - cleaning: reference/api/preprocessing/cleaning.md
-        - drop_and_missing: reference/api/preprocessing/drop_and_missing.md
-        - imputation: reference/api/preprocessing/imputation.md
-        - encoding: reference/api/preprocessing/encoding.md
-        - scaling: reference/api/preprocessing/scaling.md
-        - outliers: reference/api/preprocessing/outliers.md
-        - transformations: reference/api/preprocessing/transformations.md
-        - bucketing: reference/api/preprocessing/bucketing.md
-        - casting: reference/api/preprocessing/casting.md
-        - feature_generation: reference/api/preprocessing/feature_generation.md
-        - feature_selection: reference/api/preprocessing/feature_selection.md
-        - resampling: reference/api/preprocessing/resampling.md
-        - inspection: reference/api/preprocessing/inspection.md
-      - Modeling:
-        - Overview: reference/api/modeling/index.md
-        - base: reference/api/modeling/base.md
-        - sklearn_wrapper: reference/api/modeling/sklearn_wrapper.md
-        - classification: reference/api/modeling/classification.md
-        - regression: reference/api/modeling/regression.md
-        - cross_validation: reference/api/modeling/cross_validation.md
-        - tuning/engine: reference/api/modeling/tuning_engine.md
+    - Architecture: architecture.md
+    - Data Architecture: data_architecture.md
+    - Performance: performance.md
+    - Adding New Engine: guides/adding_new_engine.md
+    - Engine Mechanics: guides/engine_mechanics.md
+    - Engine Data Paths: guides/engine_data_paths.md
+    - Data Drift Roadmap: guides/data_drift_roadmap.md

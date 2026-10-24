@@ -88,7 +88,7 @@ cd frontend/ml-canvas && npm run dev
 2. [Overview](user_guide/overview.md) — Understand the Calculator/Applier pattern.
 3. [Pipeline Quickstart](user_guide/pipeline_quickstart.md) — Build your first pipeline in Python.
 4. [Step-by-Step (No Config)](user_guide/step_by_step_no_config.md) — Low-level building blocks.
-5. [Reference → Preprocessing Nodes](reference/preprocessing_nodes.md) / [Modeling Nodes](reference/modeling_nodes.md) — Full node catalog.
+5. [Preprocessing Nodes](reference/preprocessing_nodes.md) / [Modeling Nodes](reference/modeling_nodes.md) — Full node catalog.
 
 ### Using Databricks, MLflow and Spark
 

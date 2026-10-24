@@ -1,19 +1,25 @@
 # Writing Documentation
 
-We use [MkDocs](https://www.mkdocs.org/) with the [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme to build our documentation.
+We build the documentation with [Zensical](https://zensical.org/), which reads the existing `mkdocs.yml`.
 
 ## Setup
 
 1.  **Install Dependencies**:
     ```bash
-    pip install mkdocs mkdocs-material mkdocstrings[python]
+    uv pip install -r requirements-docs.txt
     ```
 
 2.  **Serve Locally**:
     ```bash
-    mkdocs serve
+    zensical serve
     ```
-    This will start a local server at `http://127.0.0.1:8000` that auto-reloads when you change files.
+    This starts a local server (the address is printed in the terminal) that auto-reloads when you change files.
+
+3.  **Check Before Committing**:
+    ```bash
+    zensical build --clean --strict
+    ```
+    CI runs the same command; any warning fails the docs deploy.
 
 ## Directory Structure
 

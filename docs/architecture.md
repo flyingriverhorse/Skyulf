@@ -80,7 +80,7 @@ Raw DataFrame
 If you split first (or provide a `SplitDataset`), calculators should learn only on the train split.
 This prevents leakage of statistics from test/validation.
 
-See the User Guide section "SplitDataset & Leakage" for recommended patterns.
+See [SplitDataset & Leakage](user_guide/splitdataset_and_leakage.md) for recommended patterns.
 
 ## Multi-Path Execution & Merge
 

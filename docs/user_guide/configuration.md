@@ -32,8 +32,8 @@ Each step is:
 `TransformerType` is a string key resolved via the `NodeRegistry`.
 For the full list and per-node parameters, see:
 
-- Reference → Preprocessing Nodes
-- Reference → API → Preprocessing → pipeline
+- [Preprocessing Nodes](../reference/preprocessing_nodes.md)
+- [API Reference: preprocessing pipeline](../reference/api/preprocessing/pipeline.md)
 
 #### Minimal examples
 
