@@ -51,7 +51,7 @@ stable. Transfer reviewed changes to notebooks, dependencies and graphs as one c
 | --- | --- |
 | Training (any train-job task) | Read the run's evidence, fix the cause and start a **new** train run. Databricks Repair run and task retries are rejected for lifecycle tasks. |
 | Score, after the alias change succeeded | Run the score job again. Do not retrain or repeat the approval. |
-| Monitoring, after predictions were committed | Run the monitoring job again. Committed predictions stay; a missing measurement is filled in. |
+| Monitoring, after predictions were committed | Committed predictions stay. Fix the cause (a first pinned candidate may need [`monitoring_action=prepare_references`](databricks_monitoring_enrollment.md)), then run the score job again with the same parameters: it writes no new predictions and finishes the missing measurement. Do not delete output rows. |
 | Alias change with an unknown outcome (`AliasOutcomeUnknownError`) | Stop alias writers and follow [alias recovery](databricks_lifecycle_recovery.md). Do not use rollback instead. |
 | Recovery reports `AliasConflictError` | Keep writers stopped and inspect the saved intent and all four roles; do not continue the upgrade. |
 | Old champion restored but the new score job cannot load it | Model selection is back, prediction is not. Score with the old environment, or approve a model trained under the new runtime. |
