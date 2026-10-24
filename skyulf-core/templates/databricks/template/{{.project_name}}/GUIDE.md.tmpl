@@ -187,7 +187,9 @@ def log1p_value(df, params):
 
 
 def log_feature(column):
-    return column_step(f"log_{column}", log1p_value, output=f"log_{column}", params={"column": column})
+    return column_step(
+        f"log_{column}", log1p_value, output=f"log_{column}", params={"column": column}
+    )
 ```
 
 Select it in a recipe; `params` become the factory's keyword arguments:
