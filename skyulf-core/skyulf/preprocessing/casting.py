@@ -481,9 +481,12 @@ def _cast_integral_text(series: pd.Series, target_dtype: Any) -> pd.Series:
         & (values == np.floor(values))
         & (np.abs(values) < _EXACT_FLOAT_INTEGERS)
     )
-    if integral.any():
-        text[integral] = [str(int(value)) for value in values[integral]]
-    return text
+    if not integral.any():
+        return text
+    # Build the result in numpy: pandas Series masked assignment fails for one-row frames.
+    result = text.to_numpy(dtype=object, na_value=pd.NA)
+    result[integral] = [str(int(value)) for value in values[integral]]
+    return pd.Series(result, index=series.index, name=series.name, dtype=text.dtype)
 
 
 def _cast_one_column(

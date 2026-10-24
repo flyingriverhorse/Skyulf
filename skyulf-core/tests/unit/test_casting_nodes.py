@@ -59,3 +59,15 @@ def test_saved_casts_without_the_flag_keep_their_old_text():
     del state["integral_floats_as_int"]
     CastingApplier.validate_inference_state(state)
     assert CastingApplier().apply(frame, state)["code"].tolist() == ["81.0", "12.0"]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_integral_text_is_identical_when_scored_one_row_at_a_time(engine):
+    """Serving probes score rows in chunks of 1; each row must match the whole-frame result."""
+    frame = pd.DataFrame({"code": [81.0, np.nan, 12.0, 7.5]})
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    state = CastingCalculator().fit(native, {"column_types": {"code": "string"}})
+    whole = CastingApplier().apply(native, state)["code"].to_list()
+    for index in range(len(frame)):
+        row = native[index : index + 1]
+        assert CastingApplier().apply(row, state)["code"].to_list() == [whole[index]]
