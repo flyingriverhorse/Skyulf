@@ -346,6 +346,7 @@ def test_deployment_defaults_are_ci_independent(tmp_path):
         ({"monitoring": "true"}, True, True),
         ({"score_model_selection": "champion"}, False, False),
         ({"promotion_policy": "automatic"}, False, False),
+        ({"score_follow_champion": "true"}, True, False),
     ],
 )
 def test_first_run_guide_follows_the_selected_scoring_policy(
@@ -353,6 +354,8 @@ def test_first_run_guide_follows_the_selected_scoring_policy(
 ):
     """A pinned first score must not send the user through an approval it does not need."""
     guide = (_generate_project(tmp_path, **answers) / "START_HERE.md").read_text(encoding="utf-8")
+    follows = answers.get("score_follow_champion") == "true"
+    assert ("starts a score run by itself" in guide) is follows
     assert ("score --params score_model_version=N" in guide) is pinned_first
     assert ("Approve later (optional)" in guide) is pinned_first
     assert ("5. **Approve.**" in guide) is not pinned_first

@@ -457,8 +457,14 @@ def _preview_window(checked: dict[str, Any]) -> tuple[str, Any, Any]:
     return observation_window, holdout_start, result_cutoff
 
 
-def _preview_summary(checked: dict[str, Any], training_status: str) -> list[str]:
-    """Put what is settled, what is missing and what is still unchecked before the details."""
+def preview_summary(config: dict[str, Any], *, action: str = "score") -> str:
+    """Summarize one model's settled choices, missing decisions and unchecked facts.
+
+    A generated project's preview tool prints this before the detailed preview of a
+    single model or competition; model-set branches score the set champion instead.
+    """
+    checked = validate_workflow_config(config, action=action)
+    training_status = _training_status(checked)
     threshold = checked.get("quality_threshold")
     activation = (
         f"{checked['promotion_policy']}, threshold {threshold}"
@@ -475,7 +481,7 @@ def _preview_summary(checked: dict[str, Any], training_status: str) -> list[str]
             f"pinned version {checked.get('model_version')}; one score run can select "
             "score_model_version=N without approval"
         )
-    return [
+    lines = [
         "Summary:",
         f"  Training settings: {training_status}",
         f"  Final holdout: {checked.get('split_strategy', 'random')}",
@@ -484,6 +490,16 @@ def _preview_summary(checked: dict[str, Any], training_status: str) -> list[str]
         "  Not checked: source data, permissions and workspace; next run "
         "src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id ID",
     ]
+    return "\n".join(lines)
+
+
+def _training_status(checked: dict[str, Any]) -> str:
+    """Report whether training selection is complete without failing a scoring preview."""
+    try:
+        validate_workflow_config(checked, action="train")
+    except ValueError as exc:
+        return f"needs configuration: {exc}"
+    return "configured (source data and permissions not checked)"
 
 
 def _preview_training_source(checked: dict[str, Any], training_status: str) -> list[str]:
@@ -712,13 +728,7 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
     """
     checked = validate_workflow_config(config, action=action)
     cv = CVSpec.from_workflow(checked)
-    training_status = "configured (source data and permissions not checked)"
-    try:
-        validate_workflow_config(checked, action="train")
-    except ValueError as exc:
-        training_status = f"needs configuration: {exc}"
-    lines = _preview_training_source(checked, training_status)
-    lines[2:2] = _preview_summary(checked, training_status)
+    lines = _preview_training_source(checked, _training_status(checked))
     lines.extend(
         _preview_steps(checked.get("pre_split_steps", []), "  No pre-split cleanup steps.")
     )

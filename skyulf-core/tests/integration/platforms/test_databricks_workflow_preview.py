@@ -4,7 +4,10 @@ from copy import deepcopy
 
 import pytest
 
-from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import (
+    preview_summary,
+    preview_workflow_config,
+)
 
 
 def test_preview_preserves_step_order_and_separates_cv_from_holdout(workflow_config):
@@ -93,8 +96,8 @@ def test_preview_summary_names_missing_decisions_before_details(
     workflow_config.update(
         {"score_model_selection": "pinned_version", "model_version": "1", **updates}
     )
-    report = preview_workflow_config(workflow_config)
-    summary = report[report.index("Summary:") : report.index("Engine:")]
+    summary = preview_summary(workflow_config)
     assert activation is None or activation in summary
     assert scoring in summary
     assert "Not checked: source data, permissions and workspace" in summary
+    assert "Summary:" not in preview_workflow_config(workflow_config)

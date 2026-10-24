@@ -84,7 +84,8 @@ Replace `YOUR_PROFILE` in every command.
    **Available action: approve** block from the report (the first approval uses expected
    champion `none`) into the train job's **Run now with different parameters**; see
    [operator actions](https://www.skyulf.com/manual/user_guide/databricks_lifecycle.html#operator-actions-through-run-now).
-
+{{if eq .score_follow_champion "true"}}   An approval starts a score run by itself; inspect that run instead of starting another.
+{{end}}
 {{else}}5. **Approve.** {{if eq .promotion_policy "automatic"}}This project promotes automatically when the quality gates pass; the
    report shows the decision. To roll back, copy the **If rollback is needed** block
 {{else}}Copy the **Available action: approve** block from the report (the first
