@@ -50,8 +50,8 @@ service principals.
 
 The `personal_development_targets` answer controls whether the three additional
 personal targets are generated. Detailed setup asks it; quick setup and an
-answer file without it keep `false`. Read the generated
-`deployment/README.md` for the project's selected value. Personal targets do not receive shared
+answer file without it keep `false`. Read **Deployment and schedules** in the generated
+`GUIDE.md` and `deployment/variables.yml` for the project's selected value. Personal targets do not receive shared
 service-principal identities or shared job ACL overrides. Their resolved suffix
 uses the workspace user ID, not just an email prefix, so two users named `alice`
 cannot share output/model names accidentally. Use each developer's own profile;

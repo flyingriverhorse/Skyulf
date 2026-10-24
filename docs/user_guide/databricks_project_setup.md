@@ -16,7 +16,7 @@ Six NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
 | One model, scored on Spark workers | `taxi_fare` | Promotes automatically and scores after promotion |
 | REST/SQL serving and monitoring without batch output | [taxi_fare_endpoint](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint) | Automatic endpoint after promotion, `ai_query` and captured-request monitoring; no score job or prediction table |
 | Preprocessing exclusions with Spark and raw-input serving | `taxi_fare_robust` | Reuses pre-split preparation; IQR, PowerTransformer and imputer handling; REST/`ai_query` examples and labels for monitoring |
-| One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; no batch scoring |
+| One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; batch scoring runs on its own, not after approval |
 | One target, several candidate algorithms | `taxi_high_fare` | Competition with custom steps and manual approval |
 | Several targets approved together | `taxi_trips` | Model set with a combined scoring rule |
 
@@ -106,9 +106,9 @@ model entry if you intend to approve the first candidate; see the worked run.
 Built-in steps and their full parameter cards are in the
 [Preprocessing YAML catalog](preprocessing_recipes.md). For every accepted
 training field, its default and complete examples of all three layouts, use the
-[training configuration reference](databricks_training_config.md). Generated
-`START_HERE.md`, `PREPROCESSING.md`, `SERVING.md` and deployment/monitoring
-READMEs travel with the project and document its template revision.
+[training configuration reference](databricks_training_config.md). The generated
+`README.md` (first run) and `GUIDE.md` (reference) travel with the project and
+document its template revision.
 
 ### What a configuration change requires
 
@@ -242,7 +242,7 @@ already exist and use `preview.py --action sources` to check them. Choose `true`
 only if you need an editable CREATE TABLE starter for tables that do not exist
 yet. In a JSON answer file this is `"include_source_sql": "true"` (a string).
 The starter is `config/sources.sql`; replace its namespace and type placeholders
-before running it yourself. Setup and deployment never execute it. `SOURCES.md`
+before running it yourself. Setup and deployment never execute it. **Source data** in `GUIDE.md`
 and the read-only source check remain available with either choice.
 A model set asks for the task and columns of
 each active branch. It accepts documented defaults for the remaining settings.
@@ -470,7 +470,7 @@ To move an existing project to this layout, follow
 
 ### Local tools and preview
 
-The generated `src/tools/README.md` is the short reference beside the scripts.
+**Local tools** in the generated `GUIDE.md` is the short reference beside the scripts.
 Run commands from the project root with the matching Core package installed:
 
 ```powershell

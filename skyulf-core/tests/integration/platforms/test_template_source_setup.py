@@ -23,7 +23,7 @@ def test_start_choice_reaches_each_generated_workflow(tmp_path, layout, mode):
     config = read_workflow_config(project / "config/training.yml")
     assert config["initial_scoring"] == mode
     assert _scoring_config(config).initial_scoring == mode
-    assert "initial_scoring" in (project / "SOURCES.md").read_text()
+    assert "initial_scoring" in (project / "README.md").read_text()
 
 
 @pytest.mark.parametrize(
@@ -111,7 +111,7 @@ def test_separate_outcomes_connects_training_and_monitoring(tmp_path, layout):
         assert model["result_available_at_column"] == "known_at"
     config = read_workflow_config(project / "config/training.yml")
     assert config["training_table"] == config["score_source_table"]
-    assert "SOURCES.md" in (project / "README.md").read_text()
+    assert "GUIDE.md#source-data" in (project / "README.md").read_text()
     assert not (project / "config/sources.sql").exists()
 
 
@@ -121,11 +121,12 @@ def test_source_sql_is_opt_in_without_hiding_checks(tmp_path, layout, include):
     """Existing-table projects need source guidance and checks without an unsolicited DDL file."""
     project = _generate_project(tmp_path, training_layout=layout, include_source_sql=include)
     assert (project / "config/sources.sql").is_file() == (include == "true")
-    guide = (project / "SOURCES.md").read_text()
+    guide = (project / "GUIDE.md").read_text().split("## Source data\n")[1].split("\n## ")[0]
     assert "--action sources" in guide
-    assert "Existing tables" in guide
-    assert ("[config/sources.sql](config/sources.sql)" in guide) == (include == "true")
-    assert "include_source_sql" in (project / "README.md").read_text()
+    assert ("`config/sources.sql` is an editable starter" in guide) == (include == "true")
+    # Without the starter, the guide says how to get one instead of hiding the option.
+    assert ('include_source_sql: "true"' in guide) == (include == "false")
+    assert "GUIDE.md#source-data" in (project / "README.md").read_text()
     assert (project / "src/tools/preview.py").is_file()
 
 

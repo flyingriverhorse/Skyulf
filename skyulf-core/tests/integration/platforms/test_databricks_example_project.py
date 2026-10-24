@@ -59,7 +59,7 @@ def test_example_scoring_has_one_owner_and_preserves_legacy_online_schema(name):
     assert (project / "config/scoring.yml").exists() == (name != "taxi_fare_online")
     if name == "taxi_fare_online":
         assert policy is None
-        assert "| `config/scoring.yml` |" not in (project / "README.md").read_text()
+        assert "| `config/scoring.yml` |" not in (project / "GUIDE.md").read_text()
     else:
         assert isinstance(policy, dict)
         scoring = project / "src/features/scoring.py"  # absent with include_examples=false
@@ -129,7 +129,7 @@ def test_prepared_example_matches_regeneration_and_previews(tmp_path, name):
 def test_example_copies_of_static_template_files_are_current(name):
     """Without the CLI, CI still catches a template edit that a stored example missed."""
     own = set(BUILDER["PROJECTS"][name]["sources"])
-    compared = 0
+    compared = set()
     for source in TEMPLATE.rglob("*"):
         relative = source.relative_to(TEMPLATE).as_posix()
         copy = BUILDER["example_root"](name) / name / relative
@@ -145,8 +145,38 @@ def test_example_copies_of_static_template_files_are_current(name):
         if b"{{" in text:
             continue
         assert copy.read_bytes().replace(b"\r\n", b"\n") == text, relative
-        compared += 1
-    assert compared >= 20
+        compared.add(relative)
+    # Every layout generates these; a missing copy means the example was not regenerated.
+    always = {
+        ".gitignore",
+        "src/features/requirements.txt",
+        "src/jobs/monitor_project.py",
+        "src/jobs/prepare_monitoring.py",
+        "src/tools/refresh_feature_graph.py",
+    }
+    assert always <= compared, sorted(always - compared)
+
+
+def _anchor(heading):
+    """Apply GitHub's heading-to-anchor rule for the plain headings these guides use."""
+    return re.sub(r"[^a-z0-9 -]", "", heading.strip().lower()).replace(" ", "-")
+
+
+@pytest.mark.parametrize("name", PROJECTS)
+def test_example_has_two_guides_whose_links_resolve(name):
+    """A generated project ships README and GUIDE only, so every in-guide link must land."""
+    project = BUILDER["example_root"](name) / name
+    assert sorted(path.relative_to(project).as_posix() for path in project.rglob("*.md")) == [
+        "GUIDE.md",
+        "README.md",
+    ]
+    guide = (project / "GUIDE.md").read_text(encoding="utf-8")
+    headings = {_anchor(line.lstrip("#")) for line in guide.splitlines() if line.startswith("#")}
+    # README links into GUIDE by file name; GUIDE links to its own sections by anchor alone.
+    for document, pattern in (("README.md", r"GUIDE\.md#"), ("GUIDE.md", r"(?:GUIDE\.md)?#")):
+        text = (project / document).read_text(encoding="utf-8")
+        links = set(re.findall(r"\]\(" + pattern + r"([a-z0-9-]+)\)", text))
+        assert links <= headings, (document, sorted(links - headings))
 
 
 def test_examples_add_no_setup_question():

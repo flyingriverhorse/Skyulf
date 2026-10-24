@@ -1,6 +1,6 @@
 # Scoring policy: which rows get a prediction and which extra columns are added.
 # It is saved with the NEXT trained model (or model set); editing this file does
-# not change versions that are already trained. Guide: SCORING.md.
+# not change versions that are already trained. Guide: GUIDE.md#batch-predictions.
 #
 # Three sections, three moments:
 #
@@ -95,4 +95,4 @@ combined: []
 
 # Any rule can use custom: scoring.<function> (a function in src/features/scoring.py)
 # instead of a built-in. params and version are optional; version defaults to "1".
-# Callback signatures and Spark/endpoint admission: src/features/README.md.
+# Callback signatures and Spark/endpoint admission: GUIDE.md#preprocessing-and-custom-code.

@@ -1,5 +1,5 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
-# Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+# Override scalar values with BUNDLE_VAR_<name> or --var; see GUIDE.md#deployment-and-schedules.
 {{- if or (and .label_table_name (not .label_available_at_column)) (and .label_available_at_column (not .label_table_name))}}
 {{- template "ERROR_label_table_name_and_label_available_at_column_must_be_set_together" . -}}
 {{- end}}

@@ -107,7 +107,7 @@ override retain that override even when no layout answer was supplied.
 [Check or create your source tables](databricks_source_tables.md) walks through
 the check, the table contract and its error messages.
 
-Each generated project includes `SOURCES.md` and a read-only validation command.
+Each generated project's `GUIDE.md` has a **Source data** section and a read-only validation command.
 The optional `config/sources.sql` starter is generated only when setup selects
 `include_source_sql: "true"` (default `"false"`). Existing tables need no SQL starter:
 

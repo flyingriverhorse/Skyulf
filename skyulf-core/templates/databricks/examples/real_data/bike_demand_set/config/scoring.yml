@@ -1,4 +1,4 @@
-# Scoring policy, saved with the next registered model set. Full reference: SCORING.md.
+# Scoring policy, saved with the next registered model set. Full reference: GUIDE.md#batch-predictions.
 # Functions named by custom: live in src/features/scoring.py.
 version: 1
 

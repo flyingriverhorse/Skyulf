@@ -1,90 +1,122 @@
 # taxi_fare_online
 
-New here? Read [START_HERE.md](START_HERE.md) first: it lists what to edit, the
-first training and prediction delivery, and which guide answers which question. This page maps
-each setting to the file that owns it.
+Start here to train your first model and inspect its batch predictions.
+Use [GUIDE.md](GUIDE.md) when changing settings or operating the project;
+these are the only two project guides. Run the first experiment in a development/test target.
 
-If your source tables already exist, start with the read-only source check in
-[SOURCES.md](SOURCES.md). It explains this project's input/outcome arrangement
-and column contract. If tables do not exist yet, choose `include_source_sql: "true"`
-during setup to include an editable `config/sources.sql` starter. The default is
-`"false"`; initialization and deployment never create your source tables.
+This project trains one model for one target and registers it as a candidate.
+Skyulf 0.9.6 Bundle: **regression** with **pandas** training, **batch** prediction delivery and **serverless** compute.
+Training runs in one bounded Python process.
+Batch scoring uses **single_node** batch compute.
+Run every command beside `databricks.yml`.
 
-Skyulf 0.9.6 Bundle: **regression** with **pandas** training and **batch** prediction delivery, using **serverless**
-compute. Training and preprocessing fit in one bounded Python process on this compute.
-Batch scoring uses a bounded frame in the saved pandas/Polars engine.
+## Before the first run
 
-## Where to make a change
+Setup writes placeholders where it cannot know your workspace. Replace them and
+check that the data exists before you deploy:
 
-| Change | File |
+| Where | What to set |
 | --- | --- |
-| Sources, record keys, model inputs, targets and training limits | `config/training.yml` defaults/model entries |
-| Model, tuning, CV, quality gates and recipe selection | `config/training.yml` |
-| Fixed cleanup and training eligibility | `config/pre_split.yml` |
-| Fitted preprocessing | `config/preprocessing.yml` |
-| Saved model selection, score source/output and change policy | `config/inference.yml` |
-| Upstream feature groups and their checked merge | `config/features.yml`, `src/features/groups/` |
-| Legacy scoring policy and callbacks | `src/features/scoring.py` |
-| Custom feature/scoring callbacks and packaged assets | `src/features/` |
-| Online publication, endpoint setup and rollout | `config/serving.yml`, when generated |
-| Host, namespaces, run identities, compute and schedules | `deployment/targets.yml`, `deployment/variables.yml` |
-| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `development_monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml`; per-target dashboards and development monitoring in `deployment/targets.yml` |
-| Installed Core and optional dependencies | `deployment/*requirements.txt` |
+| `deployment/targets.yml` | `host` under `test`: replace `https://replace-test.example.invalid` with your workspace URL. |
+| `deployment/variables.yml` | `test_catalog`, `test_input_schema`, `test_output_schema` and `test_metadata_schema` (`REPLACE_TEST_*`). |
+| Commands below | `YOUR_PROFILE`: an authenticated Databricks CLI profile for that workspace. |
+| Unity Catalog | The catalog, schemas and source table must exist. The table needs the record key, input and target columns from setup, and Change Data Feed on before the first score. |
+| `config/training.yml` | A numeric `quality_threshold`, if you will approve the first champion or promote automatically. Set it before training; a trained version keeps its policy. |
+| `deployment/variables.yml` and `deployment/targets.yml` (optional) | Monitoring runs only when `monitoring_enabled` is `"true"`. It writes to `monitoring_catalog`.`monitoring_schema` (variables.yml); the catalog defaults to each target's own catalog and the schema to `skyulf_monitoring`. Use the same schema in every project so all models appear in one dashboard. `deployment/targets.yml` holds each target's dashboard and the development targets' monitoring settings; only one project creates a dashboard, the others connect to it there. |
 
-The shared runtime pin is `skyulf-core[mlflow]==0.9.6` in
-`deployment/requirements.txt`. Use the Core release matching this template
-([runtime packaging](https://www.skyulf.com/manual/user_guide/databricks_deployment.html#runtime-packaging)). Changing the pin
-does not migrate saved models or rewrite already generated project files.
+For the shared `test` target, check that `test_root_path` in `deployment/variables.yml`
+is a workspace folder your team can write to. The local checks below do not flag
+these placeholders.
 
-Quick setup accepts editable defaults. Detailed setup asks applicable model,
-branch, competition and deployment choices. Both ask for the monitoring store;
-a blank catalog starts without monitoring. When a catalog is set, an omitted
-schema uses `skyulf_monitoring`; choose another schema to reuse an existing store.
-Neither mode inspects source rows.
-Empty `config/features.yml` groups create no feature job or merged table;
-training and scoring read their configured sources directly.
+Source arrangement: **single_table**. Initialization does not create source
+tables. For existing tables, use the [source checks](GUIDE.md#source-data) after
+installing dependencies in step 1. Each record key must identify one observation;
+keep the actual target out of model inputs. Use the same guide if tables do not
+exist yet or outcomes arrive separately.
 
-Training defaults to at most **10,000 rows and 64 MiB per Python input read**.
-For a larger source, set `training_sample_rows` in `config/training.yml` to
-sample eligible rows before splitting, or raise `max_rows` and `max_input_mb`
-within your compute's memory budget. Sampling never samples scoring rows.
-Detailed setup asks for the sample limit and optional `save_preprocessing_diagnostics`.
-The probe records diagnostics on at most 256 holdout rows and 8 MiB; Spark and
-endpoint admission checks are a separate requirement.
+Before training, choose `initial_scoring` in `config/inference.yml`:
+`full_snapshot` includes existing rows; `from_now` records a zero-row checkpoint
+and scores later inserts. Training may automatically start scoring, and this
+choice cannot change on an existing prediction target.
 
-With `initial_scoring: full_snapshot` (default) in `config/inference.yml`, the
-first scoring run includes existing rows. If training uses the same table,
-this includes training history; its measured performance is not independent.
-Choose `initial_scoring: from_now` before the first score to commit a zero-row
-checkpoint and score only later inserts. Rebuilds preserve that boundary using
-saved prediction keys and recent CDF. CDF-expiry recovery additionally needs the
-original starting snapshot to remain readable.
-The choice cannot be changed on an existing prediction target.
-`python src/tools/preview.py` explains the choice.
-Scheduled training with a
-`fixed_window` repeatedly reads the same date interval; use `rolling_days` or
-`rolling_calendar` when the interval should advance. Preview also warns about
-this combination; intentional repeated experiments are still allowed.
+## First train and score
 
-Monitoring job failures can notify through `monitoring_email_notifications` and
-`monitoring_webhook_notifications`. Add duration warnings as `health.rules` on the job
-under a target in `deployment/targets.yml`; jobs have no `health` block by default
-because an empty one fails Terraform-engine deploys. Measured drift
-does not fail the job; use a separate SQL alert over `monitoring_issues` for it.
-See [notifications](https://www.skyulf.com/manual/user_guide/databricks_drift.html#notifications).
-This project has no automatic reference-cleanup job because monitoring was
-disabled during setup. After enabling a store, use the monitoring job's
-`cleanup_references` action for a dry run, or regenerate a project with a
-monitoring catalog to obtain the separate cleanup resource.
-Review [reference retention](https://www.skyulf.com/manual/user_guide/databricks_monitoring_setup.html#retain-or-clean-old-spark-references)
-and its lifecycle-writer requirements before enabling deletion.
+Replace `YOUR_PROFILE` in every command.
 
-These short guides ship with this project revision and link to detailed topic
-pages. Public documentation can describe a newer release; use the release
-upgrade notes before changing deployed jobs. Fitting saves preprocessing and
-model state, so editing a recipe afterwards needs a new trained version.
-Promotion, score selection and online traffic are separate decisions. All public
-guides are listed in the [topic index](https://www.skyulf.com/manual/user_guide/databricks_bundle.html).
+1. **Check locally.** Smoke and preview read configuration only, not source data
+   or workspace access:
+
+   ```powershell
+   uv pip install -r deployment/train-requirements.txt
+   python src/tools/smoke.py
+   python src/tools/preview.py --action train
+   ```
+
+2. **Validate and deploy:**
+
+   ```powershell
+   databricks bundle validate --strict -t test --profile YOUR_PROFILE
+   databricks bundle deploy -t test --profile YOUR_PROFILE
+   ```
+
+3. **Train:**
+
+   ```powershell
+   databricks bundle run -t test --profile YOUR_PROFILE train
+   ```
+
+4. **Read the report.** Open `train_and_tune` and `training_report`. Registration alone does not
+   activate a candidate.
+   Start with **Where to look** in `training_report` > Output.
+
+5. **Approve.** Copy the **Available action: approve** block from the report (the first
+   approval uses expected champion `none`)
+   into the train job's **Run now with different parameters**; see
+   [operator actions](https://www.skyulf.com/manual/user_guide/databricks_lifecycle.html#operator-actions-through-run-now).
+
+6. **Score:**
+
+   ```powershell
+   databricks bundle run -t test --profile YOUR_PROFILE score
+   ```
+
+   Scoring resolves the champion alias, so a version must be promoted first.
+   Check the committed output.
+
+## Learn by making one change
+
+After the first successful run, use this short exercise:
+
+1. Write down the saved model version, training run and holdout result.
+2. Find one prediction and explain its inputs and model version. A registered
+   candidate, an approved champion and a live endpoint are separate states.
+3. Keep the training snapshot and split fixed; change one supported model
+   parameter or preprocessing step using the [file map](GUIDE.md#file-map).
+4. Preview, deploy and train again. Compare the new report; the old saved
+   artifact remains unchanged. Editing YAML does not change an existing model.
+5. If monitoring is enabled, distinguish drift, label coverage and measured
+   performance using [monitoring](GUIDE.md#monitoring).
+
+Use the [reference guide](GUIDE.md) for the next setting you need. The
+[worked walkthrough](https://www.skyulf.com/manual/user_guide/databricks_bundle_walkthrough.html)
+provides a small practice dataset.
+
+## If something fails
+
+Start with the first failing task and record its run ID, target and
+model version. A monitoring failure does not undo committed predictions.
+
+- [Exact validation errors and fixes](https://www.skyulf.com/manual/user_guide/databricks_troubleshooting.html)
+- [Create and preview a project](https://www.skyulf.com/manual/user_guide/databricks_project_setup.html)
+- [Complete worked project](https://www.skyulf.com/manual/user_guide/databricks_bundle_walkthrough.html)
+
+## Upgrading this project
+
+This template pins `skyulf-core[mlflow]==0.9.6` in `deployment/requirements.txt`;
+public guides describe the current revision. Before changing the pin, follow
+[Upgrade an existing project](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html)
+and **Upgrade steps for generated Databricks projects** in the
+[release notes](https://github.com/flyingriverhorse/Skyulf/blob/master/changelog/0.9.x.md).
 
 ## Legacy Python-only scoring policy
 
@@ -92,4 +124,6 @@ This example deliberately keeps its original Python scoring hooks and no
 config/scoring.yml. build_model_rules() returns None, preserving the endpoint's
 prediction schema without scoring-status columns. New template projects use
 scoring.yml; this example also verifies older Python-only projects still work.
-See SCORING.md before migrating its policy.
+To migrate, remove the Python builder definitions and exports before adding YAML;
+an empty custom policy adds scoring_status and exclusion_reason, so review the
+endpoint schema first. See [Batch predictions](GUIDE.md#batch-predictions).

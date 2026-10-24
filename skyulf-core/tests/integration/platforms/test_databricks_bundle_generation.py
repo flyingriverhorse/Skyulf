@@ -353,7 +353,7 @@ def test_first_run_guide_follows_the_selected_scoring_policy(
     tmp_path, answers, pinned_first, monitoring
 ):
     """A pinned first score must not send the user through an approval it does not need."""
-    guide = (_generate_project(tmp_path, **answers) / "START_HERE.md").read_text(encoding="utf-8")
+    guide = (_generate_project(tmp_path, **answers) / "README.md").read_text(encoding="utf-8")
     follows = answers.get("score_follow_champion") == "true"
     assert ("starts a score run by itself" in guide) is follows
     assert ("score --params score_model_version=N" in guide) is pinned_first
@@ -881,9 +881,7 @@ def test_cli_independent_schedules_preserve_shared_three_job_graph(
                 assert variables[f"{prefix}_{suffix}"]["default"] == expected
                 assert f"{prefix}_{suffix}" not in config
     tasks = {task["task_key"]: task for task in jobs["train"]["tasks"]}
-    guides = "\n".join(
-        (project / name).read_text(encoding="utf-8") for name in ("TRAINING.md", "SCORING.md")
-    )
+    guides = (project / "GUIDE.md").read_text(encoding="utf-8")
     public_guides = Path(__file__).resolve().parents[4] / "docs/user_guide"
     assert "databricks_training_reports.html" in guides
     assert "databricks_scoring.html" in guides

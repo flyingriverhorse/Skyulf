@@ -1,4 +1,4 @@
-# Scoring policy, saved with the next registered model set. Full reference: SCORING.md.
+# Scoring policy, saved with the next registered model set. Full reference: GUIDE.md#batch-predictions.
 version: 1
 
 # combined: config/pre_split.yml filters first, then the eligibility rules below.

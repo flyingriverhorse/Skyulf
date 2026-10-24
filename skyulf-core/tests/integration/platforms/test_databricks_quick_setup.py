@@ -239,7 +239,7 @@ def test_upgrade_steps_have_one_central_home_that_first_run_points_to():
     release = changelog.split("\n## v0.9.4\n")[1].split("\n## ")[0]
     assert "### Upgrade steps for generated Databricks projects" in release
     assert "initialize_monitoring_store" in release
-    first_run = (TEMPLATE / "START_HERE.md.tmpl").read_text(encoding="utf-8")
+    first_run = (TEMPLATE / "README.md.tmpl").read_text(encoding="utf-8")
     assert "changelog/0.9.x.md" in first_run
     assert "Upgrade steps for generated Databricks projects" in first_run
 

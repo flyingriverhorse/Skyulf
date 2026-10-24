@@ -1,5 +1,5 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
-# Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+# Override scalar values with BUNDLE_VAR_<name> or --var; see GUIDE.md#deployment-and-schedules.
 variables:
   pipeline_owner:
     description: User with CAN_MANAGE on every target besides the deployer; CI may pass --var pipeline_owner

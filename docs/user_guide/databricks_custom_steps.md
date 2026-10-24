@@ -59,8 +59,8 @@ recipes:
 
 Select `preprocessing_recipe: default` for the model. To add a built-in node, add
 its `name`, `transformer` and `params` entry to that same ordered list. Customize
-the Python factory when the calculation itself must change. The generated
-`PREPROCESSING.md` explains factory names, assets and advanced class examples.
+the Python factory when the calculation itself must change. **Preprocessing and custom
+code** in the generated `GUIDE.md` summarizes factory names, assets and admission.
 
 Frequency encoding learns `count / training_rows` per observed string category.
 For training values `["A", "A", "B", null]`, scoring `["A", "B", "NEW", null]`
@@ -75,7 +75,7 @@ python src/tools/preview.py --action train
 ```
 
 See the [local tools reference](databricks_project_setup.md#local-tools-and-preview)
-or the generated `src/tools/README.md` for preview flags, defaults and scope.
+or **Local tools** in the generated `GUIDE.md` for preview flags, defaults and scope.
 
 ### Writing your own step
 

@@ -1,5 +1,5 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
-# Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+# Override scalar values with BUNDLE_VAR_<name> or --var; see GUIDE.md#deployment-and-schedules.
 variables:
   serving_timeout_seconds:
     description: Serving child job limit; keep at least 300 seconds above serving.yml ready_timeout_s

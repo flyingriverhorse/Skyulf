@@ -11,7 +11,7 @@ groups: {}
 # 3. Edit the shipped company.py/activity.py functions in src/features/groups/.
 #    Each receives a Spark DataFrame and returns keys + time + declared features.
 # 4. Run python src/tools/refresh_feature_graph.py, validate/deploy the Bundle,
-#    then run the features job. See ../FEATURE_TABLES.md for exact commands.
+#    then run the features job. See GUIDE.md#optional-feature-tables.
 # 5. Point training.yml training_table and inference.yml score_source_table at
 #    the merged output; select employee_count/monthly_amount/transaction_count
 #    as model inputs. Feature production does not start training automatically.

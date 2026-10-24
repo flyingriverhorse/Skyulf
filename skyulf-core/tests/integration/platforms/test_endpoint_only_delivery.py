@@ -89,7 +89,8 @@ def test_generated_delivery_has_only_selected_jobs(tmp_path, layout, delivery):
     assert (project / "resources/score.job.yml").exists() == batch
     assert (project / "resources/serving_endpoint.job.yml").exists() == endpoint
     assert (project / "resources/monitoring.job.yml").is_file()
-    training_guide = (project / "TRAINING.md").read_text(encoding="utf-8")
+    guide = (project / "GUIDE.md").read_text(encoding="utf-8")
+    training_guide = guide.split("## Training and model decisions\n")[1].split("\n## ")[0]
     assert "promotion_policy=" in training_guide
     for setting in (
         "score_model_selection=",

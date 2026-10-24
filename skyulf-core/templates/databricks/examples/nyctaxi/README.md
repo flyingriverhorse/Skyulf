@@ -32,7 +32,7 @@ and so on) record every setup answer that differs from the defaults.
 ## Built-in alternatives to the teaching factories
 
 The examples retain custom factories to demonstrate packaging and saved-code
-replay. For a new recipe, see the [built-in alternatives](taxi_high_fare/src/features/README.md#prefer-a-built-in-when-it-expresses-the-same-rule):
+replay. For a new recipe, see the [built-in alternatives](taxi_high_fare/GUIDE.md#preprocessing-and-custom-code):
 filters, learned clipping, imputation, missing markers, frequency/rare encoding,
 cyclical dates and group deviations. The guide includes runnable YAML and the
 null, dtype and output-name differences to check before retraining. These new
@@ -61,7 +61,7 @@ built-ins require the 0.9.6 development wheel until that release is published.
    a successful promotion; wait for that child run before calling the endpoint.
    For the other projects, copy the
    approve parameters from the final training report and run the train job with
-   them; scoring follows the approval (`taxi_fare_online` has no batch scoring).
+   them; scoring follows the approval (`taxi_fare_online` turns that handoff off, so run its score job yourself).
 
 To try retraining, uncomment the February block at the end of `load_nyctaxi.sql`,
 run it, and train again. The new candidate is compared with the current
@@ -70,7 +70,7 @@ champion on the new holdout.
 ## Serve `taxi_fare_endpoint` without batch scoring
 
 Follow [its README](taxi_fare_endpoint/README.md) to deploy and train, then
-[SERVING.md](taxi_fare_endpoint/SERVING.md) for a bounded SQL query and monitoring.
+the serving section of its [GUIDE.md](taxi_fare_endpoint/GUIDE.md#call-the-taxi-endpoint-and-monitor-its-requests) for a bounded SQL query and monitoring.
 The endpoint accepts raw trip features and runs the saved pipeline. Its telemetry
 payload view is a request log, not a batch prediction table. Monitoring reads that
 log and saves observations for the **Online serving** dashboard page.
@@ -92,7 +92,7 @@ The online model needs its zone features in an online store at request time.
 4. Refresh `zone_features` (and its publication) within `max_age_seconds` in
    `config/training.yml` (7 days); older features are rejected as stale.
 
-The generated `SERVING.md` and `deployment/README.md` in each project explain
+The generated `GUIDE.md` in each project explains
 the remaining fields, targets, permissions and Core version pins.
 
 ## Serve `taxi_fare_robust`
@@ -102,7 +102,7 @@ store. Batch Spark scoring and endpoint inference use the same saved pipeline.
 The explicit `src/serve.py` helper reads `config/serving.yml`, creates one
 pinned endpoint and a typed SQL function wrapping `ai_query`. Creation is
 separate from Bundle deployment and training. Follow
-[SERVE_EXAMPLE.md](taxi_fare_robust/SERVE_EXAMPLE.md) for version selection,
+the example section of its [GUIDE.md](taxi_fare_robust/GUIDE.md#score-raw-trips-with-spark-rest-and-sql) for version selection,
 compute settings, requests with missing/outlier values, SQL and cleanup.
 
 ## Keeping them current
