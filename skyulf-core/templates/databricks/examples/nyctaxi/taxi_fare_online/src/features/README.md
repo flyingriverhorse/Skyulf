@@ -102,7 +102,7 @@ before the model.
 
 The custom factories below teach how to package your own code. New projects can
 use the following registered steps without maintaining those factories. These
-alternatives require the development changes for 0.9.5; use a wheel built from
+alternatives require the development changes for 0.9.6; use a wheel built from
 this checkout until that release is published, then change the requirements pin.
 Changing a recipe requires retraining and checking its new output schema.
 

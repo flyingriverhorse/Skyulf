@@ -29,7 +29,7 @@ replay. For a new recipe, see the [built-in alternatives](diagnostic_single/src/
 filters, learned clipping, imputation, missing markers, frequency/rare encoding,
 cyclical dates and group deviations. The guide includes runnable YAML and the
 null, dtype and output-name differences to check before retraining. These new
-built-ins require the 0.9.5 development wheel until that release is published.
+built-ins require the 0.9.6 development wheel until that release is published.
 
 ## Data, ownership and leakage boundaries
 

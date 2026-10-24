@@ -1,7 +1,7 @@
 # Shared training and scoring environment. Keep exact pins here.
 # Initial model/ensemble selections are included automatically. After editing
 # model Python files, update their optional packages here before redeploying.
-skyulf-core[mlflow]==0.9.5
+skyulf-core[mlflow]==0.9.6
 mlflow==3.16.1
 # mlflow needs sqlalchemy<3; 2.1.5 has no serverless aarch64 wheel and fails to build there.
 sqlalchemy==2.0.43

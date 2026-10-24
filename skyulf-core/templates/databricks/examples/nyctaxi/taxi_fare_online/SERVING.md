@@ -72,5 +72,5 @@ databricks bundle run daily_rollout -t test --profile YOUR_PROFILE
 - [Gradual traffic rollout](https://www.skyulf.com/manual/user_guide/databricks_serving_rollout.html)
 - [Serving monitoring](https://www.skyulf.com/manual/user_guide/databricks_serving_monitoring.html)
 
-`deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.5`. Public links show
+`deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.6`. Public links show
 the latest guide; check it against your installed version.
