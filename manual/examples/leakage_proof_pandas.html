@@ -11,17 +11,18 @@
         <link rel="canonical" href="https://www.skyulf.com/manual/examples/leakage_proof_pandas.html">
       
       
-        <link rel="prev" href="quickstart.html">
+      
+        <link rel="prev" href="./quickstart.html">
       
       
-        <link rel="next" href="leakage_proof_polars.html">
+        <link rel="next" href="./leakage_proof_polars.html">
       
       
         
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="zensical-0.0.70">
     
     
       
@@ -29,10 +30,15 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.e442bf79.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.b60ce83d.min.css">
       
       
 
@@ -46,14 +52,12 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
       
     
     
-      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
-    
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -74,14 +78,11 @@
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
-    <label class="md-overlay" for="__drawer"></label>
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
     <div data-md-component="skip">
-      
-        
-        <a href="#proof-of-trust-preventing-data-leakage-with-skyulf-pandas-engine" class="md-skip">
-          Skip to content
-        </a>
-      
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
     </div>
     <div data-md-component="announce">
       
@@ -95,12 +96,12 @@
     <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
 
     </a>
-    <label class="md-header__button md-icon" for="__drawer">
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
       
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
@@ -125,7 +126,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -135,7 +136,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -152,57 +153,30 @@
     
       
       
-        <label class="md-header__button md-icon" for="__search">
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
           
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
         </label>
-        <div class="md-search" data-md-component="search" role="dialog">
-  <label class="md-search__overlay" for="__search"></label>
-  <div class="md-search__inner" role="search">
-    <form class="md-search__form" name="search">
-      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
-      <label class="md-search__icon md-icon" for="__search">
-        
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
-        
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
-      </label>
-      <nav class="md-search__options" aria-label="Search">
-        
-        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
-          
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
-      </nav>
-      
-    </form>
-    <div class="md-search__output">
-      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
-        <div class="md-search-result" data-md-component="search-result">
-          <div class="md-search-result__meta">
-            Initializing search
-          </div>
-          <ol class="md-search-result__list" role="presentation"></ol>
-        </div>
-      </div>
-    </div>
-  </div>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
 </div>
       
     
-    
-      <div class="md-header__source">
+    <div class="md-header__source">
+      
         <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
     flyingriverhorse/Skyulf
   </div>
 </a>
-      </div>
-    
+      
+    </div>
   </nav>
   
 </header>
@@ -226,9 +200,6 @@
       <a href="../index.html" class="md-tabs__link">
         
   
-  
-    
-  
   Home
 
       </a>
@@ -242,11 +213,13 @@
   
   
     
+      
+    
+    
     
       <li class="md-tabs__item">
         <a href="../guides/platform_setup.html" class="md-tabs__link">
           
-  
   
   Backend
 
@@ -262,11 +235,13 @@
   
   
     
+      
+    
+    
     
       <li class="md-tabs__item">
         <a href="../guides/getting_started.html" class="md-tabs__link">
           
-  
   
   Guides
 
@@ -284,11 +259,13 @@
   
   
     
+      
+    
+    
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="quickstart.html" class="md-tabs__link">
+        <a href="./quickstart.html" class="md-tabs__link">
           
-  
   
   Examples
 
@@ -304,11 +281,13 @@
   
   
     
+      
+    
+    
     
       <li class="md-tabs__item">
         <a href="../contributing/writing_docs.html" class="md-tabs__link">
           
-  
   
   Contributing
 
@@ -324,11 +303,13 @@
   
   
     
+      
+    
+    
     
       <li class="md-tabs__item">
         <a href="../user_guide/overview.html" class="md-tabs__link">
           
-  
   
   User Guide
 
@@ -344,11 +325,13 @@
   
   
     
+      
+    
+    
     
       <li class="md-tabs__item">
         <a href="../user_guide/integrations.html" class="md-tabs__link">
           
-  
   
   Integrations
 
@@ -364,11 +347,13 @@
   
   
     
+      
+    
+    
     
       <li class="md-tabs__item">
         <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
           
-  
   
   Reference
 
@@ -405,7 +390,7 @@
     <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
 
     </a>
     Skyulf
@@ -415,7 +400,7 @@
       <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
     flyingriverhorse/Skyulf
@@ -439,8 +424,7 @@
   <span class="md-ellipsis">
     
   
-    Home
-  
+  Home
 
     
   </span>
@@ -484,8 +468,7 @@
   <span class="md-ellipsis">
     
   
-    Backend
-  
+  Backend
 
     
   </span>
@@ -495,19 +478,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_2">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Backend
-  
+  Backend
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -520,8 +503,7 @@
   <span class="md-ellipsis">
     
   
-    Platform Setup
-  
+  Platform Setup
 
     
   </span>
@@ -532,10 +514,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -548,8 +530,7 @@
   <span class="md-ellipsis">
     
   
-    Platform Walkthrough
-  
+  Platform Walkthrough
 
     
   </span>
@@ -560,10 +541,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -576,8 +557,7 @@
   <span class="md-ellipsis">
     
   
-    API Reference
-  
+  API Reference
 
     
   </span>
@@ -588,10 +568,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -604,8 +584,7 @@
   <span class="md-ellipsis">
     
   
-    Configuration Reference
-  
+  Configuration Reference
 
     
   </span>
@@ -616,10 +595,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -632,8 +611,7 @@
   <span class="md-ellipsis">
     
   
-    Job Idempotency
-  
+  Job Idempotency
 
     
   </span>
@@ -644,10 +622,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -685,8 +664,7 @@
   <span class="md-ellipsis">
     
   
-    Guides
-  
+  Guides
 
     
   </span>
@@ -696,19 +674,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Guides
-  
+  Guides
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -721,8 +699,7 @@
   <span class="md-ellipsis">
     
   
-    Getting Started
-  
+  Getting Started
 
     
   </span>
@@ -733,10 +710,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -749,8 +726,7 @@
   <span class="md-ellipsis">
     
   
-    Core Release Process
-  
+  Core Release Process
 
     
   </span>
@@ -761,10 +737,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -777,8 +753,7 @@
   <span class="md-ellipsis">
     
   
-    Multi-Path Pipelines
-  
+  Multi-Path Pipelines
 
     
   </span>
@@ -789,10 +764,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -805,8 +780,7 @@
   <span class="md-ellipsis">
     
   
-    FAQ & Comparison
-  
+  FAQ & Comparison
 
     
   </span>
@@ -817,10 +791,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -833,8 +807,7 @@
   <span class="md-ellipsis">
     
   
-    Recipes
-  
+  Recipes
 
     
   </span>
@@ -845,10 +818,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -861,8 +834,7 @@
   <span class="md-ellipsis">
     
   
-    Migrating from scikit-learn
-  
+  Migrating from scikit-learn
 
     
   </span>
@@ -873,10 +845,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -889,8 +861,7 @@
   <span class="md-ellipsis">
     
   
-    Skyulf vs. YData vs. Sweetviz
-  
+  Skyulf vs. YData vs. Sweetviz
 
     
   </span>
@@ -901,10 +872,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -917,8 +888,7 @@
   <span class="md-ellipsis">
     
   
-    Architecture
-  
+  Architecture
 
     
   </span>
@@ -929,10 +899,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -945,8 +915,7 @@
   <span class="md-ellipsis">
     
   
-    Data Architecture
-  
+  Data Architecture
 
     
   </span>
@@ -957,10 +926,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -973,8 +942,7 @@
   <span class="md-ellipsis">
     
   
-    Performance
-  
+  Performance
 
     
   </span>
@@ -985,10 +953,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1001,8 +969,7 @@
   <span class="md-ellipsis">
     
   
-    Adding New Engine
-  
+  Adding New Engine
 
     
   </span>
@@ -1013,10 +980,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1029,8 +996,7 @@
   <span class="md-ellipsis">
     
   
-    Engine Mechanics
-  
+  Engine Mechanics
 
     
   </span>
@@ -1041,10 +1007,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1057,8 +1023,7 @@
   <span class="md-ellipsis">
     
   
-    Engine Data Paths
-  
+  Engine Data Paths
 
     
   </span>
@@ -1069,10 +1034,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1085,8 +1050,7 @@
   <span class="md-ellipsis">
     
   
-    Data Drift Roadmap
-  
+  Data Drift Roadmap
 
     
   </span>
@@ -1097,10 +1061,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1141,8 +1106,7 @@
   <span class="md-ellipsis">
     
   
-    Examples
-  
+  Examples
 
     
   </span>
@@ -1152,33 +1116,32 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Examples
-  
+  Examples
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
   
     <li class="md-nav__item">
-      <a href="quickstart.html" class="md-nav__link">
+      <a href="./quickstart.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Quickstart
-  
+  Quickstart
 
     
   </span>
@@ -1189,10 +1152,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
     
@@ -1201,7 +1164,7 @@
   
     <li class="md-nav__item md-nav__item--active">
       
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
       
       
         
@@ -1214,8 +1177,7 @@
   <span class="md-ellipsis">
     
   
-    Leakage Proof (pandas)
-  
+  Leakage Proof (pandas)
 
     
   </span>
@@ -1232,8 +1194,7 @@
   <span class="md-ellipsis">
     
   
-    Leakage Proof (pandas)
-  
+  Leakage Proof (pandas)
 
     
   </span>
@@ -1244,7 +1205,8 @@
       
         
 
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
   
   
   
@@ -1253,16 +1215,16 @@
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
-      Table of contents
+      On this page
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
   <a href="#the-skyulf-guarantee" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         The Skyulf Guarantee
-      
+      </span>
     </span>
   </a>
   
@@ -1271,9 +1233,9 @@
         <li class="md-nav__item">
   <a href="#1-setup-and-data-loading" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         1. Setup and Data Loading
-      
+      </span>
     </span>
   </a>
   
@@ -1282,9 +1244,9 @@
         <li class="md-nav__item">
   <a href="#2-split-data" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         2. Split Data
-      
+      </span>
     </span>
   </a>
   
@@ -1293,9 +1255,9 @@
         <li class="md-nav__item">
   <a href="#3-define-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         3. Define Pipeline
-      
+      </span>
     </span>
   </a>
   
@@ -1304,9 +1266,9 @@
         <li class="md-nav__item">
   <a href="#4-verification-1-imputation-leakage" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         4. Verification 1: Imputation Leakage
-      
+      </span>
     </span>
   </a>
   
@@ -1315,9 +1277,9 @@
         <li class="md-nav__item">
   <a href="#5-verification-2-scaling-leakage" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         5. Verification 2: Scaling Leakage
-      
+      </span>
     </span>
   </a>
   
@@ -1326,9 +1288,9 @@
         <li class="md-nav__item">
   <a href="#6-verification-3-target-encoding-leakage" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         6. Verification 3: Target Encoding Leakage
-      
+      </span>
     </span>
   </a>
   
@@ -1337,9 +1299,9 @@
         <li class="md-nav__item">
   <a href="#7-the-ultimate-test-the-poisoned-dataset" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         7. The Ultimate Test: The "Poisoned" Dataset
-      
+      </span>
     </span>
   </a>
   
@@ -1348,9 +1310,9 @@
         <li class="md-nav__item">
   <a href="#conclusion" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         Conclusion
-      
+      </span>
     </span>
   </a>
   
@@ -1359,9 +1321,9 @@
         <li class="md-nav__item">
   <a href="#what-is-and-is-not-covered" class="md-nav__link">
     <span class="md-ellipsis">
-      
+      <span class="md-typeset">
         What is and is not covered
-      
+      </span>
     </span>
   </a>
   
@@ -1374,24 +1336,23 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
   
     <li class="md-nav__item">
-      <a href="leakage_proof_polars.html" class="md-nav__link">
+      <a href="./leakage_proof_polars.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Leakage Proof (polars)
-  
+  Leakage Proof (polars)
 
     
   </span>
@@ -1402,10 +1363,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1443,8 +1405,7 @@
   <span class="md-ellipsis">
     
   
-    Contributing
-  
+  Contributing
 
     
   </span>
@@ -1454,19 +1415,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Contributing
-  
+  Contributing
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1479,8 +1440,7 @@
   <span class="md-ellipsis">
     
   
-    Writing Docs
-  
+  Writing Docs
 
     
   </span>
@@ -1491,10 +1451,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1532,8 +1493,7 @@
   <span class="md-ellipsis">
     
   
-    User Guide
-  
+  User Guide
 
     
   </span>
@@ -1543,19 +1503,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    User Guide
-  
+  User Guide
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1568,8 +1528,7 @@
   <span class="md-ellipsis">
     
   
-    Overview
-  
+  Overview
 
     
   </span>
@@ -1580,10 +1539,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1596,8 +1555,7 @@
   <span class="md-ellipsis">
     
   
-    Installation
-  
+  Installation
 
     
   </span>
@@ -1608,10 +1566,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1624,8 +1582,7 @@
   <span class="md-ellipsis">
     
   
-    Preprocessing Diagnostics and Context
-  
+  Preprocessing Diagnostics and Context
 
     
   </span>
@@ -1636,10 +1593,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1652,8 +1609,7 @@
   <span class="md-ellipsis">
     
   
-    Pipeline Quickstart
-  
+  Pipeline Quickstart
 
     
   </span>
@@ -1664,10 +1620,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1680,8 +1636,7 @@
   <span class="md-ellipsis">
     
   
-    Step-by-Step (No Config)
-  
+  Step-by-Step (No Config)
 
     
   </span>
@@ -1692,10 +1647,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1708,8 +1663,7 @@
   <span class="md-ellipsis">
     
   
-    Automated EDA
-  
+  Automated EDA
 
     
   </span>
@@ -1720,10 +1674,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1736,8 +1690,7 @@
   <span class="md-ellipsis">
     
   
-    PII Detection
-  
+  PII Detection
 
     
   </span>
@@ -1748,10 +1701,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1764,8 +1717,7 @@
   <span class="md-ellipsis">
     
   
-    Text & NLP
-  
+  Text & NLP
 
     
   </span>
@@ -1776,10 +1728,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1792,8 +1744,7 @@
   <span class="md-ellipsis">
     
   
-    Validation vs scikit-learn
-  
+  Validation vs scikit-learn
 
     
   </span>
@@ -1804,10 +1755,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1820,8 +1771,7 @@
   <span class="md-ellipsis">
     
   
-    skyulf-core Configuration
-  
+  skyulf-core Configuration
 
     
   </span>
@@ -1832,10 +1782,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1848,8 +1798,7 @@
   <span class="md-ellipsis">
     
   
-    Weighted Training & Support
-  
+  Weighted Training & Support
 
     
   </span>
@@ -1860,10 +1809,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1876,8 +1825,7 @@
   <span class="md-ellipsis">
     
   
-    Verify Sampling and Weights
-  
+  Verify Sampling and Weights
 
     
   </span>
@@ -1888,10 +1836,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1904,8 +1852,7 @@
   <span class="md-ellipsis">
     
   
-    Hyperparameter Tuning
-  
+  Hyperparameter Tuning
 
     
   </span>
@@ -1916,10 +1863,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1932,8 +1879,7 @@
   <span class="md-ellipsis">
     
   
-    SHAP Explainability
-  
+  SHAP Explainability
 
     
   </span>
@@ -1944,10 +1890,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1960,8 +1906,7 @@
   <span class="md-ellipsis">
     
   
-    Cross-Validation
-  
+  Cross-Validation
 
     
   </span>
@@ -1972,10 +1917,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1988,8 +1933,7 @@
   <span class="md-ellipsis">
     
   
-    Threshold Tuning
-  
+  Threshold Tuning
 
     
   </span>
@@ -2000,10 +1944,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2016,8 +1960,7 @@
   <span class="md-ellipsis">
     
   
-    SplitDataset & Leakage
-  
+  SplitDataset & Leakage
 
     
   </span>
@@ -2028,10 +1971,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2044,8 +1987,7 @@
   <span class="md-ellipsis">
     
   
-    Leakage Safety - Core & Backend
-  
+  Leakage Safety - Core & Backend
 
     
   </span>
@@ -2056,10 +1998,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2072,8 +2014,7 @@
   <span class="md-ellipsis">
     
   
-    Preprocessing Leakage Audit
-  
+  Preprocessing Leakage Audit
 
     
   </span>
@@ -2084,10 +2025,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2100,8 +2041,7 @@
   <span class="md-ellipsis">
     
   
-    Preprocessing Placement
-  
+  Preprocessing Placement
 
     
   </span>
@@ -2112,10 +2052,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2128,8 +2068,7 @@
   <span class="md-ellipsis">
     
   
-    Drift Monitoring
-  
+  Drift Monitoring
 
     
   </span>
@@ -2140,10 +2079,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2156,8 +2095,7 @@
   <span class="md-ellipsis">
     
   
-    Serialization
-  
+  Serialization
 
     
   </span>
@@ -2168,10 +2106,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2184,8 +2122,7 @@
   <span class="md-ellipsis">
     
   
-    Project Export Quickstart
-  
+  Project Export Quickstart
 
     
   </span>
@@ -2196,10 +2133,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2212,8 +2149,7 @@
   <span class="md-ellipsis">
     
   
-    Export a Model Project
-  
+  Export a Model Project
 
     
   </span>
@@ -2224,10 +2160,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2240,8 +2176,7 @@
   <span class="md-ellipsis">
     
   
-    Extending Skyulf-Core
-  
+  Extending Skyulf-Core
 
     
   </span>
@@ -2252,10 +2187,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2268,8 +2203,7 @@
   <span class="md-ellipsis">
     
   
-    Troubleshooting
-  
+  Troubleshooting
 
     
   </span>
@@ -2280,10 +2214,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -2321,8 +2256,7 @@
   <span class="md-ellipsis">
     
   
-    Integrations
-  
+  Integrations
 
     
   </span>
@@ -2332,19 +2266,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Integrations
-  
+  Integrations
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -2357,8 +2291,7 @@
   <span class="md-ellipsis">
     
   
-    Documentation Index
-  
+  Documentation Index
 
     
   </span>
@@ -2369,10 +2302,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2403,8 +2336,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks
-  
+  Databricks
 
     
   </span>
@@ -2414,19 +2346,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Databricks
-  
+  Databricks
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -2457,8 +2389,7 @@
   <span class="md-ellipsis">
     
   
-    Get Started
-  
+  Get Started
 
     
   </span>
@@ -2468,19 +2399,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_1">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_1_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_1">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Get Started
-  
+  Get Started
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -2493,8 +2424,7 @@
   <span class="md-ellipsis">
     
   
-    End-to-End Project Guide
-  
+  End-to-End Project Guide
 
     
   </span>
@@ -2505,10 +2435,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2521,8 +2451,7 @@
   <span class="md-ellipsis">
     
   
-    Topic Index
-  
+  Topic Index
 
     
   </span>
@@ -2533,10 +2462,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2549,8 +2478,7 @@
   <span class="md-ellipsis">
     
   
-    Choose a Project Shape
-  
+  Choose a Project Shape
 
     
   </span>
@@ -2561,10 +2489,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2577,8 +2505,7 @@
   <span class="md-ellipsis">
     
   
-    Project Setup and Preview
-  
+  Project Setup and Preview
 
     
   </span>
@@ -2589,10 +2516,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2605,8 +2532,7 @@
   <span class="md-ellipsis">
     
   
-    Tables in Your Workspace
-  
+  Tables in Your Workspace
 
     
   </span>
@@ -2617,10 +2543,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2633,8 +2559,7 @@
   <span class="md-ellipsis">
     
   
-    Check or Create Source Tables
-  
+  Check or Create Source Tables
 
     
   </span>
@@ -2645,10 +2570,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2661,8 +2586,7 @@
   <span class="md-ellipsis">
     
   
-    Deployment and Access
-  
+  Deployment and Access
 
     
   </span>
@@ -2673,10 +2597,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2689,8 +2613,7 @@
   <span class="md-ellipsis">
     
   
-    Project Upgrades
-  
+  Project Upgrades
 
     
   </span>
@@ -2701,10 +2624,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2717,8 +2640,7 @@
   <span class="md-ellipsis">
     
   
-    Remove a Project
-  
+  Remove a Project
 
     
   </span>
@@ -2729,18 +2651,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2771,8 +2694,7 @@
   <span class="md-ellipsis">
     
   
-    Train
-  
+  Train
 
     
   </span>
@@ -2782,19 +2704,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_2">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_2">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Train
-  
+  Train
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -2807,8 +2729,7 @@
   <span class="md-ellipsis">
     
   
-    Training Data and Holdout
-  
+  Training Data and Holdout
 
     
   </span>
@@ -2819,10 +2740,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2835,8 +2756,7 @@
   <span class="md-ellipsis">
     
   
-    Training Configuration
-  
+  Training Configuration
 
     
   </span>
@@ -2847,10 +2767,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2863,8 +2783,7 @@
   <span class="md-ellipsis">
     
   
-    Model and Search-Space Catalog
-  
+  Model and Search-Space Catalog
 
     
   </span>
@@ -2875,10 +2794,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2891,8 +2810,7 @@
   <span class="md-ellipsis">
     
   
-    Search Strategies
-  
+  Search Strategies
 
     
   </span>
@@ -2903,10 +2821,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2919,8 +2837,7 @@
   <span class="md-ellipsis">
     
   
-    Voting and Stacking Ensembles
-  
+  Voting and Stacking Ensembles
 
     
   </span>
@@ -2931,10 +2848,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2965,8 +2882,7 @@
   <span class="md-ellipsis">
     
   
-    Preprocessing YAML Catalog
-  
+  Preprocessing YAML Catalog
 
     
   </span>
@@ -2976,19 +2892,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_7_2_2_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_2_6">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_7_2_2_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_2_6">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Preprocessing YAML Catalog
-  
+  Preprocessing YAML Catalog
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -3001,8 +2917,7 @@
   <span class="md-ellipsis">
     
   
-    Build Preprocessing with YAML
-  
+  Build Preprocessing with YAML
 
     
   </span>
@@ -3013,10 +2928,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3029,8 +2944,7 @@
   <span class="md-ellipsis">
     
   
-    Overview
-  
+  Overview
 
     
   </span>
@@ -3041,10 +2955,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3057,8 +2971,7 @@
   <span class="md-ellipsis">
     
   
-    Missing Values, Cleaning and Types
-  
+  Missing Values, Cleaning and Types
 
     
   </span>
@@ -3069,10 +2982,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3085,8 +2998,7 @@
   <span class="md-ellipsis">
     
   
-    Scaling and Numeric Transforms
-  
+  Scaling and Numeric Transforms
 
     
   </span>
@@ -3097,10 +3009,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3113,8 +3025,7 @@
   <span class="md-ellipsis">
     
   
-    Bounds and Outliers
-  
+  Bounds and Outliers
 
     
   </span>
@@ -3125,10 +3036,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3141,8 +3052,7 @@
   <span class="md-ellipsis">
     
   
-    Categorical Encoding
-  
+  Categorical Encoding
 
     
   </span>
@@ -3153,10 +3063,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3169,8 +3079,7 @@
   <span class="md-ellipsis">
     
   
-    Binning
-  
+  Binning
 
     
   </span>
@@ -3181,10 +3090,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3197,8 +3106,7 @@
   <span class="md-ellipsis">
     
   
-    Feature Generation and Selection
-  
+  Feature Generation and Selection
 
     
   </span>
@@ -3209,10 +3117,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3225,8 +3133,7 @@
   <span class="md-ellipsis">
     
   
-    Time and Geography
-  
+  Time and Geography
 
     
   </span>
@@ -3237,10 +3144,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3253,8 +3160,7 @@
   <span class="md-ellipsis">
     
   
-    Text and Embeddings
-  
+  Text and Embeddings
 
     
   </span>
@@ -3265,10 +3171,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3281,8 +3187,7 @@
   <span class="md-ellipsis">
     
   
-    Split, Sampling and Diagnostics
-  
+  Split, Sampling and Diagnostics
 
     
   </span>
@@ -3293,10 +3198,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3309,8 +3214,7 @@
   <span class="md-ellipsis">
     
   
-    Custom Factory Contracts
-  
+  Custom Factory Contracts
 
     
   </span>
@@ -3321,18 +3225,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3345,8 +3250,7 @@
   <span class="md-ellipsis">
     
   
-    Custom Preprocessing Steps
-  
+  Custom Preprocessing Steps
 
     
   </span>
@@ -3357,10 +3261,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3373,8 +3277,7 @@
   <span class="md-ellipsis">
     
   
-    Custom Pre-Split Filters
-  
+  Custom Pre-Split Filters
 
     
   </span>
@@ -3385,10 +3288,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3401,8 +3304,7 @@
   <span class="md-ellipsis">
     
   
-    Feature Tables and Merges
-  
+  Feature Tables and Merges
 
     
   </span>
@@ -3413,10 +3315,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3429,8 +3331,7 @@
   <span class="md-ellipsis">
     
   
-    Decision Thresholds
-  
+  Decision Thresholds
 
     
   </span>
@@ -3441,10 +3342,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3457,8 +3358,7 @@
   <span class="md-ellipsis">
     
   
-    Model Sets (Multi-Target)
-  
+  Model Sets (Multi-Target)
 
     
   </span>
@@ -3469,18 +3369,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3511,8 +3412,7 @@
   <span class="md-ellipsis">
     
   
-    Decide
-  
+  Decide
 
     
   </span>
@@ -3522,19 +3422,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_3">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_3">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Decide
-  
+  Decide
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -3547,8 +3447,7 @@
   <span class="md-ellipsis">
     
   
-    Training Reports and Charts
-  
+  Training Reports and Charts
 
     
   </span>
@@ -3559,10 +3458,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3575,8 +3474,7 @@
   <span class="md-ellipsis">
     
   
-    Experiment Artifacts
-  
+  Experiment Artifacts
 
     
   </span>
@@ -3587,10 +3485,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3603,8 +3501,7 @@
   <span class="md-ellipsis">
     
   
-    SHAP Explanations
-  
+  SHAP Explanations
 
     
   </span>
@@ -3615,10 +3512,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3631,8 +3528,7 @@
   <span class="md-ellipsis">
     
   
-    Approve, Reject and Roll Back
-  
+  Approve, Reject and Roll Back
 
     
   </span>
@@ -3643,10 +3539,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3659,8 +3555,7 @@
   <span class="md-ellipsis">
     
   
-    Interrupted Alias Recovery
-  
+  Interrupted Alias Recovery
 
     
   </span>
@@ -3671,18 +3566,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3713,8 +3609,7 @@
   <span class="md-ellipsis">
     
   
-    Score
-  
+  Score
 
     
   </span>
@@ -3724,19 +3619,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_4">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_4">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Score
-  
+  Score
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -3749,8 +3644,7 @@
   <span class="md-ellipsis">
     
   
-    Scoring and Publication
-  
+  Scoring and Publication
 
     
   </span>
@@ -3761,10 +3655,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3777,8 +3671,7 @@
   <span class="md-ellipsis">
     
   
-    Score on Spark Workers
-  
+  Score on Spark Workers
 
     
   </span>
@@ -3789,10 +3682,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3805,8 +3698,7 @@
   <span class="md-ellipsis">
     
   
-    Python SDK
-  
+  Python SDK
 
     
   </span>
@@ -3817,10 +3709,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3833,8 +3725,7 @@
   <span class="md-ellipsis">
     
   
-    Monthly Batch
-  
+  Monthly Batch
 
     
   </span>
@@ -3845,18 +3736,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3887,8 +3779,7 @@
   <span class="md-ellipsis">
     
   
-    Monitor
-  
+  Monitor
 
     
   </span>
@@ -3898,19 +3789,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_5">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_5">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Monitor
-  
+  Monitor
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -3923,8 +3814,7 @@
   <span class="md-ellipsis">
     
   
-    Overview
-  
+  Overview
 
     
   </span>
@@ -3935,10 +3825,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3951,8 +3841,7 @@
   <span class="md-ellipsis">
     
   
-    Store Setup and Upgrades
-  
+  Store Setup and Upgrades
 
     
   </span>
@@ -3963,10 +3852,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3979,8 +3868,7 @@
   <span class="md-ellipsis">
     
   
-    Enrollment and References
-  
+  Enrollment and References
 
     
   </span>
@@ -3991,10 +3879,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4007,8 +3895,7 @@
   <span class="md-ellipsis">
     
   
-    Delayed Labels
-  
+  Delayed Labels
 
     
   </span>
@@ -4019,10 +3906,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4035,8 +3922,7 @@
   <span class="md-ellipsis">
     
   
-    Drift and Data Quality
-  
+  Drift and Data Quality
 
     
   </span>
@@ -4047,10 +3933,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4063,8 +3949,7 @@
   <span class="md-ellipsis">
     
   
-    Performance Loss
-  
+  Performance Loss
 
     
   </span>
@@ -4075,10 +3960,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4091,8 +3976,7 @@
   <span class="md-ellipsis">
     
   
-    Automatic Retraining
-  
+  Automatic Retraining
 
     
   </span>
@@ -4103,10 +3987,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4119,8 +4003,7 @@
   <span class="md-ellipsis">
     
   
-    Dashboard
-  
+  Dashboard
 
     
   </span>
@@ -4131,18 +4014,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4173,8 +4057,7 @@
   <span class="md-ellipsis">
     
   
-    Serve
-  
+  Serve
 
     
   </span>
@@ -4184,19 +4067,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_6">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_6">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Serve
-  
+  Serve
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -4209,8 +4092,7 @@
   <span class="md-ellipsis">
     
   
-    Endpoint Setup and Queries
-  
+  Endpoint Setup and Queries
 
     
   </span>
@@ -4221,10 +4103,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4237,8 +4119,7 @@
   <span class="md-ellipsis">
     
   
-    Online Feature Lookup
-  
+  Online Feature Lookup
 
     
   </span>
@@ -4249,10 +4130,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4265,8 +4146,7 @@
   <span class="md-ellipsis">
     
   
-    Gradual Serving Rollout
-  
+  Gradual Serving Rollout
 
     
   </span>
@@ -4277,10 +4157,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4293,8 +4173,7 @@
   <span class="md-ellipsis">
     
   
-    Serving Observations
-  
+  Serving Observations
 
     
   </span>
@@ -4305,18 +4184,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4347,8 +4227,7 @@
   <span class="md-ellipsis">
     
   
-    Reference
-  
+  Reference
 
     
   </span>
@@ -4358,19 +4237,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_2_7">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_2_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_2_7">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Reference
-  
+  Reference
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -4383,8 +4262,7 @@
   <span class="md-ellipsis">
     
   
-    Troubleshooting
-  
+  Troubleshooting
 
     
   </span>
@@ -4395,10 +4273,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4411,8 +4289,7 @@
   <span class="md-ellipsis">
     
   
-    Glossary
-  
+  Glossary
 
     
   </span>
@@ -4423,26 +4300,28 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4473,8 +4352,7 @@
   <span class="md-ellipsis">
     
   
-    MLflow
-  
+  MLflow
 
     
   </span>
@@ -4484,19 +4362,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_3">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_3">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    MLflow
-  
+  MLflow
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -4509,8 +4387,7 @@
   <span class="md-ellipsis">
     
   
-    Tracking
-  
+  Tracking
 
     
   </span>
@@ -4521,10 +4398,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4537,8 +4414,7 @@
   <span class="md-ellipsis">
     
   
-    Model Packages
-  
+  Model Packages
 
     
   </span>
@@ -4549,10 +4425,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4565,8 +4441,7 @@
   <span class="md-ellipsis">
     
   
-    Registry and Lifecycle
-  
+  Registry and Lifecycle
 
     
   </span>
@@ -4577,18 +4452,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4619,8 +4495,7 @@
   <span class="md-ellipsis">
     
   
-    Spark
-  
+  Spark
 
     
   </span>
@@ -4630,19 +4505,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7_4">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_4">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Spark
-  
+  Spark
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -4655,8 +4530,7 @@
   <span class="md-ellipsis">
     
   
-    How Inference Works
-  
+  How Inference Works
 
     
   </span>
@@ -4667,10 +4541,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4683,8 +4557,7 @@
   <span class="md-ellipsis">
     
   
-    Execution and Inference
-  
+  Execution and Inference
 
     
   </span>
@@ -4695,10 +4568,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4711,8 +4584,7 @@
   <span class="md-ellipsis">
     
   
-    Measure Inference Capacity
-  
+  Measure Inference Capacity
 
     
   </span>
@@ -4723,10 +4595,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4739,8 +4611,7 @@
   <span class="md-ellipsis">
     
   
-    Portable Inference Bundles
-  
+  Portable Inference Bundles
 
     
   </span>
@@ -4751,18 +4622,20 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -4800,8 +4673,7 @@
   <span class="md-ellipsis">
     
   
-    Reference
-  
+  Reference
 
     
   </span>
@@ -4811,19 +4683,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Reference
-  
+  Reference
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -4836,8 +4708,7 @@
   <span class="md-ellipsis">
     
   
-    Preprocessing Nodes
-  
+  Preprocessing Nodes
 
     
   </span>
@@ -4848,10 +4719,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4864,8 +4735,7 @@
   <span class="md-ellipsis">
     
   
-    Modeling Nodes
-  
+  Modeling Nodes
 
     
   </span>
@@ -4876,10 +4746,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4892,8 +4762,7 @@
   <span class="md-ellipsis">
     
   
-    Data Validation
-  
+  Data Validation
 
     
   </span>
@@ -4904,10 +4773,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4920,8 +4789,7 @@
   <span class="md-ellipsis">
     
   
-    Deprecation Policy
-  
+  Deprecation Policy
 
     
   </span>
@@ -4932,10 +4800,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4966,8 +4834,7 @@
   <span class="md-ellipsis">
     
   
-    API
-  
+  API
 
     
   </span>
@@ -4977,19 +4844,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_5">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8_5">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    API
-  
+  API
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -5002,8 +4869,7 @@
   <span class="md-ellipsis">
     
   
-    Pipeline
-  
+  Pipeline
 
     
   </span>
@@ -5014,10 +4880,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5048,8 +4914,7 @@
   <span class="md-ellipsis">
     
   
-    Data
-  
+  Data
 
     
   </span>
@@ -5059,19 +4924,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8_5_2">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Data
-  
+  Data
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -5084,8 +4949,7 @@
   <span class="md-ellipsis">
     
   
-    SplitDataset
-  
+  SplitDataset
 
     
   </span>
@@ -5096,18 +4960,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5138,8 +5003,7 @@
   <span class="md-ellipsis">
     
   
-    Preprocessing
-  
+  Preprocessing
 
     
   </span>
@@ -5149,19 +5013,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_5_3">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8_5_3">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Preprocessing
-  
+  Preprocessing
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -5174,8 +5038,7 @@
   <span class="md-ellipsis">
     
   
-    Overview
-  
+  Overview
 
     
   </span>
@@ -5186,10 +5049,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5202,8 +5065,7 @@
   <span class="md-ellipsis">
     
   
-    base
-  
+  base
 
     
   </span>
@@ -5214,10 +5076,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5230,8 +5092,7 @@
   <span class="md-ellipsis">
     
   
-    pipeline
-  
+  pipeline
 
     
   </span>
@@ -5242,10 +5103,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5258,8 +5119,7 @@
   <span class="md-ellipsis">
     
   
-    split
-  
+  split
 
     
   </span>
@@ -5270,10 +5130,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5286,8 +5146,7 @@
   <span class="md-ellipsis">
     
   
-    cleaning
-  
+  cleaning
 
     
   </span>
@@ -5298,10 +5157,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5314,8 +5173,7 @@
   <span class="md-ellipsis">
     
   
-    drop_and_missing
-  
+  drop_and_missing
 
     
   </span>
@@ -5326,10 +5184,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5342,8 +5200,7 @@
   <span class="md-ellipsis">
     
   
-    imputation
-  
+  imputation
 
     
   </span>
@@ -5354,10 +5211,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5370,8 +5227,7 @@
   <span class="md-ellipsis">
     
   
-    encoding
-  
+  encoding
 
     
   </span>
@@ -5382,10 +5238,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5398,8 +5254,7 @@
   <span class="md-ellipsis">
     
   
-    scaling
-  
+  scaling
 
     
   </span>
@@ -5410,10 +5265,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5426,8 +5281,7 @@
   <span class="md-ellipsis">
     
   
-    outliers
-  
+  outliers
 
     
   </span>
@@ -5438,10 +5292,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5454,8 +5308,7 @@
   <span class="md-ellipsis">
     
   
-    transformations
-  
+  transformations
 
     
   </span>
@@ -5466,10 +5319,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5482,8 +5335,7 @@
   <span class="md-ellipsis">
     
   
-    bucketing
-  
+  bucketing
 
     
   </span>
@@ -5494,10 +5346,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5510,8 +5362,7 @@
   <span class="md-ellipsis">
     
   
-    casting
-  
+  casting
 
     
   </span>
@@ -5522,10 +5373,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5538,8 +5389,7 @@
   <span class="md-ellipsis">
     
   
-    feature_generation
-  
+  feature_generation
 
     
   </span>
@@ -5550,10 +5400,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5566,8 +5416,7 @@
   <span class="md-ellipsis">
     
   
-    feature_selection
-  
+  feature_selection
 
     
   </span>
@@ -5578,10 +5427,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5594,8 +5443,7 @@
   <span class="md-ellipsis">
     
   
-    resampling
-  
+  resampling
 
     
   </span>
@@ -5606,10 +5454,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5622,8 +5470,7 @@
   <span class="md-ellipsis">
     
   
-    inspection
-  
+  inspection
 
     
   </span>
@@ -5634,18 +5481,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5676,8 +5524,7 @@
   <span class="md-ellipsis">
     
   
-    Modeling
-  
+  Modeling
 
     
   </span>
@@ -5687,19 +5534,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8_5_4">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_5_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8_5_4">
+              <span class="md-nav__icon md-icon"></span>
+              
   
-    Modeling
-  
+  Modeling
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -5712,8 +5559,7 @@
   <span class="md-ellipsis">
     
   
-    Overview
-  
+  Overview
 
     
   </span>
@@ -5724,10 +5570,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5740,8 +5586,7 @@
   <span class="md-ellipsis">
     
   
-    base
-  
+  base
 
     
   </span>
@@ -5752,10 +5597,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5768,8 +5613,7 @@
   <span class="md-ellipsis">
     
   
-    sklearn_wrapper
-  
+  sklearn_wrapper
 
     
   </span>
@@ -5780,10 +5624,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5796,8 +5640,7 @@
   <span class="md-ellipsis">
     
   
-    classification
-  
+  classification
 
     
   </span>
@@ -5808,10 +5651,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5824,8 +5667,7 @@
   <span class="md-ellipsis">
     
   
-    regression
-  
+  regression
 
     
   </span>
@@ -5836,10 +5678,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5852,8 +5694,7 @@
   <span class="md-ellipsis">
     
   
-    cross_validation
-  
+  cross_validation
 
     
   </span>
@@ -5864,10 +5705,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -5880,8 +5721,7 @@
   <span class="md-ellipsis">
     
   
-    tuning/engine
-  
+  tuning/engine
 
     
   </span>
@@ -5892,26 +5732,29 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -5929,9 +5772,9 @@
             <div class="md-content" data-md-component="content">
               
               <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
                 
                   
-
 
   
   
@@ -6403,6 +6246,8 @@ plus <code>validation_frames</code> for holdout tuning — or scores stay optimi
 
 
 
+
+
                 
               </article>
             </div>
@@ -6423,8 +6268,8 @@ plus <code>validation_frames</code> for holdout tuning — or scores stay optimi
   
   
     Made with
-    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
-      Material for MkDocs
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
     </a>
   
 </div>
@@ -6434,7 +6279,7 @@ plus <code>validation_frames</code> for holdout tuning — or scores stay optimi
 </footer>
       
     </div>
-    <div class="md-dialog" data-md-component="dialog">
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
@@ -6442,10 +6287,14 @@ plus <code>validation_frames</code> for holdout tuning — or scores stay optimi
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.tabs","navigation.sections","navigation.expand","toc.integrate","content.code.copy","content.tabs.link"],"redirect":null,"search":"../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../assets/javascripts/bundle.a2388154.min.js"></script>
       
     
   </body>
