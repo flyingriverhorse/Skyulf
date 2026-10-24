@@ -33,7 +33,7 @@ a prediction table maintained by a scoring job.
 
 4. Open the child `serving_endpoint` run linked from training and wait for its
    successful result. Training waits for submission, not endpoint readiness.
-   Then follow [SERVING.md](SERVING.md) to call the SQL function, run monitoring
+   Then follow [this example's serving steps](GUIDE.md#call-the-taxi-endpoint-and-monitor-its-requests) to call the SQL function, run monitoring
    and open the **Online serving** dashboard page.
 
 Use the shared `test` target: its production Bundle mode enables automatic
@@ -47,7 +47,7 @@ databricks bundle run serving_endpoint -t test --profile YOUR_PROFILE
 
 This example follows the template in this checkout. For an unreleased checkout,
 use a wheel built from that checkout in the job environment; an older published
-Core package may not support these settings. See [deployment/README.md](deployment/README.md)
+Core package may not support these settings. See [deployment and schedules](GUIDE.md#deployment-and-schedules)
 for dependencies, identities and permissions.
 
 ## What is configured
@@ -62,4 +62,4 @@ for dependencies, identities and permissions.
 
 The adjacent `taxi_fare_endpoint.json` records initialization answers.
 `build_example_project.py --check` verifies generated files while preserving
-this guide, `SERVING.md` and the example's recipe files.
+this README, the serving section appended to `GUIDE.md` and the example's recipe files.

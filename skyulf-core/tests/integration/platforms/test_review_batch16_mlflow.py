@@ -1,7 +1,7 @@
 """Model transport must use registered artifacts and retain only prediction state."""
 
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 import numpy as np
 import pandas as pd
@@ -69,7 +69,10 @@ def test_resolve_uses_bound_registry_transport(
     else:
         client.get_model_version_download_uri.assert_called_once_with("catalog.schema.model", "7")
     download.assert_called_once_with(
-        artifact_uri=f"{expected}/MLmodel", tracking_uri=None, registry_uri=bound_uri
+        artifact_uri=f"{expected}/MLmodel",
+        dst_path=ANY,
+        tracking_uri=None,
+        registry_uri=bound_uri,
     )
     assert resolved.model_uri == "models:/catalog.schema.model/7"
     assert resolved.digest == "digest"

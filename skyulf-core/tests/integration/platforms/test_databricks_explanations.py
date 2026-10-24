@@ -234,6 +234,9 @@ def test_feature_cap_prevents_transform_and_shap(tmp_path, monkeypatch) -> None:
     assert result["status"] == "unavailable"
     assert result["reason"] == "feature_limit_exceeded"
     assert result["sample_count"] == 0
+    # Users need the width and the limit to choose a new max_features.
+    assert result["feature_count"] == len(artifact.manifest.feature_columns)
+    assert result["max_features"] == 1
 
 
 def test_inference_row_change_is_visible(tmp_path, monkeypatch) -> None:

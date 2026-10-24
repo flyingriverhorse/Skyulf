@@ -4,7 +4,10 @@ from copy import deepcopy
 
 import pytest
 
-from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import (
+    preview_summary,
+    preview_workflow_config,
+)
 
 
 def test_preview_preserves_step_order_and_separates_cv_from_holdout(workflow_config):
@@ -76,3 +79,35 @@ def test_preview_rejects_model_task_mismatch(workflow_config, task, model):
     workflow_config["pipeline"]["modeling"]["type"] = model
     with pytest.raises(ValueError, match="declared task"):
         preview_workflow_config(workflow_config)
+
+
+@pytest.mark.parametrize(
+    ("updates", "activation", "scoring"),
+    [
+        ({"quality_threshold": None}, "no quality_threshold", "pinned version"),
+        ({"quality_threshold": 0.5}, "threshold 0.5", "pinned version"),
+        ({"score_model_selection": "champion"}, None, "champion alias; approve"),
+    ],
+)
+def test_preview_summary_names_missing_decisions_before_details(
+    workflow_config, updates, activation, scoring
+):
+    """A first-time reader must see the missing threshold and unchecked workspace up front."""
+    workflow_config.update(
+        {"score_model_selection": "pinned_version", "model_version": "1", **updates}
+    )
+    summary = preview_summary(workflow_config)
+    assert activation is None or activation in summary
+    assert scoring in summary
+    assert "Not checked: source data, permissions and workspace" in summary
+    assert "Summary:" not in preview_workflow_config(workflow_config)
+
+
+@pytest.mark.parametrize(("delivery", "serving"), [("batch", False), ("both", True)])
+def test_preview_summary_names_the_serving_route_only_when_generated(
+    workflow_config, delivery, serving
+):
+    """Endpoint projects must see how to serve one version and where its proof is."""
+    workflow_config.update(prediction_delivery=delivery, engine="pandas")
+    summary = preview_summary(workflow_config)
+    assert ("serving_endpoint --params model_version=N" in summary) is serving

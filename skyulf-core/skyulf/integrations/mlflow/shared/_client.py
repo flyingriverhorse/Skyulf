@@ -36,19 +36,31 @@ def make_tracking_client(tracking_uri: str | None) -> Any:
     return MlflowClient(tracking_uri=tracking_uri)
 
 
+# Databricks groups experiments by this tag; this value lists them under "Machine learning".
+EXPERIMENT_KIND_TAG = "mlflow.experimentKind"
+EXPERIMENT_KIND = "custom_model_development"
+
+
 def get_or_create_experiment(client: Any, experiment_name: str | None) -> str:
-    """Resolve an experiment through the supplied client without global MLflow state."""
+    """Resolve an experiment through the supplied client without global MLflow state.
+
+    New experiments get the ``custom_model_development`` kind tag; an existing one
+    gets it only when it has no kind yet.
+    """
     if experiment_name is None:
         return "0"
-    existing = client.get_experiment_by_name(experiment_name)
-    if existing is not None:
-        return existing.experiment_id
     from mlflow.exceptions import (  # noqa: PLC0415 - optional dependency loaded on enabled tracking  # ty: ignore[unresolved-import]
         MlflowException,  # ty: ignore[unresolved-import]
     )
 
+    existing = client.get_experiment_by_name(experiment_name)
+    if existing is not None:
+        _tag_experiment_kind(client, existing, MlflowException)
+        return existing.experiment_id
     try:
-        return client.create_experiment(experiment_name)
+        return client.create_experiment(
+            experiment_name, tags={EXPERIMENT_KIND_TAG: EXPERIMENT_KIND}
+        )
     except MlflowException as exc:
         if exc.error_code != "RESOURCE_ALREADY_EXISTS":
             raise
@@ -56,3 +68,15 @@ def get_or_create_experiment(client: Any, experiment_name: str | None) -> str:
         if existing is None:
             raise
         return existing.experiment_id
+
+
+def _tag_experiment_kind(client: Any, experiment: Any, error_type: type[Exception]) -> None:
+    """Add the kind tag to an older experiment; lacking permission only skips the tag."""
+    tags = getattr(experiment, "tags", None)
+    if not isinstance(tags, dict) or EXPERIMENT_KIND_TAG in tags:
+        return
+    try:
+        client.set_experiment_tag(experiment.experiment_id, EXPERIMENT_KIND_TAG, EXPERIMENT_KIND)
+    except error_type as exc:
+        if getattr(exc, "error_code", None) != "PERMISSION_DENIED":
+            raise

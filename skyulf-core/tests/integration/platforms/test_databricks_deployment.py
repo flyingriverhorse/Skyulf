@@ -135,7 +135,8 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
         jobs = bundle["resources"]["jobs"]
         assert set(jobs) == {"train", "score", "monitoring"}
         for key, job in jobs.items():
-            assert job["name"] == f"dev_alice_{key}"
+            # Databricks development prefix, project name kept (two projects stay distinct).
+            assert job["name"] == f"[dev alice] sm33_generated_{key}"
             assert job["schedule"]["pause_status"] == "PAUSED"
             assert not job.get("run_as", {}).get("service_principal_name")
             # Deployer and the default pipeline_owner are the same user: one owner entry.
@@ -347,6 +348,30 @@ def test_personal_policy_compute_resolves_without_changing_job_identity(
     assert monitoring["tags"]["cost_center"] == "ml-test"
 
 
+def test_policy_cluster_fields_are_set_once_for_every_job(tmp_path, offline_workspace):
+    """Fields a cluster policy requires must reach every job cluster from one variable."""
+    project = _generate_project(
+        tmp_path, compute_mode="policy_cluster", cluster_policy_name="local-policy"
+    )
+    path = project / "deployment/variables.yml"
+    contents = yaml.safe_load(path.read_text())
+    cluster = contents["variables"]["job_cluster"]
+    assert cluster["type"] == "complex"
+    cluster["default"].update(
+        data_security_mode="SINGLE_USER", runtime_engine="STANDARD", use_ml_runtime=True
+    )
+    path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
+    result = _resolve(project, "test", offline_workspace)
+    for role in ("train", "score"):
+        spec = result["resources"]["jobs"][role]["job_clusters"][0]["new_cluster"]
+        assert spec["policy_id"] == "local-policy-id"
+        assert spec["spark_version"] == "17.3.x-cpu-ml-scala2.13"
+        assert spec["autoscale"] == {"min_workers": 2, "max_workers": 4}
+        assert spec["data_security_mode"] == "SINGLE_USER"
+        assert spec["runtime_engine"] == "STANDARD"
+        assert spec["use_ml_runtime"] is True
+
+
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 @pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
 @pytest.mark.parametrize("recovery", ["false", "true"])
@@ -369,12 +394,10 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
         assert variables[f"{role}_task_timeout_seconds"]["default"] == 0
         assert variables[f"{role}_email_notifications"]["default"] == {}
         assert variables[f"{role}_webhook_notifications"]["default"] == {}
-        assert variables[f"{role}_health_rules"]["default"] == []
+        # An empty health block fails Terraform-engine deploys; rules are per-target overrides.
+        assert f"{role}_health_rules" not in variables
         variables[f"{role}_timeout_seconds"]["default"] = 7200
         variables[f"{role}_task_timeout_seconds"]["default"] = 1800
-        variables[f"{role}_health_rules"]["default"] = [
-            {"metric": "RUN_DURATION_SECONDS", "op": "GREATER_THAN", "value": 3600}
-        ]
         variables[f"{role}_email_notifications"]["default"] = {
             "on_failure": ["operator@example.invalid"],
             "on_duration_warning_threshold_exceeded": ["operator@example.invalid"],
@@ -386,6 +409,16 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
     variables["score_max_retries"]["default"] = 2
     variables["score_min_retry_interval_millis"]["default"] = 60000
     path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
+    default_jobs = _resolve(project, "test", offline_workspace)["resources"]["jobs"]
+    assert not [name for name, job in default_jobs.items() if "health" in job]
+    targets_path = project / "deployment/targets.yml"
+    targets = yaml.safe_load(targets_path.read_text())
+    jobs = targets["targets"]["test"].setdefault("resources", {}).setdefault("jobs", {})
+    for role in ("train", "score"):
+        rule = {"metric": "RUN_DURATION_SECONDS", "op": "GREATER_THAN", "value": 3600}
+        jobs[role] = jobs.get(role) or {}  # an empty YAML job key loads as None
+        jobs[role]["health"] = {"rules": [rule]}
+    targets_path.write_text(yaml.safe_dump(targets, sort_keys=False), encoding="utf-8")
     bundle = _resolve(project, "test", offline_workspace)
     for role in ("train", "score"):
         job = bundle["resources"]["jobs"][role]
@@ -406,3 +439,48 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
     assert ("recover_predictions" in score_tasks) is (recovery == "true")
     if recovery == "true":
         assert score_tasks["scoring_report"]["run_if"] == "NONE_FAILED"
+
+
+def test_projects_without_examples_still_validate(tmp_path, offline_workspace):
+    """include_examples=false must drop example code and recipes yet leave a valid project."""
+    from skyulf.integrations.databricks.projects.project_checks import (
+        check_project,  # noqa: PLC0415
+    )
+
+    project = _generate_project(tmp_path, include_examples="false")
+    for name in ("preprocessing", "pre_split"):
+        recipes = yaml.safe_load((project / f"config/{name}.yml").read_text())["recipes"]
+        assert recipes == {"default": [], "none": []}
+    for relative in (
+        "src/features/preprocessing.py",
+        "src/features/pre_split.py",
+        "src/features/scoring.py",
+        "src/features/groups/company.py",
+        "src/features/groups/activity.py",
+    ):
+        assert not (project / relative).exists(), relative
+    assert "groups/company.py" not in (project / "config/features.yml").read_text()
+    assets = (project / "src/features/assets.json").read_text()
+    assert json.loads(assets)["files"] == [] and "Example 4" not in assets
+    bindings = {
+        "catalog": "workspace",
+        "input_schema": "test",
+        "output_schema": "test",
+        "metadata_schema": "test",
+        "resource_suffix": "",
+    }
+    assert check_project(project, bindings)["status"] == "passed"
+    _resolve(project, "test", offline_workspace)
+
+
+@pytest.mark.parametrize("answer", ["branch_1_preprocessing_recipe", "branch_1_pre_split_recipe"])
+def test_projects_without_examples_reject_example_recipes(tmp_path, answer):
+    """Selecting a removed example recipe must fail at init, not at the first training run."""
+    from test_databricks_bundle_generation import _initialize_project  # noqa: PLC0415
+
+    recipe = "example_imputer" if "preprocessing" in answer else "example_all"
+    result, _ = _initialize_project(tmp_path, include_examples="false", **{answer: recipe})
+    assert result.returncode != 0
+    assert "ERROR_include_examples_false_cannot_select_example_recipes" in (
+        result.stderr + result.stdout
+    )

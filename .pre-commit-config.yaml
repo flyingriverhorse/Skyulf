@@ -20,7 +20,8 @@ exclude: |
     .*\.min\.(js|css)|
     .*__snapshots__/.*\.ambr|
     skyulf-core/templates/databricks/examples/nyctaxi/.*|
-    skyulf-core/templates/databricks/examples/real_data/(diagnostic_single|bike_demand_set|air_quality_no2)/.*
+    skyulf-core/templates/databricks/examples/real_data/(diagnostic_single|bike_demand_set|air_quality_no2)/.*|
+    skyulf-core/templates/databricks/examples/lakeflow/bronze_observations/.*
   )$
 
 repos:

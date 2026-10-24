@@ -1,5 +1,5 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
-# Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+# Override scalar values with BUNDLE_VAR_<name> or --var; see GUIDE.md#deployment-and-schedules.
 {{- if or (and .label_table_name (not .label_available_at_column)) (and .label_available_at_column (not .label_table_name))}}
 {{- template "ERROR_label_table_name_and_label_available_at_column_must_be_set_together" . -}}
 {{- end}}
@@ -69,6 +69,21 @@ variables:
   max_workers:
     description: Policy cluster autoscaling maximum
     default: 4
+  job_cluster:
+    description: >-
+      new_cluster spec shared by the train, score, serving and feature jobs. Add the fields your
+      cluster policy requires here, for example data_security_mode: SINGLE_USER,
+      runtime_engine: STANDARD or use_ml_runtime: true. A target override replaces the whole spec.
+    type: complex
+    default:
+      spark_version: ${var.spark_version}
+      node_type_id: ${var.node_type_id}
+      policy_id: ${var.cluster_policy_id}
+      custom_tags:
+        {{printf "%q" .cost_tag_key}}: ${var.cost_tag_value}
+      autoscale:
+        min_workers: ${var.min_workers}
+        max_workers: ${var.max_workers}
 {{end}}
   monitoring_environment_version:
     description: Independent serverless environment version for monitoring in either compute mode
@@ -76,6 +91,9 @@ variables:
   monitoring_budget_policy_id:
     description: Optional existing monitoring serverless budget policy; blank uses workspace defaults
     default: ""
+  features_start_training:
+    description: "true starts the train job after the optional features job merges, so one scheduled features job drives features, training and the training's score handoff"
+    default: "false"
   on_drift:
     description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
     default: "disabled"
@@ -172,18 +190,6 @@ variables:
   score_min_retry_interval_millis:
     description: Minimum delay between score attempts when retries are enabled
     default: 60000
-  train_health_rules:
-    description: Optional RUN_DURATION_SECONDS warning rules for train
-    type: complex
-    default: []
-  score_health_rules:
-    description: Optional RUN_DURATION_SECONDS warning rules for score
-    type: complex
-    default: []
-  monitoring_health_rules:
-    description: Optional RUN_DURATION_SECONDS warning rules for monitoring
-    type: complex
-    default: []
   monitoring_email_notifications:
     description: Optional monitoring job email events; measured drift needs a separate SQL alert
     type: complex
@@ -219,10 +225,10 @@ variables:
     default: {{.schema}}
   output_schema:
     description: Prediction output schema
-    default: {{.schema}}
+    default: {{or .output_schema .schema}}
   metadata_schema:
     description: Registered model schema
-    default: {{.schema}}
+    default: {{or .metadata_schema .schema}}
   resource_suffix:
     description: Optional namespace suffix for shared development targets
     default: ""
@@ -265,10 +271,10 @@ variables:
     default: "{{.schema}}"
   test_output_schema:
     description: "test output_schema for the shared target"
-    default: "{{.schema}}"
+    default: "{{or .output_schema .schema}}"
   test_metadata_schema:
     description: "test metadata_schema for the shared target"
-    default: "{{.schema}}"
+    default: "{{or .metadata_schema .schema}}"
 {{if eq .personal_development_targets "true"}}
   test_development_input_schema:
     description: Existing input_schema for personal work in test

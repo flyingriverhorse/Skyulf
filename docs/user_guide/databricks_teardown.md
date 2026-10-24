@@ -57,8 +57,8 @@ confirmation. Read the list before you confirm. Repeat per target; destroying
 | Jobs `train`, `score`, `monitoring` | `resources/*.job.yml` |
 | Optional jobs `online_feature_lookup_setup`, `online_publication`, `daily_rollout` | Present when selected at setup |
 | The `features` job | `resources/features.job.yml`, when created by `refresh_feature_graph.py` |
-| The dashboard refresh task | A target's block in `deployment/monitoring.yml`, part of the monitoring job |
-| The shared monitoring dashboard | Only in a target whose `deployment/monitoring.yml` block uses `create` |
+| The dashboard refresh task | A target's block in `deployment/targets.yml`, part of the monitoring job |
+| The shared monitoring dashboard | Only in a target whose `deployment/targets.yml` block uses `create` |
 | Job permissions managed by the Bundle | `permissions` and `manage_job_permissions` settings |
 | Deployed files and Bundle state | The target's `root_path` workspace folder |
 

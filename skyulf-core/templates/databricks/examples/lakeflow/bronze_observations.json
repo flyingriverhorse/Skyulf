@@ -1,0 +1,18 @@
+{
+  "project_name": "bronze_observations",
+  "setup_mode": "detailed",
+  "catalog": "workspace",
+  "schema": "lakeflow_demo",
+  "training_layout": "single_model",
+  "task": "regression",
+  "source_table_name": "observations",
+  "record_key_columns": "entity_id, observed_on",
+  "input_columns": "region_code, employee_count, revenue",
+  "target_column": "age",
+  "training_window_mode": "full_snapshot",
+  "regression_model": "linear_regression",
+  "prediction_delivery": "batch",
+  "monitoring": "false",
+  "include_examples": "false",
+  "save_preprocessing_diagnostics": "true"
+}

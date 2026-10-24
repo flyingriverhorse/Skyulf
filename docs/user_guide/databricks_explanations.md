@@ -182,7 +182,7 @@ choices affect attribution; SHAP is not causal evidence.
 | --- | --- |
 | No `shap_*` task | Quick/default setup omitted it. Add config, pinned dependencies, notebook and task, then validate/deploy; the YAML flag alone cannot create a task. |
 | No explanation artifact | Check whether explainability was off in the fitting run, or whether fit failed before saving it. Absence alone is not a successful explanation. |
-| `feature_limit_exceeded` | Transformed width exceeds the guard. Inspect encoded/generated columns; raise the guard only within 100, or train a deliberately smaller feature set. |
+| `feature_limit_exceeded` | Transformed width exceeds the guard. The result records `feature_count` and `max_features`. Inspect encoded/generated columns; raise the guard only within 100, or train a deliberately smaller feature set. `preview.py` warns when the recipe contains a column-expanding step such as `OneHotEncoder`. |
 | `empty_training_frame`, `missing_input_columns` | No usable training sample or missing saved input columns. Repair the source/split/feature contract before retraining. |
 | `too_few_rows_after_exclusions` | Fewer than two sampled rows survived the fitted exclusion steps. Read the counts and reasons; check the data and fitted thresholds before changing the sample budget. |
 | `inference_transform_unavailable`, `row_count_changed`, `feature_schema_mismatch` | Saved preprocessing cannot produce the expected row-preserving feature frame. Inspect the transform and context requirements. |

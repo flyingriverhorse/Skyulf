@@ -6,12 +6,14 @@ groups: {}
 # To enable the example below:
 # 1. Replace the two active lines above with the uncommented example block.
 #    Do not append a second version/groups mapping to the same YAML document.
-# 2. Change workspace.demo to your real catalog/schema and check source columns.
-#    Tables use exact names here: {catalog} placeholders are NOT expanded.
+# 2. Check the source table names and columns. Names may use the training.yml
+#    placeholders {catalog}, {input_schema}, {output_schema}, {metadata_schema}
+#    and {resource_suffix}; quote such values. Each target's feature job binds them,
+#    so test, syst, prod and personal targets read and write their own tables.
 # 3. Edit the shipped company.py/activity.py functions in src/features/groups/.
 #    Each receives a Spark DataFrame and returns keys + time + declared features.
 # 4. Run python src/tools/refresh_feature_graph.py, validate/deploy the Bundle,
-#    then run the features job. See ../FEATURE_TABLES.md for exact commands.
+#    then run the features job. See GUIDE.md#optional-feature-tables.
 # 5. Point training.yml training_table and inference.yml score_source_table at
 #    the merged output; select employee_count/monthly_amount/transaction_count
 #    as model inputs. Feature production does not start training automatically.
@@ -25,7 +27,7 @@ groups: {}
 # Create the destination schema and grant access to the job's Run-as identity.
 # The job creates the three output Delta tables, then upserts by company/time.
 #
-# base_table keeps observation rows/labels; it has no Python transform.
+# base_table keeps observation rows/labels; base_transform may derive them first.
 # keys + timestamp must uniquely identify each base and produced feature row.
 # columns lists features only: exclude keys, timestamp and labels.
 # transform is a file:function reference; group and file names need not match.
@@ -34,21 +36,21 @@ groups: {}
 #
 # Copyable example (inactive until you replace the active configuration above):
 # version: 1
-# base_table: workspace.demo.company_observations
-# output_table: workspace.demo.company_merged
+# base_table: "{catalog}.{input_schema}.company_observations"
+# output_table: "{catalog}.{output_schema}.company_merged{resource_suffix}"
 # keys: [company_id]
 # timestamp: observed_at
 # groups:
 #   company:
-#     source_table: workspace.demo.company_source
-#     output_table: workspace.demo.company_features
+#     source_table: "{catalog}.{input_schema}.company_source"
+#     output_table: "{catalog}.{output_schema}.company_features{resource_suffix}"
 #     transform: src/features/groups/company.py:compute_features
 #     columns: [employee_count]
 #     lookup: exact
 #     allow_missing: false
 #   activity:
-#     source_table: workspace.demo.activity_source
-#     output_table: workspace.demo.activity_features
+#     source_table: "{catalog}.{input_schema}.activity_source"
+#     output_table: "{catalog}.{output_schema}.activity_features{resource_suffix}"
 #     transform: src/features/groups/activity.py:compute_features
 #     columns: [monthly_amount, transaction_count]
 #     lookup: asof

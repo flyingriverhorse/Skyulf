@@ -27,7 +27,7 @@ def test_experiment_creation_recovers_forced_race() -> None:
             barrier.wait(timeout=10)
         return existing
 
-    def create(name):
+    def create(name, **kwargs):
         """Allow one create and return MLflow's race error to the loser."""
         nonlocal experiment
         with lock:
@@ -44,6 +44,29 @@ def test_experiment_creation_recovers_forced_race() -> None:
             executor.submit(tracking.get_or_create_experiment, client, "shared") for _ in range(2)
         ]
         assert [future.result(timeout=15) for future in futures] == ["7", "7"]
+
+
+def test_new_experiments_are_marked_as_custom_model_development() -> None:
+    """Databricks lists experiments under "Machine learning" only with this kind tag."""
+    pytest.importorskip("mlflow")
+    client = Mock()
+    client.get_experiment_by_name.return_value = None
+    client.create_experiment.return_value = "9"
+    assert tracking.get_or_create_experiment(client, "/Shared/project") == "9"
+    assert client.create_experiment.call_args.kwargs["tags"] == {
+        "mlflow.experimentKind": "custom_model_development"
+    }
+
+
+@pytest.mark.parametrize("tags, tagged", [({}, True), ({"mlflow.experimentKind": "x"}, False)])
+def test_existing_experiments_get_the_kind_tag_only_when_missing(tags, tagged) -> None:
+    """Older experiments are tagged once; a kind someone chose is never overwritten."""
+    pytest.importorskip("mlflow")
+    client = Mock()
+    client.get_experiment_by_name.return_value = SimpleNamespace(experiment_id="4", tags=tags)
+    assert tracking.get_or_create_experiment(client, "/Shared/project") == "4"
+    assert client.set_experiment_tag.called is tagged
+    client.create_experiment.assert_not_called()
 
 
 @pytest.mark.parametrize("code", ["PERMISSION_DENIED", "INTERNAL_ERROR", "RESOURCE_ALREADY_EXISTS"])

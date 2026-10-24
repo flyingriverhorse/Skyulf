@@ -33,6 +33,29 @@ def table_identity(spark: Any, table: str) -> str:
     return str(detail["id"])
 
 
+# Catalog types without Delta history: no DESCRIBE HISTORY or versionAsOf from dedicated compute.
+UNVERSIONED_KINDS = frozenset({"STREAMING_TABLE", "MATERIALIZED_VIEW", "VIEW", "METRIC_VIEW"})
+
+
+def table_kind(spark: Any, table: str) -> str:
+    """Return the catalog table type, for example MANAGED, EXTERNAL or STREAMING_TABLE."""
+    for row in spark.sql(f"DESCRIBE TABLE EXTENDED {table_name(table)}").collect():
+        if str(row[0]).strip() == "Type":
+            return str(row[1]).strip().upper()
+    return "UNKNOWN"
+
+
+def require_versioned_table(spark: Any, table: str, label: str) -> None:
+    """Fail with the fix when a source cannot be version-pinned (Lakeflow tables, views)."""
+    kind = table_kind(spark, table)
+    if kind in UNVERSIONED_KINDS:
+        raise ValueError(
+            f"{label} {table} is a {kind}, which has no Delta history to pin. Use a regular "
+            "Delta table, or produce one in config/features.yml with base_transform and "
+            "source_snapshot: materialize."
+        )
+
+
 def history(spark: Any, table: str, *, limit: int | None = None) -> Any:
     """Read retained history, optionally limiting Delta's own latest-version lookup."""
     if limit is not None and (type(limit) is not int or limit <= 0):

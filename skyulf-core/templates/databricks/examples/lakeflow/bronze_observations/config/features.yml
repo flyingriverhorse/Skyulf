@@ -1,0 +1,13 @@
+# Train from a Lakeflow streaming table without a separate preparation job.
+# bronze_observations is a streaming table: the features job copies it once per
+# run into a pinned skyulf_src_<hash> Delta table, runs prepare(), publishes
+# observations (a regular Delta table with Change Data Feed) and drops the copy.
+# Training and the batch score job read observations; ai_query can also score the
+# streaming table directly. Run python src/tools/refresh_feature_graph.py after edits.
+version: 1
+base_table: workspace.lakeflow_demo.bronze_observations
+base_transform: src/features/groups/base.py:prepare
+output_table: workspace.lakeflow_demo.observations
+keys: [entity_id, observed_on]
+timestamp: observed_date
+groups: {}

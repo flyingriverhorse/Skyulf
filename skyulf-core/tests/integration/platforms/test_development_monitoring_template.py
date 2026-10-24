@@ -52,7 +52,7 @@ def _gate(project, job):
 def test_development_monitoring_is_off_unless_chosen(tmp_path, answers):
     """Without the answer, dev targets write nothing and the dev store name stays blank."""
     project = _generate_project(tmp_path, **answers)
-    targets = _yaml(project, "deployment/monitoring.yml")["targets"]
+    targets = _yaml(project, "deployment/targets.yml")["targets"]
     for name in DEV_TARGETS:
         if name in targets:
             assert targets[name]["variables"]["monitoring_enabled"] == "false"
@@ -64,13 +64,12 @@ def test_opt_in_passes_both_store_names_and_keeps_the_shared_schema(tmp_path):
     """Dev targets enable monitoring; every job receives the shared and the development name."""
     project = _generate_project(tmp_path, **DEV_ON)
     assert _dev_schema_default(project) == "development_monitoring"
-    # Monitoring lives in monitoring.yml; targets.yml keeps only workspace and data settings.
-    targets = _yaml(project, "deployment/monitoring.yml")["targets"]
-    deployment = _yaml(project, "deployment/targets.yml")["targets"]
+    # Every target, monitoring included, is defined in targets.yml only.
+    assert not (project / "deployment/monitoring.yml").exists()
+    targets = _yaml(project, "deployment/targets.yml")["targets"]
     for name in DEV_TARGETS:
         assert targets[name]["variables"]["monitoring_enabled"] == "true"
         assert "monitoring_schema" not in targets[name]["variables"]
-        assert "monitoring_enabled" not in deployment[name]["variables"]
     for job in ("train", "score"):
         assert _gate(project, job) == {
             "op": "NOT_EQUAL",
@@ -99,9 +98,9 @@ def test_create_gives_test_development_a_dashboard_over_its_own_store(tmp_path):
         monitoring_dashboard="create",
         monitoring_dashboard_warehouse_id="d047a4d9aa276958",
     )
-    targets = _yaml(project, "deployment/monitoring.yml")["targets"]
-    assert set(targets) == {"test", *DEV_TARGETS}
+    targets = _yaml(project, "deployment/targets.yml")["targets"]
     assert "resources" not in targets["syst_development"]
+    assert "dashboards" not in (targets["syst"].get("resources") or {})
 
     def schema(target):
         """Return the dataset schema of one target's dashboard."""

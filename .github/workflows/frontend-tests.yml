@@ -107,7 +107,8 @@ jobs:
   frontend-e2e:
     name: Frontend e2e (Playwright)
     needs: frontend-gate
-    runs-on: ubuntu-latest
+    # The locked Playwright cannot install Chromium on ubuntu-latest (26.04) yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout

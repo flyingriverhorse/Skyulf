@@ -312,21 +312,32 @@ For a sensor that writes `-200` during outages:
 
 Job failures and measured drift are separate events. A successful monitoring run
 can report drift, missing evidence or performance loss. Configure native job
-notifications for failed runs and long durations in your target variables:
+notifications for failed runs in your target variables, and a duration warning
+as a `health` rule on the monitoring job of the same target in `deployment/targets.yml`:
 
 ```yaml
-variables:
-  monitoring_email_notifications:
-    on_failure: [ml-operations@example.com]
-    on_duration_warning_threshold_exceeded: [ml-operations@example.com]
-  monitoring_health_rules:
-    - metric: RUN_DURATION_SECONDS
-      op: GREATER_THAN
-      value: 1800
-  monitoring_webhook_notifications:
-    on_failure:
-      - id: YOUR_EXISTING_NOTIFICATION_DESTINATION_ID
+targets:
+  test:
+    variables:
+      monitoring_email_notifications:
+        on_failure: [ml-operations@example.com]
+        on_duration_warning_threshold_exceeded: [ml-operations@example.com]
+      monitoring_webhook_notifications:
+        on_failure:
+          - id: YOUR_EXISTING_NOTIFICATION_DESTINATION_ID
+    resources:
+      jobs:
+        monitoring:
+          health:
+            rules:
+              - metric: RUN_DURATION_SECONDS
+                op: GREATER_THAN
+                value: 1800
 ```
+
+Jobs have no `health` block by default: an empty rule list fails `bundle deploy` with
+the Terraform engine. The warning value must not exceed the job's
+`monitoring_timeout_seconds`.
 
 Replace the example email/destination before deploying. Webhooks use an existing
 workspace notification destination ID, not a URL. Empty defaults send nothing.

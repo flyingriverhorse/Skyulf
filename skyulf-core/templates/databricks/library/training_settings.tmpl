@@ -47,7 +47,9 @@
 {{$i}}training_sample_seed: {{index $v (print $p "training_sample_seed")}}
 {{end -}}
 {{- $availability := or (eq $v.source_layout "separate_outcomes") (eq (index $v (print $p "filter_unavailable_results")) "true") -}}
-{{$i}}filter_unavailable_results: {{$availability}}
+{{$i}}filter_unavailable_results: {{$availability}} # true: skip rows with no result date (or after result_cutoff); they do not count toward max_rows. multi_target skips empty branch targets automatically
+{{if ne $v.training_layout "multi_target"}}{{$i}}skip_missing_targets: true # skip rows whose target is empty; they do not count toward max_rows
+{{end -}}
 {{if and $availability (ne (index $v (print $p "result_availability_lag_hours")) "null")}}{{$i}}result_availability_lag_hours: {{index $v (print $p "result_availability_lag_hours")}}
 {{end -}}
 {{if index $v (print $p "event_column")}}{{$i}}event_column: {{printf "%q" (index $v (print $p "event_column"))}}

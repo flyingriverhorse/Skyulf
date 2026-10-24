@@ -143,6 +143,7 @@ nav:
         - Model Sets (Multi-Target): user_guide/databricks_model_sets.md
       - Decide:
         - Training Reports and Charts: user_guide/databricks_training_reports.md
+        - Experiment Artifacts: user_guide/databricks_artifacts.md
         - SHAP Explanations: user_guide/databricks_explanations.md
         - Approve, Reject and Roll Back: user_guide/databricks_lifecycle.md
         - Interrupted Alias Recovery: user_guide/databricks_lifecycle_recovery.md

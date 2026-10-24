@@ -50,18 +50,28 @@ service principals.
 
 The `personal_development_targets` answer controls whether the three additional
 personal targets are generated. Detailed setup asks it; quick setup and an
-answer file without it keep `false`. Read the generated
-`deployment/README.md` for the project's selected value. Personal targets do not receive shared
+answer file without it keep `false`. Read **Deployment and schedules** in the generated
+`GUIDE.md` and `deployment/variables.yml` for the project's selected value. Personal targets do not receive shared
 service-principal identities or shared job ACL overrides. Their resolved suffix
 uses the workspace user ID, not just an email prefix, so two users named `alice`
 cannot share output/model names accidentally. Use each developer's own profile;
 one shared service account represents one identity, not several developers.
 
-Personal job names are `dev_<user>_train`, `dev_<user>_score` and
-`dev_<user>_monitoring`, without a project or environment label. Shared
-test/syst/prod jobs keep `<project>_train`, `<project>_score` and
-`<project>_monitoring`, without a user prefix. Environment-specific roots and output
-suffixes keep targets distinct when users choose to share one workspace.
+Personal targets use Databricks' standard development prefix, so job names are
+`[dev <user>] <project>_train`, `[dev <user>] <project>_score` and
+`[dev <user>] <project>_monitoring`. The project name (the Bundle name you chose as
+`project_name` at setup) stays in every name, so two projects deployed by the same
+person remain distinct in the Jobs list. Shared test/syst/prod jobs keep
+`<project>_train`, `<project>_score` and `<project>_monitoring`, without a user
+prefix. Environment-specific roots and output suffixes keep targets distinct when
+users choose to share one workspace.
+
+Every target, including per-target monitoring, dashboard and identity overrides, is
+defined in `deployment/targets.yml` only; other deployment files hold variables. CI
+checks that allow `targets:` in one designated file therefore pass unchanged. When
+optional feature groups add a `features` job, `src/tools/refresh_feature_graph.py`
+prints the `run_as`/`permissions` entries it needs per target; merge them into
+`targets.yml` (the smoke check fails until they match the train job).
 
 Personal names isolate deployments; they do not replace Unity Catalog grants.
 Reading production inputs still requires permission. Personal model/output
@@ -238,6 +248,28 @@ Override `job_tags` through target variables. For train and score, configure
 `serverless_environment_version` and `serverless_budget_policy_id`, or
 policy-cluster `spark_version`, `node_type_id`, `min_workers` and `max_workers`.
 
+All policy-cluster jobs (train, score, serving and the optional feature job) use
+one `new_cluster` spec: the complex `job_cluster` variable in
+`deployment/variables.yml`. When your cluster policy requires more fields, add
+them there once:
+
+```yaml
+  job_cluster:
+    type: complex
+    default:
+      spark_version: ${var.spark_version}
+      node_type_id: ${var.node_type_id}
+      policy_id: ${var.cluster_policy_id}
+      # ... generated tags and autoscale stay as they are ...
+      data_security_mode: SINGLE_USER
+      runtime_engine: STANDARD
+      use_ml_runtime: true
+```
+
+A target that sets `job_cluster` under `variables:` replaces the whole spec, so
+copy every field there. To change one value per target, override the scalar
+variables (`spark_version`, `node_type_id`, ...) instead.
+
 Monitoring always uses an independent serverless environment, including when
 train/score use policy clusters. Configure `monitoring_environment_version`
 (default `4`) and `monitoring_budget_policy_id` (default blank) separately.
@@ -321,8 +353,8 @@ Setup does not ask for the model and data catalog/schema names. It generates
 editable bindings for test/syst/prod in `variables.yml` with `REPLACE_*`
 placeholders. The separate monitoring store catalog and schema are asked in both
 setup modes; see [monitoring store setup](databricks_monitoring_setup.md).
-An initialization JSON file may still provide `catalog` and `schema` to prefill
-shared test values. These settings reference existing UC objects; they do not
+An initialization JSON file may still provide `catalog` and `schema` (input), and
+optionally `output_schema` and `metadata_schema`, to prefill shared test values. These settings reference existing UC objects; they do not
 create them.
 
 1. Set the same workspace `host` in each shared/personal environment pair in
@@ -399,7 +431,6 @@ questions. Override them under a target's `variables` when environments differ.
 | `train_task_timeout_seconds`, `score_task_timeout_seconds` | `0` | Notebook-task limit; zero means unlimited |
 | `score_max_retries` | `0` | Optional finite score retries after failure |
 | `score_min_retry_interval_millis` | `60000` | Minimum interval between score attempts |
-| `train_health_rules`, `score_health_rules` | `[]` | Optional duration-warning rules |
 | `train_email_notifications`, `score_email_notifications` | `{}` | Optional event-to-email mappings |
 | `train_webhook_notifications`, `score_webhook_notifications` | `{}` | Optional event-to-notification-destination mappings |
 | `monitoring_timeout_seconds` | `7200` | Whole monitoring job limit; optional online and rollout jobs reuse it |
@@ -420,10 +451,6 @@ score_timeout_seconds: 3600
 score_task_timeout_seconds: 3000
 score_max_retries: 2
 score_min_retry_interval_millis: 60000
-train_health_rules:
-  - metric: RUN_DURATION_SECONDS
-    op: GREATER_THAN
-    value: 10800
 train_email_notifications:
   on_failure: ["YOUR_ONCALL_EMAIL"]
   on_duration_warning_threshold_exceeded: ["YOUR_ONCALL_EMAIL"]
@@ -434,6 +461,24 @@ score_webhook_notifications:
     - id: "YOUR_EXISTING_NOTIFICATION_DESTINATION_ID"
 ```
 
+Duration warnings are `health` rules on the job itself, added under the same target
+in `targets.yml` (jobs have no `health` block by default, because an empty rule list
+fails `bundle deploy` with the Terraform engine):
+
+```yaml
+targets:
+  test:
+    resources:
+      jobs:
+        train:
+          health:
+            rules:
+              - metric: RUN_DURATION_SECONDS
+                op: GREATER_THAN
+                value: 10800
+```
+
+The warning value must not exceed the job's `timeout_seconds` when one is set.
 Webhook values are existing workspace destination IDs, not URLs or secrets.
 No destination is created and no recipient is added by default. Configure
 duration events alongside a health rule. Job-level failure notifications report

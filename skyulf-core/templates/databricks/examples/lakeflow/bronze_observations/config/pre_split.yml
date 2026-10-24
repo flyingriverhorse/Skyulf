@@ -1,0 +1,14 @@
+# Fixed row eligibility before the training split; never learn statistics here.
+# Select with pre_split_recipe in config/training.yml (default: default).
+# Competition shares its pre-split recipe. Scoring can reuse the saved filters.
+# Custom factories live in src/features/pre_split.py.
+version: 1
+recipes:
+  default: []
+  none: []
+
+# Examples to add to a selected list; use your actual column names:
+# - name: known_target
+#   transformer: DropMissingRows
+#   params: {subset: [target], how: any}
+# A target-reading filter requires skip_target_pre_split_steps: true in config/scoring.yml.

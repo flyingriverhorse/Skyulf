@@ -38,6 +38,7 @@ _SETTINGS_FIELDS = _SPEC_FIELDS | {
     "registry_uri",
     "sql_function",
     "permissions",
+    "function_permissions",
     "verification",
 }
 _BINDINGS = ("catalog", "input_schema", "output_schema", "metadata_schema", "resource_suffix")
@@ -164,8 +165,13 @@ def _validate_settings(settings: dict[str, Any]) -> None:
     ):
         raise ValueError("verification.sample_rows must be an integer from 1 to 1000.")
     settings["verification"] = verification
-    settings["permissions"] = target_permissions(
-        settings.get("permissions", []), settings["ownership"]["target"]
+    target = settings["ownership"]["target"]
+    settings["permissions"] = target_permissions(settings.get("permissions", []), target)
+    # Omitted: the endpoint callers also get the SQL function's EXECUTE grant.
+    settings["function_permissions"] = (
+        target_permissions(settings["function_permissions"], target)
+        if "function_permissions" in settings
+        else settings["permissions"]
     )
     settings["tags"] = validate_serving_tags(settings.get("tags"))
     _spec(settings, "1")
@@ -467,6 +473,7 @@ def run_serving_endpoint(
         client,
         plan,
         principals=settings["permissions"],
+        function_principals=settings["function_permissions"],
         function_name=None if function is None else function.function_name,
     )
     rest = query_named_records(client, plan, records)

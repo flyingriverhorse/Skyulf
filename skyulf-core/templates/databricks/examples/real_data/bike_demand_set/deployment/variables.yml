@@ -1,5 +1,5 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
-# Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+# Override scalar values with BUNDLE_VAR_<name> or --var; see GUIDE.md#deployment-and-schedules.
 variables:
   pipeline_owner:
     description: User with CAN_MANAGE on every target besides the deployer; CI may pass --var pipeline_owner
@@ -22,6 +22,9 @@ variables:
   monitoring_budget_policy_id:
     description: Optional existing monitoring serverless budget policy; blank uses workspace defaults
     default: ""
+  features_start_training:
+    description: "true starts the train job after the optional features job merges, so one scheduled features job drives features, training and the training's score handoff"
+    default: "false"
   on_drift:
     description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
     default: "disabled"
@@ -112,18 +115,6 @@ variables:
   score_min_retry_interval_millis:
     description: Minimum delay between score attempts when retries are enabled
     default: 60000
-  train_health_rules:
-    description: Optional RUN_DURATION_SECONDS warning rules for train
-    type: complex
-    default: []
-  score_health_rules:
-    description: Optional RUN_DURATION_SECONDS warning rules for score
-    type: complex
-    default: []
-  monitoring_health_rules:
-    description: Optional RUN_DURATION_SECONDS warning rules for monitoring
-    type: complex
-    default: []
   monitoring_email_notifications:
     description: Optional monitoring job email events; measured drift needs a separate SQL alert
     type: complex

@@ -1,7 +1,7 @@
 -- EDIT BEFORE EXECUTION: replace {catalog}, {input_schema}, and TYPE_FOR_*.
 -- Types must match your real data. Skyulf never guesses them from column names.
 -- Use CREATE TABLE without IF NOT EXISTS so an incompatible existing table fails.
--- Review existing tables instead of overwriting them; see SOURCES.md.
+-- Review existing tables instead of overwriting them; see GUIDE.md#source-data.
 -- Add any extra lookup, weight or custom pre-split inputs configured after initialization.
 {{- $source := .source_table_name -}}{{- if not $source -}}{{- $source = printf "%s_source" .project_name -}}{{- end -}}
 {{- $features := .record_key_columns -}}{{- $targets := "" -}}{{- $events := "" -}}

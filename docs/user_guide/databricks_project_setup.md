@@ -16,7 +16,7 @@ Six NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
 | One model, scored on Spark workers | `taxi_fare` | Promotes automatically and scores after promotion |
 | REST/SQL serving and monitoring without batch output | [taxi_fare_endpoint](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint) | Automatic endpoint after promotion, `ai_query` and captured-request monitoring; no score job or prediction table |
 | Preprocessing exclusions with Spark and raw-input serving | `taxi_fare_robust` | Reuses pre-split preparation; IQR, PowerTransformer and imputer handling; REST/`ai_query` examples and labels for monitoring |
-| One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; no batch scoring |
+| One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; batch scoring runs on its own, not after approval |
 | One target, several candidate algorithms | `taxi_high_fare` | Competition with custom steps and manual approval |
 | Several targets approved together | `taxi_trips` | Model set with a combined scoring rule |
 
@@ -40,6 +40,11 @@ exclusion, Yeo-Johnson, imputation, encoding), combined scoring rules, SHAP,
 evaluation charts and monitoring on a later season with real drift and a
 report-only WAPE policy. `diagnostic_single` and `bike_demand_set` add serving
 endpoints and a model set.
+
+[`examples/lakeflow`](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/lakeflow)
+trains from a Lakeflow streaming table: the features job copies and pins it, and
+a `base_transform` derives the target and a text date key, so no separate
+preparation job is needed.
 
 Then swap the taxi tables, columns and recipes for your own. The examples README
 owns the complete steps, approval and serving. Not sure which shape fits? See
@@ -101,9 +106,9 @@ model entry if you intend to approve the first candidate; see the worked run.
 Built-in steps and their full parameter cards are in the
 [Preprocessing YAML catalog](preprocessing_recipes.md). For every accepted
 training field, its default and complete examples of all three layouts, use the
-[training configuration reference](databricks_training_config.md). Generated
-`START_HERE.md`, `PREPROCESSING.md`, `SERVING.md` and deployment/monitoring
-READMEs travel with the project and document its template revision.
+[training configuration reference](databricks_training_config.md). The generated
+`README.md` (first run) and `GUIDE.md` (reference) travel with the project and
+document its template revision.
 
 ### What a configuration change requires
 
@@ -194,6 +199,29 @@ Initialize a project from a Skyulf checkout:
 databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
+Rendering is local, but the CLI still loads a profile first, so an expired login
+fails init with errors such as "refresh token is invalid". To initialize without
+credentials, hide the config file and pass a placeholder token. Use your
+workspace URL as the host; init only reads its public metadata:
+
+```powershell
+$env:DATABRICKS_CONFIG_FILE = "NUL"
+$env:DATABRICKS_HOST = "https://<your-workspace-host>"
+$env:DATABRICKS_TOKEN = "placeholder"
+databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
+Remove-Item Env:DATABRICKS_CONFIG_FILE, Env:DATABRICKS_HOST, Env:DATABRICKS_TOKEN
+```
+
+```bash
+DATABRICKS_CONFIG_FILE=/dev/null DATABRICKS_HOST=https://<your-workspace-host> \
+  DATABRICKS_TOKEN=placeholder \
+  databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
+```
+
+Answer files can also prefill `catalog` and `schema` (the test input schema),
+plus `output_schema` and `metadata_schema` when outputs or registered models live
+in other schemas. Blank values reuse `schema`.
+
 ### Guided setup and offline preview
 
 Setup follows your answers; it does not inspect source tables or sample rows.
@@ -204,14 +232,17 @@ policy-cluster details likewise appear only when selected.
 
 `setup_mode` chooses how much to answer now. The default, `quick`, asks for the
 training layout, project name, task, source arrangement, record keys and target/input columns,
-and for the monitoring destination. It also asks for optional outcome-table and
-availability-column names. `separate_all` asks for a distinct scoring source.
+and for the monitoring destination. It asks for the outcome-table and
+availability-column names only when something reads them: a separate source
+layout, or monitoring turned on. A `single_table` project without monitoring skips
+both; set them later in `deployment/variables.yml` when you enable monitoring.
+`separate_all` asks for a distinct scoring source.
 Both modes ask `include_source_sql`, default `false`: keep it off when your tables
 already exist and use `preview.py --action sources` to check them. Choose `true`
 only if you need an editable CREATE TABLE starter for tables that do not exist
 yet. In a JSON answer file this is `"include_source_sql": "true"` (a string).
 The starter is `config/sources.sql`; replace its namespace and type placeholders
-before running it yourself. Setup and deployment never execute it. `SOURCES.md`
+before running it yourself. Setup and deployment never execute it. **Source data** in `GUIDE.md`
 and the read-only source check remain available with either choice.
 A model set asks for the task and columns of
 each active branch. It accepts documented defaults for the remaining settings.
@@ -230,9 +261,9 @@ Both setup modes ask the monitoring questions after the deployment questions:
 | --- | --- | --- |
 | `monitoring` | `true` or `false` | `monitoring_enabled`; `monitoring_catalog` defaults to each target's `catalog` (`deployment/variables.yml`) |
 | `monitoring_schema` | Shared schema; omitted or blank uses `skyulf_monitoring` | `monitoring_schema` in `deployment/variables.yml` |
-| `development_monitoring` (with personal development targets) | `true` or `false` | Development targets monitor into their own schema (`deployment/monitoring.yml`) |
+| `development_monitoring` (with personal development targets) | `true` or `false` | Development targets monitor into their own schema (`deployment/targets.yml`) |
 | `development_monitoring_schema` | Any schema except the shared one | `development_monitoring_schema` in `deployment/variables.yml` |
-| `monitoring_dashboard` | `none`, `create` or `connect` | The `test` dashboard block in `deployment/monitoring.yml` |
+| `monitoring_dashboard` | `none`, `create` or `connect` | The `test` dashboard block in `deployment/targets.yml` |
 
 Give every project the same schema, reserved for monitoring (for example
 `skyulf_monitoring`), not the project's own schema: all models then appear in one
@@ -247,7 +278,7 @@ enroll models and run monitoring. `monitoring: "false"` sets it to `"false"`:
 train and score run without monitoring. A user-selected schema is preserved,
 including an existing store. To use a central catalog instead of each target's
 own, set `monitoring_catalog` in `deployment/variables.yml` or per target in
-`deployment/monitoring.yml`. The schema is created
+`deployment/targets.yml`. The schema is created
 on first use if the run-as identity may
 create schemas. Personal development targets set `monitoring_enabled` to
 `"false"` unless `development_monitoring` is `"true"`; then they monitor into
@@ -280,6 +311,8 @@ running preview:
 | `min_improvement` | `0.0` |
 | `risk_category` | Empty: the key is omitted from `config/training.yml` |
 | `catalog`, `schema` | `REPLACE_TEST_CATALOG`, `REPLACE_TEST_SCHEMA`; prefill the `test` bindings in `deployment/variables.yml` and the preview/smoke defaults |
+| `output_schema`, `metadata_schema` | Blank: reuse `schema` for the `test` output and model bindings and the preview/smoke defaults |
+| `include_examples` | `true`. `false` leaves out the `example_*` recipes, the example `src/features/preprocessing.py`, `pre_split.py` and `scoring.py` callbacks, `src/features/groups/*.py` and their commented references; create those files when you add your own steps |
 
 Quick setup also skips the settings below. Detailed setup asks them when they
 apply to the chosen layout and earlier answers:
@@ -437,7 +470,7 @@ To move an existing project to this layout, follow
 
 ### Local tools and preview
 
-The generated `src/tools/README.md` is the short reference beside the scripts.
+**Local tools** in the generated `GUIDE.md` is the short reference beside the scripts.
 Run commands from the project root with the matching Core package installed:
 
 ```powershell

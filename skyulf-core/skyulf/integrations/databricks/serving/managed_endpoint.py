@@ -101,6 +101,26 @@ def _require_route(config: dict[str, Any], entity_name: str) -> None:
         raise ValueError("Owned serving endpoint requires one 100 percent traffic route.")
 
 
+def _existing_entity(
+    endpoint: dict[str, Any], plan: PinnedEndpointPlan
+) -> tuple[dict[str, Any], str | None]:
+    """Return the owned served entity and its version, or the create name after a failed start."""
+    if _failed_before_serving(endpoint):
+        # The first deploy failed: nothing is served yet, so retry under the create name.
+        if endpoint.get("pending_config"):
+            _require_owned_model_config({**endpoint, "config": endpoint["pending_config"]}, plan)
+        return {"name": plan.spec.endpoint_name}, None
+    entity = _require_owned_config(endpoint, plan)
+    return entity, replace(plan.spec, model_version=entity.get("entity_version")).model_version
+
+
+def _failed_before_serving(endpoint: dict[str, Any]) -> bool:
+    """Return True for an endpoint whose first config update failed before any entity served."""
+    update = (endpoint.get("state") or {}).get("config_update")
+    served = (endpoint.get("config") or {}).get("served_entities")
+    return update in _FAILED_UPDATES and not served
+
+
 def _require_owned_config(endpoint: dict[str, Any], plan: PinnedEndpointPlan) -> dict[str, Any]:
     """Reject pending work, foreign models and runtime settings before replacing config."""
     update = (endpoint.get("state") or {}).get("config_update")
@@ -216,6 +236,8 @@ def ensure_owned_endpoint(
 
     Creation includes ownership tags atomically. Existing foreign names, pending
     updates, multiple entities, routing and logging conflicts fail before writes.
+    An owned endpoint whose first deployment failed (nothing served, and any pending
+    config is for this model) is retried in place instead of requiring a manual delete.
     The caller owns concurrency between separate deployments of the same target.
     """
     from databricks.sdk.errors import NotFound  # noqa: PLC0415
@@ -232,9 +254,7 @@ def ensure_owned_endpoint(
         action, previous = "created", None
     else:
         _require_owner(endpoint, owner)
-        entity = _require_owned_config(endpoint, plan)
-        prior_spec = replace(plan.spec, model_version=entity.get("entity_version"))
-        previous = prior_spec.model_version
+        entity, previous = _existing_entity(endpoint, plan)
         wanted = _named_plan(plan, entity["name"], owner | extra_tags)
         desired = wanted.config["config"]["served_entities"][0]
         tags_updated = _reconcile_tags(client, endpoint, extra_tags)
@@ -354,26 +374,34 @@ def grant_serving_access(
     *,
     principals: Any,
     function_name: str | None = None,
+    function_principals: Any = None,
 ) -> None:
-    """Add endpoint CAN_QUERY and optional SQL EXECUTE without replacing or revoking ACLs."""
+    """Add endpoint CAN_QUERY and optional SQL EXECUTE without replacing or revoking ACLs.
+
+    ``function_principals`` receive the UC EXECUTE grant; None reuses ``principals``.
+    Keep them separate when an endpoint caller, such as a workspace-local group, is not
+    a Unity Catalog principal.
+    """
     from databricks.sdk.service import serving  # noqa: PLC0415
 
     entries = validate_serving_principals(principals)
+    grantees = (
+        entries if function_principals is None else validate_serving_principals(function_principals)
+    )
     function = (
         build_serving_sql_function(plan, function_name) if function_name is not None else None
     )
-    if not entries:
-        return
-    endpoint = _dictionary(client.serving_endpoints.get(plan.spec.endpoint_name))
-    if not endpoint.get("id"):
-        raise ValueError("Serving endpoint readback requires its ID for additive grants.")
-    acl = [
-        serving.ServingEndpointAccessControlRequest.from_dict(_sdk_permission(entry))
-        for entry in entries
-    ]
-    client.serving_endpoints.update_permissions(endpoint["id"], access_control_list=acl)
+    if entries:
+        endpoint = _dictionary(client.serving_endpoints.get(plan.spec.endpoint_name))
+        if not endpoint.get("id"):
+            raise ValueError("Serving endpoint readback requires its ID for additive grants.")
+        acl = [
+            serving.ServingEndpointAccessControlRequest.from_dict(_sdk_permission(entry))
+            for entry in entries
+        ]
+        client.serving_endpoints.update_permissions(endpoint["id"], access_control_list=acl)
     if function is not None:
-        for entry in entries:
+        for entry in grantees:
             name = next(value for key, value in entry.items() if key != "level")
             principal = "`" + name.replace("`", "``") + "`"
             spark.sql(f"GRANT EXECUTE ON FUNCTION {function.quoted_name} TO {principal}").collect()

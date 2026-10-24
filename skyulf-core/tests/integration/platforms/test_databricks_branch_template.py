@@ -37,13 +37,8 @@ def test_bundle_requirement_matches_core_release_version():
     )
     assert "artifacts" not in bundle
     assert f"Skyulf {version} Bundle:" in (TEMPLATE / "README.md.tmpl").read_text()
-    for guide in (
-        "README.md.tmpl",
-        "START_HERE.md.tmpl",
-        "deployment/README.md.tmpl",
-        "SERVING.md",
-    ):
-        assert f"skyulf-core[mlflow]=={version}" in (TEMPLATE / guide).read_text(encoding="utf-8")
+    readme = (TEMPLATE / "README.md.tmpl").read_text(encoding="utf-8")
+    assert f"skyulf-core[mlflow]=={version}" in readme
 
 
 def _project(tmp_path, workflow_config):

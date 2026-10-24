@@ -14,9 +14,7 @@ from skyulf.integrations.databricks.projects.yaml_config import (
 
 ROOT = Path(__file__).resolve().parents[4]
 REFERENCE = ROOT / "docs/user_guide/databricks_training_config.md"
-PROJECT_GUIDE = (
-    ROOT / "skyulf-core/templates/databricks/template/{{.project_name}}/TRAINING.md.tmpl"
-)
+PROJECT_GUIDE = ROOT / "skyulf-core/templates/databricks/template/{{.project_name}}/GUIDE.md.tmpl"
 
 
 def _reference(path: Path) -> str:

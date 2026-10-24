@@ -3,14 +3,17 @@
 import hashlib
 import importlib
 import json
-import pickle
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Any
 
 import pandas as pd
 
-from skyulf.integrations.databricks.shared._frames import frame_bytes, output_scalar
+from skyulf.integrations.databricks.shared._frames import (  # noqa: F401 - bounded_frame re-export
+    bounded_frame,
+    frame_bytes,
+    output_scalar,
+)
 
 from .....inference.fitted_pipeline import FittedPipelineArtifact
 from .....inference.pipeline_scoring import scoring_counts
@@ -127,52 +130,6 @@ def _validate_prepared(
     if any(name in {"_change_type", "_commit_version", "_commit_timestamp"} for name in inputs):
         raise ValueError("Model inputs collide with Delta change metadata.")
     return feature_source_columns(artifact)
-
-
-def bounded_frame(
-    selected: Any,
-    columns: tuple[str, ...],
-    record_key_columns: tuple[str, ...],
-    max_rows: int,
-    max_bytes: int,
-    *,
-    require_unique_keys: bool = True,
-) -> pd.DataFrame:
-    """Read bounded rows, optionally deferring key uniqueness until label eligibility.
-
-    Features and predictions require unique keys by default. Label readers can
-    defer that check until future revisions are excluded; null keys and transfer
-    limits remain invalid in either mode.
-    """
-    from skyulf.engines.spark_engine import (  # noqa: PLC0415
-        normalize_spark_decimals,
-        restore_spark_decimal_dtypes,
-    )
-
-    selected = selected.select(*columns).orderBy(*record_key_columns).limit(max_rows + 1)
-    selected, conversions = normalize_spark_decimals(
-        selected, columns=set(columns).difference(record_key_columns)
-    )
-    records: list[dict[str, Any]] = []
-    decoded_bytes = 0
-    for row in selected.toLocalIterator():
-        if len(records) == max_rows:
-            raise ValueError("Source increment exceeds max_rows.")
-        record = row.asDict(recursive=True)
-        decoded_bytes += len(pickle.dumps(record, protocol=pickle.HIGHEST_PROTOCOL))
-        if decoded_bytes > max_bytes:
-            raise ValueError("Source increment exceeds max_bytes.")
-        records.append(record)
-    frame = restore_spark_decimal_dtypes(
-        pd.DataFrame.from_records(records, columns=columns), conversions
-    )
-    if frame_bytes(frame) > max_bytes:
-        raise ValueError("Source local frame exceeds max_bytes.")
-    if frame.loc[:, list(record_key_columns)].isna().any().any():
-        raise ValueError("Source row keys must not be null.")
-    if require_unique_keys and frame.duplicated(subset=list(record_key_columns)).any():
-        raise ValueError("Source row keys must be globally unique within this increment.")
-    return frame
 
 
 def run_incremental_batch(

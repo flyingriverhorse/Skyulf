@@ -24,15 +24,21 @@ def test_monitoring_notifications_resolve_in_real_bundle(tmp_path, offline_works
     settings = {
         "email_notifications": {"on_failure": ["operator@example.invalid"]},
         "webhook_notifications": {"on_failure": [{"id": "test-destination"}]},
-        "health_rules": [{"metric": "RUN_DURATION_SECONDS", "op": "GREATER_THAN", "value": 1800}],
     }
     for name, value in settings.items():
         document["variables"][f"monitoring_{name}"]["default"] = value
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    rules = [{"metric": "RUN_DURATION_SECONDS", "op": "GREATER_THAN", "value": 1800}]
+    targets_path = project / "deployment/targets.yml"
+    targets = yaml.safe_load(targets_path.read_text())
+    jobs = targets["targets"]["test"].setdefault("resources", {}).setdefault("jobs", {})
+    jobs["monitoring"] = jobs.get("monitoring") or {}  # an empty YAML job key loads as None
+    jobs["monitoring"]["health"] = {"rules": rules}
+    targets_path.write_text(yaml.safe_dump(targets, sort_keys=False), encoding="utf-8")
     job = _resolve(project, "test", offline_workspace)["resources"]["jobs"]["monitoring"]
     assert job["email_notifications"] == settings["email_notifications"]
     assert job["webhook_notifications"] == settings["webhook_notifications"]
-    assert job["health"]["rules"] == settings["health_rules"]
+    assert job["health"]["rules"] == rules
 
 
 def test_reference_cleanup_is_manual_and_dry_run_by_default(tmp_path):

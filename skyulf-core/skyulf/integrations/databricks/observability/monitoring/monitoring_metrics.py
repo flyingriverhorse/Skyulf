@@ -210,6 +210,7 @@ def _feature_quality(
     missing = sum(_is_missing(value, numeric) for value in values)
     nonfinite = sum(numeric and _not_finite_number(value) for value in values)
     baseline = _reference_missing_fraction(reference, column)
+    baseline_total = 0 if reference is None else len(reference)
     return [
         monitoring_metric(
             "quality",
@@ -217,7 +218,9 @@ def _feature_quality(
             "missing_fraction",
             missing / len(values),
             baseline,
-            issue=_missingness_increased(missing, len(values), reference, column),
+            issue=missing_increase(
+                missing, len(values), round(baseline * baseline_total), baseline_total
+            ),
         ),
         monitoring_metric(
             "quality",
@@ -229,24 +232,20 @@ def _feature_quality(
     ]
 
 
-def _missingness_increased(
-    missing: int, total: int, reference: pl.DataFrame | None, column: str
-) -> bool:
+def missing_increase(missing: int, total: int, baseline_missing: int, baseline_total: int) -> bool:
     """Test a one-sided increase at 1%; previously absent missingness remains an issue.
 
+    Shared by local and Spark monitoring so both apply one rule to exact counts.
     Fisher's exact test accounts for the sizes of both independent samples.
     Successful saved predictions are still required separately for missing rows.
     """
-    baseline = _reference_missing_fraction(reference, column)
+    baseline = baseline_missing / baseline_total if baseline_total else 0.0
     if missing / total <= baseline:
         return False
-    if baseline == 0 or reference is None:
+    if baseline == 0:
         return True
-    observed = round(baseline * len(reference))
-    result = fisher_exact(
-        [[missing, total - missing], [observed, len(reference) - observed]], alternative="greater"
-    )
-    return bool(result.pvalue <= 0.01)
+    table = [[missing, total - missing], [baseline_missing, baseline_total - baseline_missing]]
+    return bool(fisher_exact(table, alternative="greater").pvalue <= 0.01)
 
 
 def _reference_missing_fraction(reference: pl.DataFrame | None, column: str) -> float:

@@ -22,7 +22,7 @@ flowchart TD
 A project reads data in up to three roles: training data, scoring input and
 actual outcomes. [Choose a table layout](databricks_training_data.md#choose-a-table-layout)
 explains the roles and the `single_table`, `separate_outcomes` and
-`separate_all` layouts. The generated `SOURCES.md` repeats the bindings for your
+`separate_all` layouts. **Source data** in the generated `GUIDE.md` repeats the bindings for your
 project.
 
 ## What to edit
@@ -60,7 +60,7 @@ Every table must satisfy this contract:
 
 Choose `include_source_sql: "true"` during quick or detailed setup (or add
 `"include_source_sql": "true"` to the JSON answer file) to generate the starter.
-The default is `"false"`; `SOURCES.md` and source checks remain available in
+The default is `"false"`; the `GUIDE.md` source section and source checks remain available in
 either case. If you already generated a project, render a separate folder with
 the option enabled and copy only the starter; do not overwrite your configuration.
 

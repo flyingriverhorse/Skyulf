@@ -1,6 +1,7 @@
 {
   "label_table_name": {
     "order": 7.2,
+    "skip_prompt_if": {"properties": {"source_layout": {"const": "single_table"}, "monitoring": {"const": "false"}}},
     "type": "string",
     "default": "",
     "description": "1. Data | Actual outcomes table for performance monitoring: short name in the input schema or catalog.schema.table. Blank disables label-based monitoring",
@@ -8,17 +9,18 @@
   },
   "label_available_at_column": {
     "order": 7.3,
+    "skip_prompt_if": {"properties": {"source_layout": {"const": "single_table"}, "monitoring": {"const": "false"}}},
     "type": "string",
     "default": "",
     "description": "1. Data | UTC timestamp column recording when the actual outcome became available; required with an outcomes table",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
   },
   "monitoring": {
-    "order": 749,
+    "order": 6.9,
     "type": "string",
     "default": "false",
     "enum": ["false", "true"],
-    "description": "6. Deployment | Monitor drift and performance? The monitoring store uses each environment's own catalog (override monitoring_catalog in deployment/variables.yml for a central catalog). false starts without monitoring; enable it later in deployment/variables.yml"
+    "description": "1. Data | Monitor drift and performance? The monitoring store uses each environment's own catalog (override monitoring_catalog in deployment/variables.yml for a central catalog). false starts without monitoring; enable it later in deployment/variables.yml"
   },
   "monitoring_schema": {
     "order": 750,

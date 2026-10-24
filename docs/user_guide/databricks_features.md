@@ -29,6 +29,28 @@ another workflow registers or publishes. Producing an ordinary Delta table does
 not declare UC primary keys, provision an online store, publish it, or deploy an
 endpoint. See [online features](databricks_online_features.md) for that workflow.
 
+### Ready training table (no feature groups)
+
+When an upstream pipeline already writes one regular Delta table with the target,
+the raw inputs and a record key, use it directly and leave `config/features.yml`
+disabled; no feature job is generated. Keep inputs raw (imputation and encoding
+are fitted by the model), and point both `training_table` and
+`score_source_table` at the table. Their placeholders vary the table per target:
+
+```yaml
+# config/training.yml
+defaults:
+  training_table: "{catalog}.{input_schema}.observations{resource_suffix}"
+  record_key_columns: [entity_id, observed_on]
+```
+
+A natural composite key works as long as every part is a non-null `STRING` or
+`BIGINT` and the parts are unique together. Store a date part as a string or
+integer when writing the table, for example
+`date_format(observed_on, 'yyyy-MM-dd') AS observed_on`. A separate
+`observation_id` is needed only when feature-group joins require the date as a
+`DATE` column while the model needs a string or integer key.
+
 Keep learned imputers, scalers, category statistics and selectors in
 [preprocessing.yml](preprocessing_recipes.md), where fitting occurs inside the
 training partition/fold. Use upstream groups for fixed formulas, domain
@@ -136,16 +158,31 @@ groups:
     allow_missing: false
 ```
 
-These table names are exact three-part names. Unlike training/inference table
-settings, this file does not expand `{catalog}` placeholders or add a deployment
-suffix. Choose separate names for each environment. Every output must differ
-from every input and other output, with one owning producer.
+Table names are three-part names and may use the same placeholders as
+`training.yml`: `{catalog}`, `{input_schema}`, `{output_schema}`,
+`{metadata_schema}` and `{resource_suffix}`. Quote such values in YAML. The
+feature job receives each target's values from the Bundle variables, so one file
+serves `test`, `syst`, `prod` and personal targets:
+
+```yaml
+base_table: "{catalog}.{input_schema}.company_observations"
+output_table: "{catalog}.{output_schema}.company_merged{resource_suffix}"
+```
+
+Add `{resource_suffix}` to outputs so personal targets do not overwrite each
+other. After adding placeholders to an existing project, run
+`refresh_feature_graph.py` and redeploy: older feature jobs pass no target values
+and fail with a message naming that fix. Every output must differ from every
+input and other output, with one owning producer.
 
 | Field | Type / default | What you configure |
 | --- | --- | --- |
 | `version` | Integer, required `1` | Feature configuration format. |
-| `groups` | Mapping, required; `{}` disables production | Up to 20 groups. Disabled configuration contains only version and groups. |
-| `base_table` | String, required when enabled | Existing observations and labels; no transform is applied to the base. |
+| `groups` | Mapping, required; `{}` disables production unless `base_transform` is set | Up to 20 groups. Disabled configuration contains only version and groups. |
+| `base_table` | String, required when enabled | Existing observations and labels, used as they are unless `base_transform` is set. |
+| `base_transform` | Optional `src/features/groups/module.py:function` | Runs on the pinned base before the joins and may derive the target and record keys; see [Derive labels and keys](#derive-labels-and-keys-with-base_transform). |
+| `source_snapshot` | `materialize` default, or `fail` | Sources without Delta history (streaming tables, materialized views, views) are copied each run into an owned Delta snapshot that is pinned instead; `fail` stops with a message. |
+| `source_snapshot_schema` | Optional `catalog.schema`; default: the `output_table` schema | Where `skyulf_src_<hash>` snapshot tables are written. |
 | `output_table` | String, required when enabled | Destination for the merged base and features. |
 | `keys` | Nonempty distinct string list | Entity keys used by every group join. |
 | `timestamp` | String, required when enabled | A separate date/timestamp column, already typed consistently across inputs. |
@@ -155,6 +192,84 @@ from every input and other output, with one owning producer.
 | `columns` | Required nonempty distinct string list | Features only; exclude keys, timestamp and labels. |
 | `lookup` | `exact` default, or `asof` | Exact matches key and time; asof selects the latest feature time at or before the base time. |
 | `allow_missing` | Boolean, default `false` | Permit unmatched observations with null features, or fail the merge. |
+
+### Lakeflow streaming tables and materialized views as sources
+
+Feature inputs are pinned to a Delta version so every task of a run, and any later
+repair, reads the same rows. Streaming tables, materialized views and views have no
+history to pin (Databricks also refuses `DESCRIBE HISTORY` on them from dedicated
+compute). The feature job therefore copies each such source once per run, with a
+plain read, into an owned Delta table `skyulf_src_<hash>` and pins that copy. No
+setting is needed:
+
+```yaml
+version: 1
+base_table: "workspace.bronze.observations_st"   # a streaming table: copied and pinned
+base_transform: src/features/groups/base.py:prepare  # only if the target or key must be derived
+output_table: "workspace.silver.observations"
+keys: [entity_id, observed_on]
+timestamp: observed_date
+groups: {}
+```
+
+The copy costs a full scan per run; regular Delta tables are never copied. After
+`merge_features` publishes the output, the job drops its copies. If the run fails
+they are kept, so repairing the failed task reads the same rows; the next run
+replaces them. A table with the snapshot name that Skyulf did not create is never
+replaced or dropped. `source_snapshot_schema: catalog.schema` chooses where the
+copies go (default: the output schema); `source_snapshot: fail` turns copying off.
+
+The prepared [`lakeflow/bronze_observations`](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/lakeflow)
+example runs this end to end, with a `setup.sql` that creates the streaming table.
+
+Train from `output_table`, a regular Delta table. To score, `ai_query` and the
+serving SQL function can read the streaming table itself, and REST callers send
+rows; only the batch `score` job needs a regular table with Change Data Feed, such
+as `output_table`. Training directly from a streaming table stops with a message.
+
+### Derive labels and keys with base_transform
+
+When the raw source has no ready target or record key, for example a birth date
+instead of an age, or a `DATE` that the model cannot use as a key, add one
+project function instead of a separate preparation job:
+
+```yaml
+version: 1
+base_table: "workspace.demo.raw_observations"
+base_transform: src/features/groups/base.py:prepare
+output_table: "workspace.demo.observations"
+keys: [entity_id, observed_on]   # observed_on: a yyyy-MM-dd string made by prepare()
+timestamp: observed_date         # stays DATE for the feature grain and group joins
+groups: {}                       # optional; groups still join on keys + timestamp
+```
+
+```python
+# src/features/groups/base.py
+from pyspark.sql import functions as F
+
+
+def prepare(frame):
+    """Derive the target and a string date key from the pinned raw rows."""
+    return frame.select(
+        F.col("entity_id").cast("string").alias("entity_id"),
+        F.date_format("observed_date", "yyyy-MM-dd").alias("observed_on"),
+        "observed_date",
+        F.round(F.months_between("observed_date", "birth_date") / 12, 2).alias("age"),
+        "region_code",
+        "employee_count",
+    )
+```
+
+The job pins the base version and the function's code at `initialize_features`,
+runs `prepare()` in `merge_features`, checks that keys plus timestamp are non-null
+and unique, and publishes `output_table`. With no groups the job has only these
+two tasks. Point `training_table` at `output_table` and use
+`record_key_columns: [entity_id, observed_on]`. Keep `prepare()` free of learned
+statistics (means, encodings); those belong in `preprocessing.yml`. Run
+`python src/tools/refresh_feature_graph.py` after enabling it. Adding or removing
+a column in `prepare()` changes the output schema, which the job refuses to
+migrate silently ("Feature table schema differs"); drop or migrate
+`output_table` deliberately, then rerun the job.
 
 An asof match has no built-in maximum age in this group-merge implementation.
 Use explicit source rules when old feature values must expire. A matching row
@@ -228,7 +343,12 @@ databricks bundle run features -t test --profile YOUR_PROFILE
 
 Replace `YOUR_PROFILE` with your configured profile. Refresh is local: it reads
 and validates `config/features.yml`, then creates `resources/features.job.yml`
-and its thin notebook. Smoke does not read `config/features.yml`; it checks the
+and its thin notebook. That file defines no `targets:`. When the train job has a
+per-target `run_as` or `permissions` in `deployment/targets.yml`, refresh prints the
+matching `features` entries to merge into the same targets, and smoke fails until
+they are there (or, after feature groups are turned off, until leftover `features`
+entries are removed, because Bundle would otherwise create an empty job).
+Smoke does not read `config/features.yml`; it checks the
 training configuration and the Python syntax of `src/`, including the group
 modules. Neither reads Delta data or executes Spark transformations.
 Refresh after changing feature configuration or inherited deployment controls,
@@ -303,6 +423,14 @@ prediction_table: "{catalog}.{output_schema}.company_predictions{resource_suffix
 
 Once there are enough representative rows for the configured split/CV, run the
 normal training workflow and approve/select a saved version before scoring.
+
+To run everything from one schedule, set `features_start_training: "true"` for
+the target in `deployment/targets.yml` (variable default `"false"`) and schedule
+only the features job. After `merge_features` succeeds, its `start_training`
+task runs the train job, whose usual handoff starts scoring after an alias
+change; scoring then starts monitoring. A pinned scorer is not started by
+training, so keep its own schedule. Run `refresh_feature_graph.py` once so an
+existing feature job gains the two tasks.
 For independent-target layouts, check model-level input/target overrides as
 well as defaults. The merged table may contain labels; labels are not model
 inputs. A separate unlabeled observation/merge table can be the scoring source.

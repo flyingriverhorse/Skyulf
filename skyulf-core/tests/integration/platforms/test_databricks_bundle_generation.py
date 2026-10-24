@@ -214,18 +214,13 @@ def test_optional_runtime_pins_are_unique_across_selected_models(tmp_path, layou
 def _read_bundle(project):
     """Read the root and deployment includes without emulating CLI variable resolution.
 
-    deployment/monitoring.yml repeats target keys; its target variables are merged
-    into targets.yml's, as the CLI merges them (its dashboard resources are not).
+    Every target is defined in deployment/targets.yml only.
     """
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     for name in ("variables", "targets"):
         path = project / "deployment" / f"{name}.yml"
         if path.is_file():
             bundle.update(yaml.safe_load(path.read_text()))
-    monitoring = project / "deployment/monitoring.yml"
-    if monitoring.is_file():
-        for name, target in (yaml.safe_load(monitoring.read_text())["targets"] or {}).items():
-            bundle["targets"][name].setdefault("variables", {}).update(target.get("variables", {}))
     return bundle
 
 
@@ -344,6 +339,30 @@ def test_deployment_defaults_are_ci_independent(tmp_path):
         assert "resources" not in target  # Identity/ACL ownership remains external by default.
 
 
+@pytest.mark.parametrize(
+    ("answers", "pinned_first", "monitoring"),
+    [
+        ({}, True, False),
+        ({"monitoring": "true"}, True, True),
+        ({"score_model_selection": "champion"}, False, False),
+        ({"promotion_policy": "automatic"}, False, False),
+        ({"score_follow_champion": "true"}, True, False),
+    ],
+)
+def test_first_run_guide_follows_the_selected_scoring_policy(
+    tmp_path, answers, pinned_first, monitoring
+):
+    """A pinned first score must not send the user through an approval it does not need."""
+    guide = (_generate_project(tmp_path, **answers) / "README.md").read_text(encoding="utf-8")
+    follows = answers.get("score_follow_champion") == "true"
+    assert ("starts a score run by itself" in guide) is follows
+    assert ("score --params score_model_version=N" in guide) is pinned_first
+    assert ("Approve later (optional)" in guide) is pinned_first
+    assert ("5. **Approve.**" in guide) is not pinned_first
+    assert ("monitoring_report" in guide) is monitoring
+    assert "{{" not in guide
+
+
 def test_owner_and_view_groups_follow_setup_answers(tmp_path):
     """Shared targets add only the answered read group; personal targets stay manager-only."""
     project = _generate_project(
@@ -381,6 +400,30 @@ def test_catalog_and_schema_generate_without_questions(tmp_path, prefill):
         assert bundle["variables"][f"test_{key}"]["default"] == expected_schema
         assert bundle["targets"]["test"]["variables"][key] == f"${{var.test_{key}}}"
     assert bundle["targets"]["test"]["variables"]["catalog"] == "${var.test_catalog}"
+
+
+def test_output_and_metadata_schemas_can_differ_from_input(tmp_path):
+    """Local tools must not resolve outputs and models in the input schema when they differ."""
+    project = _generate_project(
+        tmp_path,
+        schema="bronze",
+        output_schema="gold",
+        metadata_schema="models",
+        prediction_delivery="both",
+        include_online_feature_lookup="true",
+    )
+    variables = _read_bundle(project)["variables"]
+    assert variables["test_input_schema"]["default"] == "bronze"
+    assert variables["test_output_schema"]["default"] == "gold"
+    assert variables["test_metadata_schema"]["default"] == "models"
+    for tool in ("preview", "smoke"):
+        text = (project / f"src/tools/{tool}.py").read_text(encoding="utf-8")
+        assert '"--input-schema", default="bronze"' in text
+        assert '"--output-schema", default="gold"' in text
+        assert '"--metadata-schema", default="models"' in text
+    serving = yaml.safe_load((project / "config/serving.yml").read_text(encoding="utf-8"))
+    # Same schema as the main endpoint's inference tables ({metadata_schema}).
+    assert serving["online_feature_lookup"]["endpoint"]["logging_schema"] == "models"
 
 
 @pytest.mark.parametrize(
@@ -429,9 +472,9 @@ def test_personal_targets_keep_outputs_and_identity_separate(tmp_path, identity)
         assert personal["variables"]["scoring_pause_status"] == "PAUSED"
         assert personal["variables"]["monitoring_pause_status"] == "PAUSED"
         assert personal["variables"]["monitoring_enabled"] == "false"
-        assert personal["resources"]["jobs"] == {
-            job: {"name": job} for job in ("train", "score", "monitoring")
-        }
+        # No short-name overrides: the development prefix keeps the project in job names.
+        assert "resources" not in personal
+        assert "name_prefix" not in personal.get("presets", {})
         assert "run_as" not in personal
         for job in ("train", "score", "monitoring"):
             resource = shared["resources"]["jobs"][job]
@@ -838,9 +881,7 @@ def test_cli_independent_schedules_preserve_shared_three_job_graph(
                 assert variables[f"{prefix}_{suffix}"]["default"] == expected
                 assert f"{prefix}_{suffix}" not in config
     tasks = {task["task_key"]: task for task in jobs["train"]["tasks"]}
-    guides = "\n".join(
-        (project / name).read_text(encoding="utf-8") for name in ("TRAINING.md", "SCORING.md")
-    )
+    guides = (project / "GUIDE.md").read_text(encoding="utf-8")
     public_guides = Path(__file__).resolve().parents[4] / "docs/user_guide"
     assert "databricks_training_reports.html" in guides
     assert "databricks_scoring.html" in guides

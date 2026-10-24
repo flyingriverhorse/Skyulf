@@ -1,0 +1,16 @@
+# Ordered model transformations, fitted on training rows after the split.
+# region_code is a nullable integer code, so it arrives as floats; Casting writes
+# 81.0 as "81" so the fixed one-hot categories match.
+version: 1
+recipes:
+  default:
+    - name: region_text
+      transformer: Casting
+      params: {column_types: {region_code: string}}
+    - name: region_onehot
+      transformer: OneHotEncoder
+      params: {columns: [region_code], categories: {region_code: ["12", "34", "81"]}, max_categories: null}
+    - name: impute_revenue
+      transformer: SimpleImputer
+      params: {columns: [revenue], strategy: mean}
+  none: []

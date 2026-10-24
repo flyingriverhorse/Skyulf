@@ -19,7 +19,7 @@ For a complete endpoint-only project, copy
 [taxi_fare_endpoint](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint).
 It uses the built-in NYC taxi data, automatically updates serving after champion
 promotion, and demonstrates SQL requests plus telemetry monitoring. Its
-[serving walkthrough](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint/SERVING.md)
+[serving walkthrough](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint/GUIDE.md#call-the-taxi-endpoint-and-monitor-its-requests)
 ends at the **Online serving** dashboard; no batch prediction table is created.
 
 ### Choose how predictions are produced
@@ -51,7 +51,7 @@ and models listed in [Spark scoring support](databricks_spark_scoring.md#what-sp
 Additional built-in models, voting/stacking and eligible preprocessing recipes
 need the training evidence described in
 [built-in recipes and model evidence](databricks_spark_scoring.md#built-in-recipes-and-model-evidence).
-Selecting the endpoint job enables `defaults.allow_tested_custom_steps: true`
+Selecting the endpoint job enables `defaults.probe_pipeline_for_serving: true`
 in `config/training.yml`. For an existing endpoint-only project, enable it before
 training. Spark and online-feature projects already enable it.
 `prepare_pinned_endpoint` recomputes the certificate from
@@ -178,6 +178,18 @@ serving_endpoint:
 
 The job adds endpoint `CAN_QUERY` and function `EXECUTE`. Callers also need
 `USE CATALOG` and `USE SCHEMA`, which the job does not grant.
+
+`permissions` get both grants by default. Unity Catalog rejects workspace-local
+groups such as `users` in `GRANT`, while the endpoint accepts them. In that case,
+list the UC grantees separately in `function_permissions` (same format, a list or
+a per-target mapping). An empty list grants no `EXECUTE`:
+
+```yaml
+  permissions:
+    - group_name: users          # endpoint CAN_QUERY only
+  function_permissions:
+    - group_name: risk_readers   # function EXECUTE
+```
 
 ```sql
 SELECT main.ml.risk_score(`amount` => s.`amount`) AS result
@@ -308,7 +320,29 @@ file. The endpoint job's existing dispatch tasks remain in place in either mode.
 - **Recovery:** a failed smoke can leave the new version serving. Rerun with
   `--params model_version=<previous_version>` from the deployment result or
   endpoint configuration history (failed runs may have no final summary).
-  Recovery is explicit and leaves champion unchanged.
+  Recovery is explicit and leaves champion unchanged. If the very first deploy
+  fails (`UPDATE_FAILED`, nothing served), the next run retries the same owned
+  endpoint; there is no need to delete it.
+- **Private package index:** Model Serving installs the model's own
+  requirements, not the job's `--index-url` lines. When public PyPI is blocked,
+  set environment variables on the job that logs the model; on policy clusters,
+  add `spark_env_vars` to the `job_cluster` variable in `deployment/variables.yml`:
+
+  ```yaml
+      spark_env_vars:
+        SKYULF_MODEL_PIP_INDEX_URL: https://<your-index>/simple
+        # Use this when the serving build cannot reach any index:
+        SKYULF_MODEL_PIP_BUNDLE_WHEELS: "true"
+  ```
+
+  `SKYULF_MODEL_PIP_INDEX_URL` and `SKYULF_MODEL_PIP_EXTRA_INDEX_URLS`
+  (space-separated) are written into the model's requirements; URLs with
+  credentials are rejected. `SKYULF_MODEL_PIP_BUNDLE_WHEELS: "true"` downloads
+  every dependency wheel for Linux x86_64 and the job's Python into the model
+  (`code/wheels`, at most 2 GiB) and installs with `--no-index`; the index
+  variables are then used only for that download. Only models trained after the
+  change are affected. Serverless jobs cannot set these variables; ask a workspace
+  admin to set the workspace default package repository instead.
 
 
 ## The command
@@ -548,6 +582,11 @@ For floating-point inputs, the wrapper represents SQL nulls as a same-width
 `NaN` before calling `ai_query`, so the saved preprocessing handles missing
 values. This prevents the numeric-null-to-zero behavior reproduced in native
 testing. It does not fill values with a new SQL-side mean or constant.
+Integer and boolean inputs that had no missing values in training have no
+nullable wire form, and `ai_query` would send their NULL as `0` or `false`. For
+them the wrapper raises an error naming the column instead, so the query stops
+rather than scoring a wrong value. Fill the column, or retrain with missing
+values present so it gets the nullable form.
 Use matching source types: SQL's argument coercion is not a data validation layer.
 
 `result` is the named per-row prediction struct, not the REST `predictions` array.

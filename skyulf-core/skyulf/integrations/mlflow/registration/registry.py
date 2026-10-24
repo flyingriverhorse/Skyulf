@@ -7,6 +7,7 @@ MLflow remains an optional dependency and is imported only when an operation is
 requested.
 """
 
+import logging
 import shutil
 import tempfile
 from collections.abc import Iterator
@@ -17,6 +18,8 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ....inference.bundle import InferenceBundle
@@ -115,7 +118,7 @@ def _artifact_uri(package_uri: str, relative: str) -> str:
 def _download_registered_entry(
     mlflow: Any,
     client: Any,
-    resolved: ResolvedModel,
+    identity: tuple[str, str],
     tracking_uri: str | None,
     uri: str,
     destination: Path,
@@ -131,33 +134,29 @@ def _download_registered_entry(
             )
         )
     except Exception as exc:  # noqa: BLE001 - artifact transport boundary
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+        raise translate_error(exc, name=identity[0], version=identity[1]) from exc
 
 
 def _registered_metadata(
     mlflow: Any,
     client: Any,
-    resolved: ResolvedModel,
+    identity: tuple[str, str],
     tracking_uri: str | None,
     root: Path,
 ) -> tuple[str, Any]:
-    """Read pinned MLmodel metadata with the existing typed registry failures."""
+    """Read pinned MLmodel metadata for (name, version) with typed registry failures."""
+    name, version = identity
     try:
-        package_uri = _registered_package_uri(client, resolved.name, resolved.version)
+        package_uri = _registered_package_uri(client, name, version)
     except Exception as exc:  # noqa: BLE001 - explicit OSS registry lookup boundary
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+        raise translate_error(exc, name=name, version=version) from exc
     metadata_path = _download_registered_entry(
-        mlflow,
-        client,
-        resolved,
-        tracking_uri,
-        _artifact_uri(package_uri, "MLmodel"),
-        root,
+        mlflow, client, identity, tracking_uri, _artifact_uri(package_uri, "MLmodel"), root
     )
     try:
         return package_uri, mlflow.models.Model.load(metadata_path)
     except Exception as exc:  # noqa: BLE001 - preserve metadata error translation
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+        raise translate_error(exc, name=name, version=version) from exc
 
 
 def _payload_metadata(model: Any, key: str, digest: str | None) -> dict[str, Any]:
@@ -192,11 +191,13 @@ def downloaded_registered_payload(
     """
     root = Path(tempfile.mkdtemp(prefix="skyulf-registry-payload-")).resolve()
     try:
-        package_uri, model = _registered_metadata(mlflow, client, resolved, tracking_uri, root)
+        package_uri, model = _registered_metadata(
+            mlflow, client, (resolved.name, resolved.version), tracking_uri, root
+        )
         _payload_metadata(model, key, resolved.digest)
         if "skyulf_feature_store" in (model.metadata or {}):
             local = _download_registered_entry(
-                mlflow, client, resolved, tracking_uri, package_uri, root
+                mlflow, client, (resolved.name, resolved.version), tracking_uri, package_uri, root
             )
             from ..models.feature_model import feature_package_models  # noqa: PLC0415
 
@@ -235,7 +236,7 @@ def _download_payload_directory(
         downloaded = _download_registered_entry(
             mlflow,
             client,
-            resolved,
+            (resolved.name, resolved.version),
             tracking_uri,
             _artifact_uri(package_uri, relative),
             download_root,
@@ -426,17 +427,10 @@ def resolve_model(
 
     concrete_version = str(model_version.version)
     model_uri = f"models:/{name}/{concrete_version}"
-    try:
-        package_uri = urlparse(_registered_package_uri(client, name, concrete_version))
-        metadata_uri = package_uri._replace(path=package_uri.path.rstrip("/") + "/MLmodel").geturl()
-        local_path = mlflow.artifacts.download_artifacts(
-            artifact_uri=metadata_uri,
-            tracking_uri=tracking_uri,
-            registry_uri=client._registry_uri,
+    with tempfile.TemporaryDirectory(prefix="skyulf-registry-metadata-") as root:
+        _, model = _registered_metadata(
+            mlflow, client, (name, concrete_version), tracking_uri, Path(root)
         )
-        model = mlflow.models.Model.load(Path(local_path))
-    except Exception as exc:  # noqa: BLE001 - artifact metadata is another registry boundary
-        raise translate_error(exc, name=name, version=concrete_version) from exc
     metadata = digest_metadata(model.metadata or {})
     digest = (
         metadata.get("bundle_digest")
@@ -478,9 +472,39 @@ def register_model(
             raise translate_error(exc, name=name, version="new") from exc
     try:
         options = {"tags": tags} if tags is not None else {}
-        return client.create_model_version(name=name, source=model_uri, run_id=run_id, **options)
+        created = client.create_model_version(name=name, source=model_uri, run_id=run_id, **options)
     except Exception as exc:  # noqa: BLE001 - translate MLflow's backend errors at the boundary
         raise translate_error(exc, name=name, version="new") from exc
+    _list_in_models_tab(client, model_uri, run_id, name, str(created.version))
+    return created
+
+
+def _list_in_models_tab(client: Any, model_uri: str, run_id: str, name: str, version: str) -> None:
+    """Add a metadata-only MLflow 3 LoggedModel so the experiment's Models tab lists the fit.
+
+    The run artifact stays the only model copy and the registry source; this entry holds
+    no files. It is presentation only, so a backend without LoggedModels never blocks
+    registration.
+    """
+    try:
+        run = client.get_run(run_id)
+        logged = client.create_logged_model(
+            experiment_id=run.info.experiment_id,
+            name=name.rsplit(".", 1)[-1],
+            source_run_id=run_id,
+            tags={
+                "skyulf.model_uri": model_uri,
+                "skyulf.registered_model": name,
+                "skyulf.registered_version": version,
+            },
+        )
+        for key, value in run.data.metrics.items():
+            client.log_metric(run_id, key, value, model_id=logged.model_id)
+        client.finalize_logged_model(logged.model_id, "READY")
+    except Exception as exc:  # noqa: BLE001 - listing is optional presentation
+        logger.warning(
+            "Model version %s v%s is not listed in the Models tab: %s", name, version, exc
+        )
 
 
 def _validate_reference(

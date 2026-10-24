@@ -34,6 +34,8 @@ _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 # Preview shows the public inference.yml spelling (see yaml_config.INFERENCE_OPTIONS).
 _PUBLIC_MODEL_CHANGE = {"incremental_append": "score_new_rows", "full_rebuild": "rescore_all"}
 WORKFLOW_FIELDS = {
+    "drop_missing_labels",
+    "keep_prediction_generations",
     "prediction_delivery",
     "initial_scoring",
     "preprocessing_probe",
@@ -455,6 +457,58 @@ def _preview_window(checked: dict[str, Any]) -> tuple[str, Any, Any]:
     return observation_window, holdout_start, result_cutoff
 
 
+def preview_summary(config: dict[str, Any], *, action: str = "score") -> str:
+    """Summarize one model's settled choices, missing decisions and unchecked facts.
+
+    A generated project's preview tool prints this before the detailed preview of a
+    single model or competition; model-set branches score the set champion instead.
+    """
+    checked = validate_workflow_config(config, action=action)
+    training_status = _training_status(checked)
+    threshold = checked.get("quality_threshold")
+    activation = (
+        f"{checked['promotion_policy']}, threshold {threshold}"
+        if threshold is not None
+        else f"{checked['promotion_policy']}; no quality_threshold, so a first champion "
+        "approval or automatic promotion needs one in config/training.yml before training"
+    )
+    if checked.get("prediction_delivery") == "endpoint":
+        scoring = "endpoint only; no batch score job"
+    elif checked.get("score_model_selection") == "champion":
+        scoring = "champion alias; approve or promote a version first"
+    else:
+        scoring = (
+            f"pinned version {checked.get('model_version')}; one score run can select "
+            "score_model_version=N without approval"
+        )
+    lines = [
+        "Summary:",
+        f"  Training settings: {training_status}",
+        f"  Final holdout: {checked.get('split_strategy', 'random')}",
+        f"  Activation: {activation}",
+        f"  Scoring: {scoring}",
+    ]
+    if checked.get("prediction_delivery") in {"endpoint", "both"}:
+        lines.append(
+            "  Serving: champion alias; serving_endpoint --params model_version=N serves one "
+            "registered version; its run output shows model_uri and REST/SQL verification"
+        )
+    lines.append(
+        "  Not checked: source data, permissions and workspace; next run "
+        "src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id ID"
+    )
+    return "\n".join(lines)
+
+
+def _training_status(checked: dict[str, Any]) -> str:
+    """Report whether training selection is complete without failing a scoring preview."""
+    try:
+        validate_workflow_config(checked, action="train")
+    except ValueError as exc:
+        return f"needs configuration: {exc}"
+    return "configured (source data and permissions not checked)"
+
+
 def _preview_training_source(checked: dict[str, Any], training_status: str) -> list[str]:
     """Describe source selection, resource bounds and the final holdout."""
     sample = checked.get("training_sample_rows")
@@ -628,6 +682,22 @@ def _append_search_cv_preview(lines: list[str], cv: CVSpec) -> None:
         )
 
 
+# Steps whose output can be wider than their input columns (counted by SHAP max_features).
+_EXPANDING_TRANSFORMERS = frozenset(
+    {
+        "OneHotEncoder",
+        "DummyEncoder",
+        "HashEncoder",
+        "PolynomialFeatures",
+        "FeatureInteraction",
+        "count_vectorizer",
+        "hashing_vectorizer",
+        "tfidf_vectorizer",
+        "sentence_embedder",
+    }
+)
+
+
 def _preview_explanations(pipeline: dict[str, Any]) -> list[str]:
     """Report the opted-in SHAP sample, feature and display budgets."""
     settings = pipeline.get("explainability")
@@ -636,10 +706,24 @@ def _preview_explanations(pipeline: dict[str, Any]) -> list[str]:
     samples = settings.get("max_samples", 100)
     features = settings.get("max_features", 30)
     display = settings.get("max_display_samples", min(10, samples))
-    return [
+    lines = [
         f"Explanations: SHAP, max_samples={samples}, max_features={features}, "
         f"max_display_samples={display}; computed from the fitted training artifact when available."
     ]
+    expanding = sorted(
+        {
+            step["transformer"]
+            for step in pipeline.get("preprocessing", [])
+            if step.get("transformer") in _EXPANDING_TRANSFORMERS
+        }
+    )
+    if expanding:
+        lines.append(
+            f"Explanations warning: {', '.join(expanding)} can add columns, and max_features counts "
+            "model features after encoding. SHAP is skipped (feature_limit_exceeded) above the "
+            "limit; the training report shows the real width."
+        )
+    return lines
 
 
 def preview_workflow_config(config: dict[str, Any], *, action: str = "score") -> str:
@@ -651,12 +735,7 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
     """
     checked = validate_workflow_config(config, action=action)
     cv = CVSpec.from_workflow(checked)
-    training_status = "configured (source data and permissions not checked)"
-    try:
-        validate_workflow_config(checked, action="train")
-    except ValueError as exc:
-        training_status = f"needs configuration: {exc}"
-    lines = _preview_training_source(checked, training_status)
+    lines = _preview_training_source(checked, _training_status(checked))
     lines.extend(
         _preview_steps(checked.get("pre_split_steps", []), "  No pre-split cleanup steps.")
     )
