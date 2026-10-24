@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..projects.yaml_config import read_yaml_mapping
-from .config import FeaturePlan, parse_feature_config
+from .config import TARGET_PLACEHOLDERS, FeaturePlan, parse_feature_config
 
 _JOB_CONTROLS = (
     "tags",
@@ -79,6 +79,8 @@ def build_feature_job(plan: FeaturePlan, training_job: dict[str, Any]) -> dict[s
     params = {
         "config_path": "${workspace.file_path}/config/features.yml",
         "plan_sha256": plan_digest(plan),
+        # Target values for {catalog}-style placeholders in features.yml table names.
+        **{key: f"${{var.{key}}}" for key in TARGET_PLACEHOLDERS},
         "selected_groups": "{{job.parameters.selected_groups}}",
     }
     tasks = [_task("initialize_features", "initialize", prototype, params)]
@@ -194,11 +196,13 @@ def refresh_feature_graph(project: str | Path) -> list[str]:
         .read_text(encoding="utf-8")
     )
     notebook.parent.mkdir(parents=True, exist_ok=True)
-    notebook.write_text(source, encoding="utf-8")
+    # LF on every OS, so a refresh on Windows does not rewrite every line.
+    notebook.write_text(source, encoding="utf-8", newline="\n")
     # No `targets:` here: identities per target belong in deployment/targets.yml.
     resource: dict[str, Any] = {"resources": {"jobs": {"features": job}}}
     target.write_text(
         marker + yaml.safe_dump(resource, sort_keys=False),
         encoding="utf-8",
+        newline="\n",
     )
     return [group.name for group in plan.groups]

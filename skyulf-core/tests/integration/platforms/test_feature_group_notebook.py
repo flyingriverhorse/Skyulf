@@ -1,6 +1,7 @@
 """Offline notebook transport checks; these do not exercise Databricks or Spark."""
 
 import json
+import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -347,3 +348,25 @@ def test_direct_dataclass_plans_cannot_bypass_validation_before_spark(
         build_feature_group(spark, Path(tmp_path), invalid_plan, {}, "company")
     with pytest.raises(ValueError, match=reason):
         merge_feature_groups(spark, invalid_plan, {}, {})
+
+
+def test_placeholder_plan_is_bound_from_task_parameters(notebook, operations):
+    """The feature job must read and write the active target's tables, not a shared one."""
+    text = notebook.path.read_text(encoding="utf-8")
+    # YAML needs quotes around a value that starts with a brace.
+    text = re.sub(r": catalog\.demo\.(\w+)", r': "{catalog}.demo.\1"', text)
+    notebook.path.write_text(text, encoding="utf-8")
+    plan = feature_task.parse_feature_config(feature_task.read_yaml_mapping(notebook.path))
+    assert plan is not None
+    notebook.widgets.values.update(
+        plan_sha256=plan_digest(plan),
+        catalog="syst",
+        input_schema="raw",
+        output_schema="gold",
+        metadata_schema="ml",
+        resource_suffix="",
+    )
+    feature_task.run_feature_notebook(object(), notebook.dbutils)
+    bound = operations.initialize.call_args.args[2]
+    assert bound.base_table == "syst.demo.observations"
+    assert bound.groups[0].output_table == "syst.demo.company_features"

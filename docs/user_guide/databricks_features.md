@@ -158,10 +158,22 @@ groups:
     allow_missing: false
 ```
 
-These table names are exact three-part names. Unlike training/inference table
-settings, this file does not expand `{catalog}` placeholders or add a deployment
-suffix. Choose separate names for each environment. Every output must differ
-from every input and other output, with one owning producer.
+Table names are three-part names and may use the same placeholders as
+`training.yml`: `{catalog}`, `{input_schema}`, `{output_schema}`,
+`{metadata_schema}` and `{resource_suffix}`. Quote such values in YAML. The
+feature job receives each target's values from the Bundle variables, so one file
+serves `test`, `syst`, `prod` and personal targets:
+
+```yaml
+base_table: "{catalog}.{input_schema}.company_observations"
+output_table: "{catalog}.{output_schema}.company_merged{resource_suffix}"
+```
+
+Add `{resource_suffix}` to outputs so personal targets do not overwrite each
+other. After adding placeholders to an existing project, run
+`refresh_feature_graph.py` and redeploy: older feature jobs pass no target values
+and fail with a message naming that fix. Every output must differ from every
+input and other output, with one owning producer.
 
 | Field | Type / default | What you configure |
 | --- | --- | --- |

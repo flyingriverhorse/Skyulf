@@ -1,7 +1,7 @@
 """Validate feature data domains independently of model and training settings."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from ..shared._contracts import column_name, table_name
@@ -70,11 +70,64 @@ def _columns(value: Any, label: str) -> tuple[str, ...]:
     return tuple(value)
 
 
+# The same target bindings as training.yml; the feature job passes them as task parameters.
+TARGET_PLACEHOLDERS = (
+    "catalog",
+    "input_schema",
+    "output_schema",
+    "metadata_schema",
+    "resource_suffix",
+)
+_PLACEHOLDER = re.compile(r"\{(" + "|".join(TARGET_PLACEHOLDERS) + r")\}")
+
+
+def _unbound_sample(value: Any) -> Any:
+    """Stand in a valid identifier for each placeholder so names validate before deployment."""
+    if type(value) is not str:
+        return value
+    return _PLACEHOLDER.sub(lambda match: "" if match[1] == "resource_suffix" else "x", value)
+
+
 def _feature_table(value: Any) -> None:
     """Require canonical catalog.schema.table identity for source/write isolation."""
-    table_name(value)
-    if len(value.split(".")) != 3:
+    sample = _unbound_sample(value)
+    table_name(sample)
+    if len(sample.split(".")) != 3:
         raise ValueError("Feature table names must contain catalog.schema.table.")
+
+
+def bind_feature_plan(plan: FeaturePlan, bindings: dict[str, str]) -> FeaturePlan:
+    """Resolve target placeholders in every table name before any read or write."""
+
+    def bind(value: str) -> str:
+        """Replace each known placeholder with the active target's value."""
+
+        def resolve(match: re.Match) -> str:
+            """Fail clearly when an older feature graph passes no binding."""
+            if match[1] not in bindings:
+                raise ValueError(
+                    f"Feature table placeholder {{{match[1]}}} has no value; "
+                    "run src/tools/refresh_feature_graph.py and redeploy."
+                )
+            return bindings[match[1]]
+
+        return _PLACEHOLDER.sub(resolve, value)
+
+    groups = tuple(
+        replace(group, source_table=bind(group.source_table), output_table=bind(group.output_table))
+        for group in plan.groups
+    )
+    schema = plan.source_snapshot_schema
+    bound = replace(
+        plan,
+        base_table=bind(plan.base_table),
+        output_table=bind(plan.output_table),
+        groups=groups,
+        source_snapshot_schema=None if schema is None else bind(schema),
+    )
+    if bound != plan:
+        validate_feature_plan(bound)  # bound names still need three parts and distinct outputs
+    return bound
 
 
 def _group(name: str, value: Any) -> FeatureGroup:
@@ -116,7 +169,7 @@ def _snapshot_settings(data: dict) -> tuple[str, str | None]:
     if schema is not None:
         if type(schema) is not str or len(schema.split(".")) != 2:
             raise ValueError("source_snapshot_schema must be catalog.schema.")
-        table_name(f"{schema}.probe")
+        table_name(f"{_unbound_sample(schema)}.probe")
     return policy, schema
 
 

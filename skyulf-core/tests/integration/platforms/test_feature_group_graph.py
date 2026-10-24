@@ -167,6 +167,11 @@ def test_parallel_tasks_preserve_compute_and_permissions(compute):
         {"task_key": "feature_company"},
         {"task_key": "feature_activity"},
     ]
+    for task in tasks.values():
+        # Each task receives the target values that bind {catalog}-style table names.
+        parameters = task["notebook_task"]["base_parameters"]
+        assert parameters["catalog"] == "${var.catalog}"
+        assert parameters["resource_suffix"] == "${var.resource_suffix}"
     assert job["permissions"] == source["permissions"]
     assert job.get("environments") == source.get("environments")
     assert job.get("job_clusters") == source.get("job_clusters")

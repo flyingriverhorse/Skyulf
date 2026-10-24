@@ -194,8 +194,10 @@ and [traffic rollout](https://www.skyulf.com/manual/user_guide/databricks_servin
 
 ## Optional feature tables
 
-Empty `groups: {}` creates no feature job. In `config/features.yml`, use explicit
-three-part tables; deployment placeholders are not expanded. Each selected
+Empty `groups: {}` creates no feature job. In `config/features.yml`, table names
+are three-part and may use the `training.yml` placeholders (`{catalog}`,
+`{input_schema}`, `{output_schema}`, `{metadata_schema}`, `{resource_suffix}`);
+each target's feature job binds them. Each selected
 `src/features/groups/<file>.py:<function>` receives its pinned Spark frame and
 returns unique keys/time plus exactly the declared features; no YAML `params`.
 Keep reads/collection/writes outside transforms and learned statistics in preprocessing.

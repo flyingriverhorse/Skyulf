@@ -32,6 +32,11 @@ resources:
           base_parameters:
             config_path: ${workspace.file_path}/config/features.yml
             plan_sha256: cbfd8e2bee3e27271a9f927e306c00af073761aa0ec07e101295d01738e62fd7
+            catalog: ${var.catalog}
+            input_schema: ${var.input_schema}
+            output_schema: ${var.output_schema}
+            metadata_schema: ${var.metadata_schema}
+            resource_suffix: ${var.resource_suffix}
             selected_groups: '{{job.parameters.selected_groups}}'
             phase: initialize
       - environment_key: skyulf
@@ -45,6 +50,11 @@ resources:
           base_parameters:
             config_path: ${workspace.file_path}/config/features.yml
             plan_sha256: cbfd8e2bee3e27271a9f927e306c00af073761aa0ec07e101295d01738e62fd7
+            catalog: ${var.catalog}
+            input_schema: ${var.input_schema}
+            output_schema: ${var.output_schema}
+            metadata_schema: ${var.metadata_schema}
+            resource_suffix: ${var.resource_suffix}
             selected_groups: '{{job.parameters.selected_groups}}'
             snapshot_json: '{{tasks.initialize_features.values.snapshot_json}}'
             phase: merge

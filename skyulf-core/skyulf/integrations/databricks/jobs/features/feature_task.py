@@ -2,10 +2,16 @@
 
 import json
 import math
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from ...features.config import parse_feature_config
+from ...features.config import (
+    TARGET_PLACEHOLDERS,
+    FeaturePlan,
+    bind_feature_plan,
+    parse_feature_config,
+)
 from ...features.graph import plan_digest
 from ...features.runtime import build_feature_group, initialize_features, merge_feature_groups
 from ...projects.yaml_config import read_yaml_mapping
@@ -29,6 +35,18 @@ def _evidence(value: str) -> dict[str, Any]:
     return result
 
 
+def _target_bindings(get: Any, plan: FeaturePlan) -> dict[str, str]:
+    """Read target values only when the plan uses placeholders; older graphs pass none."""
+    text = json.dumps(asdict(plan))
+    bindings = {}
+    for key in (key for key in TARGET_PLACEHOLDERS if "{" + key + "}" in text):
+        try:
+            bindings[key] = get(key)
+        except Exception:  # noqa: BLE001 - an older graph has no such widget; binding explains the fix
+            continue
+    return bindings
+
+
 def run_feature_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
     """Resolve declared widget inputs and publish bounded task evidence, not records."""
     get = dbutils.widgets.get
@@ -38,6 +56,7 @@ def run_feature_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         raise ValueError("Feature job is disabled; refresh the feature graph and redeploy.")
     if get("plan_sha256") != plan_digest(plan):
         raise ValueError("Feature graph is stale; run refresh_feature_graph.py and redeploy.")
+    plan = bind_feature_plan(plan, _target_bindings(get, plan))
     phase = get("phase")
     if phase == "initialize":
         result = initialize_features(spark, config_path.parent.parent, plan, get("selected_groups"))
