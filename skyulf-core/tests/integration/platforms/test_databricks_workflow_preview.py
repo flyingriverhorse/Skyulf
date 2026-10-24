@@ -76,3 +76,25 @@ def test_preview_rejects_model_task_mismatch(workflow_config, task, model):
     workflow_config["pipeline"]["modeling"]["type"] = model
     with pytest.raises(ValueError, match="declared task"):
         preview_workflow_config(workflow_config)
+
+
+@pytest.mark.parametrize(
+    ("updates", "activation", "scoring"),
+    [
+        ({"quality_threshold": None}, "no quality_threshold", "pinned version"),
+        ({"quality_threshold": 0.5}, "threshold 0.5", "pinned version"),
+        ({"score_model_selection": "champion"}, None, "champion alias; approve"),
+    ],
+)
+def test_preview_summary_names_missing_decisions_before_details(
+    workflow_config, updates, activation, scoring
+):
+    """A first-time reader must see the missing threshold and unchecked workspace up front."""
+    workflow_config.update(
+        {"score_model_selection": "pinned_version", "model_version": "1", **updates}
+    )
+    report = preview_workflow_config(workflow_config)
+    summary = report[report.index("Summary:") : report.index("Engine:")]
+    assert activation is None or activation in summary
+    assert scoring in summary
+    assert "Not checked: source data, permissions and workspace" in summary

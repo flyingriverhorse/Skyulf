@@ -232,8 +232,11 @@ policy-cluster details likewise appear only when selected.
 
 `setup_mode` chooses how much to answer now. The default, `quick`, asks for the
 training layout, project name, task, source arrangement, record keys and target/input columns,
-and for the monitoring destination. It also asks for optional outcome-table and
-availability-column names. `separate_all` asks for a distinct scoring source.
+and for the monitoring destination. It asks for the outcome-table and
+availability-column names only when something reads them: a separate source
+layout, or monitoring turned on. A `single_table` project without monitoring skips
+both; set them later in `deployment/variables.yml` when you enable monitoring.
+`separate_all` asks for a distinct scoring source.
 Both modes ask `include_source_sql`, default `false`: keep it off when your tables
 already exist and use `preview.py --action sources` to check them. Choose `true`
 only if you need an editable CREATE TABLE starter for tables that do not exist

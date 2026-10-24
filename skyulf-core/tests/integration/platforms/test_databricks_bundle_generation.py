@@ -339,6 +339,27 @@ def test_deployment_defaults_are_ci_independent(tmp_path):
         assert "resources" not in target  # Identity/ACL ownership remains external by default.
 
 
+@pytest.mark.parametrize(
+    ("answers", "pinned_first", "monitoring"),
+    [
+        ({}, True, False),
+        ({"monitoring": "true"}, True, True),
+        ({"score_model_selection": "champion"}, False, False),
+        ({"promotion_policy": "automatic"}, False, False),
+    ],
+)
+def test_first_run_guide_follows_the_selected_scoring_policy(
+    tmp_path, answers, pinned_first, monitoring
+):
+    """A pinned first score must not send the user through an approval it does not need."""
+    guide = (_generate_project(tmp_path, **answers) / "START_HERE.md").read_text(encoding="utf-8")
+    assert ("score --params score_model_version=N" in guide) is pinned_first
+    assert ("Approve later (optional)" in guide) is pinned_first
+    assert ("5. **Approve.**" in guide) is not pinned_first
+    assert ("monitoring_report" in guide) is monitoring
+    assert "{{" not in guide
+
+
 def test_owner_and_view_groups_follow_setup_answers(tmp_path):
     """Shared targets add only the answered read group; personal targets stay manager-only."""
     project = _generate_project(

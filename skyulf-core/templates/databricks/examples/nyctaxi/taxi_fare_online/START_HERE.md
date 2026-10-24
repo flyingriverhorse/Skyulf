@@ -68,9 +68,7 @@ Replace `YOUR_PROFILE` in every command.
    ```
 
    Scoring resolves the champion alias, so a version must be promoted first.
-   Check the committed output, then `monitoring_report` and `evaluate_retraining`.
-   Before monitoring an unactivated pinned candidate for the first time, prepare its
-   [reference](https://www.skyulf.com/manual/user_guide/databricks_monitoring_enrollment.html).
+   Check the committed output.
 
 ## When you need it
 

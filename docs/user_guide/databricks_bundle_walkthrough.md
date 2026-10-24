@@ -524,10 +524,12 @@ the actual result. The default is version "1". Redeploy changes before running. 
 #### Score and inspect the demonstration rows
 
 Quick setup defaults to `score_model_selection: pinned_version` and writes
-`model_version: "1"` into `config/inference.yml`. Replace that version with the
-actual registered result and redeploy if necessary. A pinned scorer can run a
-registered candidate without promoting it; choosing `champion` requires the
-successful activation described above.
+`model_version: "1"` into `config/inference.yml`. To score the registered
+result once, pass the version shown in `training_report` (`<model> vN`) as
+`--params score_model_version=N`; this changes neither the file nor any alias.
+For scheduled runs, set `model_version` to that version and redeploy. A pinned
+scorer can run a registered candidate without promoting it; choosing `champion`
+requires the successful activation described above.
 
 ```powershell
 databricks bundle run score -t test --profile YOUR_PROFILE

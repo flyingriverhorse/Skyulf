@@ -457,6 +457,35 @@ def _preview_window(checked: dict[str, Any]) -> tuple[str, Any, Any]:
     return observation_window, holdout_start, result_cutoff
 
 
+def _preview_summary(checked: dict[str, Any], training_status: str) -> list[str]:
+    """Put what is settled, what is missing and what is still unchecked before the details."""
+    threshold = checked.get("quality_threshold")
+    activation = (
+        f"{checked['promotion_policy']}, threshold {threshold}"
+        if threshold is not None
+        else f"{checked['promotion_policy']}; no quality_threshold, so a first champion "
+        "approval or automatic promotion needs one in config/training.yml before training"
+    )
+    if checked.get("prediction_delivery") == "endpoint":
+        scoring = "endpoint only; no batch score job"
+    elif checked.get("score_model_selection") == "champion":
+        scoring = "champion alias; approve or promote a version first"
+    else:
+        scoring = (
+            f"pinned version {checked.get('model_version')}; one score run can select "
+            "score_model_version=N without approval"
+        )
+    return [
+        "Summary:",
+        f"  Training settings: {training_status}",
+        f"  Final holdout: {checked.get('split_strategy', 'random')}",
+        f"  Activation: {activation}",
+        f"  Scoring: {scoring}",
+        "  Not checked: source data, permissions and workspace; next run "
+        "src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id ID",
+    ]
+
+
 def _preview_training_source(checked: dict[str, Any], training_status: str) -> list[str]:
     """Describe source selection, resource bounds and the final holdout."""
     sample = checked.get("training_sample_rows")
@@ -689,6 +718,7 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
     except ValueError as exc:
         training_status = f"needs configuration: {exc}"
     lines = _preview_training_source(checked, training_status)
+    lines[2:2] = _preview_summary(checked, training_status)
     lines.extend(
         _preview_steps(checked.get("pre_split_steps", []), "  No pre-split cleanup steps.")
     )

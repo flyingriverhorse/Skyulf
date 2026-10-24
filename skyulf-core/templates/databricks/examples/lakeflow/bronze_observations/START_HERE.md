@@ -56,22 +56,23 @@ Replace `YOUR_PROFILE` in every command.
    activate a candidate.
    Start with **Where to look** in `training_report` > Output.
 
-5. **Approve.** Copy the **Available action: approve** block from the report (the first
-   approval uses expected champion `none`)
-   into the train job's **Run now with different parameters**; see
-   [operator actions](https://www.skyulf.com/manual/user_guide/databricks_lifecycle.html#operator-actions-through-run-now).
-
-6. **Score:**
+5. **Score the new version.** `training_report` > **Where to look** names the
+   registered version as `<model> vN`. Score that version for this run only:
 
    ```powershell
-   databricks bundle run -t test --profile YOUR_PROFILE score
+   databricks bundle run -t test --profile YOUR_PROFILE score --params score_model_version=N
    ```
 
-   Scoring uses the pinned `model_version` in `config/inference.yml` (`"1"` for
-   a new model) and needs no approval. Change it to score a later version.
-   Check the committed output, then `monitoring_report` and `evaluate_retraining`.
-   Before monitoring an unactivated pinned candidate for the first time, prepare its
-   [reference](https://www.skyulf.com/manual/user_guide/databricks_monitoring_enrollment.html).
+   Replace `N` with that version. This needs no approval and changes neither
+   `config/inference.yml` nor any alias. Scheduled runs use `model_version` in
+   `config/inference.yml`; set it to the same version when you are ready.
+   Check the committed output.
+
+6. **Approve later (optional).** Approval makes a version the champion, which
+   champion scoring needs. It uses the `quality_threshold` set before training. Copy the
+   **Available action: approve** block from the report (the first approval uses expected
+   champion `none`) into the train job's **Run now with different parameters**; see
+   [operator actions](https://www.skyulf.com/manual/user_guide/databricks_lifecycle.html#operator-actions-through-run-now).
 
 ## When you need it
 
