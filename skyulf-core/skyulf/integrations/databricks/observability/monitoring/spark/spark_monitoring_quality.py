@@ -2,8 +2,6 @@
 
 from typing import Any
 
-from scipy.stats import fisher_exact
-
 from ..missing_markers import (
     Marker,
     require_marked_features,
@@ -12,6 +10,7 @@ from ..missing_markers import (
 )
 from ..monitoring_metrics import (
     exclusion_metrics,
+    missing_increase,
     monitoring_metric,
     monitoring_report_status,
     validate_monitoring_inputs,
@@ -86,17 +85,6 @@ def _quality_counts(frame: Any, column: str) -> tuple[int, int, int, int]:
     )
 
 
-def _missing_increase(missing: int, total: int, baseline_missing: int, baseline_total: int) -> bool:
-    """Use the existing one-sided Fisher missingness gate on exact aggregate counts."""
-    baseline = baseline_missing / baseline_total if baseline_total else 0.0
-    if missing / total <= baseline:
-        return False
-    if baseline == 0:
-        return True
-    table = [[missing, total - missing], [baseline_missing, baseline_total - baseline_missing]]
-    return bool(fisher_exact(table, alternative="greater").pvalue <= 0.01)
-
-
 def _quality(reference: Any, current: Any, unscored: Any, column: str) -> list[dict]:
     """Require usable saved predictions for missing inputs even with accepted baseline rates."""
     total, missing, nonfinite, infinite = _quality_counts(current, column)
@@ -106,7 +94,7 @@ def _quality(reference: Any, current: Any, unscored: Any, column: str) -> list[d
             for name in ("missing_fraction", "nonfinite_fraction")
         ]
     baseline_total, baseline_missing, _, _ = _quality_counts(reference, column)
-    issue = _missing_increase(missing, total, baseline_missing, baseline_total)
+    issue = missing_increase(missing, total, baseline_missing, baseline_total)
     issue = issue or has_spark_rows(unscored.where(_missing(current, column)))
     baseline = baseline_missing / baseline_total if baseline_total else 0.0
     return [
