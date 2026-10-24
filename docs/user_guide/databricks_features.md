@@ -207,6 +207,9 @@ replaces them. A table with the snapshot name that Skyulf did not create is neve
 replaced or dropped. `source_snapshot_schema: catalog.schema` chooses where the
 copies go (default: the output schema); `source_snapshot: fail` turns copying off.
 
+The prepared [`lakeflow/bronze_observations`](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/lakeflow)
+example runs this end to end, with a `setup.sql` that creates the streaming table.
+
 Train from `output_table`, a regular Delta table. To score, `ai_query` and the
 serving SQL function can read the streaming table itself, and REST callers send
 rows; only the batch `score` job needs a regular table with Change Data Feed, such

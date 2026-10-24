@@ -165,6 +165,18 @@ PROJECTS = {
         "removed": SAMPLES,
         "training_edits": (),
     },
+    "bronze_observations": {
+        "group": "lakeflow",
+        "sources": (
+            "config/features.yml",
+            "config/preprocessing.yml",
+            "src/features/groups/base.py",
+            "resources/features.job.yml",
+            "src/jobs/feature_task.py",
+        ),
+        "removed": SAMPLES,
+        "training_edits": (),
+    },
     "air_quality_no2": {
         "group": "real_data",
         "sources": (

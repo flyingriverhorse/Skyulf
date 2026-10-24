@@ -62,7 +62,8 @@ def test_example_scoring_has_one_owner_and_preserves_legacy_online_schema(name):
         assert "| `config/scoring.yml` |" not in (project / "README.md").read_text()
     else:
         assert isinstance(policy, dict)
-        assert "def build_model_rules(" not in (project / "src/features/scoring.py").read_text()
+        scoring = project / "src/features/scoring.py"  # absent with include_examples=false
+        assert not scoring.exists() or "def build_model_rules(" not in scoring.read_text()
 
 
 @CLI_ONLY

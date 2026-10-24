@@ -41,6 +41,11 @@ evaluation charts and monitoring on a later season with real drift and a
 report-only WAPE policy. `diagnostic_single` and `bike_demand_set` add serving
 endpoints and a model set.
 
+[`examples/lakeflow`](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/lakeflow)
+trains from a Lakeflow streaming table: the features job copies and pins it, and
+a `base_transform` derives the target and a text date key, so no separate
+preparation job is needed.
+
 Then swap the taxi tables, columns and recipes for your own. The examples README
 owns the complete steps, approval and serving. Not sure which shape fits? See
 [choose a project shape](databricks_choose.md).
