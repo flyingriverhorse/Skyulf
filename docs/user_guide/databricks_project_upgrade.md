@@ -16,6 +16,46 @@ the project pin and release-specific contracts together.
 Keep bundle identity, target resource keys, workspace root, output/state paths and edited recipes
 stable. Transfer reviewed changes to notebooks, dependencies and graphs as one compatible set.
 
+### Upgrade in this order
+
+1. **Record what works now.** Write down the Core pin, the champion or pinned model
+   version, the last successful train and score run IDs, and any wheel or
+   `src/features` code the model needs. Keep that environment and run one real
+   score with it, so you know it still works.
+2. **Clear pending alias events.** A `pending_alias_event` on the model means an
+   earlier alias change has an unknown outcome. [Reconcile it](databricks_lifecycle_recovery.md)
+   with the Core version that wrote it before changing anything else.
+3. **Generate the new template in a separate directory** and compare it with your
+   project as described above. Upgrade the [monitoring store](databricks_monitoring_setup.md)
+   before the jobs that write to it.
+4. **Run the local checks** in [the command](#the-command), then deploy.
+5. **Train a new candidate.** Pin `training_table_version` to the version the old
+   champion used if you want a like-for-like comparison. Old model files are not
+   converted; each loads only under the runtime that produced it.
+6. **Activate deliberately.** The old champion cannot be scored under the new
+   runtime, so the comparison reports `champion_runtime_unavailable` and automatic
+   promotion holds. Review the candidate's own metrics, then approve with
+   `allow_unloadable_champion=true`; see
+   [replacing a champion](#replacing-a-champion-produced-by-the-previous-release).
+   A pinned project can instead score the new version for one run with
+   `score_model_version`.
+7. **Check the first outputs:** the score job's committed predictions and, with
+   monitoring on, the next monitoring report.
+8. **Know your way back.** Rolling the alias back restores the old version as
+   champion, but the new score job cannot load it. Scoring it again needs the old
+   environment from step 1; an alias change alone is not a working rollback.
+
+### If a step fails
+
+| What failed | Next action |
+| --- | --- |
+| Training (any train-job task) | Read the run's evidence, fix the cause and start a **new** train run. Databricks Repair run and task retries are rejected for lifecycle tasks. |
+| Score, after the alias change succeeded | Run the score job again. Do not retrain or repeat the approval. |
+| Monitoring, after predictions were committed | Run the monitoring job again. Committed predictions stay; a missing measurement is filled in. |
+| Alias change with an unknown outcome (`AliasOutcomeUnknownError`) | Stop alias writers and follow [alias recovery](databricks_lifecycle_recovery.md). Do not use rollback instead. |
+| Recovery reports `AliasConflictError` | Keep writers stopped and inspect the saved intent and all four roles; do not continue the upgrade. |
+| Old champion restored but the new score job cannot load it | Model selection is back, prediction is not. Score with the old environment, or approve a model trained under the new runtime. |
+
 ### Configuration validation and migration
 
 New projects declare `config_version: 1` and `task`. The notebook validates
