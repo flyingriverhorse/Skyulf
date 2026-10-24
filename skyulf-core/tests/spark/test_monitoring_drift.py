@@ -175,6 +175,21 @@ def test_middle_range_matches_local_exact_ks():
     assert evidence.status == "not_detected"
 
 
+@pytest.mark.parametrize(("n", "m"), [(2000, 2000), (1999, 2003), (1001, 9999)])
+def test_middle_range_matches_local_exact_ks_for_any_sizes(n, m):
+    """Equal, coprime and uneven sizes take other exact-count paths; all must match local."""
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (
+        _ks_evidence,
+    )
+
+    rng = np.random.default_rng(1)
+    reference, current = rng.normal(size=n), rng.normal(0.1, size=m)
+    local = ks_2samp(reference, current, method="exact")
+    evidence = _ks_evidence(float(local.statistic), n, m)
+    assert evidence.test == "ks_2samp"
+    assert evidence.p_value == pytest.approx(local.pvalue, rel=1e-12)
+
+
 def test_inconclusive_bound_is_unavailable(monkeypatch):
     """A conservative probability bound that cannot reject must never imply healthy evidence."""
     from skyulf.integrations.databricks.observability.monitoring.spark import (

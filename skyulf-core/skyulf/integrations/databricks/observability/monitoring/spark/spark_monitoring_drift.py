@@ -2,11 +2,12 @@
 
 import importlib
 import math
+import warnings
 from decimal import Decimal
 from typing import Any
 
 import numpy as np
-from scipy.stats import entropy, kstwo
+from scipy.stats import entropy, ks_2samp, kstwo
 
 from skyulf.profiling._drift_evidence import (
     DriftEvidence,
@@ -49,20 +50,31 @@ def _exact_ks_probability(statistic: float, n: int, m: int) -> float:
 
 
 def _scipy_exact_probability(statistic: float, n: int, m: int) -> float | None:
-    """Return SciPy's exact two-sample KS probability, the one local ks_2samp uses here.
+    """Return the exact two-sample KS probability that local ``ks_2samp`` computes.
 
-    shortcut: private SciPy helper (stable since 1.5); if it moves, the DKW bound is used.
+    The exact probability depends only on n, m and the statistic, so two tied samples
+    with the same statistic (i values of 0 among n, j among m, |i/n - j/m| = statistic)
+    give it through SciPy's public ``ks_2samp``. None means the caller falls back to the
+    DKW bound: no such samples, or SciPy could not finish the exact count.
     """
-    try:
-        from scipy.stats._stats_py import _attempt_exact_2kssamp  # noqa: PLC0415
-
-        success, _, probability = _attempt_exact_2kssamp(
-            n, m, math.gcd(n, m), float(statistic), "two-sided"
-        )
-    except (ImportError, TypeError, ValueError, ArithmeticError):
+    divisor = math.gcd(n, m)
+    target = round(float(statistic) * (n * m // divisor)) * divisor
+    for zeros in range(n + 1):
+        other_zeros, remainder = divmod(zeros * m - target, n)
+        if remainder == 0 and 0 <= other_zeros <= m:
+            break
+    else:
         return None
-    probability = float(probability)
-    return probability if success and 0.0 <= probability <= 1.0 else None
+    reference = np.repeat([0.0, 1.0], [zeros, n - zeros])
+    current = np.repeat([0.0, 1.0], [other_zeros, m - other_zeros])
+    try:
+        with warnings.catch_warnings():
+            # SciPy warns and silently switches to the asymptotic method on failure.
+            warnings.simplefilter("error", RuntimeWarning)
+            probability = float(ks_2samp(reference, current, method="exact").pvalue)
+    except (RuntimeWarning, ValueError, ArithmeticError):
+        return None
+    return probability if 0.0 <= probability <= 1.0 else None
 
 
 def _ks_evidence(statistic: float, n: int, m: int) -> DriftEvidence:
