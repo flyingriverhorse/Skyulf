@@ -34,6 +34,12 @@ This reference covers settings, saved model behavior and operational results.
 Change models/recipes without editing job notebooks. Training captures selected
 preprocessing, scoring rules and code; later edits do not alter saved versions.
 
+Do not edit `src/jobs/*.py`: they are thin entry points that a template upgrade
+replaces, and the job logic ships in the Core wheel. Model code belongs in
+`src/features/`, job settings in `deployment/`, and a private package index or
+bundled wheels for logged models in the `SKYULF_MODEL_PIP_*` job variables; see
+[serving packages](https://www.skyulf.com/manual/user_guide/databricks_serving.html).
+
 ## Source data
 
 The selected arrangement is **{{.source_layout}}**. Initialization/deployment do
