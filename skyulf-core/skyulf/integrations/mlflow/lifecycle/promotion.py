@@ -937,6 +937,34 @@ def _validated_report(
     _validate_report_approval(
         report, expected_champion_version, require_eligible, allow_unloadable_champion
     )
+    fresh = _fresh_comparison(
+        report,
+        expected_champion_version,
+        heldout,
+        target_column=target_column,
+        limits=(max_rows, max_bytes),
+        stores=(tracking_uri, registry_uri),
+    )
+    if fresh != report:
+        raise ValueError("Pinned comparison no longer matches the supplied report.")
+    return comparison_digest(fresh)
+
+
+def _fresh_comparison(
+    report: ModelComparisonReport,
+    champion_version: str | None,
+    heldout: pd.DataFrame | pl.DataFrame,
+    *,
+    target_column: str,
+    limits: tuple[int, int],
+    stores: tuple[str | None, str | None],
+) -> ModelComparisonReport:
+    """Rerun the report's comparison on the pinned versions with the report's own policy.
+
+    Callers keep their own eligibility checks and mismatch messages; this only rebuilds
+    the comparison so both promotion paths copy the same report fields.
+    """
+    tracking_uri, registry_uri = stores
     candidate = resolve_model(
         report.model_name,
         version=report.candidate_version,
@@ -946,11 +974,11 @@ def _validated_report(
     champion = (
         resolve_model(
             report.model_name,
-            version=expected_champion_version,
+            version=champion_version,
             tracking_uri=tracking_uri,
             registry_uri=registry_uri,
         )
-        if expected_champion_version is not None
+        if champion_version is not None
         else None
     )
     fresh = compare_registered_pipeline_models(
@@ -965,16 +993,13 @@ def _validated_report(
         quality_gates=report.quality_gates,
         min_scored_fraction=report.min_scored_fraction,
         max_coverage_drop=report.max_coverage_drop,
-        max_rows=max_rows,
-        max_bytes=max_bytes,
+        max_rows=limits[0],
+        max_bytes=limits[1],
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
-    if report.holdout_reference is not None:
-        fresh = replace(fresh, holdout_reference=report.holdout_reference)
-    if fresh != report:
-        raise ValueError("Pinned comparison no longer matches the supplied report.")
-    return comparison_digest(fresh)
+    # The comparison never sets holdout_reference; carry the report's own.
+    return replace(fresh, holdout_reference=report.holdout_reference)
 
 
 def initialize_champion(
@@ -995,30 +1020,14 @@ def initialize_champion(
     threshold = report.quality_threshold
     if threshold is None:
         raise ValueError("First champion needs an absolute quality threshold.")
-    candidate = resolve_model(
-        report.model_name,
-        version=report.candidate_version,
-        tracking_uri=tracking_uri,
-        registry_uri=registry_uri,
-    )
-    fresh = compare_registered_pipeline_models(
-        candidate,
+    fresh = _fresh_comparison(
+        report,
         None,
         heldout,
         target_column=target_column,
-        dataset_id=report.dataset_id,
-        metric=report.metric,
-        min_improvement=report.min_improvement,
-        quality_threshold=report.quality_threshold,
-        quality_gates=report.quality_gates,
-        min_scored_fraction=report.min_scored_fraction,
-        max_coverage_drop=report.max_coverage_drop,
-        max_rows=max_rows,
-        max_bytes=max_bytes,
-        tracking_uri=tracking_uri,
-        registry_uri=registry_uri,
+        limits=(max_rows, max_bytes),
+        stores=(tracking_uri, registry_uri),
     )
-    fresh = replace(fresh, holdout_reference=report.holdout_reference)
     if fresh != report:
         raise ValueError("Pinned first-champion comparison changed before initialization.")
     if not quality_gates_pass(fresh):
