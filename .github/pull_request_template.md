@@ -1,36 +1,29 @@
 <!-- © 2025 Murat Unsal — Skyulf Project -->
 
-## Summary
+## What and why
 
-Describe the change and what it improves for users.
+<!-- What changes for users, and why. A few sentences is enough. -->
 
-## Type of change
+## Type
 
 - [ ] Bug fix
 - [ ] New feature
-- [ ] Docs only
-- [ ] Refactor/maintenance
+- [ ] Docs
+- [ ] Maintenance / refactor
+
+## How I checked it
+
+<!-- Commands you ran and their real result, e.g.
+`uv run --no-sync python -m pytest path/to/test_file.py -q` → 12 passed.
+For a bug fix, say how you reproduced it first. Screenshots welcome for UI changes.
+Run only the affected tests; CI runs the full suites. -->
 
 ## Checklist
 
-- [ ] Code builds and basic tests pass locally (or in CI)
-- [ ] Added/updated tests where appropriate
-- [ ] Backend param/enum changes are mirrored in `frontend/ml-canvas/src/modules/nodes/`
-- [ ] Updated `changelog/` and docs/README where appropriate
-- [ ] No secrets or sensitive data committed
-- [ ] All commits are signed off (DCO) with `git commit -s`
-
-## How was this verified?
-
-Describe the commands, tests, or manual checks you ran, and what they showed
-(e.g. `uv run --no-sync python -m pytest path/to/affected_test.py -q` with its
-actual result; or a before/after screenshot). Follow `AGENTS.md`: run affected
-tests locally and leave full suites/coverage to CI unless explicitly requested.
-Evidence over assertions: a fix without a failing-test-first note or a
-reproduction check is harder to review.
-
-## Screenshots or demo (optional)
-
-## Related issues
+- [ ] Tests added or updated (if code changed)
+- [ ] `changelog/` and docs updated (if users notice the change)
+- [ ] Docs changes build: `zensical build --clean --strict`
+- [ ] Backend node param/enum changes mirrored in `frontend/ml-canvas/src/modules/nodes/`
+- [ ] Commits signed off (`git commit -s`), no secrets committed
 
 Fixes #
