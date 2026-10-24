@@ -9,8 +9,7 @@ An `AliasOutcomeUnknownError` or a pending alias event means a registry write
 may have succeeded before its response was received. Further controlled training,
 promotion and champion scoring can remain blocked until that event is reconciled.
 This procedure concerns registry aliases; a failed score or dashboard refresh
-after a confirmed promotion does not by itself require alias recovery; for those,
-see [if a step fails](databricks_project_upgrade.md#if-a-step-fails).
+after a confirmed promotion does not by itself require alias recovery.
 
 ```mermaid
 flowchart LR
