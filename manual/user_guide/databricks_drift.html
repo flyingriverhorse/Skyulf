@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3414,6 +3414,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6389,19 +6417,29 @@ such codes per column to count them as missing instead:</p>
 <h2 id="notifications">Notifications</h2>
 <p>Job failures and measured drift are separate events. A successful monitoring run
 can report drift, missing evidence or performance loss. Configure native job
-notifications for failed runs and long durations in your target variables:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">variables</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">monitoring_email_notifications</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ml-operations@example.com</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">on_duration_warning_threshold_exceeded</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ml-operations@example.com</span><span class="p p-Indicator">]</span>
-<span class="w">  </span><span class="nt">monitoring_health_rules</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RUN_DURATION_SECONDS</span>
-<span class="w">      </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GREATER_THAN</span>
-<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1800</span>
-<span class="w">  </span><span class="nt">monitoring_webhook_notifications</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">on_failure</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">YOUR_EXISTING_NOTIFICATION_DESTINATION_ID</span>
+notifications for failed runs in your target variables, and a duration warning
+as a <code>health</code> rule on the monitoring job of the same target in <code>deployment/targets.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">targets</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">test</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">variables</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">monitoring_email_notifications</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ml-operations@example.com</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">on_duration_warning_threshold_exceeded</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ml-operations@example.com</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">monitoring_webhook_notifications</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">on_failure</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">YOUR_EXISTING_NOTIFICATION_DESTINATION_ID</span>
+<span class="w">    </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">jobs</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">monitoring</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">health</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RUN_DURATION_SECONDS</span>
+<span class="w">                </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GREATER_THAN</span>
+<span class="w">                </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1800</span>
 </code></pre></div>
+<p>Jobs have no <code>health</code> block by default: an empty rule list fails <code>bundle deploy</code> with
+the Terraform engine. The warning value must not exceed the job's
+<code>monitoring_timeout_seconds</code>.</p>
 <p>Replace the example email/destination before deploying. Webhooks use an existing
 workspace notification destination ID, not a URL. Empty defaults send nothing.
 To notify on monitoring findings, create a separate SQL alert over the shared
@@ -6468,10 +6506,10 @@ does not create this SQL alert or any recipient automatically.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

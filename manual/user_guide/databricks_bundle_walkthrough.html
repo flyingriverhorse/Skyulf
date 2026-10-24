@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -4449,6 +4449,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6855,8 +6883,8 @@ No input data is created by <code>bundle init</code> or deployment.</p>
 </tr>
 </tbody>
 </table>
-<p>The generated <code>START_HERE.md</code> is the short offline path. <code>TRAINING.md</code>,
-<code>SCORING.md</code> and the other topic files remain bound to that project's revision.
+<p>The generated <code>README.md</code> is the short offline path. <code>GUIDE.md</code> holds the
+project's reference; both remain bound to that project's revision.
 The public site can describe a newer release; follow the upgrade chapter before
 changing runtime pins.</p>
 <p>The chapters follow one path from a new project to monitored predictions:</p>
@@ -7150,8 +7178,8 @@ There is no project-wheel or <code>dist/</code> build step. Run:</p>
 <span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-action</span> <span class="n">score</span>
 </code></pre></div>
 <p>Use the <a href="databricks_project_setup.html#local-tools-and-preview">local tools reference</a>
-for preview's binding flags, defaults and scope; the generated
-<code>src/tools/README.md</code> keeps the same short reference beside the scripts.
+for preview's binding flags, defaults and scope; <strong>Local tools</strong> in the generated
+<code>GUIDE.md</code> keeps the same short reference beside the scripts.
 Then validate and deploy from the generated directory:</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">test</span> <span class="p">-</span><span class="n">-profile</span> <span class="n">YOUR_PROFILE</span>
 <span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">test</span> <span class="p">-</span><span class="n">-profile</span> <span class="n">YOUR_PROFILE</span>
@@ -7224,10 +7252,12 @@ the actual result. The default is version "1". Redeploy changes before running. 
 <h3 id="the-command_8">The command</h3>
 <h4 id="score-and-inspect-the-demonstration-rows">Score and inspect the demonstration rows</h4>
 <p>Quick setup defaults to <code>score_model_selection: pinned_version</code> and writes
-<code>model_version: "1"</code> into <code>config/inference.yml</code>. Replace that version with the
-actual registered result and redeploy if necessary. A pinned scorer can run a
-registered candidate without promoting it; choosing <code>champion</code> requires the
-successful activation described above.</p>
+<code>model_version: "1"</code> into <code>config/inference.yml</code>. To score the registered
+result once, pass the version shown in <code>training_report</code> (<code>&lt;model&gt; vN</code>) as
+<code>--params score_model_version=N</code>; this changes neither the file nor any alias.
+For scheduled runs, set <code>model_version</code> to that version and redeploy. A pinned
+scorer can run a registered candidate without promoting it; choosing <code>champion</code>
+requires the successful activation described above.</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">run</span> <span class="n">score</span> <span class="n">-t</span> <span class="n">test</span> <span class="p">-</span><span class="n">-profile</span> <span class="n">YOUR_PROFILE</span>
 </code></pre></div>
 <p>Open <strong>Jobs &amp; Pipelines &gt; claim_demo_score &gt; latest run &gt; score &gt; Output</strong>.
@@ -7326,7 +7356,7 @@ coverage and cooldown guards; it still passes normal model-quality gates.</p>
 <h3 id="when-you-need-it_10">When you need it</h3>
 <p>Only when consumers need an HTTP/SQL endpoint rather than a Delta prediction table.</p>
 <h3 id="what-to-edit_10">What to edit</h3>
-<p>Follow the project's <code>SERVING.md</code> for concrete model selection and endpoint
+<p>Follow <strong>Serving requests</strong> in the project's <code>GUIDE.md</code> for concrete model selection and endpoint
 creation. <a href="databricks_online_features.html">Online feature lookup</a> adds key-based
 retrieval; <a href="databricks_serving_rollout.html">gradual rollout</a> controls traffic between
 served versions. These are separate choices. Online publication syncs Delta
@@ -7423,10 +7453,10 @@ the matching files together; see the
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

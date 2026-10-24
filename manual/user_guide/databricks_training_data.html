@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -2773,6 +2773,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rows-without-a-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rows without a target
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#local-input-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3612,6 +3623,34 @@
     
   
     Training Reports and Charts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
   
 
     
@@ -6006,7 +6045,7 @@ training run, make sure the training and scoring sources meet these rules:</p>
 </tr>
 <tr>
 <td>Record key columns of type <code>STRING</code> or <code>BIGINT</code>, nonnull and unique</td>
-<td>Keys identify each prediction. Date or timestamp keys are not supported.</td>
+<td>Keys identify each prediction. Date or timestamp keys are not supported; store a date key as <code>date_format(observed_on, 'yyyy-MM-dd')</code> (STRING) or <code>yyyyMMdd</code> (BIGINT).</td>
 </tr>
 <tr>
 <td>Keys kept out of <code>input_columns</code></td>
@@ -6111,7 +6150,7 @@ availability column. Existing answer files with an explicit scoring-table
 override retain that override even when no layout answer was supplied.</p>
 <p><a href="databricks_source_tables.html">Check or create your source tables</a> walks through
 the check, the table contract and its error messages.</p>
-<p>Each generated project includes <code>SOURCES.md</code> and a read-only validation command.
+<p>Each generated project's <code>GUIDE.md</code> has a <strong>Source data</strong> section and a read-only validation command.
 The optional <code>config/sources.sql</code> starter is generated only when setup selects
 <code>include_source_sql: "true"</code> (default <code>"false"</code>). Existing tables need no SQL starter:</p>
 <div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-action</span> <span class="n">sources</span> <span class="p">-</span><span class="n">-profile</span> <span class="n">YOUR_PROFILE</span> <span class="p">-</span><span class="n">-warehouse-id</span> <span class="n">YOUR_WAREHOUSE_ID</span> <span class="p">-</span><span class="n">-catalog</span> <span class="n">my_catalog</span> <span class="p">-</span><span class="n">-input-schema</span> <span class="n">my_schema</span> <span class="p">-</span><span class="n">-output-schema</span> <span class="n">my_schema</span> <span class="p">-</span><span class="n">-metadata-schema</span> <span class="n">my_schema</span>
@@ -6293,11 +6332,53 @@ changed. In <code>separate_all</code>, rows arriving only in the scoring source 
 to reach the configured training feature source upstream. Model-set branches
 may share one outcome table with multiple targets; each branch keeps its own
 target and availability policy.</p>
+<h3 id="rows-without-a-target">Rows without a target</h3>
+<p>Training needs a target on every row it uses. What happens to rows whose target
+is empty depends on the layout and on whether results arrive later:</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Every row has a target</td>
+<td>Nothing; keep <code>filter_unavailable_results: false</code>.</td>
+</tr>
+<tr>
+<td><code>multi_target</code>, some branch targets empty</td>
+<td>Nothing; each branch skips rows whose own target is empty.</td>
+</tr>
+<tr>
+<td>The result is known only later (for example churn after 3 months)</td>
+<td>Set <code>filter_unavailable_results: true</code> with a <code>result_available_at_column</code> that is empty until the result is known. Those rows are skipped.</td>
+</tr>
+<tr>
+<td><code>single_model</code>, some targets empty, no result date</td>
+<td>Set <code>skip_missing_targets: true</code> (new projects already do): those rows are skipped. Without it training stops, so an unexpected gap in the table is not ignored.</td>
+</tr>
+</tbody>
+</table>
+<p><code>filter_unavailable_results</code> is only for results that arrive later; without a
+date involved it is not needed. Skipping happens only in training: the scoring
+source keeps every row, so rows without a target still get predictions. If you
+filter empty-target rows out of the table itself instead (upstream or in a
+<a href="databricks_features.html#derive-labels-and-keys-with-base_transform"><code>base_transform</code></a>),
+use two tables: a training table with labeled rows (<code>training_table</code>) and a
+scoring table with all rows (<code>score_source_table</code>).</p>
+<p>Skipped rows do not count toward <code>max_rows</code> and appear in the reported
+unavailable-label count.</p>
 <h3 id="local-input-limits">Local input limits</h3>
 <p><code>max_rows</code> bounds the rows read into the local process before train/test splitting.
-Without sampling it applies after any observation-window selection, but before
-result-availability filtering. An overflow fails; the reader never silently
-truncates data. Explicit sampling is available as described below.</p>
+Without sampling it applies after any observation-window selection and after
+rows without a usable label are dropped on Spark, so they do not count toward
+it: rows outside <code>filter_unavailable_results</code>, and in <code>multi_target</code> rows whose
+branch target is missing. Single-model sources still need a label on every
+eligible row. Those
+rows still appear in the reported unavailable-label count. An overflow fails;
+the reader never silently truncates data. Explicit sampling is available as described below.</p>
 <p>Quick setup uses <code>max_rows: 10000</code> and <code>max_input_mb: 64</code>. Detailed setup also
 asks for <code>training_sample_rows</code>; null means no sampling. Overflow errors show
 the configured limit and the setting to edit. A bounded read reports <strong>at least</strong>
@@ -6736,10 +6817,10 @@ labels arriving after predictions, see <a href="databricks_monitoring_labels.htm
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

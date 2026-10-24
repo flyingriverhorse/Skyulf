@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3656,6 +3656,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6038,7 +6066,7 @@ Six NYC taxi projects on <code>samples.nyctaxi.trips</code> cover the main shape
 <tr>
 <td>One model behind an online endpoint</td>
 <td><code>taxi_fare_online</code></td>
-<td>Needs a billable Lakebase online store; no batch scoring</td>
+<td>Needs a billable Lakebase online store; batch scoring runs on its own, not after approval</td>
 </tr>
 <tr>
 <td>One target, several candidate algorithms</td>
@@ -6073,6 +6101,10 @@ exclusion, Yeo-Johnson, imputation, encoding), combined scoring rules, SHAP,
 evaluation charts and monitoring on a later season with real drift and a
 report-only WAPE policy. <code>diagnostic_single</code> and <code>bike_demand_set</code> add serving
 endpoints and a model set.</p>
+<p><a href="https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/lakeflow"><code>examples/lakeflow</code></a>
+trains from a Lakeflow streaming table: the features job copies and pins it, and
+a <code>base_transform</code> derives the target and a text date key, so no separate
+preparation job is needed.</p>
 <p>Then swap the taxi tables, columns and recipes for your own. The examples README
 owns the complete steps, approval and serving. Not sure which shape fits? See
 <a href="databricks_choose.html">choose a project shape</a>.</p>
@@ -6193,9 +6225,9 @@ model entry if you intend to approve the first candidate; see the worked run.</p
 <p>Built-in steps and their full parameter cards are in the
 <a href="preprocessing_recipes.html">Preprocessing YAML catalog</a>. For every accepted
 training field, its default and complete examples of all three layouts, use the
-<a href="databricks_training_config.html">training configuration reference</a>. Generated
-<code>START_HERE.md</code>, <code>PREPROCESSING.md</code>, <code>SERVING.md</code> and deployment/monitoring
-READMEs travel with the project and document its template revision.</p>
+<a href="databricks_training_config.html">training configuration reference</a>. The generated
+<code>README.md</code> (first run) and <code>GUIDE.md</code> (reference) travel with the project and
+document its template revision.</p>
 <h3 id="what-a-configuration-change-requires">What a configuration change requires</h3>
 <table>
 <thead>
@@ -6312,6 +6344,23 @@ and <code>regression_metric</code>/<code>classification_metric</code>.</p>
 <p>Initialize a project from a Skyulf checkout:</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">init</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">templates</span><span class="p">/</span><span class="n">databricks</span> <span class="p">-</span><span class="n">-output-dir</span> <span class="p">./</span><span class="n">generated</span>
 </code></pre></div>
+<p>Rendering is local, but the CLI still loads a profile first, so an expired login
+fails init with errors such as "refresh token is invalid". To initialize without
+credentials, hide the config file and pass a placeholder token. Use your
+workspace URL as the host; init only reads its public metadata:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">$env:DATABRICKS_CONFIG_FILE</span> <span class="p">=</span> <span class="s2">"NUL"</span>
+<span class="nv">$env:DATABRICKS_HOST</span> <span class="p">=</span> <span class="s2">"https://&lt;your-workspace-host&gt;"</span>
+<span class="nv">$env:DATABRICKS_TOKEN</span> <span class="p">=</span> <span class="s2">"placeholder"</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">init</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">templates</span><span class="p">/</span><span class="n">databricks</span> <span class="p">-</span><span class="n">-output-dir</span> <span class="p">./</span><span class="n">generated</span>
+<span class="nb">Remove-Item</span> <span class="n">Env</span><span class="p">:</span><span class="n">DATABRICKS_CONFIG_FILE</span><span class="p">,</span> <span class="n">Env</span><span class="p">:</span><span class="n">DATABRICKS_HOST</span><span class="p">,</span> <span class="n">Env</span><span class="p">:</span><span class="n">DATABRICKS_TOKEN</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="nv">DATABRICKS_CONFIG_FILE</span><span class="o">=</span>/dev/null<span class="w"> </span><span class="nv">DATABRICKS_HOST</span><span class="o">=</span>https://&lt;your-workspace-host&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">DATABRICKS_TOKEN</span><span class="o">=</span>placeholder<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>databricks<span class="w"> </span>bundle<span class="w"> </span>init<span class="w"> </span>skyulf-core/templates/databricks<span class="w"> </span>--output-dir<span class="w"> </span>./generated
+</code></pre></div>
+<p>Answer files can also prefill <code>catalog</code> and <code>schema</code> (the test input schema),
+plus <code>output_schema</code> and <code>metadata_schema</code> when outputs or registered models live
+in other schemas. Blank values reuse <code>schema</code>.</p>
 <h3 id="guided-setup-and-offline-preview">Guided setup and offline preview</h3>
 <p>Setup follows your answers; it does not inspect source tables or sample rows.
 Random full-snapshot training hides observation-date questions. Result-availability
@@ -6320,14 +6369,17 @@ using the selected outcome availability timestamp. Schedule and
 policy-cluster details likewise appear only when selected.</p>
 <p><code>setup_mode</code> chooses how much to answer now. The default, <code>quick</code>, asks for the
 training layout, project name, task, source arrangement, record keys and target/input columns,
-and for the monitoring destination. It also asks for optional outcome-table and
-availability-column names. <code>separate_all</code> asks for a distinct scoring source.
+and for the monitoring destination. It asks for the outcome-table and
+availability-column names only when something reads them: a separate source
+layout, or monitoring turned on. A <code>single_table</code> project without monitoring skips
+both; set them later in <code>deployment/variables.yml</code> when you enable monitoring.
+<code>separate_all</code> asks for a distinct scoring source.
 Both modes ask <code>include_source_sql</code>, default <code>false</code>: keep it off when your tables
 already exist and use <code>preview.py --action sources</code> to check them. Choose <code>true</code>
 only if you need an editable CREATE TABLE starter for tables that do not exist
 yet. In a JSON answer file this is <code>"include_source_sql": "true"</code> (a string).
 The starter is <code>config/sources.sql</code>; replace its namespace and type placeholders
-before running it yourself. Setup and deployment never execute it. <code>SOURCES.md</code>
+before running it yourself. Setup and deployment never execute it. <strong>Source data</strong> in <code>GUIDE.md</code>
 and the read-only source check remain available with either choice.
 A model set asks for the task and columns of
 each active branch. It accepts documented defaults for the remaining settings.
@@ -6361,7 +6413,7 @@ to change them afterwards.</p>
 <tr>
 <td><code>development_monitoring</code> (with personal development targets)</td>
 <td><code>true</code> or <code>false</code></td>
-<td>Development targets monitor into their own schema (<code>deployment/monitoring.yml</code>)</td>
+<td>Development targets monitor into their own schema (<code>deployment/targets.yml</code>)</td>
 </tr>
 <tr>
 <td><code>development_monitoring_schema</code></td>
@@ -6371,7 +6423,7 @@ to change them afterwards.</p>
 <tr>
 <td><code>monitoring_dashboard</code></td>
 <td><code>none</code>, <code>create</code> or <code>connect</code></td>
-<td>The <code>test</code> dashboard block in <code>deployment/monitoring.yml</code></td>
+<td>The <code>test</code> dashboard block in <code>deployment/targets.yml</code></td>
 </tr>
 </tbody>
 </table>
@@ -6387,7 +6439,7 @@ enroll models and run monitoring. <code>monitoring: "false"</code> sets it to <c
 train and score run without monitoring. A user-selected schema is preserved,
 including an existing store. To use a central catalog instead of each target's
 own, set <code>monitoring_catalog</code> in <code>deployment/variables.yml</code> or per target in
-<code>deployment/monitoring.yml</code>. The schema is created
+<code>deployment/targets.yml</code>. The schema is created
 on first use if the run-as identity may
 create schemas. Personal development targets set <code>monitoring_enabled</code> to
 <code>"false"</code> unless <code>development_monitoring</code> is <code>"true"</code>; then they monitor into
@@ -6435,6 +6487,14 @@ running preview:</p>
 <tr>
 <td><code>catalog</code>, <code>schema</code></td>
 <td><code>REPLACE_TEST_CATALOG</code>, <code>REPLACE_TEST_SCHEMA</code>; prefill the <code>test</code> bindings in <code>deployment/variables.yml</code> and the preview/smoke defaults</td>
+</tr>
+<tr>
+<td><code>output_schema</code>, <code>metadata_schema</code></td>
+<td>Blank: reuse <code>schema</code> for the <code>test</code> output and model bindings and the preview/smoke defaults</td>
+</tr>
+<tr>
+<td><code>include_examples</code></td>
+<td><code>true</code>. <code>false</code> leaves out the <code>example_*</code> recipes, the example <code>src/features/preprocessing.py</code>, <code>pre_split.py</code> and <code>scoring.py</code> callbacks, <code>src/features/groups/*.py</code> and their commented references; create those files when you add your own steps</td>
 </tr>
 </tbody>
 </table>
@@ -6696,7 +6756,7 @@ and factories. A training sample is a real training input, not a no-write smoke 
 <p>To move an existing project to this layout, follow
 <a href="databricks_project_upgrade.html">project upgrades</a>.</p>
 <h3 id="local-tools-and-preview">Local tools and preview</h3>
-<p>The generated <code>src/tools/README.md</code> is the short reference beside the scripts.
+<p><strong>Local tools</strong> in the generated <code>GUIDE.md</code> is the short reference beside the scripts.
 Run commands from the project root with the matching Core package installed:</p>
 <div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span>
 <span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-models</span>
@@ -6888,10 +6948,10 @@ table/column names and snapshot pins with real values.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

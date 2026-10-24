@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3414,6 +3414,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6170,7 +6198,7 @@ The <a href="#the-command">notebook API</a> remains available for explicit, crea
 <a href="https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint">taxi_fare_endpoint</a>.
 It uses the built-in NYC taxi data, automatically updates serving after champion
 promotion, and demonstrates SQL requests plus telemetry monitoring. Its
-<a href="https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint/SERVING.md">serving walkthrough</a>
+<a href="https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/nyctaxi/taxi_fare_endpoint/GUIDE.md#call-the-taxi-endpoint-and-monitor-its-requests">serving walkthrough</a>
 ends at the <strong>Online serving</strong> dashboard; no batch prediction table is created.</p>
 <h3 id="choose-how-predictions-are-produced">Choose how predictions are produced</h3>
 <table>
@@ -6247,7 +6275,7 @@ and models listed in <a href="databricks_spark_scoring.html#what-spark-scoring-s
 <p>Additional built-in models, voting/stacking and eligible preprocessing recipes
 need the training evidence described in
 <a href="databricks_spark_scoring.html#built-in-recipes-and-model-evidence">built-in recipes and model evidence</a>.
-Selecting the endpoint job enables <code>defaults.allow_tested_custom_steps: true</code>
+Selecting the endpoint job enables <code>defaults.probe_pipeline_for_serving: true</code>
 in <code>config/training.yml</code>. For an existing endpoint-only project, enable it before
 training. Spark and online-feature projects already enable it.
 <code>prepare_pinned_endpoint</code> recomputes the certificate from
@@ -6373,6 +6401,15 @@ copy the job's generated examples with every required field.</p>
 </code></pre></div>
 <p>The job adds endpoint <code>CAN_QUERY</code> and function <code>EXECUTE</code>. Callers also need
 <code>USE CATALOG</code> and <code>USE SCHEMA</code>, which the job does not grant.</p>
+<p><code>permissions</code> get both grants by default. Unity Catalog rejects workspace-local
+groups such as <code>users</code> in <code>GRANT</code>, while the endpoint accepts them. In that case,
+list the UC grantees separately in <code>function_permissions</code> (same format, a list or
+a per-target mapping). An empty list grants no <code>EXECUTE</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">permissions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">users</span><span class="w">          </span><span class="c1"># endpoint CAN_QUERY only</span>
+<span class="w">  </span><span class="nt">function_permissions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">risk_readers</span><span class="w">   </span><span class="c1"># function EXECUTE</span>
+</code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="n">main</span><span class="p">.</span><span class="n">ml</span><span class="p">.</span><span class="n">risk_score</span><span class="p">(</span><span class="o">`</span><span class="n">amount</span><span class="o">`</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="o">`</span><span class="n">amount</span><span class="o">`</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">result</span>
 <span class="k">FROM</span><span class="w"> </span><span class="n">main</span><span class="p">.</span><span class="k">source</span><span class="p">.</span><span class="n">customers</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">s</span><span class="p">;</span>
 </code></pre></div>
@@ -6543,7 +6580,26 @@ file. The endpoint job's existing dispatch tasks remain in place in either mode.
 - <strong>Recovery:</strong> a failed smoke can leave the new version serving. Rerun with
   <code>--params model_version=&lt;previous_version&gt;</code> from the deployment result or
   endpoint configuration history (failed runs may have no final summary).
-  Recovery is explicit and leaves champion unchanged.</p>
+  Recovery is explicit and leaves champion unchanged. If the very first deploy
+  fails (<code>UPDATE_FAILED</code>, nothing served), the next run retries the same owned
+  endpoint; there is no need to delete it.
+- <strong>Private package index:</strong> Model Serving installs the model's own
+  requirements, not the job's <code>--index-url</code> lines. When public PyPI is blocked,
+  set environment variables on the job that logs the model; on policy clusters,
+  add <code>spark_env_vars</code> to the <code>job_cluster</code> variable in <code>deployment/variables.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="nt">spark_env_vars</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">SKYULF_MODEL_PIP_INDEX_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://&lt;your-index&gt;/simple</span>
+<span class="w">      </span><span class="c1"># Use this when the serving build cannot reach any index:</span>
+<span class="w">      </span><span class="nt">SKYULF_MODEL_PIP_BUNDLE_WHEELS</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span>
+</code></pre></div>
+<p><code>SKYULF_MODEL_PIP_INDEX_URL</code> and <code>SKYULF_MODEL_PIP_EXTRA_INDEX_URLS</code>
+  (space-separated) are written into the model's requirements; URLs with
+  credentials are rejected. <code>SKYULF_MODEL_PIP_BUNDLE_WHEELS: "true"</code> downloads
+  every dependency wheel for Linux x86_64 and the job's Python into the model
+  (<code>code/wheels</code>, at most 2 GiB) and installs with <code>--no-index</code>; the index
+  variables are then used only for that download. Only models trained after the
+  change are affected. Serverless jobs cannot set these variables; ask a workspace
+  admin to set the workspace default package repository instead.</p>
 <h2 id="the-command">The command</h2>
 <p>This advanced path creates a new endpoint and SQL function explicitly. It keeps
 the create-only behavior; use the Bundle job above for managed version updates.</p>
@@ -6758,6 +6814,11 @@ For floating-point inputs, the wrapper represents SQL nulls as a same-width
 <code>NaN</code> before calling <code>ai_query</code>, so the saved preprocessing handles missing
 values. This prevents the numeric-null-to-zero behavior reproduced in native
 testing. It does not fill values with a new SQL-side mean or constant.
+Integer and boolean inputs that had no missing values in training have no
+nullable wire form, and <code>ai_query</code> would send their NULL as <code>0</code> or <code>false</code>. For
+them the wrapper raises an error naming the column instead, so the query stops
+rather than scoring a wrong value. Fill the column, or retrain with missing
+values present so it gets the nullable form.
 Use matching source types: SQL's argument coercion is not a data validation layer.</p>
 <p><code>result</code> is the named per-row prediction struct, not the REST <code>predictions</code> array.
 Its fields match <code>endpoint.output_schema</code>: e.g. <code>result.prediction</code>, probability
@@ -7067,10 +7128,10 @@ decisions, inspect the <a href="databricks_serving_rollout.html#decisions-and-ti
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

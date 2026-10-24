@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3414,6 +3414,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -5945,7 +5973,7 @@ dashboard schedule can refresh independently of monitoring if desired.</p>
 No separate monitoring template or setup Bundle is required. The first activation,
 scoring registration or scheduled monitoring run bootstraps missing objects.
 Initialize before validating the dashboard SQL, because its queries need the views.</p>
-<p>Dashboards are set per shared target in <code>deployment/monitoring.yml</code>. Each workspace
+<p>Dashboards are set per shared target in <code>deployment/targets.yml</code>. Each workspace
 has its own dashboard and SQL warehouse, so <code>test</code>, <code>syst</code> and <code>prod</code> are configured
 separately; leave a target out for no dashboard. A configured target adds two tasks
 after <code>evaluate_retraining</code> in the monitoring job: <code>dashboard_refresh_enabled</code> checks
@@ -5983,7 +6011,7 @@ See the <a href="https://docs.databricks.com/aws/en/jobs/tasks/dashboard">Databr
 </tbody>
 </table>
 <h3 id="how-the-refresh-task-is-added">How the refresh task is added</h3>
-<p><code>deployment/monitoring.yml</code> does not define a second job. <code>resources/monitoring.job.yml</code>
+<p>A target block in <code>deployment/targets.yml</code> does not define a second job. <code>resources/monitoring.job.yml</code>
 defines the <code>monitoring</code> job for every target, and a target block repeats only its
 name with two extra tasks:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># resources/monitoring.job.yml (every target)</span>
@@ -5995,7 +6023,7 @@ name with two extra tasks:</p>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monitoring_report</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">evaluate_retraining</span>
 
-<span class="c1"># deployment/monitoring.yml (only the test target)</span>
+<span class="c1"># deployment/targets.yml (only the test target; merged with its other keys)</span>
 <span class="nt">targets</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">test</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">resources</span><span class="p">:</span>
@@ -6066,7 +6094,7 @@ investigation filters and five content pages, plus the global filter page.
 <code>resources/monitoring.job.yml</code> contains the separate Spark measurement, report and
 retraining job. No separate monitoring Bundle is required.</p>
 <h2 id="the-command">The command</h2>
-<p>After editing <code>deployment/monitoring.yml</code> for a target, validate and deploy it:</p>
+<p>After editing <code>deployment/targets.yml</code> for a target, validate and deploy it:</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">test</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
 <span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">test</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
 </code></pre></div>
@@ -6306,10 +6334,10 @@ dashboard refresh.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3660,6 +3660,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6308,8 +6336,16 @@ answers use the same question name with a <code>branch_N_</code> prefix.</p>
 <td>Integer</td>
 <td><code>10000</code></td>
 <td>Positive; aggregate fit/holdout input must fit</td>
-<td>Rejects a larger local training population instead of silently truncating it.</td>
+<td>Rejects a larger local training population instead of silently truncating it. Rows dropped by <code>filter_unavailable_results</code> (and missing branch targets in <code>multi_target</code>) are removed first and do not count.</td>
 <td><code>max_rows</code></td>
+</tr>
+<tr>
+<td><code>skip_missing_targets</code></td>
+<td>Boolean</td>
+<td><code>false</code> when omitted; new projects write <code>true</code></td>
+<td>true, false</td>
+<td>Skip rows whose target is empty instead of failing; they do not count toward <code>max_rows</code> and appear in the unavailable-label count. <code>multi_target</code> always skips empty branch targets.</td>
+<td><code>skip_missing_targets</code></td>
 </tr>
 <tr>
 <td><code>max_input_mb</code></td>
@@ -6669,11 +6705,19 @@ answers use the same question name with a <code>branch_N_</code> prefix.</p>
 <td>YAML</td>
 </tr>
 <tr>
-<td><code>allow_tested_custom_steps</code></td>
+<td><code>probe_pipeline_for_serving</code></td>
 <td>Boolean</td>
 <td><code>false</code>; automatic with <code>batch_compute: spark</code> or <code>online_features</code></td>
 <td>Explicit opt-in for other projects, such as endpoint-only serving</td>
 <td>Seals partition evidence for eligible models, ensembles and built-in preprocessing; also lints and probes <code>column_step</code>/<code>fitted_step</code> steps and saved scoring rules. Checks use 16 to 256 holdout rows. A failing required check stops training before registration. See <a href="databricks_spark_scoring.html#built-in-recipes-and-model-evidence">Built-in evidence</a> and <a href="databricks_spark_scoring.html#admit-your-own-row-steps-opt-in">Custom row steps</a>.</td>
+<td>YAML</td>
+</tr>
+<tr>
+<td><code>allow_tested_custom_steps</code></td>
+<td>Boolean</td>
+<td>Not set</td>
+<td>Old name of <code>probe_pipeline_for_serving</code>, still accepted</td>
+<td>Same setting; set only one of the two names, or setup fails.</td>
 <td>YAML</td>
 </tr>
 <tr>
@@ -7273,10 +7317,10 @@ inspection and copyable approval/rollback fields.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

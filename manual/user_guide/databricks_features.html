@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3308,6 +3308,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Choose a data route">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ready-training-table-no-feature-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ready training table (no feature groups)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3329,6 +3346,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="2. Configure two groups and the merge">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lakeflow-streaming-tables-and-materialized-views-as-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lakeflow streaming tables and materialized views as sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derive-labels-and-keys-with-base_transform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derive labels and keys with base_transform
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3540,6 +3585,34 @@
     
   
     Training Reports and Charts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
   
 
     
@@ -5956,6 +6029,23 @@ example tables have been created in your workspace.</p>
 another workflow registers or publishes. Producing an ordinary Delta table does
 not declare UC primary keys, provision an online store, publish it, or deploy an
 endpoint. See <a href="databricks_online_features.html">online features</a> for that workflow.</p>
+<h3 id="ready-training-table-no-feature-groups">Ready training table (no feature groups)</h3>
+<p>When an upstream pipeline already writes one regular Delta table with the target,
+the raw inputs and a record key, use it directly and leave <code>config/features.yml</code>
+disabled; no feature job is generated. Keep inputs raw (imputation and encoding
+are fitted by the model), and point both <code>training_table</code> and
+<code>score_source_table</code> at the table. Their placeholders vary the table per target:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># config/training.yml</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">training_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.observations{resource_suffix}"</span>
+<span class="w">  </span><span class="nt">record_key_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">entity_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">observed_on</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>A natural composite key works as long as every part is a non-null <code>STRING</code> or
+<code>BIGINT</code> and the parts are unique together. Store a date part as a string or
+integer when writing the table, for example
+<code>date_format(observed_on, 'yyyy-MM-dd') AS observed_on</code>. A separate
+<code>observation_id</code> is needed only when feature-group joins require the date as a
+<code>DATE</code> column while the model needs a string or integer key.</p>
 <p>Keep learned imputers, scalers, category statistics and selectors in
 <a href="preprocessing_recipes.html">preprocessing.yml</a>, where fitting occurs inside the
 training partition/fold. Use upstream groups for fixed formulas, domain
@@ -6051,10 +6141,19 @@ append it to the disabled <code>groups: {}</code> mapping.</p>
 <span class="w">    </span><span class="nt">lookup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">asof</span>
 <span class="w">    </span><span class="nt">allow_missing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </code></pre></div>
-<p>These table names are exact three-part names. Unlike training/inference table
-settings, this file does not expand <code>{catalog}</code> placeholders or add a deployment
-suffix. Choose separate names for each environment. Every output must differ
-from every input and other output, with one owning producer.</p>
+<p>Table names are three-part names and may use the same placeholders as
+<code>training.yml</code>: <code>{catalog}</code>, <code>{input_schema}</code>, <code>{output_schema}</code>,
+<code>{metadata_schema}</code> and <code>{resource_suffix}</code>. Quote such values in YAML. The
+feature job receives each target's values from the Bundle variables, so one file
+serves <code>test</code>, <code>syst</code>, <code>prod</code> and personal targets:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">base_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{input_schema}.company_observations"</span>
+<span class="nt">output_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{output_schema}.company_merged{resource_suffix}"</span>
+</code></pre></div>
+<p>Add <code>{resource_suffix}</code> to outputs so personal targets do not overwrite each
+other. After adding placeholders to an existing project, run
+<code>refresh_feature_graph.py</code> and redeploy: older feature jobs pass no target values
+and fail with a message naming that fix. Every output must differ from every
+input and other output, with one owning producer.</p>
 <table>
 <thead>
 <tr>
@@ -6071,13 +6170,28 @@ from every input and other output, with one owning producer.</p>
 </tr>
 <tr>
 <td><code>groups</code></td>
-<td>Mapping, required; <code>{}</code> disables production</td>
+<td>Mapping, required; <code>{}</code> disables production unless <code>base_transform</code> is set</td>
 <td>Up to 20 groups. Disabled configuration contains only version and groups.</td>
 </tr>
 <tr>
 <td><code>base_table</code></td>
 <td>String, required when enabled</td>
-<td>Existing observations and labels; no transform is applied to the base.</td>
+<td>Existing observations and labels, used as they are unless <code>base_transform</code> is set.</td>
+</tr>
+<tr>
+<td><code>base_transform</code></td>
+<td>Optional <code>src/features/groups/module.py:function</code></td>
+<td>Runs on the pinned base before the joins and may derive the target and record keys; see <a href="#derive-labels-and-keys-with-base_transform">Derive labels and keys</a>.</td>
+</tr>
+<tr>
+<td><code>source_snapshot</code></td>
+<td><code>materialize</code> default, or <code>fail</code></td>
+<td>Sources without Delta history (streaming tables, materialized views, views) are copied each run into an owned Delta snapshot that is pinned instead; <code>fail</code> stops with a message.</td>
+</tr>
+<tr>
+<td><code>source_snapshot_schema</code></td>
+<td>Optional <code>catalog.schema</code>; default: the <code>output_table</code> schema</td>
+<td>Where <code>skyulf_src_&lt;hash&gt;</code> snapshot tables are written.</td>
 </tr>
 <tr>
 <td><code>output_table</code></td>
@@ -6126,6 +6240,70 @@ from every input and other output, with one owning producer.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="lakeflow-streaming-tables-and-materialized-views-as-sources">Lakeflow streaming tables and materialized views as sources</h3>
+<p>Feature inputs are pinned to a Delta version so every task of a run, and any later
+repair, reads the same rows. Streaming tables, materialized views and views have no
+history to pin (Databricks also refuses <code>DESCRIBE HISTORY</code> on them from dedicated
+compute). The feature job therefore copies each such source once per run, with a
+plain read, into an owned Delta table <code>skyulf_src_&lt;hash&gt;</code> and pins that copy. No
+setting is needed:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">base_table</span><span class="p">:</span><span class="w"> </span><span class="s">"workspace.bronze.observations_st"</span><span class="w">   </span><span class="c1"># a streaming table: copied and pinned</span>
+<span class="nt">base_transform</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/features/groups/base.py:prepare</span><span class="w">  </span><span class="c1"># only if the target or key must be derived</span>
+<span class="nt">output_table</span><span class="p">:</span><span class="w"> </span><span class="s">"workspace.silver.observations"</span>
+<span class="nt">keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">entity_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">observed_on</span><span class="p p-Indicator">]</span>
+<span class="nt">timestamp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">observed_date</span>
+<span class="nt">groups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+</code></pre></div>
+<p>The copy costs a full scan per run; regular Delta tables are never copied. After
+<code>merge_features</code> publishes the output, the job drops its copies. If the run fails
+they are kept, so repairing the failed task reads the same rows; the next run
+replaces them. A table with the snapshot name that Skyulf did not create is never
+replaced or dropped. <code>source_snapshot_schema: catalog.schema</code> chooses where the
+copies go (default: the output schema); <code>source_snapshot: fail</code> turns copying off.</p>
+<p>The prepared <a href="https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/lakeflow"><code>lakeflow/bronze_observations</code></a>
+example runs this end to end, with a <code>setup.sql</code> that creates the streaming table.</p>
+<p>Train from <code>output_table</code>, a regular Delta table. To score, <code>ai_query</code> and the
+serving SQL function can read the streaming table itself, and REST callers send
+rows; only the batch <code>score</code> job needs a regular table with Change Data Feed, such
+as <code>output_table</code>. Training directly from a streaming table stops with a message.</p>
+<h3 id="derive-labels-and-keys-with-base_transform">Derive labels and keys with base_transform</h3>
+<p>When the raw source has no ready target or record key, for example a birth date
+instead of an age, or a <code>DATE</code> that the model cannot use as a key, add one
+project function instead of a separate preparation job:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">base_table</span><span class="p">:</span><span class="w"> </span><span class="s">"workspace.demo.raw_observations"</span>
+<span class="nt">base_transform</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/features/groups/base.py:prepare</span>
+<span class="nt">output_table</span><span class="p">:</span><span class="w"> </span><span class="s">"workspace.demo.observations"</span>
+<span class="nt">keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">entity_id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">observed_on</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># observed_on: a yyyy-MM-dd string made by prepare()</span>
+<span class="nt">timestamp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">observed_date</span><span class="w">         </span><span class="c1"># stays DATE for the feature grain and group joins</span>
+<span class="nt">groups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w">                       </span><span class="c1"># optional; groups still join on keys + timestamp</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># src/features/groups/base.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">functions</span> <span class="k">as</span> <span class="n">F</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">prepare</span><span class="p">(</span><span class="n">frame</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Derive the target and a string date key from the pinned raw rows."""</span>
+    <span class="k">return</span> <span class="n">frame</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+        <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">"entity_id"</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="s2">"string"</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">"entity_id"</span><span class="p">),</span>
+        <span class="n">F</span><span class="o">.</span><span class="n">date_format</span><span class="p">(</span><span class="s2">"observed_date"</span><span class="p">,</span> <span class="s2">"yyyy-MM-dd"</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">"observed_on"</span><span class="p">),</span>
+        <span class="s2">"observed_date"</span><span class="p">,</span>
+        <span class="n">F</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">months_between</span><span class="p">(</span><span class="s2">"observed_date"</span><span class="p">,</span> <span class="s2">"birth_date"</span><span class="p">)</span> <span class="o">/</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">"age"</span><span class="p">),</span>
+        <span class="s2">"region_code"</span><span class="p">,</span>
+        <span class="s2">"employee_count"</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div>
+<p>The job pins the base version and the function's code at <code>initialize_features</code>,
+runs <code>prepare()</code> in <code>merge_features</code>, checks that keys plus timestamp are non-null
+and unique, and publishes <code>output_table</code>. With no groups the job has only these
+two tasks. Point <code>training_table</code> at <code>output_table</code> and use
+<code>record_key_columns: [entity_id, observed_on]</code>. Keep <code>prepare()</code> free of learned
+statistics (means, encodings); those belong in <code>preprocessing.yml</code>. Run
+<code>python src/tools/refresh_feature_graph.py</code> after enabling it. Adding or removing
+a column in <code>prepare()</code> changes the output schema, which the job refuses to
+migrate silently ("Feature table schema differs"); drop or migrate
+<code>output_table</code> deliberately, then rerun the job.</p>
 <p>An asof match has no built-in maximum age in this group-merge implementation.
 Use explicit source rules when old feature values must expire. A matching row
 whose feature value is null still counts as a match; <code>allow_missing</code> controls
@@ -6182,7 +6360,12 @@ general dependency graph. Saved model versions retain their original snapshots.<
 </code></pre></div>
 <p>Replace <code>YOUR_PROFILE</code> with your configured profile. Refresh is local: it reads
 and validates <code>config/features.yml</code>, then creates <code>resources/features.job.yml</code>
-and its thin notebook. Smoke does not read <code>config/features.yml</code>; it checks the
+and its thin notebook. That file defines no <code>targets:</code>. When the train job has a
+per-target <code>run_as</code> or <code>permissions</code> in <code>deployment/targets.yml</code>, refresh prints the
+matching <code>features</code> entries to merge into the same targets, and smoke fails until
+they are there (or, after feature groups are turned off, until leftover <code>features</code>
+entries are removed, because Bundle would otherwise create an empty job).
+Smoke does not read <code>config/features.yml</code>; it checks the
 training configuration and the Python syntax of <code>src/</code>, including the group
 modules. Neither reads Delta data or executes Spark transformations.
 Refresh after changing feature configuration or inherited deployment controls,
@@ -6282,7 +6465,14 @@ retaining its model, registry, split, quality and resource settings:</p>
 <span class="nt">prediction_table</span><span class="p">:</span><span class="w"> </span><span class="s">"{catalog}.{output_schema}.company_predictions{resource_suffix}"</span>
 </code></pre></div>
 <p>Once there are enough representative rows for the configured split/CV, run the
-normal training workflow and approve/select a saved version before scoring.
+normal training workflow and approve/select a saved version before scoring.</p>
+<p>To run everything from one schedule, set <code>features_start_training: "true"</code> for
+the target in <code>deployment/targets.yml</code> (variable default <code>"false"</code>) and schedule
+only the features job. After <code>merge_features</code> succeeds, its <code>start_training</code>
+task runs the train job, whose usual handoff starts scoring after an alias
+change; scoring then starts monitoring. A pinned scorer is not started by
+training, so keep its own schedule. Run <code>refresh_feature_graph.py</code> once so an
+existing feature job gains the two tasks.
 For independent-target layouts, check model-level input/target overrides as
 well as defaults. The merged table may contain labels; labels are not model
 inputs. A separate unlabeled observation/merge table can be the scoring source.</p>
@@ -6493,10 +6683,10 @@ lookup; it is not a historical asof endpoint or a multi-target online flow.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

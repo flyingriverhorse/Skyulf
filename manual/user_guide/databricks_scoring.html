@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3414,6 +3414,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6521,6 +6549,11 @@ projects.</p>
 <td>score_new_rows or rescore_all; controls behavior when model/set selection changes.</td>
 </tr>
 <tr>
+<td><code>keep_prediction_generations</code></td>
+<td>Integer <code>2</code>, or <code>null</code></td>
+<td>With rescore_all, how many newest <code>_v&lt;n&gt;</code> generations to keep after a switch; the active one is always kept. <code>null</code> keeps all.</td>
+</tr>
+<tr>
 <td><code>rescore_when_history_expires</code></td>
 <td>Boolean <code>false</code></td>
 <td>Opt into the matching deployed recovery graph for recognized expiry only.</td>
@@ -6599,8 +6632,13 @@ versions. Use stored provenance when comparing rows. Merely choosing a different
 version with no new source rows does not rescore the old population.</p>
 <p>With rescore_all, the logical prediction name is a managed view over a physical
 <code>&lt;prediction_table&gt;_v&lt;version&gt;</code> generation. A new version scores the eligible
-snapshot and switches the view after successful publication; older generation
-tables remain. Repeated runs for that generation can continue incrementally.
+snapshot and switches the view after successful publication. Then older
+generations are dropped automatically, keeping the newest
+<code>keep_prediction_generations</code> (default <code>2</code>: the active one and the one before it,
+for rollback) and always the active one. Only <code>&lt;prediction_table&gt;_v&lt;n&gt;</code> tables
+tagged as this model's full-rebuild output are dropped; set
+<code>keep_prediction_generations: null</code> in <code>config/inference.yml</code> to keep them all.
+Repeated runs for that generation can continue incrementally.
 With <code>full_snapshot</code>, every current source row is eligible. With <code>from_now</code>,
 the rebuild uses keys already in the previous prediction generation plus new
 CDF inserts after its source watermark; pre-start history remains excluded.
@@ -6645,8 +6683,9 @@ stops rather than scoring pre-start history. Normal model-change rebuilds use
 the saved prediction keys and recent CDF instead. A
 successful replacement verifies source/output identities and the expected output
 version, then atomically retains the output table identity, grants and
-named views, then ordinary incremental scoring resumes at the new watermark. Older model-version
-generations remain available; rollback inside the rebuilt generation depends on
+named views, then ordinary incremental scoring resumes at the new watermark. The
+previous model-version generation remains available (see
+<code>keep_prediction_generations</code>); rollback inside the rebuilt generation depends on
 Delta history retention.
 An exact committed recovery retry is a no-op. Open scoring_report for the
 completed result; the initial score output saying recovery was requested is not
@@ -6798,10 +6837,10 @@ can consume predictions without publishing a Delta prediction table.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

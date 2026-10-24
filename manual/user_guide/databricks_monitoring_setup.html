@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3414,6 +3414,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -5973,7 +6001,7 @@ never moved or migrated. The catalog is not asked: <code>monitoring_catalog</cod
 each target's own <code>catalog</code>. Setup writes both to <code>deployment/variables.yml</code>; see
 <a href="databricks_project_setup.html#monitoring-destination">the setup questions</a>. To
 use other names in one target, put this excerpt under
-<code>targets.&lt;target&gt;.variables</code> in <code>deployment/monitoring.yml</code>. The values are
+<code>targets.&lt;target&gt;.variables</code> in <code>deployment/targets.yml</code>. The values are
 examples; use your existing catalog and a schema reserved for the shared store.</p>
 <div class="highlight"><pre><span></span><code><span class="nt">monitoring_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">operations</span>
 <span class="nt">monitoring_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model_monitoring</span>
@@ -6189,8 +6217,10 @@ monitoring store. Nothing is cleaned during ordinary observation.</p>
 <p>Projects initialized with a monitoring catalog include a separate
 <code>monitoring_cleanup</code> job. It runs Sundays at 04:00 UTC with confirmation enabled
 and a 90-day minimum reference age. This schedule is independent of monitoring
-and retraining; personal development targets keep it paused. Override these
-variables in <code>deployment/targets.yml</code>:</p>
+and retraining; personal development targets keep it paused. A run before the
+monitoring store exists (no model enrolled yet on that target) finishes with status
+<code>store_not_initialized</code> and changes nothing, so the schedule can stay on from the first
+deploy. Override these variables in <code>deployment/targets.yml</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">monitoring_cleanup_cron</span><span class="p">:</span><span class="w"> </span><span class="s">"0</span><span class="nv"> </span><span class="s">0</span><span class="nv"> </span><span class="s">4</span><span class="nv"> </span><span class="s">?</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">SUN"</span>
 <span class="nt">monitoring_cleanup_confirm</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span><span class="w"> </span><span class="c1"># false reports candidates without deleting</span>
 <span class="nt">monitoring_cleanup_pause_status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UNPAUSED</span><span class="w"> </span><span class="c1"># PAUSED stops the cleanup schedule</span>
@@ -6438,10 +6468,10 @@ them before an owner upgrade.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

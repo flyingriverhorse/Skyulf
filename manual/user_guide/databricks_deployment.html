@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3661,6 +3661,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6067,17 +6095,26 @@ use the same workspace. The template does not create catalogs, schemas, users or
 service principals.</p>
 <p>The <code>personal_development_targets</code> answer controls whether the three additional
 personal targets are generated. Detailed setup asks it; quick setup and an
-answer file without it keep <code>false</code>. Read the generated
-<code>deployment/README.md</code> for the project's selected value. Personal targets do not receive shared
+answer file without it keep <code>false</code>. Read <strong>Deployment and schedules</strong> in the generated
+<code>GUIDE.md</code> and <code>deployment/variables.yml</code> for the project's selected value. Personal targets do not receive shared
 service-principal identities or shared job ACL overrides. Their resolved suffix
 uses the workspace user ID, not just an email prefix, so two users named <code>alice</code>
 cannot share output/model names accidentally. Use each developer's own profile;
 one shared service account represents one identity, not several developers.</p>
-<p>Personal job names are <code>dev_&lt;user&gt;_train</code>, <code>dev_&lt;user&gt;_score</code> and
-<code>dev_&lt;user&gt;_monitoring</code>, without a project or environment label. Shared
-test/syst/prod jobs keep <code>&lt;project&gt;_train</code>, <code>&lt;project&gt;_score</code> and
-<code>&lt;project&gt;_monitoring</code>, without a user prefix. Environment-specific roots and output
-suffixes keep targets distinct when users choose to share one workspace.</p>
+<p>Personal targets use Databricks' standard development prefix, so job names are
+<code>[dev &lt;user&gt;] &lt;project&gt;_train</code>, <code>[dev &lt;user&gt;] &lt;project&gt;_score</code> and
+<code>[dev &lt;user&gt;] &lt;project&gt;_monitoring</code>. The project name (the Bundle name you chose as
+<code>project_name</code> at setup) stays in every name, so two projects deployed by the same
+person remain distinct in the Jobs list. Shared test/syst/prod jobs keep
+<code>&lt;project&gt;_train</code>, <code>&lt;project&gt;_score</code> and <code>&lt;project&gt;_monitoring</code>, without a user
+prefix. Environment-specific roots and output suffixes keep targets distinct when
+users choose to share one workspace.</p>
+<p>Every target, including per-target monitoring, dashboard and identity overrides, is
+defined in <code>deployment/targets.yml</code> only; other deployment files hold variables. CI
+checks that allow <code>targets:</code> in one designated file therefore pass unchanged. When
+optional feature groups add a <code>features</code> job, <code>src/tools/refresh_feature_graph.py</code>
+prints the <code>run_as</code>/<code>permissions</code> entries it needs per target; merge them into
+<code>targets.yml</code> (the smoke check fails until they match the train job).</p>
 <p>Personal names isolate deployments; they do not replace Unity Catalog grants.
 Reading production inputs still requires permission. Personal model/output
 schemas must also allow that developer's writes. If the company disallows writes
@@ -6279,6 +6316,24 @@ direct pins do not fully lock transitive dependencies.</p>
 <p>Override <code>job_tags</code> through target variables. For train and score, configure
 <code>serverless_environment_version</code> and <code>serverless_budget_policy_id</code>, or
 policy-cluster <code>spark_version</code>, <code>node_type_id</code>, <code>min_workers</code> and <code>max_workers</code>.</p>
+<p>All policy-cluster jobs (train, score, serving and the optional feature job) use
+one <code>new_cluster</code> spec: the complex <code>job_cluster</code> variable in
+<code>deployment/variables.yml</code>. When your cluster policy requires more fields, add
+them there once:</p>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="nt">job_cluster</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">complex</span>
+<span class="w">    </span><span class="nt">default</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">spark_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${var.spark_version}</span>
+<span class="w">      </span><span class="nt">node_type_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${var.node_type_id}</span>
+<span class="w">      </span><span class="nt">policy_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${var.cluster_policy_id}</span>
+<span class="w">      </span><span class="c1"># ... generated tags and autoscale stay as they are ...</span>
+<span class="w">      </span><span class="nt">data_security_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SINGLE_USER</span>
+<span class="w">      </span><span class="nt">runtime_engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STANDARD</span>
+<span class="w">      </span><span class="nt">use_ml_runtime</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>A target that sets <code>job_cluster</code> under <code>variables:</code> replaces the whole spec, so
+copy every field there. To change one value per target, override the scalar
+variables (<code>spark_version</code>, <code>node_type_id</code>, ...) instead.</p>
 <p>Monitoring always uses an independent serverless environment, including when
 train/score use policy clusters. Configure <code>monitoring_environment_version</code>
 (default <code>4</code>) and <code>monitoring_budget_policy_id</code> (default blank) separately.
@@ -6382,8 +6437,8 @@ Record keys must be unique, nonnull STRING/BIGINT columns. See
 editable bindings for test/syst/prod in <code>variables.yml</code> with <code>REPLACE_*</code>
 placeholders. The separate monitoring store catalog and schema are asked in both
 setup modes; see <a href="databricks_monitoring_setup.html">monitoring store setup</a>.
-An initialization JSON file may still provide <code>catalog</code> and <code>schema</code> to prefill
-shared test values. These settings reference existing UC objects; they do not
+An initialization JSON file may still provide <code>catalog</code> and <code>schema</code> (input), and
+optionally <code>output_schema</code> and <code>metadata_schema</code>, to prefill shared test values. These settings reference existing UC objects; they do not
 create them.</p>
 <ol>
 <li>Set the same workspace <code>host</code> in each shared/personal environment pair in
@@ -6469,11 +6524,6 @@ questions. Override them under a target's <code>variables</code> when environmen
 <td>Minimum interval between score attempts</td>
 </tr>
 <tr>
-<td><code>train_health_rules</code>, <code>score_health_rules</code></td>
-<td><code>[]</code></td>
-<td>Optional duration-warning rules</td>
-</tr>
-<tr>
 <td><code>train_email_notifications</code>, <code>score_email_notifications</code></td>
 <td><code>{}</code></td>
 <td>Optional event-to-email mappings</td>
@@ -6511,10 +6561,6 @@ handoff, so leave time for that child run when configuring its whole-job limit.<
 <span class="nt">score_task_timeout_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3000</span>
 <span class="nt">score_max_retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 <span class="nt">score_min_retry_interval_millis</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60000</span>
-<span class="nt">train_health_rules</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RUN_DURATION_SECONDS</span>
-<span class="w">    </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GREATER_THAN</span>
-<span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10800</span>
 <span class="nt">train_email_notifications</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"YOUR_ONCALL_EMAIL"</span><span class="p p-Indicator">]</span>
 <span class="w">  </span><span class="nt">on_duration_warning_threshold_exceeded</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"YOUR_ONCALL_EMAIL"</span><span class="p p-Indicator">]</span>
@@ -6524,7 +6570,22 @@ handoff, so leave time for that child run when configuring its whole-job limit.<
 <span class="w">  </span><span class="nt">on_failure</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">"YOUR_EXISTING_NOTIFICATION_DESTINATION_ID"</span>
 </code></pre></div>
-<p>Webhook values are existing workspace destination IDs, not URLs or secrets.
+<p>Duration warnings are <code>health</code> rules on the job itself, added under the same target
+in <code>targets.yml</code> (jobs have no <code>health</code> block by default, because an empty rule list
+fails <code>bundle deploy</code> with the Terraform engine):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">targets</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">test</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">jobs</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">train</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">health</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">              </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RUN_DURATION_SECONDS</span>
+<span class="w">                </span><span class="nt">op</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GREATER_THAN</span>
+<span class="w">                </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10800</span>
+</code></pre></div>
+<p>The warning value must not exceed the job's <code>timeout_seconds</code> when one is set.
+Webhook values are existing workspace destination IDs, not URLs or secrets.
 No destination is created and no recipient is added by default. Configure
 duration events alongside a health rule. Job-level failure notifications report
 the final failed job, rather than every failed retry attempt. See the official
@@ -6678,10 +6739,10 @@ and budget-policy settings regardless of that choice.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

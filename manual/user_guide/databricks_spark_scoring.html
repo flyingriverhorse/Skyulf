@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3414,6 +3414,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6166,8 +6194,9 @@ instead of registering a model that would score inconsistently. Typical cases:</
 </ul>
 <p>Spark and online-feature projects run the checks automatically. Endpoint-only
 projects enable the same training check with
-<code>defaults.allow_tested_custom_steps: true</code> in <code>config/training.yml</code>; despite its
-historical name, this setting also seals built-in and model evidence. Train and
+<code>defaults.probe_pipeline_for_serving: true</code> in <code>config/training.yml</code> (old name
+<code>allow_tested_custom_steps</code>, still accepted); it checks and seals the whole
+pipeline, including built-in steps and the model, not only custom steps. Train and
 register a new version after enabling it. Editing an old artifact's flag does
 not create evidence.</p>
 <p>Built-in code uses an exact calculator/applier identity check instead of project
@@ -6216,7 +6245,7 @@ endpoints:</p>
 </ul>
 <div class="highlight"><pre><span></span><code><span class="c1"># config/training.yml</span>
 <span class="nt">defaults</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">allow_tested_custom_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">probe_pipeline_for_serving</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># src/features/preprocessing.py; inference_context="row" is optional</span>
 <span class="n">fitted_step</span><span class="p">(</span><span class="s2">"clip_duration"</span><span class="p">,</span> <span class="n">learn</span><span class="p">,</span> <span class="n">apply</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">"duration"</span><span class="p">)</span>
@@ -6505,10 +6534,10 @@ rule format.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,10 +29,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3694,6 +3694,34 @@
   
   
     <li class="md-nav__item">
+      <a href="databricks_artifacts.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiment Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="databricks_explanations.html" class="md-nav__link">
         
   
@@ -6109,8 +6137,8 @@ the ordered recipe lists; Python owns only the selected functions/factories:</p>
 </code></pre></div>
 <p>Select <code>preprocessing_recipe: default</code> for the model. To add a built-in node, add
 its <code>name</code>, <code>transformer</code> and <code>params</code> entry to that same ordered list. Customize
-the Python factory when the calculation itself must change. The generated
-<code>PREPROCESSING.md</code> explains factory names, assets and advanced class examples.</p>
+the Python factory when the calculation itself must change. <strong>Preprocessing and custom
+code</strong> in the generated <code>GUIDE.md</code> summarizes factory names, assets and admission.</p>
 <p>Frequency encoding learns <code>count / training_rows</code> per observed string category.
 For training values <code>["A", "A", "B", null]</code>, scoring <code>["A", "B", "NEW", null]</code>
 produces <code>[0.5, 0.25, 0.0, 0.0]</code>. It replaces selected columns in place, preserving
@@ -6121,7 +6149,7 @@ Select these columns in workflow <code>input_columns</code>, excluding target/re
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>src/tools/preview.py<span class="w"> </span>--action<span class="w"> </span>train
 </code></pre></div>
 <p>See the <a href="databricks_project_setup.html#local-tools-and-preview">local tools reference</a>
-or the generated <code>src/tools/README.md</code> for preview flags, defaults and scope.</p>
+or <strong>Local tools</strong> in the generated <code>GUIDE.md</code> for preview flags, defaults and scope.</p>
 <h3 id="writing-your-own-step">Writing your own step</h3>
 <p>The function helpers build ordinary Core steps: <code>column_step</code> produces
 <code>ColumnFunction</code>, <code>fitted_step</code> produces <code>FittedFunction</code>, and <code>filter_step</code>
@@ -6849,10 +6877,10 @@ editable YAML or Python. Changing rules/assets/pins requires a new model.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>
