@@ -15,6 +15,38 @@ This reference covers settings, saved model behavior and operational results.
 - [Local tools](#local-tools)
 - [Failures and upgrades](#failures-and-upgrades)
 
+## How do I
+
+| I want to | Go to |
+| --- | --- |
+| Check my tables before the first run | [Source data](#source-data) |
+| Fill missing values, encode categories or scale columns | [Preprocessing](#preprocessing-and-custom-code) |
+| Drop invalid rows before training | [Preprocessing](#preprocessing-and-custom-code) (`pre_split.yml`) |
+| Change the model or its parameters | [Training](#training-and-model-decisions) |
+| Set the quality bar a version must pass | [Training](#training-and-model-decisions) |
+| Choose which version scoring uses | [Batch predictions](#batch-predictions) |
+| Skip rows or add output columns when scoring | [Batch predictions](#batch-predictions) |
+| Call the model over REST or SQL | [Serving requests](#serving-requests) |
+| Turn on drift and performance monitoring | [Monitoring](#monitoring) |
+| Change hosts, schedules or compute | [Deployment and schedules](#deployment-and-schedules) |
+| Recover from a failed run | [Failures and upgrades](#failures-and-upgrades) |
+
+## Words used here
+
+- **Candidate**: a newly trained model version in the registry. **Champion**: the
+  version approved for use. `champion` is an *alias*, a movable label on one version.
+- **Holdout**: rows kept out of fitting and used only to measure the final model.
+- **Pre-split** steps run before the train/holdout split and never learn from data.
+  **Preprocessing** steps run after it and learn (means, categories) from training rows only.
+- **Receipt**: the saved record of what a run read and wrote (versions, row counts),
+  used to check results and repeat runs safely.
+- **Admission**: the training-time check that a saved recipe can also run on Spark
+  workers or a serving endpoint.
+- **CDF** (Change Data Feed): Delta's log of row changes; incremental scoring uses it
+  to score only new rows.
+
+More terms: [glossary](https://www.skyulf.com/manual/user_guide/databricks_glossary.html).
+
 ## File map
 
 | Change | Owner |
@@ -42,10 +74,14 @@ bundled wheels for logged models in the `SKYULF_MODEL_PIP_*` job variables; see
 
 ## Source data
 
-The selected arrangement is **single_table**. Initialization/deployment do
-not create or populate input tables. Bind existing namespaces and choose immutable,
-nonnull, unique supported record keys identifying observations, not just people.
-Keep keys/targets out of model inputs; matching outcome keys need identical types.
+The selected arrangement is **single_table**. Setup and deployment do not
+create or fill input tables; they must exist.
+
+- **Record keys** identify one observation (for example `customer_id, month`), not
+  just one person. They must be unique, never empty and never change; use STRING or
+  BIGINT columns, not dates.
+- **Model inputs** exclude the keys and the target.
+- Keys in a separate outcomes table need the same types as in the source.
 
 Training expects targets in its training table. A monitoring label-table
 binding does not join outcomes into training. To train from external outcomes,
@@ -74,6 +110,35 @@ fold-local preprocessing/model fit. Keep learned means, quantiles and categories
 after splitting. Both phase YAML files have `version: 1`, `recipes`, and a
 `default` recipe; empty recipes do nothing. Example recipes run only when selected.
 Select `pre_split_recipe` and `preprocessing_recipe` in training settings.
+
+A typical recipe, with your own column names:
+
+```yaml
+# config/preprocessing.yml: learned on training rows after the split
+version: 1
+recipes:
+  default:
+    - name: fill_income
+      transformer: SimpleImputer
+      params: {columns: [income], strategy: median}
+    - name: city_onehot
+      transformer: OneHotEncoder
+      params: {columns: [city], handle_unknown: ignore}
+```
+
+```yaml
+# config/pre_split.yml: fixed rules before the split; nothing is learned
+version: 1
+recipes:
+  default:
+    - name: known_income
+      transformer: DropMissingRows
+      params: {subset: [income]}
+```
+
+Run `python src/tools/preview.py --action train` to see the resolved steps in order.
+Every built-in step and its parameters are in the
+[preprocessing catalog](https://www.skyulf.com/manual/user_guide/preprocessing_recipes.html).
 
 Prefer a registered step's `name`, `transformer` and `params` when suitable.
 `custom: my_rules.make_feature` selects a top-level factory in
@@ -115,6 +180,23 @@ aggregate work with `competition_max_trials` and `competition_max_candidates`.
 Model entries replace complete nested mappings from defaults, rather than
 deep-merging them. Remove `tuning` for fixed model parameters. Inspect the
 resolved recipe with `preview.py --action train` before deploying changes.
+
+For example, a fixed model with a quality bar in `config/training.yml`:
+
+```yaml
+defaults:
+  quality_threshold: 0.8   # holdout metric must reach this
+models:
+  main:
+    model:
+      type: logistic_regression
+      params: {C: 1.0}
+    # no tuning block: these values are used as given
+```
+
+Choose the threshold from what the business needs, before training. The
+[training field reference](https://www.skyulf.com/manual/user_guide/databricks_training_config.html)
+lists every model, its parameters and the tuning options.
 
 Training fits **polars** in one process. `max_rows`/`max_input_mb` bound input,
 not total RAM or preprocessing/model expansion. `training_sample_rows` selects
@@ -174,7 +256,24 @@ Built-ins include `required_values`, `value_range` and `prediction_band`.
 Custom rules use `custom: scoring.<function>` and declared output columns/dtypes.
 The `combined` list is cross-model arithmetic, not the eligibility mode. Do not
 add Python builders beside YAML; legacy builders remain valid without YAML.
-See [scoring and publication](https://www.skyulf.com/manual/user_guide/databricks_scoring.html).
+For example, to score only rows with a known, adult age:
+
+```yaml
+# config/scoring.yml
+version: 1
+mode: custom
+skip_target_pre_split_steps: false
+eligibility:
+  - name: observed_age
+    check: required_values
+    params: {columns: [age]}
+  - name: adult_age
+    check: value_range
+    params: {column: age, minimum: 18.0, maximum: 120.0}
+```
+
+A failing row is not deleted: it stays in the output with `scoring_status: excluded`,
+its `exclusion_reason` and an empty prediction. See [scoring and publication](https://www.skyulf.com/manual/user_guide/databricks_scoring.html).
 
 ## Serving requests
 
@@ -230,7 +329,15 @@ Use the target's `monitoring_enabled` and catalog/schema bindings; storage is
 independent of training/model/output destinations. Share one intended store and
 dashboard owner; initialize/upgrade it before producers without creation grants.
 Personal development monitoring explicitly opts into a separate schema and never
-enables development retraining. Inspect the actual target block.
+enables development retraining. Inspect the actual target block, for example:
+
+```yaml
+# deployment/targets.yml
+targets:
+  test:
+    variables:
+      monitoring_enabled: "true"
+```
 
 Prepare missing references with the monitoring job's
 `monitoring_action=prepare_references`; then inspect concrete model enrollment
