@@ -129,6 +129,9 @@ Review anything you pass to params, tags and config before logging it.
 
 ## Training datasets in Inputs
 
+For the run's `model/`, `lifecycle/` and training JSON files, see the
+[experiment artifact reference](databricks_artifacts.md).
+
 Databricks candidate training records two native MLflow dataset inputs on the
 run that produces the model: `training` and `holdout`. This happens automatically
 for `train_candidate` and generated Bundle training jobs, with either pandas or

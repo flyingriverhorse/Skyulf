@@ -75,6 +75,10 @@ Artifact links open that run's **Artifacts** tab; select the filename shown in
 the link. Threshold previews show at most ten entries and shorten long labels
 or values. Open `decision_threshold.json` for the complete saved mapping.
 
+For `lifecycle/`, `model/` and the individual training JSON files, use the
+[experiment artifact reference](databricks_artifacts.md). It explains their
+contents, when to open each file and how similarly named evidence differs.
+
 Chart leaves run independently and can still be running when this final report
 renders. Their eventual task state is in the job graph. A requested child score
 run starts **after** `training_report`, so it cannot have a child-run link in
