@@ -41,6 +41,7 @@ from ..scoring.shared.prediction_output import (
     activate_prediction_view,
     active_prediction_generation,
     provision_prediction_table,
+    prune_prediction_generations,
     scoring_target,
 )
 from ..scoring.workflow import (
@@ -757,6 +758,13 @@ def _run_scoring_action(
     )
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
         activate_prediction_view(spark, config["prediction_table"], target)
+        prune_prediction_generations(
+            spark,
+            config["prediction_table"],
+            target,
+            model_name=config["model_name"],
+            keep=config.get("keep_prediction_generations", 2),
+        )
     return result
 
 

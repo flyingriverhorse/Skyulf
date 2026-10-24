@@ -35,6 +35,7 @@ _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 _PUBLIC_MODEL_CHANGE = {"incremental_append": "score_new_rows", "full_rebuild": "rescore_all"}
 WORKFLOW_FIELDS = {
     "drop_missing_labels",
+    "keep_prediction_generations",
     "prediction_delivery",
     "initial_scoring",
     "preprocessing_probe",

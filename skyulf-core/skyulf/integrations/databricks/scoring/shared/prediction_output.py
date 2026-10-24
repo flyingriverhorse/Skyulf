@@ -73,6 +73,57 @@ def activate_prediction_view(spark: Any, logical: str, generation: str) -> None:
     spark.sql(f"ALTER VIEW {logical} AS SELECT * FROM {generation}").collect()
 
 
+def prune_prediction_generations(
+    spark: Any,
+    logical: str,
+    active: str,
+    *,
+    model_name: str,
+    keep: int | None = 2,
+) -> list[str]:
+    """Drop older full-rebuild generations, keeping the newest ``keep`` and the active one.
+
+    Only ``<logical>_v<n>`` tables tagged as this model's full-rebuild output are
+    dropped; ``keep=None`` keeps every generation. Returns the dropped table names.
+    """
+    if keep is None:
+        return []
+    if type(keep) is not int or keep < 1:
+        raise ValueError("keep_prediction_generations must be a positive integer or null.")
+    catalog, schema, base = logical.split(".")
+    pattern = re.compile(re.escape(base) + r"_v([1-9][0-9]*)", re.IGNORECASE)
+    listed = spark.sql(f"SHOW TABLES IN `{catalog}`.`{schema}` LIKE '{base}_v*'").collect()
+    versions = {
+        f"{catalog}.{schema}.{row['tableName']}": int(match[1])
+        for row in listed
+        if (match := pattern.fullmatch(row["tableName"]))
+    }
+    newest = sorted(versions, key=versions.__getitem__, reverse=True)
+    kept = {name.lower() for name in newest[:keep]} | {active.lower()}
+    dropped = []
+    for name in newest[keep:]:
+        if name.lower() in kept or not _owned_generation(spark, name, model_name):
+            continue
+        spark.sql(f"DROP TABLE IF EXISTS {_quoted(name)}").collect()
+        dropped.append(name)
+    return dropped
+
+
+def _owned_generation(spark: Any, name: str, model_name: str) -> bool:
+    """Return True for a full-rebuild generation written for ``model_name``."""
+    rows = spark.sql(f"SHOW TBLPROPERTIES {_quoted(name)}").collect()
+    properties = {row["key"]: row["value"] for row in rows}
+    return (
+        properties.get("skyulf.mode") == "full_rebuild"
+        and properties.get("skyulf.model_name") == model_name
+    )
+
+
+def _quoted(name: str) -> str:
+    """Backtick each part of a validated three-part name."""
+    return ".".join(f"`{part}`" for part in name.split("."))
+
+
 def active_prediction_generation(spark: Any, logical: str) -> str | None:
     """Resolve only a managed same-target generation for boundary inheritance."""
     if not TABLE_NAME_PATTERN.fullmatch(logical):

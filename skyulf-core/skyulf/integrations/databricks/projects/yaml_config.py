@@ -45,6 +45,7 @@ _INTERNAL_OPTIONS = {
     for internal, _ in options.values()
 }
 INFERENCE_FIELDS = {
+    "keep_prediction_generations",
     "prediction_delivery",
     "initial_scoring",
     "spark_udf_env_manager",

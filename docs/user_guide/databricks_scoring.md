@@ -407,6 +407,7 @@ projects.
 | `score_model_selection` | String `pinned_version` | pinned_version or champion for single-model/competition scoring. |
 | `model_version` | Positive version string; generated `"1"` when pinned | Required concrete pin for pinned single-model selection; replace with an inspected version. |
 | `on_model_change` | String `score_new_rows` | score_new_rows or rescore_all; controls behavior when model/set selection changes. |
+| `keep_prediction_generations` | Integer `2`, or `null` | With rescore_all, how many newest `_v<n>` generations to keep after a switch; the active one is always kept. `null` keeps all. |
 | `rescore_when_history_expires` | Boolean `false` | Opt into the matching deployed recovery graph for recognized expiry only. |
 | `follow_champion` | Boolean `false` | true or false; must match deployed graph parameters. |
 | `spark_udf_env_manager` | String; generated only for Spark | local on serverless or virtualenv on the generated job-cluster route; must match supported compute/dependencies. |
@@ -449,8 +450,13 @@ version with no new source rows does not rescore the old population.
 
 With rescore_all, the logical prediction name is a managed view over a physical
 `<prediction_table>_v<version>` generation. A new version scores the eligible
-snapshot and switches the view after successful publication; older generation
-tables remain. Repeated runs for that generation can continue incrementally.
+snapshot and switches the view after successful publication. Then older
+generations are dropped automatically, keeping the newest
+`keep_prediction_generations` (default `2`: the active one and the one before it,
+for rollback) and always the active one. Only `<prediction_table>_v<n>` tables
+tagged as this model's full-rebuild output are dropped; set
+`keep_prediction_generations: null` in `config/inference.yml` to keep them all.
+Repeated runs for that generation can continue incrementally.
 With `full_snapshot`, every current source row is eligible. With `from_now`,
 the rebuild uses keys already in the previous prediction generation plus new
 CDF inserts after its source watermark; pre-start history remains excluded.
@@ -504,8 +510,9 @@ stops rather than scoring pre-start history. Normal model-change rebuilds use
 the saved prediction keys and recent CDF instead. A
 successful replacement verifies source/output identities and the expected output
 version, then atomically retains the output table identity, grants and
-named views, then ordinary incremental scoring resumes at the new watermark. Older model-version
-generations remain available; rollback inside the rebuilt generation depends on
+named views, then ordinary incremental scoring resumes at the new watermark. The
+previous model-version generation remains available (see
+`keep_prediction_generations`); rollback inside the rebuilt generation depends on
 Delta history retention.
 An exact committed recovery retry is a no-op. Open scoring_report for the
 completed result; the initial score output saying recovery was requested is not
