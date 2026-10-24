@@ -3,7 +3,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'a74905055e25293a',
+    'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -52,7 +52,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'a74905055e25293a',
+    'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -101,7 +101,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': '150156bca4d7feac',
-    'README.md': 'd50a9156ac550d8a',
+    'README.md': 'd9a8e353d6fa1810',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'e188f415c95635a6',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -150,7 +150,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'dcadf371900785a7',
+    'README.md': 'd94aa17240dfc339',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -199,7 +199,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b4065f1ec1017889',
-    'README.md': '5be454a6b80810a7',
+    'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -248,7 +248,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'e0e8177f4c915f8d',
-    'README.md': 'a56109f1146982d2',
+    'README.md': 'a6e6390aac94bb53',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '432d7b43d515bce5',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -302,7 +302,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': '28b8548ecb39c7e9',
-    'README.md': '7c3b5b1cff8bf522',
+    'README.md': '65978840ba8fc8da',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -351,7 +351,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'f8cf8d82166ffd38',
+    'README.md': '75354649780e75c0',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -400,7 +400,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': '28b8548ecb39c7e9',
-    'README.md': '7c3b5b1cff8bf522',
+    'README.md': '65978840ba8fc8da',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -449,7 +449,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b4065f1ec1017889',
-    'README.md': '5be454a6b80810a7',
+    'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -498,7 +498,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b4065f1ec1017889',
-    'README.md': '5be454a6b80810a7',
+    'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -547,7 +547,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'f8cf8d82166ffd38',
+    'README.md': '75354649780e75c0',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -596,7 +596,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'a74905055e25293a',
+    'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -645,7 +645,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'd560140e09d1b5ec',
+    'README.md': 'ab66607d91dc127c',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -695,7 +695,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b4065f1ec1017889',
-    'README.md': '5be454a6b80810a7',
+    'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
     'config/pre_split.yml': '8dda2c847c6ddcf2',
@@ -744,7 +744,7 @@
   dict({
     '.gitignore': '1616f3be3463b0c4',
     'GUIDE.md': 'b77cfc79ac18799a',
-    'README.md': 'a74905055e25293a',
+    'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
     'config/pre_split.yml': '8dda2c847c6ddcf2',

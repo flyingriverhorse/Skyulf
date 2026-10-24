@@ -21,6 +21,7 @@ check that the data exists before you deploy:
 | `deployment/targets.yml` | `host` under `test`: replace `https://replace-test.example.invalid` with your workspace URL. |
 | `deployment/variables.yml` | `test_catalog`, `test_input_schema`, `test_output_schema` and `test_metadata_schema` (`REPLACE_TEST_*`). |
 | Commands below | `YOUR_PROFILE`: an authenticated Databricks CLI profile for that workspace. |
+| Unity Catalog grants | The job identity reads the inputs, writes the output schema and registers models in the metadata schema; see [required access](https://www.skyulf.com/manual/user_guide/databricks_deployment.html#data-model-and-experiment-access). |
 | Unity Catalog | The catalog, schemas and source table must exist. The table needs the record key, input and target columns from setup, and Change Data Feed on before the first score. |
 | `config/training.yml` | A numeric `quality_threshold`, if you will approve the first champion or promote automatically. Set it before training; a trained version keeps its policy. |
 | `deployment/variables.yml` and `deployment/targets.yml` (optional) | Monitoring runs only when `monitoring_enabled` is `"true"`. It writes to `monitoring_catalog`.`monitoring_schema` (variables.yml); the catalog defaults to each target's own catalog and the schema to `skyulf_monitoring`. Use the same schema in every project so all models appear in one dashboard. `deployment/targets.yml` holds each target's dashboard and the development targets' monitoring settings; only one project creates a dashboard, the others connect to it there. |
@@ -89,16 +90,36 @@ Replace `YOUR_PROFILE` in every command.
 
 ## Learn by making one change
 
-After the first successful run, use this short exercise:
+After the first successful run, change one setting and compare two fits of the same data:
 
-1. Write down the saved model version, training run and holdout result.
-2. Find one prediction and explain its inputs and model version. A registered
-   candidate, an approved champion and a live endpoint are separate states.
-3. Keep the training snapshot and split fixed; change one supported model
-   parameter or preprocessing step using the [file map](GUIDE.md#file-map).
-4. Preview, deploy and train again. Compare the new report; the old saved
-   artifact remains unchanged. Editing YAML does not change an existing model.
-5. If monitoring is enabled, distinguish drift, label coverage and measured
+1. **Record the first fit.** In `training_report` > **Where to look**, note the
+   version (`<model> vN`), the holdout metric and the **Training data** column's
+   `Delta version`.
+2. **Fix the data.** In `config/training.yml` defaults, set `training_table_version`
+   to that Delta version, so the second fit reads the same rows. The split seed
+   (`random_state`) already stays the same.
+3. **Change one setting.** For a tuned model, raise the search size under the
+   model's `tuning`, for example:
+
+   ```yaml
+   # before
+       tuning:
+         n_trials: 3
+   # after
+       tuning:
+         n_trials: 10
+   ```
+
+   For a fixed model, change one value under its `model` > `params` instead.
+   `python src/tools/preview.py --action train` shows the new value before you deploy.
+4. **Deploy and train again.** A new version `vN+1` is registered; `vN` and its
+   files do not change.
+5. **Compare.** Put both training reports side by side: same source version and
+   holdout rows, so a metric difference comes from your change. More trials do
+   not guarantee a better score; keep whichever version is better for your goal.
+   Score the new version for one run with `--params score_model_version=N+1` and
+   compare one record's prediction from both versions.
+6. If monitoring is enabled, distinguish drift, label coverage and measured
    performance using [monitoring](GUIDE.md#monitoring).
 
 Use the [reference guide](GUIDE.md) for the next setting you need. The
