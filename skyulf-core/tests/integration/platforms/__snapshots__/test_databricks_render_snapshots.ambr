@@ -2,7 +2,7 @@
 # name: test_rendered_project_matches_snapshot[date-free-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'a879e01802e54f6a',
+    'GUIDE.md': '0de086e3510bad24',
     'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
@@ -51,7 +51,7 @@
 # name: test_rendered_project_matches_snapshot[defaults]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'a879e01802e54f6a',
+    'GUIDE.md': '0de086e3510bad24',
     'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
@@ -100,7 +100,7 @@
 # name: test_rendered_project_matches_snapshot[guided-classification-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '94b9b30c2d1ca053',
+    'GUIDE.md': 'dc4d8eca21a777e9',
     'README.md': 'd9a8e353d6fa1810',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'e188f415c95635a6',
@@ -149,7 +149,7 @@
 # name: test_rendered_project_matches_snapshot[nested-group-threshold-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '407a462acf62b927',
+    'GUIDE.md': '42ebea45e32014fa',
     'README.md': 'd94aa17240dfc339',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
@@ -198,7 +198,7 @@
 # name: test_rendered_project_matches_snapshot[nested-temporal-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '27bb86185811d29d',
+    'GUIDE.md': '89ef726784d313eb',
     'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
@@ -247,7 +247,7 @@
 # name: test_rendered_project_matches_snapshot[nyctaxi/taxi_fare_endpoint.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'b33e3f6ae26a547c',
+    'GUIDE.md': 'a9bef1aa58fc4c42',
     'README.md': 'a6e6390aac94bb53',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '432d7b43d515bce5',
@@ -301,7 +301,7 @@
 # name: test_rendered_project_matches_snapshot[paying-reg-no-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '825dc84803ac85fe',
+    'GUIDE.md': '8b0db266ff81f7d0',
     'README.md': '65978840ba8fc8da',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
@@ -350,7 +350,7 @@
 # name: test_rendered_project_matches_snapshot[personal-targets-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'a879e01802e54f6a',
+    'GUIDE.md': 'b4b0183eb5a22f6e',
     'README.md': '75354649780e75c0',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
@@ -399,7 +399,7 @@
 # name: test_rendered_project_matches_snapshot[policy-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '825dc84803ac85fe',
+    'GUIDE.md': '8b0db266ff81f7d0',
     'README.md': '65978840ba8fc8da',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
@@ -448,7 +448,7 @@
 # name: test_rendered_project_matches_snapshot[random-delayed-results-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '27bb86185811d29d',
+    'GUIDE.md': '89ef726784d313eb',
     'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
@@ -497,7 +497,7 @@
 # name: test_rendered_project_matches_snapshot[random-window-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '27bb86185811d29d',
+    'GUIDE.md': '89ef726784d313eb',
     'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
@@ -546,7 +546,7 @@
 # name: test_rendered_project_matches_snapshot[separate-identities-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'a879e01802e54f6a',
+    'GUIDE.md': 'b4b0183eb5a22f6e',
     'README.md': '75354649780e75c0',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
@@ -595,7 +595,7 @@
 # name: test_rendered_project_matches_snapshot[serverless-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'a879e01802e54f6a',
+    'GUIDE.md': '0de086e3510bad24',
     'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
@@ -644,7 +644,7 @@
 # name: test_rendered_project_matches_snapshot[shared-monitoring]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'a879e01802e54f6a',
+    'GUIDE.md': '0de086e3510bad24',
     'README.md': 'ab66607d91dc127c',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': 'c04552d031fc281c',
@@ -694,7 +694,7 @@
 # name: test_rendered_project_matches_snapshot[temporal-delayed-results-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': '27bb86185811d29d',
+    'GUIDE.md': '89ef726784d313eb',
     'README.md': 'b14e85d8c7254f6e',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',
@@ -743,7 +743,7 @@
 # name: test_rendered_project_matches_snapshot[tuning-init.example.json]
   dict({
     '.gitignore': '1616f3be3463b0c4',
-    'GUIDE.md': 'a879e01802e54f6a',
+    'GUIDE.md': '0de086e3510bad24',
     'README.md': '1604db2f9ba0c9c8',
     'config/features.yml': '67b3aecbf7783206',
     'config/inference.yml': '85c16c5fee535252',

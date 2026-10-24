@@ -99,7 +99,9 @@ python src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-
 
 This is read-only, but uniqueness checks can scan tables. It checks the supplied
 profile's access, not another run identity or future data. Add the target's
-`--resource-suffix` when needed. No DDL starter was selected. If needed, generate a separate project with
+`--resource-suffix` when needed.
+
+No DDL starter was selected. If needed, generate a separate project with
 `include_source_sql: "true"` and adapt its SQL without overwriting this project.
 See [source contracts and time windows](https://www.skyulf.com/manual/user_guide/databricks_training_data.html).
 
@@ -140,14 +142,45 @@ Run `python src/tools/preview.py --action train` to see the resolved steps in or
 Every built-in step and its parameters are in the
 [preprocessing catalog](https://www.skyulf.com/manual/user_guide/preprocessing_recipes.html).
 
-Prefer a registered step's `name`, `transformer` and `params` when suitable.
-`custom: my_rules.make_feature` selects a top-level factory in
-`src/features/my_rules.py`; YAML `params` become keyword arguments.
-It returns a Core step, not a DataFrame. Import `filter_step` for fixed row
-eligibility, `column_step` for fixed columns, or `fitted_step` for learn/apply
-state from `skyulf.preprocessing`. Learned JSON-compatible state is fitted per
-training fold and reused on holdout/prediction. Do not combine YAML ownership
-with Python builders or add inline pipeline steps to `training.yml`.
+### Your own step in Python
+
+Use a built-in step when one fits. When none does, write a small factory. For example,
+`src/features/my_rules.py` adds `log_income = log(1 + income)`:
+
+```python
+import numpy as np
+
+from skyulf.preprocessing import column_step
+
+
+def log1p_value(df, params):
+    return np.log1p(df[params["column"]].clip(lower=0))
+
+
+def log_feature(column):
+    return column_step(f"log_{column}", log1p_value, output=f"log_{column}", params={"column": column})
+```
+
+Select it in a recipe; `params` become the factory's keyword arguments:
+
+```yaml
+    - custom: my_rules.log_feature
+      params: {column: income}
+```
+
+A step that learns from training rows (a mean, a mapping) uses `fitted_step` with a
+`learn(df, y, params)` and an `apply(df, state, params)` function;
+`src/features/preprocessing.py` shows both kinds with comments.
+
+Rules for your own code:
+- A factory is a top-level function in a module under `src/features/`; it returns a
+  Core step, not a DataFrame.
+- Import `filter_step` for fixed row eligibility, `column_step` for fixed columns,
+  or `fitted_step` for learn/apply state from `skyulf.preprocessing`.
+- Learned JSON-compatible state is fitted per training fold and reused on
+  holdout/prediction.
+- Do not combine YAML recipes with Python builders, or add inline pipeline steps
+  to `training.yml`.
 
 Keep imports/factories free of I/O. Preserve keys and protected time/group/weight
 metadata. Use relative imports for packaged helpers; never import `groups/`
@@ -215,7 +248,7 @@ This project has `promotion_policy=manual_approval`,
 `rescore_when_history_expires: false`.
 Read **training_report > Output > Where to look** for version, fitting run,
 holdout evidence and decision. Inspect the outcome: a report can finalize failure.
-Copy **Available action** parameters to the serialized train job for
+Copy **Available action** parameters into a train job run for
 approve/reject/rollback; first approval expects champion `none`. Keep receipts.
 Child score/serving completion is separate. See [training fields](https://www.skyulf.com/manual/user_guide/databricks_training_config.html),
 [reports](https://www.skyulf.com/manual/user_guide/databricks_training_reports.html),
@@ -234,13 +267,21 @@ once recorded; use a new destination for a separate scoring history. Enable
 Delta CDF before scoring, keep keys immutable and deliver late labels to their
 outcomes table instead of inserting duplicate prediction keys.
 
-Inspect concrete model/source versions, input/output counts, exclusions and
-the Delta receipt. Incremental replay with the same model and unchanged source
-should be a no-op. `on_model_change` governs model replacement; ordinary single
-model insert scoring rejects source UPDATE/DELETE. Model sets have their own
-`on_source_change` policy. Rebuilds and CDF-expiry recovery are explicit options;
-recovery needs the matching generated graph and retained evidence. Do not reset
-watermarks to retry. Read **score > Output**; this graph has no `scoring_report` task.
+After each score run:
+
+- **Check the result** in the run output: the model and source versions used, rows
+  in and out, excluded rows, and the Delta version written.
+- **Retrying is safe.** The same model on an unchanged source writes nothing new.
+- **New source rows** are scored on the next run. Changing or deleting existing source
+  rows makes ordinary single-model scoring fail;
+  a model set follows its `on_source_change` setting.
+- **A new model version** follows `on_model_change`: `score_new_rows` keeps old
+  predictions, `rescore_all` scores every row again into a new prediction table generation.
+- **Old history:** if the source's change history (CDF) has expired, rescoring is an
+  explicit option (`rescore_when_history_expires`). Never reset the scoring position
+  by hand to force a retry.
+
+Read **score > Output**; this graph has no `scoring_report` task.
 Workers run admitted pandas-fitted MLflow pyfunc batches with matching dependencies.
 Polars whole-frame behavior and arbitrary history/context do not become worker-safe.
 
@@ -274,9 +315,19 @@ its `exclusion_reason` and an empty prediction. See [scoring and publication](ht
 
 ## Serving requests
 
-This batch project has no `serving_endpoint` job. Generate/review the documented
-endpoint or both-delivery configuration before using this route. Existing saved
-models need serving admission evidence; changing delivery does not certify them.
+This batch project has no `serving_endpoint` job. To add an endpoint:
+
+1. Generate a new project in another folder with the same answers and
+   `prediction_delivery: "both"`.
+2. Copy its new files: `config/serving.yml`, `resources/serving_endpoint.job.yml`,
+   `src/jobs/serving_endpoint.py`, `src/jobs/dispatch_serving.py` and
+   `deployment/serving-requirements.txt`.
+3. Compare and merge its `config/training.yml`, `config/inference.yml`,
+   `deployment/variables.yml` and `resources/train.job.yml` into yours.
+4. Train a new version: models trained before the change have no serving checks.
+5. Follow that project's README **Serve the model** steps: publish, check what is
+   live, call it, monitor it.
+
 Inspect serving verification and generated REST/SQL/SDK examples. Test all
 required inputs; approval/submission does not prove which version is serving.
 
@@ -298,7 +349,9 @@ and [traffic rollout](https://www.skyulf.com/manual/user_guide/databricks_servin
 
 ## Optional feature tables
 
-Empty `groups: {}` creates no feature job. In `config/features.yml`, table names
+Empty `groups: {}` creates no feature job. The comments in `config/features.yml` list
+the steps and hold a complete two-group example to uncomment.
+In `config/features.yml`, table names
 are three-part and may use the `training.yml` placeholders (`{catalog}`,
 `{input_schema}`, `{output_schema}`, `{metadata_schema}`, `{resource_suffix}`);
 each target's feature job binds them. Each selected
@@ -322,23 +375,37 @@ and [online features](https://www.skyulf.com/manual/user_guide/databricks_online
 
 ## Monitoring
 
-Use the target's `monitoring_enabled` and catalog/schema bindings; storage is
-independent of training/model/output destinations. Share one intended store and
-dashboard owner; initialize/upgrade it before producers without creation grants.
-Personal development monitoring explicitly opts into a separate schema and never
-enables development retraining. Inspect the actual target block, for example:
+To set it up:
 
-```yaml
-# deployment/targets.yml
-targets:
-  test:
-    variables:
-      monitoring_enabled: "true"
-```
+1. **Turn it on** for the target in `deployment/targets.yml`:
 
-Prepare missing references with the monitoring job's
-`monitoring_action=prepare_references`; then inspect concrete model enrollment
-and configured selectors. A one-run score override does not change monitoring's
+   ```yaml
+   targets:
+     test:
+       variables:
+         monitoring_enabled: "true"
+   ```
+
+2. **Pick the store.** Results go to `monitoring_catalog`.`monitoring_schema` in
+   `deployment/variables.yml`. If setup had monitoring off, both are empty: set them,
+   for example to your catalog and `skyulf_monitoring`. Its tables are created on first
+   use if the job identity may create a schema. Use one store for all projects so they
+   share a dashboard.
+3. **Dashboard (optional).** One project creates it, the others connect to it; the
+   comments in `deployment/targets.yml` show both.
+4. **First pinned version only:** prepare its reference once, then score again:
+
+   ```powershell
+   databricks bundle run -t test --profile YOUR_PROFILE monitoring --params monitoring_action=prepare_references
+   ```
+
+5. **Run scoring.** Each committed score run starts the monitoring job, which writes
+   drift for that run.
+6. **Performance needs real outcomes:** set `monitoring_label_table` and
+   `monitoring_result_available_at_column` in `deployment/variables.yml`.
+
+Personal development targets use their own monitoring schema and never retrain.
+After preparing references, inspect the enrolled model and configured selectors. A one-run score override does not change monitoring's
 persistent selector. For model sets, component monitoring requires `all` or
 `separate_views`, not `combined_only`. Enable schedules only after checking references.
 
@@ -390,18 +457,19 @@ and remote checks remain necessary. See [tool details](https://www.skyulf.com/ma
 
 ## Failures and upgrades
 
-Identify the first failure and last confirmed result. A failed training phase
-does not support generic repair/resume; inspect evidence before a new run. A
-completed alias change and failed scoring need downstream recovery, not another
-fit. If scoring committed but its monitoring failed, retry the **same score
-request**, preparing references if necessary, so the existing receipt can be
-reused. An uncertain alias outcome requires reconciliation, not guessed rollback.
+Start from the first failed task and record its run ID.
 
-Before changing `deployment/requirements.txt`, preserve the working project,
-artifact/version, dependencies and receipts. Compare a fresh template separately;
-align graph/controller/runtime and upgrade metadata owners in the documented order.
-A changed pin does not migrate models. Prove actual load/predict in compatible
-environments; restored aliases alone are insufficient. Follow [ordered upgrades](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html),
+| What failed | What to do |
+| --- | --- |
+| Training (any train-job task) | Fix the cause and start a **new** train run. Repairing or retrying the failed run is rejected. |
+| Scoring, after an approval or promotion succeeded | Run the score job again; do not retrain or approve again. |
+| Monitoring, after predictions were written | Predictions stay. Prepare references if asked, then run the **same** score request again; it writes nothing new and finishes the measurement. |
+| An alias change whose outcome is unknown | Stop jobs that change aliases and follow alias recovery below; do not roll back instead. |
+
+**Upgrading Core** (`deployment/requirements.txt`): a model loads only with the
+library versions that trained it. After raising the pin, train a new version; to
+use an older one again you need its old environment. Keep the old working project
+and its versions until the new one is checked. Follow [ordered upgrades](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html),
 [alias recovery](https://www.skyulf.com/manual/user_guide/databricks_lifecycle_recovery.html),
 and [troubleshooting](https://www.skyulf.com/manual/user_guide/databricks_troubleshooting.html).
 These local instructions match the generated revision; public guides may be newer.
