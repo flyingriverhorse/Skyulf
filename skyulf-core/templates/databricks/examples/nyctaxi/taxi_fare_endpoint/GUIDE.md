@@ -89,6 +89,9 @@ create or fill input tables; they must exist.
   BIGINT columns, not dates.
 - **Model inputs** exclude the keys and the target.
 - Keys in a separate outcomes table need the same types as in the source.
+- Setup already wrote your answers into `config/training.yml` under `defaults:`
+  (`training_table`, `record_key_columns`, `input_columns`, `target_column`); edit
+  them there.
 
 Training expects targets in its training table. A monitoring label-table
 binding does not join outcomes into training. To train from external outcomes,
@@ -192,8 +195,8 @@ Rules for your own code:
   or `fitted_step` for learn/apply state from `skyulf.preprocessing`.
 - Learned JSON-compatible state is fitted per training fold and reused on
   holdout/prediction.
-- Do not combine YAML recipes with Python builders, or add inline pipeline steps
-  to `training.yml`.
+- Keep recipes in the YAML files. Do not also define the same recipe in Python, and do
+  not write pipeline steps inside `training.yml`.
 
 Keep imports/factories free of I/O. Preserve keys and protected time/group/weight
 metadata. Use relative imports for packaged helpers; never import `groups/`
@@ -237,7 +240,8 @@ models:
     # no tuning block: these values are used as given
 ```
 
-The threshold is compared with the `metric` in the same `defaults` block (for example
+The threshold is compared with the `metric` in the same `defaults` block (setup wrote
+this project's metric there; for example
 `heldout_accuracy`): error metrics such as RMSE must stay at or below it, scores such as
 accuracy must reach it. Choose it from what the business needs, before training. The
 [training field reference](https://www.skyulf.com/manual/user_guide/databricks_training_config.html)
