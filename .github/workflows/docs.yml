@@ -54,8 +54,8 @@ jobs:
       - name: Install skyulf-core (uv)
         run: uv pip install --system -e ./skyulf-core
 
-      # Build MkDocs documentation
-      - run: mkdocs build
+      # Build the documentation with Zensical (reads mkdocs.yml)
+      - run: zensical build --clean --strict
 
       # Create deployment directory with landing page + docs
       - name: Prepare deployment
