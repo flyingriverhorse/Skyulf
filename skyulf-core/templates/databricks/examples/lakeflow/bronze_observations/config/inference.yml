@@ -12,3 +12,4 @@ model_version: "1"
 on_model_change: score_new_rows
 rescore_when_history_expires: false
 follow_champion: false
+

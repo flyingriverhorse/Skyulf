@@ -49,3 +49,4 @@ models:
       n_trials: 10
       random_state: 42
       search_space: {"fit_intercept": [true, false]}
+
