@@ -7,6 +7,7 @@ MLflow remains an optional dependency and is imported only when an operation is
 requested.
 """
 
+import logging
 import shutil
 import tempfile
 from collections.abc import Iterator
@@ -17,6 +18,8 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ....inference.bundle import InferenceBundle
@@ -469,9 +472,39 @@ def register_model(
             raise translate_error(exc, name=name, version="new") from exc
     try:
         options = {"tags": tags} if tags is not None else {}
-        return client.create_model_version(name=name, source=model_uri, run_id=run_id, **options)
+        created = client.create_model_version(name=name, source=model_uri, run_id=run_id, **options)
     except Exception as exc:  # noqa: BLE001 - translate MLflow's backend errors at the boundary
         raise translate_error(exc, name=name, version="new") from exc
+    _list_in_models_tab(client, model_uri, run_id, name, str(created.version))
+    return created
+
+
+def _list_in_models_tab(client: Any, model_uri: str, run_id: str, name: str, version: str) -> None:
+    """Add a metadata-only MLflow 3 LoggedModel so the experiment's Models tab lists the fit.
+
+    The run artifact stays the only model copy and the registry source; this entry holds
+    no files. It is presentation only, so a backend without LoggedModels never blocks
+    registration.
+    """
+    try:
+        run = client.get_run(run_id)
+        logged = client.create_logged_model(
+            experiment_id=run.info.experiment_id,
+            name=name.rsplit(".", 1)[-1],
+            source_run_id=run_id,
+            tags={
+                "skyulf.model_uri": model_uri,
+                "skyulf.registered_model": name,
+                "skyulf.registered_version": version,
+            },
+        )
+        for key, value in run.data.metrics.items():
+            client.log_metric(run_id, key, value, model_id=logged.model_id)
+        client.finalize_logged_model(logged.model_id, "READY")
+    except Exception as exc:  # noqa: BLE001 - listing is optional presentation
+        logger.warning(
+            "Model version %s v%s is not listed in the Models tab: %s", name, version, exc
+        )
 
 
 def _validate_reference(
