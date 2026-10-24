@@ -106,6 +106,28 @@ def _check_serving(root: Path, bindings: dict[str, str]) -> None:
             raise ValueError(f"{label}: {section}: {exc}") from exc
 
 
+def _check_feature_targets(root: Path) -> None:
+    """Keep the feature job's per-target identity in step with training, in targets.yml."""
+    from ..features.graph import (  # noqa: PLC0415
+        feature_targets_snippet,
+        missing_feature_controls,
+        stale_feature_targets,
+    )
+
+    missing = missing_feature_controls(root)
+    if missing:
+        raise ValueError(
+            "deployment/targets.yml: the feature job needs the training job's run_as/"
+            "permissions in these targets; merge:\n" + feature_targets_snippet(missing)
+        )
+    stale = stale_feature_targets(root)
+    if stale:
+        raise ValueError(
+            "deployment/targets.yml: remove resources.jobs.features from "
+            f"{', '.join(stale)}; feature groups are off, so Bundle would create an empty job."
+        )
+
+
 def _check_packages(root: Path) -> list[str]:
     """Reuse training's inert snapshot validation without importing project packages."""
     checked = []
@@ -140,6 +162,7 @@ def check_project(project_path: str | Path, bindings: dict[str, str]) -> dict[st
     root = Path(project_path).resolve(strict=True)
     config = _check_config(root, bindings)
     _check_serving(root, bindings)
+    _check_feature_targets(root)
     sources = sorted((root / "src").rglob("*.py"))
     if not sources:
         raise ValueError("Project src must contain Python source files.")

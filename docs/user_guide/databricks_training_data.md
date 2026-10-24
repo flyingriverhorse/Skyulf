@@ -17,7 +17,7 @@ training run, make sure the training and scoring sources meet these rules:
 | --- | --- |
 | Unity Catalog Delta table | Training pins a Delta snapshot version; scoring reads Delta changes. |
 | Change Data Feed on the scoring source, before new rows arrive | Incremental scoring reads new rows from the change feed. The default first score processes existing rows; `initial_scoring: from_now` checkpoints without predictions. [Scoring](databricks_scoring.md) explains the starting choice, updates and deletes. |
-| Record key columns of type `STRING` or `BIGINT`, nonnull and unique | Keys identify each prediction. Date or timestamp keys are not supported. |
+| Record key columns of type `STRING` or `BIGINT`, nonnull and unique | Keys identify each prediction. Date or timestamp keys are not supported; store a date key as `date_format(observed_on, 'yyyy-MM-dd')` (STRING) or `yyyyMMdd` (BIGINT). |
 | Keys kept out of `input_columns` | Keys are copied to the output, not learned from. |
 | A nonnull target for every eligible training row | Skyulf does not create labels. Use [result availability](#record-identity-and-result-availability) for delayed outcomes. |
 | The same key and input columns, with the same types, in training and scoring sources | The saved pipeline expects the training input schema. The scoring source needs no target. |
@@ -107,7 +107,7 @@ override retain that override even when no layout answer was supplied.
 [Check or create your source tables](databricks_source_tables.md) walks through
 the check, the table contract and its error messages.
 
-Each generated project includes `SOURCES.md` and a read-only validation command.
+Each generated project's `GUIDE.md` has a **Source data** section and a read-only validation command.
 The optional `config/sources.sql` starter is generated only when setup selects
 `include_source_sql: "true"` (default `"false"`). Existing tables need no SQL starter:
 
@@ -269,12 +269,39 @@ to reach the configured training feature source upstream. Model-set branches
 may share one outcome table with multiple targets; each branch keeps its own
 target and availability policy.
 
+### Rows without a target
+
+Training needs a target on every row it uses. What happens to rows whose target
+is empty depends on the layout and on whether results arrive later:
+
+| Situation | What to do |
+| --- | --- |
+| Every row has a target | Nothing; keep `filter_unavailable_results: false`. |
+| `multi_target`, some branch targets empty | Nothing; each branch skips rows whose own target is empty. |
+| The result is known only later (for example churn after 3 months) | Set `filter_unavailable_results: true` with a `result_available_at_column` that is empty until the result is known. Those rows are skipped. |
+| `single_model`, some targets empty, no result date | Set `skip_missing_targets: true` (new projects already do): those rows are skipped. Without it training stops, so an unexpected gap in the table is not ignored. |
+
+`filter_unavailable_results` is only for results that arrive later; without a
+date involved it is not needed. Skipping happens only in training: the scoring
+source keeps every row, so rows without a target still get predictions. If you
+filter empty-target rows out of the table itself instead (upstream or in a
+[`base_transform`](databricks_features.md#derive-labels-and-keys-with-base_transform)),
+use two tables: a training table with labeled rows (`training_table`) and a
+scoring table with all rows (`score_source_table`).
+
+Skipped rows do not count toward `max_rows` and appear in the reported
+unavailable-label count.
+
 ### Local input limits
 
 `max_rows` bounds the rows read into the local process before train/test splitting.
-Without sampling it applies after any observation-window selection, but before
-result-availability filtering. An overflow fails; the reader never silently
-truncates data. Explicit sampling is available as described below.
+Without sampling it applies after any observation-window selection and after
+rows without a usable label are dropped on Spark, so they do not count toward
+it: rows outside `filter_unavailable_results`, and in `multi_target` rows whose
+branch target is missing. Single-model sources still need a label on every
+eligible row. Those
+rows still appear in the reported unavailable-label count. An overflow fails;
+the reader never silently truncates data. Explicit sampling is available as described below.
 
 Quick setup uses `max_rows: 10000` and `max_input_mb: 64`. Detailed setup also
 asks for `training_sample_rows`; null means no sampling. Overflow errors show

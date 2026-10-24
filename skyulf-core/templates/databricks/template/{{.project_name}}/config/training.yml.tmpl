@@ -22,6 +22,15 @@
 {{- if and (ne .prediction_delivery "batch") (ne .engine "pandas") -}}
 {{- template "ERROR_serving_endpoint_requires_engine_pandas" . -}}
 {{- end -}}
+{{- if ne .include_examples "true" -}}
+{{- $recipes := .competition_preprocessing_recipe -}}
+{{- range $slot := (regexp "[1-8]").FindAllString "12345678" -1 -}}
+{{- $recipes = printf "%s %s %s" $recipes (index $ (printf "branch_%s_preprocessing_recipe" $slot)) (index $ (printf "branch_%s_pre_split_recipe" $slot)) -}}
+{{- end -}}
+{{- if (regexp "(^| )example_").MatchString $recipes -}}
+{{- template "ERROR_include_examples_false_cannot_select_example_recipes" . -}}
+{{- end -}}
+{{- end -}}
 {{- /* Core competition admission rejects these; test_databricks_wizard_guards.py checks Core. */ -}}
 {{- $unsupported_competition_metrics := "^heldout_(mape|precision_weighted|recall_weighted)$" -}}
 {{- if and (eq .training_layout "model_competition") ((regexp $unsupported_competition_metrics).MatchString (index . (printf "%s_metric" .task))) -}}
@@ -32,7 +41,7 @@
 # preprocessing_recipe selects a list in config/preprocessing.yml.
 # pre_split_recipe selects a list in config/pre_split.yml.
 # Keep custom functions in src/features/preprocessing.py and pre_split.py.
-# See PREPROCESSING.md; do not add pipeline.preprocessing here.
+# See GUIDE.md#preprocessing-and-custom-code; do not add pipeline.preprocessing here.
 version: 1
 defaults:
   config_version: 1
@@ -51,11 +60,11 @@ defaults:
       - column: ""
         max_age_seconds: null
 {{end}}
-  save_preprocessing_diagnostics: {{.save_preprocessing_diagnostics}} # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
+  save_preprocessing_diagnostics: {{.save_preprocessing_diagnostics}} # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See GUIDE.md#preprocessing-and-custom-code.
   # Spark and online-feature projects check admission automatically, even when false below.
   # Set true to check preprocessing during training and save the results needed for endpoint deployment.
   # Details: https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html
-  allow_tested_custom_steps: {{if ne .prediction_delivery "batch"}}true{{else}}false{{end}}
+  probe_pipeline_for_serving: {{if ne .prediction_delivery "batch"}}true{{else}}false{{end}}
   training_table: "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}"
 {{if eq .source_layout "separate_outcomes"}}  training_label_table: "{{if not ((regexp "\\.").MatchString .label_table_name)}}{catalog}.{input_schema}.{{end}}{{.label_table_name}}"
   # null uses the latest label-table version at run start; set a number to reuse a specific version.

@@ -320,7 +320,8 @@ def _validate_key_types(frame: Any, spec: FrameSpec) -> None:
     for key in spec.record_key_columns:
         if frame.schema[key].dataType.typeName() not in supported:
             raise TypeError(
-                f"Unsupported inference key dtype for {key}; use integer/string/boolean."
+                f"Unsupported inference key dtype for {key}; use integer/string/boolean "
+                "(store dates as yyyy-MM-dd STRING (date_format) or yyyyMMdd BIGINT)."
             )
 
 

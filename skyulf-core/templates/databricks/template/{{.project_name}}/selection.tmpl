@@ -1,5 +1,12 @@
 {{- /* Generation-only selection: skip paths are relative to this directory. */ -}}
 {{- skip "selection" -}}
+{{- if ne .include_examples "true" -}}
+{{- skip "src/features/preprocessing.py" -}}
+{{- skip "src/features/pre_split.py" -}}
+{{- skip "src/features/scoring.py" -}}
+{{- skip "src/features/groups/company.py" -}}
+{{- skip "src/features/groups/activity.py" -}}
+{{- end -}}
 {{- if ne .include_source_sql "true" -}}
 {{- skip "config/sources.sql" -}}
 {{- end -}}

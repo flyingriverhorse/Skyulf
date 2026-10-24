@@ -110,6 +110,9 @@ class _FeatureSpark:
         import re
 
         self.operations.append(statement)
+        if statement.startswith("DESCRIBE TABLE EXTENDED"):
+            # Source kind lookup: every table here is a regular managed Delta table.
+            return SimpleNamespace(collect=lambda: [("Type", "MANAGED")])
         table = statement.split()[2].replace("`", "")
         if statement.startswith("DESCRIBE DETAIL"):
             state = self.tables[table]
@@ -365,3 +368,80 @@ def test_legacy_feature_snapshot_can_read_reuse_but_cannot_publish(feature_publi
         runtime.merge_feature_groups(spark, plan, snapshot, {"company": receipt})
     assert receipt["reused"] is True
     assert not any(sql.startswith(("MERGE", "ALTER", "CREATE")) for sql in spark.operations)
+
+
+def _base_plan():
+    """A raw base whose target and key come from one project function, without groups."""
+    return FeaturePlan(
+        "c.s.raw", "c.s.merged", ("id", "day"), "at", (), "src/features/groups/base.py:prepare"
+    )
+
+
+def _base_project(tmp_path, body="    return [*frame, 'derived']\n"):
+    """Write the project's base transform and return its root."""
+    path = tmp_path / "src/features/groups/base.py"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("def prepare(frame):\n" + body, encoding="utf-8")
+    return tmp_path
+
+
+def _merge_spies(monkeypatch):
+    """Replace Delta reads, joins and publication with recorders."""
+    seen = {}
+    monkeypatch.setattr(runtime, "_require_snapshot", lambda plan, snapshot: None)
+    monkeypatch.setattr(runtime, "_check_publication", lambda *args: {})
+    monkeypatch.setattr(runtime, "read_version", lambda spark, table, version: ["raw-row"])
+    monkeypatch.setattr(
+        runtime, "join_feature_groups", lambda base, frames, plan: seen.setdefault("base", base)
+    )
+    monkeypatch.setattr(runtime, "publish_feature_table", lambda *args, **kwargs: {"version": 2})
+    return seen
+
+
+def test_base_transform_runs_on_the_pinned_base_before_joins(tmp_path, monkeypatch):
+    """Labels and keys derived by prepare() must reach the published observation table."""
+    project = _base_project(tmp_path)
+    digest = runtime.project_function_source(project, _base_plan().base_transform)[1]
+    seen = _merge_spies(monkeypatch)
+    snapshot = {"source_versions": {"c.s.raw": 3}, "base_transform_sha256": digest}
+    result = runtime.merge_feature_groups(None, _base_plan(), snapshot, {}, project)
+    assert seen["base"] == ["raw-row", "derived"]
+    assert result == {"version": 2}
+
+
+def test_base_transform_edited_mid_run_is_rejected(tmp_path, monkeypatch):
+    """A repair must not publish rows from code that differs from the initialized run."""
+    project = _base_project(tmp_path)
+    _merge_spies(monkeypatch)
+    snapshot = {"source_versions": {"c.s.raw": 3}, "base_transform_sha256": "0" * 64}
+    with pytest.raises(ValueError, match="base_transform changed"):
+        runtime.merge_feature_groups(None, _base_plan(), snapshot, {}, project)
+
+
+def test_initialize_pins_the_base_transform_code(tmp_path, monkeypatch):
+    """The base code digest is fixed at initialize, like group transforms."""
+    project = _base_project(tmp_path)
+    monkeypatch.setattr(
+        runtime, "pin_source", lambda spark, table, policy, snapshot_schema: (table, 7)
+    )
+    monkeypatch.setattr(runtime, "publication_state", lambda spark, table: None)
+    snapshot = runtime.initialize_features(None, project, _base_plan(), "*")
+    expected = runtime.project_function_source(project, _base_plan().base_transform)[1]
+    assert snapshot["base_transform_sha256"] == expected
+    assert snapshot["source_versions"] == {"c.s.raw": 7}
+
+
+def test_base_only_feature_job_merges_after_initialize():
+    """Without group tasks the merge must still wait for the pinned snapshot."""
+    from skyulf.integrations.databricks.features.graph import build_feature_job
+
+    training = {"tasks": [{"task_key": "t", "notebook_task": {}, "environment_key": "skyulf"}]}
+    job = build_feature_job(_base_plan(), training)
+    tasks = {task["task_key"]: task for task in job["tasks"]}
+    assert set(tasks) == {
+        "initialize_features",
+        "merge_features",
+        "training_requested",
+        "start_training",
+    }
+    assert tasks["merge_features"]["depends_on"] == [{"task_key": "initialize_features"}]

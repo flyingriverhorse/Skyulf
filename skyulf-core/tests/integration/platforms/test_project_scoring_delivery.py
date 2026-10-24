@@ -263,18 +263,18 @@ def test_scoring_policy_classification_and_ensembles(tmp_path, engine, model):
         assert len(estimator.model.estimators_) == 2
 
 
-def test_template_scoring_rules_are_usable_from_saved_package():
+def test_template_scoring_rules_are_usable_from_saved_package(tmp_path):
     """The generated project supplies working reusable callbacks and an opt-in recipe."""
-    from pathlib import Path
+    from template_sources import TEMPLATE, copy_template
 
     from skyulf.inference.project_code import load_project_module
     from skyulf.inference.project_scoring import run_project_scoring
     from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
 
-    root = (
-        Path(__file__).resolve().parents[3]
-        / "templates/databricks/template/{{.project_name}}/src/features"
-    )
+    (tmp_path / "config").mkdir()
+    for phase in ("preprocessing", "pre_split", "scoring"):
+        copy_template(TEMPLATE / f"config/{phase}.yml", tmp_path / f"config/{phase}.yml")
+    root = copy_template(TEMPLATE / "src/features", tmp_path / "src/features")
     source = feature_project_source(root)
     module = load_project_module(source)
     assert module.build_model_rules() == {"reuse_pre_split": True, "skip_target_steps": False}

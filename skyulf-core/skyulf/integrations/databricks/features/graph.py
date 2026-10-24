@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..projects.yaml_config import read_yaml_mapping
-from .config import FeaturePlan, parse_feature_config
+from .config import TARGET_PLACEHOLDERS, FeaturePlan, parse_feature_config
 
 _JOB_CONTROLS = (
     "tags",
@@ -25,9 +25,23 @@ _JOB_CONTROLS = (
 )
 
 
+# Optional plan fields left at these defaults stay out of the digest, so plans written
+# before the fields existed keep the plan_sha256 their deployed feature jobs carry.
+_OPTIONAL_DEFAULTS = {
+    "base_transform": None,
+    "source_snapshot": "materialize",
+    "source_snapshot_schema": None,
+}
+
+
 def plan_digest(plan: FeaturePlan) -> str:
     """Identify the semantic feature graph and its ordered output schema."""
-    return hashlib.sha256(json.dumps(asdict(plan), sort_keys=True).encode()).hexdigest()
+    data = {
+        key: value
+        for key, value in asdict(plan).items()
+        if key not in _OPTIONAL_DEFAULTS or value != _OPTIONAL_DEFAULTS[key]
+    }
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
 
 def _task(name: str, phase: str, prototype: dict, parameters: dict) -> dict:
@@ -59,12 +73,18 @@ def build_feature_job(plan: FeaturePlan, training_job: dict[str, Any]) -> dict[s
         name="${bundle.name}_features",
         max_concurrent_runs=1,
         queue={"enabled": True},
-        parameters=[{"name": "selected_groups", "default": "*"}],
+        parameters=[
+            {"name": "selected_groups", "default": "*"},
+            # true makes this job the single scheduled entry point: features -> train -> score.
+            {"name": "start_training", "default": "${var.features_start_training}"},
+        ],
     )
     prototype = next(task for task in training_job["tasks"] if "notebook_task" in task)
     params = {
         "config_path": "${workspace.file_path}/config/features.yml",
         "plan_sha256": plan_digest(plan),
+        # Target values for {catalog}-style placeholders in features.yml table names.
+        **{key: f"${{var.{key}}}" for key in TARGET_PLACEHOLDERS},
         "selected_groups": "{{job.parameters.selected_groups}}",
     }
     tasks = [_task("initialize_features", "initialize", prototype, params)]
@@ -78,8 +98,28 @@ def build_feature_job(plan: FeaturePlan, training_job: dict[str, Any]) -> dict[s
         for g in plan.groups
     }
     merge = _task("merge_features", "merge", prototype, {**params, **receipts})
-    merge["depends_on"] = [{"task_key": f"feature_{g.name}"} for g in plan.groups]
+    merge["depends_on"] = [{"task_key": f"feature_{g.name}"} for g in plan.groups] or [
+        {"task_key": "initialize_features"}  # base_transform only: no group tasks
+    ]
     tasks.append(merge)
+    tasks.append(
+        {
+            "task_key": "training_requested",
+            "depends_on": [{"task_key": "merge_features"}],
+            "condition_task": {
+                "op": "EQUAL_TO",
+                "left": "{{job.parameters.start_training}}",
+                "right": "true",
+            },
+        }
+    )
+    tasks.append(
+        {
+            "task_key": "start_training",
+            "depends_on": [{"task_key": "training_requested", "outcome": "true"}],
+            "run_job_task": {"job_id": "${resources.jobs.train.id}"},
+        }
+    )
     job["tasks"] = tasks
     return job
 
@@ -94,23 +134,65 @@ def _owned_target(root: Path, relative: str, marker: str) -> Path:
     return target
 
 
-def _feature_targets(root: Path) -> dict[str, Any]:
-    """Inherit target-specific training identities and permissions for this producer."""
+def _target_jobs(root: Path) -> dict[str, dict[str, Any]]:
+    """Read each target's job overrides from deployment/targets.yml, tolerating empty keys."""
     import yaml  # noqa: PLC0415
 
     path = root / "deployment/targets.yml"
     if not path.is_file():
         return {}
-    targets = yaml.safe_load(path.read_text(encoding="utf-8")).get("targets", {})
-    result = {}
-    for name, target in targets.items():
-        training = target.get("resources", {}).get("jobs", {}).get("train", {})
-        controls = {key: deepcopy(training[key]) for key in _JOB_CONTROLS if key in training}
-        if target.get("mode") == "development":
-            controls["name"] = "features"
-        if controls:
-            result[name] = {"resources": {"jobs": {"features": controls}}}
-    return result
+    targets = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("targets") or {}
+    return {
+        name: ((target or {}).get("resources") or {}).get("jobs") or {}
+        for name, target in targets.items()
+    }
+
+
+def missing_feature_controls(project: str | Path) -> dict[str, dict[str, Any]]:
+    """Return per-target training identities and ACLs the feature job does not yet repeat.
+
+    Targets are defined only in deployment/targets.yml, so the feature job's run_as and
+    permissions must be added there by hand; this lists what is still missing.
+    """
+    root = Path(project).resolve()
+    if not (root / "resources/features.job.yml").is_file():
+        return {}
+    missing = {}
+    for name, jobs in _target_jobs(root).items():
+        training = jobs.get("train") or {}
+        current = jobs.get("features") or {}
+        lacking = {
+            key: deepcopy(training[key])
+            for key in _JOB_CONTROLS
+            if key in training and current.get(key) != training[key]
+        }
+        if lacking:
+            missing[name] = lacking
+    return missing
+
+
+def stale_feature_targets(project: str | Path) -> list[str]:
+    """Return targets that still override a feature job that is no longer generated.
+
+    Bundle would create an empty "Untitled" job for each of them.
+    """
+    root = Path(project).resolve()
+    if (root / "resources/features.job.yml").is_file():
+        return []
+    return sorted(name for name, jobs in _target_jobs(root).items() if "features" in jobs)
+
+
+def feature_targets_snippet(missing: dict[str, dict[str, Any]]) -> str:
+    """Render the deployment/targets.yml additions for :func:`missing_feature_controls`."""
+    import yaml  # noqa: PLC0415
+
+    document = {
+        "targets": {
+            name: {"resources": {"jobs": {"features": controls}}}
+            for name, controls in missing.items()
+        }
+    }
+    return yaml.safe_dump(document, sort_keys=False)
 
 
 def refresh_feature_graph(project: str | Path) -> list[str]:
@@ -136,13 +218,13 @@ def refresh_feature_graph(project: str | Path) -> list[str]:
         .read_text(encoding="utf-8")
     )
     notebook.parent.mkdir(parents=True, exist_ok=True)
-    notebook.write_text(source, encoding="utf-8")
+    # LF on every OS, so a refresh on Windows does not rewrite every line.
+    notebook.write_text(source, encoding="utf-8", newline="\n")
+    # No `targets:` here: identities per target belong in deployment/targets.yml.
     resource: dict[str, Any] = {"resources": {"jobs": {"features": job}}}
-    targets = _feature_targets(root)
-    if targets:
-        resource["targets"] = targets
     target.write_text(
         marker + yaml.safe_dump(resource, sort_keys=False),
         encoding="utf-8",
+        newline="\n",
     )
     return [group.name for group in plan.groups]

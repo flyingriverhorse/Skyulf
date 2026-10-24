@@ -339,6 +339,11 @@ def persist_report(spark: Any, namespace: str, row: dict[str, Any]) -> None:
     _merge_row(spark, f"{namespace}.monitoring_results", row, RESULT_SCHEMA, "report_id")
 
 
+def store_initialized(spark: Any, namespace: str) -> bool:
+    """Report whether the owned inventory exists; a foreign same-named table still raises."""
+    return ensure_owned_object(spark, qualified_name(f"{namespace}.model_inventory"))
+
+
 def load_enrolled_models(spark: Any, namespace: str, *, max_models: int = 10000) -> list[dict]:
     """Read one bounded inventory snapshot without rewriting concurrent producer changes."""
     name = qualified_name(f"{namespace}.model_inventory")

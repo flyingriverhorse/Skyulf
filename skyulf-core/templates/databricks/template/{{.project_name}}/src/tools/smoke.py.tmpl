@@ -41,8 +41,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", default="{{.catalog}}")
     parser.add_argument("--input-schema", default="{{.schema}}")
-    parser.add_argument("--output-schema", default="{{.schema}}")
-    parser.add_argument("--metadata-schema", default="{{.schema}}")
+    parser.add_argument("--output-schema", default="{{or .output_schema .schema}}")
+    parser.add_argument("--metadata-schema", default="{{or .metadata_schema .schema}}")
     parser.add_argument("--resource-suffix", default="")
     parser.add_argument(
         "--probe",

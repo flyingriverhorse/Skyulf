@@ -4,7 +4,6 @@ import io
 import json
 import pickle
 import re
-import shutil
 import subprocess
 import sys
 import unicodedata
@@ -14,6 +13,7 @@ from urllib.parse import unquote, urlsplit
 import numpy as np
 import pandas as pd
 import pytest
+from template_sources import copy_template
 
 yaml = pytest.importorskip("yaml")
 pl = pytest.importorskip("polars")
@@ -194,10 +194,10 @@ def _blocks(page, language):
 def _project(tmp_path, pre_split, preprocessing):
     """Use the shipped project Python with literal phase files from the guide."""
     features = tmp_path / "src/features"
-    shutil.copytree(TEMPLATE / "src/features", features)
+    copy_template(TEMPLATE / "src/features", features)
     config = tmp_path / "config"
     config.mkdir()
-    shutil.copyfile(TEMPLATE / "config/scoring.yml", config / "scoring.yml")
+    copy_template(TEMPLATE / "config/scoring.yml", config / "scoring.yml")
     for filename, value in (("pre_split.yml", pre_split), ("preprocessing.yml", preprocessing)):
         (config / filename).write_text(yaml.safe_dump(value), encoding="utf-8")
     return features

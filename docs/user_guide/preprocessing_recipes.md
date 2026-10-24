@@ -21,7 +21,7 @@ saved-state diagnostics and lag/rolling continuation, see
 the installed Core registry. Use the parameter tables on the family pages for the full set of
 supported options and required inputs. Preview's flags and limits are in the
 [local tools reference](databricks_project_setup.md#local-tools-and-preview)
-and the generated `src/tools/README.md`.
+and **Local tools** in the generated `GUIDE.md`.
 
 The `feature_selection` wrapper forwards its options
 to the selected algorithm: for example, `threshold` works with `method: variance`.

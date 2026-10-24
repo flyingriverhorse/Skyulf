@@ -17,7 +17,10 @@ from skyulf.integrations.databricks.projects.source_validation import (
     query_source_sql,
     validate_project_sources,
 )
-from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import (
+    preview_summary,
+    preview_workflow_config,
+)
 from skyulf.integrations.databricks.projects.yaml_config import (
     project_config_path,
     read_workflow_config,
@@ -29,8 +32,12 @@ from skyulf.registry import NodeRegistry
 def _preview(config, action):
     """Show every requested candidate, including its independent preprocessing and search."""
     if config.get("training_layout") != "model_competition":
-        return preview_workflow_config(config, action=action)
+        summary = preview_summary(config, action=action)
+        return summary + "\n\n" + preview_workflow_config(config, action=action)
+    first = next(iter(config["competition"]["candidates"].values()))
     lines = [
+        preview_summary({**config, "pipeline": first["pipeline"]}, action=action),
+        "",
         "Model competition: shared source, target and CV; separate candidate training tasks.",
         "Only the CV winner receives the final holdout check and registration.",
     ]
@@ -122,8 +129,8 @@ def main():
     parser.add_argument("--label-available-at-column", default={{printf "%q" .label_available_at_column}})
     parser.add_argument("--catalog", default="{{.catalog}}")
     parser.add_argument("--input-schema", default="{{.schema}}")
-    parser.add_argument("--output-schema", default="{{.schema}}")
-    parser.add_argument("--metadata-schema", default="{{.schema}}")
+    parser.add_argument("--output-schema", default="{{or .output_schema .schema}}")
+    parser.add_argument("--metadata-schema", default="{{or .metadata_schema .schema}}")
     parser.add_argument("--resource-suffix", default="")
     parser.add_argument("--list-models", action="store_true")
     parser.add_argument("--list-preprocessors", action="store_true")

@@ -1,4 +1,4 @@
-"""Explicit raw-input endpoint example, called from a notebook; see SERVE_EXAMPLE.md."""
+"""Explicit raw-input endpoint example, called from a notebook; see GUIDE.md."""
 
 from pathlib import Path
 

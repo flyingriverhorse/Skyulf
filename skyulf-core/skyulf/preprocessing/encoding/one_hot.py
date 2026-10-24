@@ -356,7 +356,22 @@ def _fit_sklearn_onehot(X_subset: Any, opts: dict[str, Any], cols: list[str]) ->
     encoder.fit(X_np)
     if opts["categories"] is None:
         _warn_degenerate_categories(encoder, cols, opts["drop"])
+    else:
+        _warn_unmatched_fixed_categories(X_np, categories, cols)
     return encoder
+
+
+def _warn_unmatched_fixed_categories(values: Any, categories: Any, cols: list[str]) -> None:
+    """Warn when no training value is a fixed category, so every indicator would be 0."""
+    for index, col in enumerate(cols):
+        observed = {value for value in values[:, index] if isinstance(value, str)}
+        if observed and not observed & set(categories[index]):
+            sample = ", ".join(repr(value) for value in sorted(observed)[:3])
+            logger.warning(
+                f"OneHotEncoder: column '{col}' matches none of its fixed categories "
+                f"(training values such as {sample}); every indicator will be 0. Check "
+                "the column's text form, for example '81' versus '81.0'."
+            )
 
 
 def _build_onehot_artifact(

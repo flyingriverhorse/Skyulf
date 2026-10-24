@@ -2,7 +2,6 @@
 
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +11,7 @@ import pandas as pd
 import polars as pl
 import pytest
 import yaml
+from template_sources import copy_template
 
 from skyulf.inference.project_code import load_project_module
 
@@ -41,11 +41,11 @@ def _class_example():
 def _copy_features(tmp_path):
     """Keep the same feature/config placement as a generated Bundle project."""
     root = tmp_path / "src/features"
-    shutil.copytree(FEATURES, root, ignore=shutil.ignore_patterns("__pycache__"))
+    copy_template(FEATURES, root)
     config = tmp_path / "config"
     config.mkdir()
     for phase in ("preprocessing", "pre_split", "scoring"):
-        shutil.copyfile(FEATURES.parents[1] / "config" / f"{phase}.yml", config / f"{phase}.yml")
+        copy_template(FEATURES.parents[1] / "config" / f"{phase}.yml", config / f"{phase}.yml")
     return root
 
 

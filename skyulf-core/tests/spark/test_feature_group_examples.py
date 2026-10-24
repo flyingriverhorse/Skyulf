@@ -15,7 +15,10 @@ PROJECT = Path(__file__).resolve().parents[2] / "templates/databricks/template/{
 
 def test_shipped_groups_preserve_observations_and_do_not_join_future_activity(spark):
     """The copyable config must produce real totals without duplicating or leaking labels."""
-    text = (PROJECT / "config/features.yml").read_text(encoding="utf-8")
+    # The example block is wrapped for include_examples; the default render keeps it.
+    text = (PROJECT / "config/features.yml.tmpl").read_text(encoding="utf-8")
+    for marker in ('{{if eq .include_examples "true"}}', "{{end -}}"):
+        text = text.replace(marker, "")
     _, marker, example = text.partition("# version: 1\n")
     assert marker
     config = yaml.safe_load("version: 1\n" + "\n".join(line[2:] for line in example.splitlines()))

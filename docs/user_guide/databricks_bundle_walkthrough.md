@@ -29,8 +29,8 @@ No input data is created by `bundle init` or deployment.
 | Score | Concrete model, source watermark and Delta receipt | [Scoring guide](databricks_scoring.md) |
 | Observe | Saved drift/performance evidence and retraining decision | [Monitoring overview](databricks_monitoring.md) |
 
-The generated `START_HERE.md` is the short offline path. `TRAINING.md`,
-`SCORING.md` and the other topic files remain bound to that project's revision.
+The generated `README.md` is the short offline path. `GUIDE.md` holds the
+project's reference; both remain bound to that project's revision.
 The public site can describe a newer release; follow the upgrade chapter before
 changing runtime pins.
 
@@ -416,8 +416,8 @@ python src/tools/preview.py --action score
 ```
 
 Use the [local tools reference](databricks_project_setup.md#local-tools-and-preview)
-for preview's binding flags, defaults and scope; the generated
-`src/tools/README.md` keeps the same short reference beside the scripts.
+for preview's binding flags, defaults and scope; **Local tools** in the generated
+`GUIDE.md` keeps the same short reference beside the scripts.
 Then validate and deploy from the generated directory:
 
 ```powershell
@@ -524,10 +524,12 @@ the actual result. The default is version "1". Redeploy changes before running. 
 #### Score and inspect the demonstration rows
 
 Quick setup defaults to `score_model_selection: pinned_version` and writes
-`model_version: "1"` into `config/inference.yml`. Replace that version with the
-actual registered result and redeploy if necessary. A pinned scorer can run a
-registered candidate without promoting it; choosing `champion` requires the
-successful activation described above.
+`model_version: "1"` into `config/inference.yml`. To score the registered
+result once, pass the version shown in `training_report` (`<model> vN`) as
+`--params score_model_version=N`; this changes neither the file nor any alias.
+For scheduled runs, set `model_version` to that version and redeploy. A pinned
+scorer can run a registered candidate without promoting it; choosing `champion`
+requires the successful activation described above.
 
 ```powershell
 databricks bundle run score -t test --profile YOUR_PROFILE
@@ -667,7 +669,7 @@ Only when consumers need an HTTP/SQL endpoint rather than a Delta prediction tab
 
 ### What to edit
 
-Follow the project's `SERVING.md` for concrete model selection and endpoint
+Follow **Serving requests** in the project's `GUIDE.md` for concrete model selection and endpoint
 creation. [Online feature lookup](databricks_online_features.md) adds key-based
 retrieval; [gradual rollout](databricks_serving_rollout.md) controls traffic between
 served versions. These are separate choices. Online publication syncs Delta

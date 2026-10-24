@@ -360,14 +360,14 @@ def test_history_charts_and_date_filters_use_the_data_window() -> None:
 
 
 def _dashboard_examples() -> dict:
-    """Uncomment the hand-copy examples in deployment/monitoring.yml.tmpl and parse them."""
-    text = (TEMPLATE / "deployment/monitoring.yml.tmpl").read_text(encoding="utf-8")
+    """Uncomment the dashboard examples in deployment/targets.yml.tmpl and parse them."""
+    text = (TEMPLATE / "deployment/targets.yml.tmpl").read_text(encoding="utf-8")
     parsed = {}
     for block in text.split("# Example: ")[1:]:
         title, _, body = block.partition("\n")
         lines = [line[1:] for line in body.splitlines() if line.startswith("#  ")]
         parsed[title.split(" ")[0]] = yaml.safe_load("\n".join(lines))
-    return parsed
+    return {name: parsed[name] for name in ("create", "connect")}
 
 
 def test_bundle_has_one_serial_manual_writer_and_stable_dashboard() -> None:

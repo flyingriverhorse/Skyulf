@@ -8,7 +8,7 @@ that wraps them. YAML selects the factory and passes params as keyword arguments
 
 Built-in steps and ordered lists live only in config/preprocessing.yml.
 These functions learn from training rows after the split; scoring reuses saved state.
-See PREPROCESSING.md for a complete example.
+See GUIDE.md#preprocessing-and-custom-code for the rules.
 
 Two kinds of step:
 

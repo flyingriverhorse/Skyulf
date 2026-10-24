@@ -164,8 +164,9 @@ instead of registering a model that would score inconsistently. Typical cases:
 
 Spark and online-feature projects run the checks automatically. Endpoint-only
 projects enable the same training check with
-`defaults.allow_tested_custom_steps: true` in `config/training.yml`; despite its
-historical name, this setting also seals built-in and model evidence. Train and
+`defaults.probe_pipeline_for_serving: true` in `config/training.yml` (old name
+`allow_tested_custom_steps`, still accepted); it checks and seals the whole
+pipeline, including built-in steps and the model, not only custom steps. Train and
 register a new version after enabling it. Editing an old artifact's flag does
 not create evidence.
 
@@ -221,7 +222,7 @@ endpoints:
 ```yaml
 # config/training.yml
 defaults:
-  allow_tested_custom_steps: true
+  probe_pipeline_for_serving: true
 ```
 
 ```python

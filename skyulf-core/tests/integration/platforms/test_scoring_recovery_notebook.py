@@ -204,6 +204,7 @@ def test_full_rebuild_empty_recovery_replay_and_normal_noop_reach_report(monkeyp
     monkeypatch.setattr(workflow, "prepare_workflow", Mock())
     provision = Mock()
     monkeypatch.setattr(workflow, "provision_prediction_table", provision)
+    monkeypatch.setattr(workflow, "prune_prediction_generations", Mock(return_value=[]))
     batch = Mock(
         side_effect=[
             IncrementalBatchResult(None, 9, 0, 0, 4, {}, False, config["model_name"], "2"),

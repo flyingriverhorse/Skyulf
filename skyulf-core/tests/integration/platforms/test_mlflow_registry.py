@@ -266,3 +266,46 @@ def test_unity_catalog_requires_three_part_model_name_without_network() -> None:
             version="1",
             registry_uri="databricks-uc",
         )
+
+
+def test_registration_lists_the_model_in_the_experiment_models_tab(tmp_path: Path) -> None:
+    """MLflow 3's Models tab shows LoggedModels; a registered version must appear there."""
+    bundle, _ = _bundle()
+    config = _config(tmp_path, "logged")
+    with track_run(config, run_name="registry-fit") as run:
+        model_uri = log_model(
+            bundle, run_id=run.run_id, artifact_path="model", tracking_uri=config.tracking_uri
+        )
+    client = mlflow.MlflowClient(tracking_uri=config.tracking_uri, registry_uri=config.tracking_uri)
+    client.log_metric(run.run_id, "heldout_rmse", 0.25)
+    register_model(
+        model_uri, "logged", tracking_uri=config.tracking_uri, registry_uri=config.tracking_uri
+    )
+
+    experiment = client.get_run(run.run_id).info.experiment_id
+    models = client.search_logged_models([experiment])
+    assert len(models) == 1
+    logged = models[0]
+    assert logged.source_run_id == run.run_id
+    assert logged.status.to_proto() == mlflow.entities.LoggedModelStatus.READY.to_proto()
+    assert logged.tags["skyulf.registered_model"] == "logged"
+    assert logged.tags["skyulf.registered_version"] == "1"
+    assert logged.tags["skyulf.model_uri"] == model_uri
+    assert {metric.key: metric.value for metric in logged.metrics} == {"heldout_rmse": 0.25}
+
+
+def test_models_tab_entry_never_blocks_registration(tmp_path: Path, monkeypatch) -> None:
+    """The listing is presentation only; a backend without LoggedModels still registers."""
+    bundle, _ = _bundle()
+    config = _config(tmp_path, "nolisting")
+    with track_run(config, run_name="registry-fit") as run:
+        model_uri = log_model(
+            bundle, run_id=run.run_id, artifact_path="model", tracking_uri=config.tracking_uri
+        )
+    monkeypatch.setattr(
+        mlflow.MlflowClient, "create_logged_model", Mock(side_effect=RuntimeError("unsupported"))
+    )
+    version = register_model(
+        model_uri, "nolisting", tracking_uri=config.tracking_uri, registry_uri=config.tracking_uri
+    )
+    assert str(version.version) == "1"

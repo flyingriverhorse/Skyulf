@@ -130,7 +130,7 @@ The 1.5-IQR gate on right-skewed trip distances can reject legitimate long trips
 The sample policy therefore lowers the standard 90% coverage floor to 80%,
 while still requiring RMSE <= 6. Review the excluded
 population for your use case. See
-[SERVE_EXAMPLE.md](taxi_fare_robust/SERVE_EXAMPLE.md) for concrete requests and SQL.
+[its GUIDE.md](taxi_fare_robust/GUIDE.md#score-raw-trips-with-spark-rest-and-sql) for concrete requests and SQL.
 
 ## taxi_high_fare: competition of four classifiers
 

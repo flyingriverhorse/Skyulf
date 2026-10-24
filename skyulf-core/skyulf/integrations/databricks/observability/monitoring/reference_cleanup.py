@@ -36,7 +36,13 @@ from ...shared._contracts import table_name
 from .monitoring_config import MonitorConfig, json_digest, qualified_name
 from .monitoring_registration import monitoring_destination
 from .monitoring_sources import read_snapshot
-from .monitoring_store import OWNER, PROPERTY, ensure_owned_object, load_enrolled_models
+from .monitoring_store import (
+    OWNER,
+    PROPERTY,
+    ensure_owned_object,
+    load_enrolled_models,
+    store_initialized,
+)
 from .reference_admission import (
     hold_reference_mutation,
     is_reference_control_row,
@@ -132,6 +138,10 @@ def cleanup_references(
     namespace = monitoring_destination(values)
     if namespace is None:
         return {"status": "disabled"}
+    if not store_initialized(spark, namespace):
+        # The weekly schedule can run before any training enrolled a model: nothing to clean.
+        empty = {"references": [], "skipped": [], "deleted": []}
+        return {"status": "store_not_initialized", "namespace": namespace} | empty
     context = _Context(
         spark,
         namespace,

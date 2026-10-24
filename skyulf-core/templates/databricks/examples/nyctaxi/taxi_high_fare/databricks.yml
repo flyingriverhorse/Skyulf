@@ -4,7 +4,6 @@ bundle:
 include:
   - deployment/variables.yml
   - deployment/targets.yml
-  - deployment/monitoring.yml
   - resources/*.yml
 
 sync:

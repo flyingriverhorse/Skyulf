@@ -153,14 +153,41 @@ def test_numeric_drift_effect_parity(spark, discrete):
     assert not unmeasured
 
 
-def test_inconclusive_bound_is_unavailable():
-    """A conservative probability bound that cannot reject must never imply healthy evidence."""
+def test_middle_range_matches_local_exact_ks():
+    """Spark must judge 1k-10k rows like local ks_2samp, not mark healthy data degraded."""
+    import numpy as np
+    from scipy import stats
+
     from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (
         _correct_results,
         _ks_evidence,
     )
     from skyulf.profiling.drift import ColumnDrift
 
+    rng = np.random.default_rng(0)
+    reference, current = rng.normal(size=1600), rng.normal(size=2000)
+    local = stats.ks_2samp(reference, current, method="exact")
+    evidence = _ks_evidence(float(local.statistic), 1600, 2000)
+    assert evidence.test == "ks_2samp"
+    assert evidence.p_value == pytest.approx(local.pvalue, rel=1e-12)
+    result = ColumnDrift(column="x", metrics=[], drift_detected=False, evidence=evidence)
+    _correct_results({"x": result})
+    assert evidence.status == "not_detected"
+
+
+def test_inconclusive_bound_is_unavailable(monkeypatch):
+    """A conservative probability bound that cannot reject must never imply healthy evidence."""
+    from skyulf.integrations.databricks.observability.monitoring.spark import (
+        spark_monitoring_drift as drift,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (
+        _correct_results,
+        _ks_evidence,
+    )
+    from skyulf.profiling.drift import ColumnDrift
+
+    # Only when SciPy's exact count is unavailable does the middle range use the bound.
+    monkeypatch.setattr(drift, "_scipy_exact_probability", lambda *args: None)
     evidence = _ks_evidence(0.001, 2000, 2000)
     result = ColumnDrift(column="x", metrics=[], drift_detected=False, evidence=evidence)
     _correct_results({"x": result})

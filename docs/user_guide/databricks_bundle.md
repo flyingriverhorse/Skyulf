@@ -44,6 +44,7 @@ when the installed release differs. Training fits in one bounded Python process;
 | <span id="configuration-validation-and-migration"></span>Configuration validation and migration | [Open guide](databricks_project_upgrade.md#configuration-validation-and-migration) |
 | Upgrade integration code | [Open guide](databricks_project_upgrade.md#upgrade-integration-code) |
 | <span id="where-the-workflow-lives"></span>Where the workflow lives | [Open guide](databricks_training_reports.md) |
+| Understand files in an experiment's Artifacts tab | [Artifact reference](databricks_artifacts.md) |
 | <span id="independent-scoring-and-promotion-policies"></span>Independent scoring and promotion policies | [Open guide](databricks_lifecycle.md#independent-scoring-and-promotion-policies) |
 | <span id="operator-actions-through-run-now"></span>Operator actions through Run now | [Open guide](databricks_lifecycle.md#operator-actions-through-run-now) |
 | <span id="approve-an-existing-candidate-without-training"></span>Approve an existing candidate without training | [Open guide](databricks_lifecycle.md#approve-an-existing-candidate-without-training) |

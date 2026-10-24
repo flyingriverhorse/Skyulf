@@ -4,7 +4,6 @@ Spark only selects a pinned, filtered source snapshot. Fitted feature
 engineering and prediction use pandas or Polars in the current Python process.
 """
 
-import pickle
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,8 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import pandas as pd
 import polars as pl
 
-from skyulf.engines.spark_engine import normalize_spark_decimals, restore_spark_decimal_dtypes
-from skyulf.integrations.databricks.shared._frames import frame_bytes
+from skyulf.integrations.databricks.shared._frames import bounded_frame, frame_bytes
 
 from .....data.dataset import SplitDataset
 from .....inference.fitted_pipeline import (
@@ -116,26 +114,15 @@ def read_source(spark: Any, spec: SourceSpec) -> pd.DataFrame:
         f"{column_name(spec.period_column)} < TIMESTAMP '{end}'"
     )
     names = (*spec.record_key_columns, *spec.input_columns)
-    selected = selected.select(*names).orderBy(*spec.record_key_columns).limit(spec.max_rows + 1)
-    selected, conversions = normalize_spark_decimals(selected, columns=spec.input_columns)
-    records: list[dict[str, Any]] = []
-    serialized_bytes = 0
-    for row in selected.toLocalIterator():
-        if len(records) >= spec.max_rows:
-            raise ValueError("Source exceeds max_rows.")
-        record = row.asDict(recursive=True) if hasattr(row, "asDict") else dict(row)
-        # This is the decoded row payload, not a claim about Spark wire framing.
-        serialized_bytes += len(pickle.dumps(record, protocol=pickle.HIGHEST_PROTOCOL))
-        if serialized_bytes > spec.max_bytes:
-            raise ValueError("Source exceeds max_bytes.")
-        records.append(record)
-    frame = restore_spark_decimal_dtypes(
-        pd.DataFrame.from_records(records, columns=names), conversions
+    frame = bounded_frame(
+        selected,
+        names,
+        spec.record_key_columns,
+        spec.max_rows,
+        spec.max_bytes,
+        require_unique_keys=False,
+        subject="Source",
     )
-    if frame_bytes(frame) > spec.max_bytes:
-        raise ValueError("Source local frame exceeds max_bytes.")
-    if frame.loc[:, list(spec.record_key_columns)].isna().any().any():
-        raise ValueError("Source row keys must not be null.")
     if frame.duplicated(subset=list(spec.record_key_columns)).any():
         raise ValueError("Source row keys must be unique within the requested period.")
     return frame

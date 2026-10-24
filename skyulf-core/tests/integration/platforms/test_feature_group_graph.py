@@ -10,7 +10,13 @@ import pytest
 import yaml
 
 from skyulf.integrations.databricks.features.config import parse_feature_config
-from skyulf.integrations.databricks.features.graph import build_feature_job, refresh_feature_graph
+from skyulf.integrations.databricks.features.graph import (
+    build_feature_job,
+    feature_targets_snippet,
+    missing_feature_controls,
+    refresh_feature_graph,
+    stale_feature_targets,
+)
 
 
 def test_refresh_creates_and_removes_only_optional_feature_files(tmp_path):
@@ -75,19 +81,29 @@ def test_refresh_creates_and_removes_only_optional_feature_files(tmp_path):
     assert (tmp_path / "src/jobs/feature_task.py").is_file()
     assert (tmp_path / "resources/features.job.yml").is_file()
     generated = yaml.safe_load((tmp_path / "resources/features.job.yml").read_text())
-    target_jobs = generated["targets"]
-    assert target_jobs["prod"]["resources"]["jobs"]["features"]["run_as"] == {
-        "service_principal_name": "${var.train_service_principal}"
+    # Company CI accepts `targets:` only in deployment/targets.yml.
+    assert "targets" not in generated
+    missing = missing_feature_controls(tmp_path)
+    assert missing == {
+        "prod": {
+            "run_as": {"service_principal_name": "${var.train_service_principal}"},
+            "permissions": "${var.train_permissions}",
+        }
     }
-    assert (
-        target_jobs["prod"]["resources"]["jobs"]["features"]["permissions"]
-        == "${var.train_permissions}"
+    snippet = yaml.safe_load(feature_targets_snippet(missing))
+    targets_path = tmp_path / "deployment/targets.yml"
+    document = yaml.safe_load(targets_path.read_text())
+    document["targets"]["prod"]["resources"]["jobs"].update(
+        snippet["targets"]["prod"]["resources"]["jobs"]
     )
-    assert target_jobs["test_development"]["resources"]["jobs"]["features"]["name"] == "features"
+    targets_path.write_text(yaml.safe_dump(document))
+    assert missing_feature_controls(tmp_path) == {}
     path.write_text("version: 1\ngroups: {}\n")
     assert refresh_feature_graph(tmp_path) == []
     assert not (tmp_path / "src/jobs/feature_task.py").exists()
     assert not (tmp_path / "resources/features.job.yml").exists()
+    # A leftover override would make Bundle create an empty "Untitled" job.
+    assert stale_feature_targets(tmp_path) == ["prod"]
 
 
 def _plan():
@@ -151,6 +167,11 @@ def test_parallel_tasks_preserve_compute_and_permissions(compute):
         {"task_key": "feature_company"},
         {"task_key": "feature_activity"},
     ]
+    for task in (task for task in tasks.values() if "notebook_task" in task):
+        # Each notebook task receives the target values that bind {catalog}-style names.
+        parameters = task["notebook_task"]["base_parameters"]
+        assert parameters["catalog"] == "${var.catalog}"
+        assert parameters["resource_suffix"] == "${var.resource_suffix}"
     assert job["permissions"] == source["permissions"]
     assert job.get("environments") == source.get("environments")
     assert job.get("job_clusters") == source.get("job_clusters")
@@ -197,3 +218,24 @@ groups:
     with pytest.raises(ValueError, match="within|outside|project"):
         refresh_feature_graph(root)
     assert target.read_text(encoding="utf-8") == original
+
+
+def test_feature_job_can_start_training_after_merge():
+    """One scheduled features job must be able to drive train, which hands off to scoring."""
+    plan = _plan()
+    assert plan is not None
+    source: dict[str, Any] = {
+        "name": "example_train",
+        "tasks": [{"task_key": "initialize_run", "notebook_task": {"base_parameters": {}}}],
+    }
+    job = build_feature_job(plan, source)
+    assert {"name": "start_training", "default": "${var.features_start_training}"} in job[
+        "parameters"
+    ]
+    tasks = {task["task_key"]: task for task in job["tasks"]}
+    gate = tasks["training_requested"]
+    assert gate["depends_on"] == [{"task_key": "merge_features"}]
+    assert gate["condition_task"]["left"] == "{{job.parameters.start_training}}"
+    start = tasks["start_training"]
+    assert start["depends_on"] == [{"task_key": "training_requested", "outcome": "true"}]
+    assert start["run_job_task"] == {"job_id": "${resources.jobs.train.id}"}

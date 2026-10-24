@@ -70,13 +70,13 @@ PROJECTS = {
     "taxi_fare_endpoint": {
         "sources": (
             "README.md",
-            "SERVING.md",
             "config/pre_split.yml",
             "config/preprocessing.yml",
             "config/scoring.yml",
             "src/features/scoring.py",
         ),
         "removed": (*SAMPLES, "src/features/pre_split.py", "src/features/preprocessing.py"),
+        "guide_note": "taxi_fare_endpoint.guide.md",
         "training_edits": (
             (
                 "  quality_threshold: 6.0\n",
@@ -91,7 +91,9 @@ PROJECTS = {
             "config/scoring.yml. build_model_rules() returns None, preserving the endpoint's\n"
             "prediction schema without scoring-status columns. New template projects use\n"
             "scoring.yml; this example also verifies older Python-only projects still work.\n"
-            "See SCORING.md before migrating its policy.\n"
+            "To migrate, remove the Python builder definitions and exports before adding YAML;\n"
+            "an empty custom policy adds scoring_status and exclusion_reason, so review the\n"
+            "endpoint schema first. See [Batch predictions](GUIDE.md#batch-predictions).\n"
         ),
         "sources": (
             "config/pre_split.yml",
@@ -99,7 +101,6 @@ PROJECTS = {
             "src/features/pre_split.py",
             "src/features/scoring.py",
             "src/features/__init__.py",
-            "SCORING.md",
         ),
         # Retain the legacy None policy and endpoint schema as a compatibility example.
         "removed": (*SAMPLES, "src/features/preprocessing.py", "config/scoring.yml"),
@@ -113,7 +114,7 @@ PROJECTS = {
             "using a 20% relative tolerance and two consecutive windows. It never requests\n"
             "training. Before deployment, replace the baseline version with the concrete\n"
             "version you will monitor; older Spark reference caches without WAPE remain unavailable.\n"
-            "See [SERVE_EXAMPLE.md](SERVE_EXAMPLE.md#report-performance-loss-without-retraining)\n"
+            "See [GUIDE.md](GUIDE.md#report-performance-loss-without-retraining)\n"
             "for label coverage, timing, baseline changes and disabling the policy.\n"
         ),
         "sources": (
@@ -125,9 +126,9 @@ PROJECTS = {
             "src/features/pre_split.py",
             "src/features/scoring.py",
             "src/serve.py",
-            "SERVE_EXAMPLE.md",
         ),
         "removed": (*SAMPLES, "src/features/preprocessing.py"),
+        "guide_note": "taxi_fare_robust.guide.md",
         "training_edits": (),
     },
     "taxi_high_fare": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": ()},
@@ -161,6 +162,18 @@ PROJECTS = {
             "src/features/preprocessing.py",
             "src/features/scoring.py",
             "src/features/numeric.py",
+        ),
+        "removed": SAMPLES,
+        "training_edits": (),
+    },
+    "bronze_observations": {
+        "group": "lakeflow",
+        "sources": (
+            "config/features.yml",
+            "config/preprocessing.yml",
+            "src/features/groups/base.py",
+            "resources/features.job.yml",
+            "src/jobs/feature_task.py",
         ),
         "removed": SAMPLES,
         "training_edits": (),
@@ -279,16 +292,28 @@ def generate_example(directory, name):
             raise RuntimeError(f"{name}: generated training.yml no longer contains: {old!r}")
         text = text.replace(old, new)
     training_path.write_text(text, encoding="utf-8", newline="\n")
+    _apply_guide_notes(project, name, spec)
+    return project
+
+
+def _apply_guide_notes(project, name, spec):
+    """Append example-owned notes to the two generated guides."""
     if note := spec.get("readme_note"):
         readme = project / "README.md"
-        content = readme.read_text(encoding="utf-8")
-        if "config/scoring.yml" in spec["removed"]:
-            content = content.replace(
-                "| Scoring eligibility, outputs and combined rules | `config/scoring.yml` |",
-                "| Legacy scoring policy and callbacks | `src/features/scoring.py` |",
-            )
-        readme.write_text(content + note, encoding="utf-8", newline="\n")
-    return project
+        readme.write_text(readme.read_text(encoding="utf-8") + note, encoding="utf-8", newline="\n")
+    guide = project / "GUIDE.md"
+    content = guide.read_text(encoding="utf-8")
+    if "config/scoring.yml" in spec["removed"]:
+        row = "| Saved scoring eligibility, output columns and business rules | `config/scoring.yml` |"
+        if content.count(row) != 1:
+            raise RuntimeError(f"{name}: generated GUIDE.md no longer contains: {row!r}")
+        content = content.replace(
+            row, "| Legacy scoring policy and callbacks | `src/features/scoring.py` |"
+        )
+    if note := spec.get("guide_note"):
+        # Example-owned steps live beside the answer file, outside the project folder.
+        content += (example_root(name) / note).read_text(encoding="utf-8")
+    guide.write_text(content, encoding="utf-8", newline="\n")
 
 
 def changed_files(name, generated):

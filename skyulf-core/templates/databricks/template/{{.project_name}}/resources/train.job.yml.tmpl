@@ -9,8 +9,6 @@ resources:
       budget_policy_id: ${var.serverless_budget_policy_id}
 {{end}}
       timeout_seconds: ${var.train_timeout_seconds}
-      health:
-        rules: ${var.train_health_rules}
       email_notifications: ${var.train_email_notifications}
       webhook_notifications: ${var.train_webhook_notifications}
       max_concurrent_runs: 1
@@ -526,13 +524,6 @@ resources:
 {{else}}
       job_clusters:
         - job_cluster_key: skyulf
-          new_cluster:
-            spark_version: ${var.spark_version}
-            node_type_id: ${var.node_type_id}
-            policy_id: ${var.cluster_policy_id}
-            custom_tags:
-              {{printf "%q" .cost_tag_key}}: ${var.cost_tag_value}
-            autoscale:
-              min_workers: ${var.min_workers}
-              max_workers: ${var.max_workers}
+          # Edit job_cluster in deployment/variables.yml to add fields your cluster policy requires.
+          new_cluster: ${var.job_cluster}
 {{end}}

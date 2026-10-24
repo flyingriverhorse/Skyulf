@@ -550,6 +550,10 @@ class CandidateResult:
     holdout_key_sha256: str
 
 
+# Frame attribute: unlabeled rows dropped on Spark before the max_rows limit.
+PREFILTERED_ROWS = "prefiltered_unavailable_rows"
+
+
 def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     """Project and cap a versioned Delta read before materializing driver rows."""
     if not isinstance(spec, TrainingSpec):
@@ -587,12 +591,12 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
             f"{column_name(cast(str, spec.event_column))} >= {start} AND "
             f"{column_name(cast(str, spec.event_column))} < {cutoff}"
         )
-    selection = None
-    if spec.training_sample_rows is not None:
-        source, selection = sample_training_source(source, spec)
+    source, selection, prefiltered = _limited_population(source, spec)
     ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
     selected = source.orderBy(*ordering).limit(spec.max_rows + 1)
     frame = _materialize_training_rows(selected, spec, names)
+    if prefiltered:
+        frame.attrs[PREFILTERED_ROWS] = prefiltered
     validate_label_identity(spark, spec)
     if spec.training_label_table is not None:
         frame.attrs["training_labels"] = label_binding(spec)
@@ -607,6 +611,32 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     if selection is not None:
         frame.attrs["training_selection"] = {**selection, "selected_rows": len(frame)}
     return frame
+
+
+def _limited_population(source: Any, spec: TrainingSpec) -> tuple[Any, dict | None, int]:
+    """Choose the rows max_rows applies to: a seeded sample, or the labeled rows."""
+    if spec.training_sample_rows is not None:
+        sampled, selection = sample_training_source(source, spec)
+        return sampled, selection, 0
+    labeled, dropped = _labeled_rows_before_limit(source, spec)
+    return labeled, None, dropped
+
+
+def _labeled_rows_before_limit(source: Any, spec: TrainingSpec) -> tuple[Any, int]:
+    """Drop rows without a usable label on Spark, so max_rows counts only trainable rows.
+
+    Returns the filtered source and how many rows were dropped. split_labeled_snapshot
+    adds them back to source_rows, so evidence equals the earlier local filtering.
+    """
+    if not (spec.filter_unavailable_results or spec.drop_missing_labels):
+        return source, 0
+    floating = {
+        field.name
+        for field in source.schema.fields
+        if field.dataType.typeName() in {"double", "float"}
+    }
+    eligible = eligible_training_source(source, spec, floating)
+    return eligible, source.count() - eligible.count()
 
 
 def sample_training_source(source: Any, spec: TrainingSpec) -> tuple[Any, dict[str, Any]]:
@@ -859,13 +889,15 @@ def split_labeled_snapshot(
     holdout_frame.attrs["pre_filter_rows"] = available_count
     holdout_frame.attrs["survivor_rows"] = len(selected)
     holdout_frame.attrs["training_rows"] = len(train)
-    holdout_frame.attrs["source_rows"] = len(frame)
+    prefiltered = frame.attrs.get(PREFILTERED_ROWS, 0)
+    holdout_frame.attrs["source_rows"] = len(frame) + prefiltered
     if spec.group_column:
         holdout_frame.attrs["group_split"] = _group_split_evidence(
             train, heldout, spec.group_column
         )
     unavailable = (
         len(frame)
+        + prefiltered
         - available_count
         + frame.attrs.get("training_selection", {}).get("unavailable_labels", 0)
     )

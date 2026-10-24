@@ -253,8 +253,13 @@ def _record_key_schema(source: Any, keys: tuple[str, ...]) -> tuple[ColumnSpec, 
         "boolean": "bool",
     }
     types = dict(source.dtypes)
-    if any(types.get(key) not in supported for key in keys):
-        raise ValueError("Model set record keys require integer, string or boolean source columns.")
+    unsupported = [key for key in keys if types.get(key) not in supported]
+    if unsupported:
+        raise ValueError(
+            f"Model set record keys require integer, string or boolean source columns: "
+            f"{', '.join(unsupported)}; store dates as yyyy-MM-dd STRING (date_format) "
+            "or yyyyMMdd BIGINT."
+        )
     return tuple(ColumnSpec(name=key, dtype=supported[types[key]]) for key in keys)
 
 

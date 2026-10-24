@@ -24,9 +24,8 @@ SHARED = {
     "record_key_columns",
     # Monitoring defaults to off; its schema is asked only after "monitoring: true".
     "monitoring",
-    "label_table_name",
-    "label_available_at_column",
 }
+LABELS = {"label_table_name", "label_available_at_column"}
 ONE_TARGET = SHARED | {"task", "input_columns", "target_column"}
 LAYOUTS = ["single_model", "model_competition", "multi_target"]
 
@@ -240,7 +239,7 @@ def test_upgrade_steps_have_one_central_home_that_first_run_points_to():
     release = changelog.split("\n## v0.9.4\n")[1].split("\n## ")[0]
     assert "### Upgrade steps for generated Databricks projects" in release
     assert "initialize_monitoring_store" in release
-    first_run = (TEMPLATE / "START_HERE.md.tmpl").read_text(encoding="utf-8")
+    first_run = (TEMPLATE / "README.md.tmpl").read_text(encoding="utf-8")
     assert "changelog/0.9.x.md" in first_run
     assert "Upgrade steps for generated Databricks projects" in first_run
 
@@ -252,3 +251,28 @@ def test_quick_setup_asks_for_the_monitoring_schema_once_monitoring_is_on():
     # The old catalog answer remains only as a removed-answer guard that accepts blank.
     assert PROPERTIES["monitoring_catalog"]["enum"] == [""]
     assert "monitoring_catalog" not in asked
+
+
+@pytest.mark.parametrize(
+    ("source_layout", "monitoring", "asks_labels"),
+    [
+        ("single_table", "false", False),
+        ("single_table", "true", True),
+        ("separate_outcomes", "false", True),
+        ("separate_all", "false", True),
+    ],
+)
+def test_outcome_table_is_asked_only_when_something_reads_it(
+    source_layout, monitoring, asks_labels
+):
+    """One embedded-label table without monitoring has no reader for an outcomes table."""
+    asked = _cli_asked(source_layout=source_layout, monitoring=monitoring)
+    assert (set(asked) >= LABELS) is asks_labels
+    assert LABELS.isdisjoint(asked) is not asks_labels
+    assert asked.index("monitoring") < asked.index("source_table_name")
+
+
+def test_first_single_model_batch_project_asks_twelve_questions():
+    """The default quick path stays short; each prompt here has no usable default."""
+    asked = _cli_asked(training_layout="single_model")
+    assert len(asked) == 12

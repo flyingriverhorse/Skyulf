@@ -245,3 +245,12 @@ def test_fixed_pipeline_save_load_retains_worker_admission(tmp_path, monkeypatch
     pieces = pd.concat([predict_pipeline(query.iloc[[index]], restored) for index in range(3)])
     assert certificate.steps[0].node_type == "OneHotEncoder"
     pd.testing.assert_frame_equal(full, pieces)
+
+
+def test_fixed_categories_matching_no_training_value_are_reported(caplog):
+    """Every indicator would be 0, for example when codes arrive as "81.0" instead of "81"."""
+    frame = pd.DataFrame({"code": pd.Series(["81.0", "12.0"], dtype=object)})
+    config = {"columns": ["code"], "categories": {"code": ["81", "12"]}, "max_categories": None}
+    with caplog.at_level("WARNING"):
+        OneHotEncoderCalculator().fit(frame, config)
+    assert "code" in caplog.text and "none of its fixed categories" in caplog.text

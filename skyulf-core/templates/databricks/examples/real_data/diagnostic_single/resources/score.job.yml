@@ -7,8 +7,6 @@ resources:
       budget_policy_id: ${var.serverless_budget_policy_id}
 
       timeout_seconds: ${var.score_timeout_seconds}
-      health:
-        rules: ${var.score_health_rules}
       email_notifications: ${var.score_email_notifications}
       webhook_notifications: ${var.score_webhook_notifications}
       max_concurrent_runs: 1

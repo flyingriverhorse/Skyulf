@@ -155,6 +155,8 @@ def _smoke_script(root):
     script.write_text(
         template.read_text(encoding="utf-8")
         .replace("{{.catalog}}", "workspace")
+        .replace("{{or .output_schema .schema}}", "test")
+        .replace("{{or .metadata_schema .schema}}", "test")
         .replace("{{.schema}}", "test"),
         encoding="utf-8",
     )

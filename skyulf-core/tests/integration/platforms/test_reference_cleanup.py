@@ -229,6 +229,7 @@ def _prepare(spark: FakeSpark, config: MonitorConfig, version: str, **table) -> 
 
 def _store(spark: FakeSpark, requests: list[dict] | None = None) -> None:
     """Add owned request and inventory tables to the store."""
+    spark.add(f"{NS}.model_inventory")
     spark.add(f"{NS}.retraining_requests", requests or [])
 
 
@@ -794,11 +795,42 @@ def test_a_child_replaced_during_deletion_stops_before_dropping_it(monkeypatch):
 def test_missing_request_table_aborts_as_unknown_state(monkeypatch):
     """Without the request table, unfinished retraining cannot be ruled out."""
     spark = FakeSpark()
+    spark.add(f"{NS}.model_inventory")
     config = _config()
     _prepare(spark, config, "1")
     with pytest.raises(ValueError, match="retraining_requests is missing"):
         _run(spark, monkeypatch, [config], cleanup_confirm="true")
     assert spark.log == []
+
+
+@pytest.mark.parametrize("confirm", ["false", "true"])
+def test_cleanup_before_the_store_exists_is_a_clean_no_op(monkeypatch, confirm):
+    """The scheduled cleanup must not fail on a target whose store nobody initialized yet."""
+    spark = FakeSpark()
+    monkeypatch.setattr(
+        reference_cleanup,
+        "load_enrolled_models",
+        lambda *args: pytest.fail("cleanup read an uninitialized store"),
+    )
+    result = reference_cleanup.cleanup_references(
+        spark, VALUES | {"cleanup_confirm": confirm}, registry=lambda name: {}, now=NOW
+    )
+    assert result == {
+        "status": "store_not_initialized",
+        "namespace": NS,
+        "references": [],
+        "skipped": [],
+        "deleted": [],
+    }
+    assert spark.log == []
+
+
+def test_cleanup_still_refuses_a_foreign_inventory_table(monkeypatch):
+    """A same-named table someone else owns must stop cleanup, not look like a missing store."""
+    spark = FakeSpark()
+    spark.add(f"{NS}.model_inventory", owner="someone-else")
+    with pytest.raises(ValueError, match="ownership differs"):
+        reference_cleanup.cleanup_references(spark, VALUES, registry=lambda name: {}, now=NOW)
 
 
 def test_a_foreign_audit_table_created_concurrently_stops_deletion(monkeypatch):

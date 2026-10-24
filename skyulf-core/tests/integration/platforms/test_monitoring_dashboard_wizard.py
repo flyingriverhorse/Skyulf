@@ -1,4 +1,4 @@
-"""The wizard sets up the test dashboard; deployment/monitoring.yml explains syst and prod."""
+"""The wizard sets up the test dashboard; deployment/targets.yml explains syst and prod."""
 
 import json
 from pathlib import Path
@@ -36,8 +36,18 @@ def _visible(name, values):
 
 
 def _dashboards(project):
-    """Parse the per-target dashboard file of a rendered project."""
-    return yaml.safe_load((project / "deployment/monitoring.yml").read_text(encoding="utf-8"))
+    """Parse the targets file, which holds every target's dashboard settings."""
+    return yaml.safe_load((project / "deployment/targets.yml").read_text(encoding="utf-8"))
+
+
+def _with_dashboard(targets):
+    """Targets that create a dashboard or add its refresh task to the monitoring job."""
+    return [
+        name
+        for name, target in targets.items()
+        if "dashboards" in (target.get("resources") or {})
+        or "tasks" in (((target.get("resources") or {}).get("jobs") or {}).get("monitoring") or {})
+    ]
 
 
 def _refresh_task(target):
@@ -57,7 +67,7 @@ def _refresh_task(target):
 
 def _examples(project):
     """Uncomment the hand-copy examples so their YAML is checked like real configuration."""
-    text = (project / "deployment/monitoring.yml").read_text(encoding="utf-8")
+    text = (project / "deployment/targets.yml").read_text(encoding="utf-8")
     blocks = text.split("# Example: ")[1:]
     parsed = {}
     for block in blocks:
@@ -113,9 +123,10 @@ def test_answer_patterns_match_the_helper(name, value, valid):
 def test_default_configures_no_target_but_keeps_examples(tmp_path):
     """none leaves every target without a dashboard; both examples still parse when uncommented."""
     project = _generate_project(tmp_path, **STORE)
-    assert _dashboards(project) == {"targets": {}}
+    assert not _with_dashboard(_dashboards(project)["targets"])
     examples = _examples(project)
-    assert set(examples) == {"create", "connect"}
+    assert set(examples) == {"create", "connect", "duration"}
+    assert examples["duration"]["prod"]["resources"]["jobs"]["train"]["health"]["rules"]
     create = examples["create"]["prod"]
     assert create["resources"]["dashboards"]["monitoring_dashboard"]["warehouse_id"] == (
         "REPLACE_WITH_WAREHOUSE_ID"
@@ -139,7 +150,7 @@ def test_create_configures_only_the_test_target(tmp_path):
         monitoring_dashboard_warehouse_id=WAREHOUSE_ID,
     )
     targets = _dashboards(project)["targets"]
-    assert set(targets) == {"test"}
+    assert _with_dashboard(targets) == ["test"]
     test = targets["test"]
     dashboard = test["resources"]["dashboards"]["monitoring_dashboard"]
     assert dashboard["warehouse_id"] == WAREHOUSE_ID
@@ -176,7 +187,7 @@ def test_connect_refreshes_the_existing_dashboard(tmp_path, warehouse):
     assert test["variables"]["monitoring_dashboard_url"] == URL
     assert (
         "deployment/monitoring.yml"
-        in yaml.safe_load((project / "databricks.yml").read_text(encoding="utf-8"))["include"]
+        not in yaml.safe_load((project / "databricks.yml").read_text(encoding="utf-8"))["include"]
     )
 
 

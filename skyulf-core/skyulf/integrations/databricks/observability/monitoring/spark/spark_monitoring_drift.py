@@ -48,10 +48,28 @@ def _exact_ks_probability(statistic: float, n: int, m: int) -> float:
     return (total - previous[m]) / total
 
 
+def _scipy_exact_probability(statistic: float, n: int, m: int) -> float | None:
+    """Return SciPy's exact two-sample KS probability, the one local ks_2samp uses here.
+
+    shortcut: private SciPy helper (stable since 1.5); if it moves, the DKW bound is used.
+    """
+    try:
+        from scipy.stats._stats_py import _attempt_exact_2kssamp  # noqa: PLC0415
+
+        success, _, probability = _attempt_exact_2kssamp(
+            n, m, math.gcd(n, m), float(statistic), "two-sided"
+        )
+    except (ImportError, TypeError, ValueError, ArithmeticError):
+        return None
+    probability = float(probability)
+    return probability if success and 0.0 <= probability <= 1.0 else None
+
+
 def _ks_evidence(statistic: float, n: int, m: int) -> DriftEvidence:
     """Match Core exact/asymptotic KS where bounded; otherwise use a named valid bound.
 
-    The middle range uses the union bound on two one-sample DKW inequalities:
+    The middle range uses SciPy's exact count, like local ks_2samp. Only when that is
+    unavailable does it fall back to the union bound on two one-sample DKW inequalities:
     P(D >= d) <= 4 exp(-2 d^2 / (1/sqrt(n) + 1/sqrt(m))^2).
     It is conservative finite-sample evidence, never an approximation labeled as KS.
     An inconclusive bound is surfaced as unavailable after family correction.
@@ -61,6 +79,9 @@ def _ks_evidence(statistic: float, n: int, m: int) -> DriftEvidence:
     if max(n, m) > 10_000:
         probability = float(kstwo.sf(statistic, round(n * m / (n + m))))
         return numeric_evidence(probability, n, m)
+    exact = _scipy_exact_probability(statistic, n, m)
+    if exact is not None:
+        return numeric_evidence(exact, n, m)
     bound = min(1.0, 4 * math.exp(-2 * statistic**2 / (1 / math.sqrt(n) + 1 / math.sqrt(m)) ** 2))
     return DriftEvidence(
         test="ks_dkw_union_bound", p_value=bound, reference_count=n, current_count=m

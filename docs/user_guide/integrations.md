@@ -72,6 +72,7 @@ paths and configuration fields.
 | Guide | What it covers |
 | --- | --- |
 | [Training reports and charts](databricks_training_reports.md) | Locate evaluation metrics, chosen parameters, reports, charts and task failures after a run. |
+| [Experiment artifacts](databricks_artifacts.md) | Explain each training JSON file, the fitted model package and lifecycle records; distinguish configuration, data fingerprints and decisions. |
 | [SHAP explanations in Databricks](databricks_explanations.md) | Enable explanations and locate and interpret saved feature and individual-prediction reports. |
 | [Approve, reject and roll back](databricks_lifecycle.md) | Compare candidates, apply quality gates, control champion/challenger aliases and reverse a promotion. |
 | [Interrupted alias recovery](databricks_lifecycle_recovery.md) | Inspect and recover an interrupted model-version alias operation. |

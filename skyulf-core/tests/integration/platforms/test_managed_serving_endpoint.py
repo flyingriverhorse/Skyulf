@@ -150,6 +150,50 @@ def test_failed_foreign_pending_config_is_not_discarded(plan, ownership):
     client.serving_endpoints.update_config.assert_not_called()
 
 
+def _never_served(plan, ownership, pending_model=None):
+    """An owned endpoint whose first deployment failed has no active served entity."""
+    endpoint = remote(plan, ownership)
+    endpoint["state"] = {"ready": "NOT_READY", "config_update": "UPDATE_FAILED"}
+    pending = deepcopy(endpoint["config"])
+    if pending_model:
+        pending["served_entities"][0]["entity_name"] = pending_model
+    endpoint["pending_config"] = pending
+    endpoint["config"] = {}
+    return endpoint
+
+
+@pytest.mark.parametrize("pending", [True, False])
+def test_failed_first_deployment_is_repaired_in_place(plan, ownership, pending):
+    """A failed first deploy must not need a manual endpoint delete before the next run."""
+    broken = _never_served(plan, ownership)
+    if not pending:
+        del broken["pending_config"]
+    client = Mock()
+    client.serving_endpoints.get.side_effect = [broken, remote(plan, ownership)]
+    result = managed.ensure_owned_endpoint(client, plan, ownership=ownership)
+    entity = client.serving_endpoints.update_config.call_args.kwargs["served_entities"][0]
+    assert (entity.name, entity.entity_version) == ("risk-prod", "8")
+    assert result["action"] == "updated" and result["previous_version"] is None
+    client.serving_endpoints.create.assert_not_called()
+
+
+@pytest.mark.parametrize("case", ["foreign_pending", "not_failed", "foreign_owner"])
+def test_empty_endpoint_is_repaired_only_when_owned_and_failed(plan, ownership, case):
+    """Repair must not take over another model, a running update or someone else's endpoint."""
+    endpoint = _never_served(
+        plan, ownership, "main.ml.foreign" if case == "foreign_pending" else None
+    )
+    if case == "not_failed":
+        endpoint["state"]["config_update"] = "IN_PROGRESS"
+    if case == "foreign_owner":
+        endpoint["tags"] = [{"key": "project", "value": "other"}]
+    client = Mock()
+    client.serving_endpoints.get.return_value = endpoint
+    with pytest.raises((RuntimeError, ValueError)):
+        managed.ensure_owned_endpoint(client, plan, ownership=ownership)
+    client.serving_endpoints.update_config.assert_not_called()
+
+
 @pytest.mark.parametrize("change", ["runtime", "route", "legacy_logging", "gateway_logging"])
 def test_failed_pending_config_preserves_runtime_route_and_logging_guards(plan, ownership, change):
     """A terminal failure must not bypass admission for pending settings or payload sinks."""
@@ -309,6 +353,30 @@ def test_managed_sql_is_stable_across_model_versions_and_replaced_for_wire_chang
     assert "CAST(`x` AS STRING)" in spark.sql.call_args.args[0]
 
 
+def test_existing_sql_gets_the_null_guard_once(plan, ownership):
+    """Functions created before the integer NULL guard must be replaced, not kept forever."""
+    import hashlib
+    import json
+
+    guarded = replace(plan, input_schema=(("x", "int64"),))
+    client, spark = Mock(), Mock()
+    client.serving_endpoints.get.return_value = remote(guarded, ownership)
+    function = build_serving_sql_function(guarded, "main.ml.score")
+    # The comment an older release wrote: same contract, without the guard entry.
+    contract = {k: v for k, v in function.schema_contract.items() if k != "null_guard"}
+    digest = hashlib.sha256(json.dumps(contract, sort_keys=True, separators=(",", ":")).encode())
+    metadata = {
+        "ownership": managed._ownership(ownership),
+        "endpoint_name": "risk-prod",
+        "schema_sha256": digest.hexdigest(),
+    }
+    comment = managed._COMMENT_PREFIX + json.dumps(metadata, sort_keys=True, separators=(",", ":"))
+    client.functions.get.return_value = {"comment": comment}
+    result = managed.ensure_owned_sql_function(spark, client, function, ownership=ownership)
+    assert result["action"] == "updated"
+    assert "raise_error(" in spark.sql.call_args.args[0]
+
+
 def test_foreign_function_is_never_replaced(plan, ownership):
     """A shared UC schema must not let deployment erase unrelated functions."""
     client, spark = Mock(), Mock()
@@ -338,6 +406,28 @@ def test_additive_grants_preserve_acls_and_escape_principals(plan):
         "GRANT EXECUTE ON FUNCTION `main`.`ml`.`score` TO `data``science`"
     )
     client.serving_endpoints.set_permissions.assert_not_called()
+
+
+@pytest.mark.parametrize("function_principals", [[], [{"group_name": "uc-readers"}]])
+def test_function_grants_use_their_own_principals(plan, function_principals):
+    """Endpoint callers and UC EXECUTE grantees are separate lists when both are given."""
+    client, spark = Mock(), Mock()
+    client.serving_endpoints.get.return_value = {"id": "endpoint-id"}
+    managed.grant_serving_access(
+        spark,
+        client,
+        plan,
+        principals=[{"group_name": "users"}],
+        function_principals=function_principals,
+        function_name="main.ml.score",
+    )
+    acl = client.serving_endpoints.update_permissions.call_args.kwargs["access_control_list"]
+    assert [entry.group_name for entry in acl] == ["users"]
+    grants = [call.args[0] for call in spark.sql.call_args_list]
+    assert grants == [
+        f"GRANT EXECUTE ON FUNCTION `main`.`ml`.`score` TO `{p['group_name']}`"
+        for p in function_principals
+    ]
 
 
 @pytest.mark.parametrize(

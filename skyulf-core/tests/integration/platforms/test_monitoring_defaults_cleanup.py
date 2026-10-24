@@ -111,11 +111,10 @@ def test_cleanup_job_has_independent_clock_and_existing_monitoring_identity(tmp_
         assert owner["task_key"] == task_key
         assert owner["workspace_host"] == "${workspace.host}"
     targets = yaml.safe_load((project / "deployment/targets.yml").read_text())["targets"]
-    monitoring = yaml.safe_load((project / "deployment/monitoring.yml").read_text())["targets"]
-    for name, target in targets.items():
+    for target in targets.values():
         if target["mode"] == "development":
-            assert monitoring[name]["variables"]["monitoring_cleanup_pause_status"] == "PAUSED"
-            assert target["resources"]["jobs"]["monitoring_cleanup"]["name"] == "monitoring_cleanup"
+            assert target["variables"]["monitoring_cleanup_pause_status"] == "PAUSED"
+            assert "resources" not in target  # no short-name override, no shared identity
         else:
             jobs = target["resources"]["jobs"]
             assert jobs["monitoring_cleanup"] == jobs["monitoring"]

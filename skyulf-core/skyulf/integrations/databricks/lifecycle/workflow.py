@@ -29,6 +29,7 @@ from ...mlflow.lifecycle.promotion import (
 from ...mlflow.lifecycle.validation import quality_gates_pass
 from ...mlflow.registration.registry import RegistryModelNotFoundError, resolve_model
 from ..data.admission import SingleWriterAdmission
+from ..data.delta_io.delta import require_versioned_table
 from ..data.training.training_dates import training_date_spec
 from ..observability.reports.explanations import validate_explanation_config
 from ..scoring.incremental.incremental_batch import (
@@ -40,6 +41,7 @@ from ..scoring.shared.prediction_output import (
     activate_prediction_view,
     active_prediction_generation,
     provision_prediction_table,
+    prune_prediction_generations,
     scoring_target,
 )
 from ..scoring.workflow import (
@@ -500,12 +502,17 @@ def resolve_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> 
     spec = training_spec(training_settings(config, now))
     validate_cv_holdout_policy(spec, CVSpec.from_workflow(config))
     if config.get("training_version") is None:
-        latest = (
-            spark.sql(f"DESCRIBE HISTORY {spec.table}")
-            .select("version")
-            .orderBy("version", ascending=False)
-            .first()
-        )
+        try:
+            latest = (
+                spark.sql(f"DESCRIBE HISTORY {spec.table}")
+                .select("version")
+                .orderBy("version", ascending=False)
+                .first()
+            )
+        except Exception:
+            # Explain Lakeflow tables and views; other failures keep their own error.
+            require_versioned_table(spark, spec.table, "training_table")
+            raise
         if latest is None or type(latest["version"]) is not int or latest["version"] < 0:
             raise ValueError("Training source has no concrete Delta version.")
         spec = replace(spec, version=latest["version"])
@@ -751,6 +758,13 @@ def _run_scoring_action(
     )
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
         activate_prediction_view(spark, config["prediction_table"], target)
+        prune_prediction_generations(
+            spark,
+            config["prediction_table"],
+            target,
+            model_name=config["model_name"],
+            keep=config.get("keep_prediction_generations", 2),
+        )
     return result
 
 

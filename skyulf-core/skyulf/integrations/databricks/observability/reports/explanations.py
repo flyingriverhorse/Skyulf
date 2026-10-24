@@ -122,6 +122,21 @@ def _sample_training_inputs(
     return sampled
 
 
+def _unavailable(
+    evidence: dict[str, Any], reason: str, artifact: FittedPipelineArtifact
+) -> dict[str, Any]:
+    """Return the skip reason, with the encoded width and limit when the budget is exceeded."""
+    if reason != "feature_limit_exceeded":
+        return {**evidence, "reason": reason}
+    width = len(artifact.manifest.feature_columns)
+    return {
+        **evidence,
+        "reason": reason,
+        "feature_count": width,
+        "max_features": evidence["limits"]["max_features"],
+    }
+
+
 def _transformed_unavailable_reason(
     artifact: FittedPipelineArtifact,
     transformed: pd.DataFrame | pl.DataFrame,
@@ -197,7 +212,7 @@ def _explain_sample(
         return {**evidence, "reason": "too_few_rows_after_exclusions"}
     reason = _transformed_unavailable_reason(artifact, transformed, count, limits["max_features"])
     if reason:
-        return {**evidence, "reason": reason}
+        return _unavailable(evidence, reason, artifact)
     features = transformed.to_pandas() if isinstance(transformed, pl.DataFrame) else transformed
     estimator = artifact.pipeline.model_estimator
     if estimator is None or estimator.model is None:
@@ -233,7 +248,7 @@ def explain_training_artifact(
     }
     reason = _input_unavailable_reason(artifact, training_frame, limits)
     if reason:
-        return {**evidence, "reason": reason}
+        return _unavailable(evidence, reason, artifact)
     # The caller already bounds the training population. Context-dependent or
     # undeclared steps need that complete population; only SHAP rows are sampled.
     input_limit = len(training_frame) if _requires_context(artifact) else limits["max_samples"]

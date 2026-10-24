@@ -628,6 +628,7 @@ def test_auto_champion_score_pins_resolved_version_before_target_selection(monke
     monkeypatch.setattr(workflow, "provision_prediction_table", provision)
     monkeypatch.setattr(workflow, "run_incremental_batch", Mock(return_value=object()))
     monkeypatch.setattr(workflow, "activate_prediction_view", Mock())
+    monkeypatch.setattr(workflow, "prune_prediction_generations", Mock())
     spark = Mock()
     spark.catalog.tableExists.return_value = False
     workflow.run_action(spark, config, "score")
@@ -679,10 +680,14 @@ def test_full_rebuild_scores_new_generation_before_view_activation(monkeypatch):
     )
     activate = Mock(side_effect=lambda *args: events.append("activate"))
     monkeypatch.setattr(workflow, "activate_prediction_view", activate)
+    prune = Mock(side_effect=lambda *args, **kwargs: events.append("prune"))
+    monkeypatch.setattr(workflow, "prune_prediction_generations", prune)
     spark = Mock()
     spark.catalog.tableExists.return_value = False
     workflow.run_action(spark, config, "score")
-    assert events == ["prepare", "provision", "score", "activate"]
+    # Old generations are dropped only after the view reads the new one.
+    assert events == ["prepare", "provision", "score", "activate", "prune"]
+    assert prune.call_args.kwargs["keep"] == 2
     assert provision.call_args.args[1]["prediction_table"] == "workspace.test.predictions_v2"
     assert activate.call_args.args[1:] == (
         "workspace.test.predictions",

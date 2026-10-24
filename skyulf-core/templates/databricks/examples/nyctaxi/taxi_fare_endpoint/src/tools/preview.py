@@ -17,7 +17,10 @@ from skyulf.integrations.databricks.projects.source_validation import (
     query_source_sql,
     validate_project_sources,
 )
-from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import (
+    preview_summary,
+    preview_workflow_config,
+)
 from skyulf.integrations.databricks.projects.yaml_config import (
     project_config_path,
     read_workflow_config,
@@ -29,8 +32,12 @@ from skyulf.registry import NodeRegistry
 def _preview(config, action):
     """Show every requested candidate, including its independent preprocessing and search."""
     if config.get("training_layout") != "model_competition":
-        return preview_workflow_config(config, action=action)
+        summary = preview_summary(config, action=action)
+        return summary + "\n\n" + preview_workflow_config(config, action=action)
+    first = next(iter(config["competition"]["candidates"].values()))
     lines = [
+        preview_summary({**config, "pipeline": first["pipeline"]}, action=action),
+        "",
         "Model competition: shared source, target and CV; separate candidate training tasks.",
         "Only the CV winner receives the final holdout check and registration.",
     ]

@@ -2,28 +2,38 @@
 
 from pathlib import Path
 
+from template_sources import copy_template, template_text
+
 from skyulf.inference.project_code import load_project_module
 from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
 
-def test_shared_scoring_exports_both_rule_stages_without_active_business_examples():
+def _features(tmp_path):
+    """Copy src/features and the phase YAML that feature_project_source reads."""
+    (tmp_path / "config").mkdir()
+    for phase in ("preprocessing", "pre_split", "scoring"):
+        copy_template(TEMPLATE / f"config/{phase}.yml", tmp_path / f"config/{phase}.yml")
+    return copy_template(TEMPLATE / "src/features", tmp_path / "src/features")
+
+
+def test_shared_scoring_exports_both_rule_stages_without_active_business_examples(tmp_path):
     """Consolidation must preserve normal pre-split scoring and keep business rules opt-in."""
-    module = load_project_module(feature_project_source(TEMPLATE / "src/features"))
+    module = load_project_module(feature_project_source(_features(tmp_path)))
     assert module.build_model_rules() == {"reuse_pre_split": True, "skip_target_steps": False}
     assert module.build_combined_rules() == []
     assert not hasattr(module, "build_scoring")
     assert not (TEMPLATE / "src/composition").exists()
 
 
-def test_profit_callback_preserves_negative_margins():
+def test_profit_callback_preserves_negative_margins(tmp_path):
     """The sample business rule must subtract costs and retain loss-making results."""
     import importlib
 
     import pandas as pd
 
-    module = load_project_module(feature_project_source(TEMPLATE / "src/features"))
+    module = load_project_module(feature_project_source(_features(tmp_path)))
     inputs = pd.DataFrame({"id": [1, 2]}, index=[8, 3])
     predictions = pd.DataFrame(
         {"revenue__prediction": [100.0, 80.0], "cost__prediction": [60.0, 90.0]}, index=inputs.index
@@ -36,7 +46,6 @@ def test_profit_callback_preserves_negative_margins():
 
 def test_shared_feature_callback_replays_with_two_saved_models(tmp_path):
     """The unified scoring package must resolve callbacks after original source changes."""
-    import shutil
 
     import pytest
     import yaml
@@ -49,7 +58,7 @@ def test_shared_feature_callback_replays_with_two_saved_models(tmp_path):
     original, _, query = _saved_set(tmp_path / "original")
     project = tmp_path / "project"
     features = project / "src/features"
-    shutil.copytree(TEMPLATE / "src/features", features)
+    copy_template(TEMPLATE / "src/features", features)
     (project / "config").mkdir()
     rule = {
         "name": "profit",
@@ -59,7 +68,7 @@ def test_shared_feature_callback_replays_with_two_saved_models(tmp_path):
         "columns": [{"name": "profit", "dtype": "float64"}],
         "required_components": ["revenue", "cost"],
     }
-    declaration = yaml.safe_load((TEMPLATE / "config/scoring.yml").read_text())
+    declaration = yaml.safe_load(template_text(TEMPLATE / "config/scoring.yml"))
     declaration["combined"] = [rule]
     (project / "config/scoring.yml").write_text(yaml.safe_dump(declaration), encoding="utf-8")
     config, source = capture_set_rules(

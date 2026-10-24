@@ -117,7 +117,12 @@ def test_primitive_types_use_only_required_wire_casts(endpoint, dtype, sql_type,
     plan = serving.build_serving_sql_function(endpoint, "main.api.score")
     assert f"`select` {sql_type}" in plan.create_sql
     expression = "CAST(`select` AS STRING)" if encoded else "`select`"
-    assert f"'select', {expression}\n" in plan.create_sql
+    if dtype in {"int32", "int64", "bool"}:
+        # Non-nullable inputs pass through unchanged but stop on NULL.
+        expression = "CASE WHEN `select` IS NULL THEN raise_error("
+        assert "ELSE `select` END\n" in plan.create_sql
+    assert f"'select', {expression}" in plan.create_sql
+    assert encoded == ("CAST(`select` AS STRING)" in plan.create_sql)
 
 
 @pytest.mark.parametrize(
@@ -132,6 +137,16 @@ def test_sql_float_nulls_reach_fitted_imputation_instead_of_becoming_zero(
     ddl = serving.build_serving_sql_function(endpoint, "main.api.score").create_sql
     assert f"'value', COALESCE(`value`, CAST('NaN' AS {sql_type}))" in ddl
     assert "CAST(`value` AS STRING)" not in ddl
+
+
+@pytest.mark.parametrize("dtype", ["int64", "int32", "bool"])
+def test_sql_nulls_in_non_nullable_inputs_fail_instead_of_becoming_zero(endpoint, dtype):
+    """ai_query sends 0/false for a SQL NULL here, which would bypass fitted imputation."""
+    endpoint = replace(endpoint, input_columns=("year",), input_schema=(("year", dtype),))
+    ddl = serving.build_serving_sql_function(endpoint, "main.api.score").create_sql
+    assert "'year', CASE WHEN `year` IS NULL THEN raise_error(" in ddl
+    assert "ELSE `year` END" in ddl
+    assert "trained without missing values" in ddl
 
 
 @pytest.mark.parametrize("error_mode", ["false", 0, None])

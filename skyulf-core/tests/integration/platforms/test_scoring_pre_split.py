@@ -7,6 +7,7 @@ import pandas as pd
 import polars as pl
 import pytest
 import yaml
+from template_sources import copy_template, template_text
 
 from skyulf.inference.project_scoring import run_project_scoring
 from skyulf.integrations.databricks.projects.project import load_project_workflow
@@ -20,12 +21,12 @@ TEMPLATE = (
 def _project(tmp_path, *, skip=False, mode="pre_split", steps=None, engine="pandas", examples=True):
     """Exercise actual generated switches with an editable pre-split recipe."""
     root = tmp_path / "src/features"
-    shutil.copytree(TEMPLATE, root)
+    copy_template(TEMPLATE, root)
     directory = tmp_path / "config"
     directory.mkdir()
     for phase in ("preprocessing", "pre_split"):
-        shutil.copyfile(TEMPLATE.parents[1] / "config" / f"{phase}.yml", directory / f"{phase}.yml")
-    declaration = yaml.safe_load((TEMPLATE.parents[1] / "config/scoring.yml").read_text())
+        copy_template(TEMPLATE.parents[1] / "config" / f"{phase}.yml", directory / f"{phase}.yml")
+    declaration = yaml.safe_load(template_text(TEMPLATE.parents[1] / "config/scoring.yml"))
     declaration.update(mode=mode, skip_target_pre_split_steps=skip)
     if examples and mode in ("custom", "combined"):
         declaration["eligibility"] = [

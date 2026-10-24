@@ -48,6 +48,9 @@ serving_endpoint:
   #       - service_principal_name: <application-id>
   #       - user_name: someone@example.com
   permissions: []
+  # Optional: UC grantees for function EXECUTE when they differ from the endpoint
+  # callers above (UC rejects workspace-local groups such as users). Same format.
+  # function_permissions: []
   verification:
     sample_rows: 20 # Bounded sample from config/inference.yml score_source_table; zero rows fails.
 
@@ -73,7 +76,7 @@ serving_endpoint:
 {{- else}}
     # Databricks writes <logging_catalog>.<logging_schema>.<logging_table_prefix>_payload.
     logging_catalog: "{{.catalog}}"
-    logging_schema: "{{.schema}}"
+    logging_schema: "{{or .metadata_schema .schema}}"
     logging_table_prefix: "{{if .serving_logging_table_prefix}}{{.serving_logging_table_prefix}}{{else}}{{.project_name}}_endpoint{{end}}"
 {{- end}}
     # telemetry | ai_gateway | disabled (no inference table; no rollout or serving monitoring).

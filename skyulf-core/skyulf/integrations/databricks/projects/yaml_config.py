@@ -23,7 +23,11 @@ INFERENCE_OPTIONS = {
 }
 TRAINING_OPTIONS = {
     "save_preprocessing_diagnostics": ("preprocessing_probe", None),
+    "probe_pipeline_for_serving": ("admit_probed_custom_steps", None),
+    # Old name of probe_pipeline_for_serving; still accepted.
     "allow_tested_custom_steps": ("admit_probed_custom_steps", None),
+    # Skip rows with an empty target (multi_target always does, per branch).
+    "skip_missing_targets": ("drop_missing_labels", None),
 }
 TRAINING_RENAMES = {
     "training_table_version": "training_version",
@@ -41,6 +45,7 @@ _INTERNAL_OPTIONS = {
     for internal, _ in options.values()
 }
 INFERENCE_FIELDS = {
+    "keep_prediction_generations",
     "prediction_delivery",
     "initial_scoring",
     "spark_udf_env_manager",
@@ -196,22 +201,29 @@ def _fields(value: Any, allowed: set[str], label: str) -> dict[str, Any]:
 def _internal_options(value: dict[str, Any], options: dict, label: str) -> dict[str, Any]:
     """Replace validated public option names and values with their internal workflow form."""
     result = dict(value)
+    sources: dict[str, str] = {}
     for public, (internal, choices) in options.items():
         if public not in result:
             continue
-        option = result.pop(public)
-        if choices is None:
-            if type(option) is not bool:
-                raise ValueError(f"{label} {public} must be true or false.")
-            result[internal] = option
-            continue
-        # type() check keeps YAML true/false and 1/0 distinct from each other.
-        match = [key for key in choices if type(key) is type(option) and key == option]
-        if not match:
-            allowed = ", ".join(json.dumps(key) for key in choices)
-            raise ValueError(f"{label} {public} must be one of: {allowed}.")
-        result[internal] = choices[match[0]]
+        if internal in sources:
+            raise ValueError(f"{label}: set only {sources[internal]}; {public} is its old name.")
+        sources[internal] = public
+        result[internal] = _internal_value(result.pop(public), choices, f"{label} {public}")
     return result
+
+
+def _internal_value(option: Any, choices: dict | None, label: str) -> Any:
+    """Validate one public option value and return its internal form."""
+    if choices is None:
+        if type(option) is not bool:
+            raise ValueError(f"{label} must be true or false.")
+        return option
+    # type() check keeps YAML true/false and 1/0 distinct from each other.
+    match = [key for key in choices if type(key) is type(option) and key == option]
+    if not match:
+        allowed = ", ".join(json.dumps(key) for key in choices)
+        raise ValueError(f"{label} must be one of: {allowed}.")
+    return choices[match[0]]
 
 
 def _version(document: dict[str, Any], label: str) -> None:

@@ -25,11 +25,11 @@ bands describe this fitted model's output; they are not clinical decision rules.
 ## Built-in alternatives to the teaching factories
 
 The examples retain custom factories to demonstrate packaging and saved-code
-replay. For a new recipe, see the [built-in alternatives](diagnostic_single/src/features/README.md#prefer-a-built-in-when-it-expresses-the-same-rule):
+replay. For a new recipe, see the [built-in alternatives](diagnostic_single/GUIDE.md#preprocessing-and-custom-code):
 filters, learned clipping, imputation, missing markers, frequency/rare encoding,
 cyclical dates and group deviations. The guide includes runnable YAML and the
 null, dtype and output-name differences to check before retraining. These new
-built-ins require the 0.9.5 development wheel until that release is published.
+built-ins require the 0.9.6 development wheel until that release is published.
 
 ## Data, ownership and leakage boundaries
 

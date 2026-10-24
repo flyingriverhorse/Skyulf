@@ -131,7 +131,7 @@ def test_generated_notebooks_match_selected_job_tasks(tmp_path, layout, shap, ch
         training_layout=layout,
         shap_enabled=shap,
         evaluation_charts_enabled=charts,
-        auto_rebuild_on_cdf_expiry=recovery,
+        rescore_when_history_expires=recovery,
     )
     referenced = set()
     for resource in (project / "resources").glob("*.yml"):

@@ -156,7 +156,7 @@ Unpause the dedicated Spark monitoring schedule after enrollment. Individual HTT
 requests do not launch monitoring jobs; observation reads asynchronously delivered
 logs on that schedule. Completed performance windows are revisited according to
 `monitoring_revisit_windows` so late logs and outcomes can update their evidence.
-If the target has a dashboard in `deployment/monitoring.yml`, its native
+If the target has a dashboard in `deployment/targets.yml`, its native
 Dashboard task refreshes the published dashboard after the monitoring flow
 completes with monitoring enabled; development targets never refresh. Without it, new Delta rows alone do not
 invalidate the dashboard's cached view.

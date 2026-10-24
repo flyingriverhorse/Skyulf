@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from template_sources import template_text
 
 from skyulf.inference.project_code import load_project_module
 from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
@@ -15,9 +16,17 @@ FEATURES = (
 )
 
 
-def test_scoring_defaults_are_declared_only_in_yaml():
+@pytest.fixture
+def features(tmp_path):
+    """Copy src/features and config as a default include_examples=true project would hold them."""
+    from test_databricks_custom_steps import _copy_features  # noqa: PLC0415
+
+    return _copy_features(tmp_path)
+
+
+def test_scoring_defaults_are_declared_only_in_yaml(features):
     """New projects must expose one inactive scoring policy without Python owners."""
-    policy = yaml.safe_load((FEATURES.parents[1] / "config/scoring.yml").read_text())
+    policy = yaml.safe_load((features.parents[1] / "config/scoring.yml").read_text())
     assert policy == {
         "version": 1,
         "mode": "pre_split",
@@ -44,9 +53,9 @@ def test_scoring_defaults_are_declared_only_in_yaml():
         ("example_all", ["SimpleImputer", "ColumnFunction", "FittedFunction", "FittedFunction"]),
     ],
 )
-def test_shipped_preprocessing_recipes_select_exact_steps(recipe, expected):
+def test_shipped_preprocessing_recipes_select_exact_steps(recipe, expected, features):
     """A frequency-only branch must never silently inherit an imputer from another branch."""
-    module = load_project_module(feature_project_source(FEATURES))
+    module = load_project_module(feature_project_source(features))
     steps = module.build_preprocessing(recipe=recipe)
     assert len(steps) == len(expected)
     assert all(
@@ -58,9 +67,9 @@ def test_shipped_preprocessing_recipes_select_exact_steps(recipe, expected):
     "recipe, count",
     [("default", 0), ("none", 0), ("example_complete_inputs", 1), ("example_all", 2)],
 )
-def test_shipped_pre_split_recipes_are_independently_selectable(recipe, count):
+def test_shipped_pre_split_recipes_are_independently_selectable(recipe, count, features):
     """Filtering may be shared or omitted independently of the learned transformations."""
-    module = load_project_module(feature_project_source(FEATURES))
+    module = load_project_module(feature_project_source(features))
     steps = module.build_pre_split_steps(recipe=recipe)
     assert len(steps) == count
     if steps:
@@ -68,16 +77,16 @@ def test_shipped_pre_split_recipes_are_independently_selectable(recipe, count):
 
 
 @pytest.mark.parametrize("factory", ["build_preprocessing", "build_pre_split_steps"])
-def test_shipped_recipes_reject_unknown_names(factory):
+def test_shipped_recipes_reject_unknown_names(factory, features):
     """A misspelled recipe must fail instead of silently training without intended steps."""
-    module = load_project_module(feature_project_source(FEATURES))
+    module = load_project_module(feature_project_source(features))
     with pytest.raises(ValueError, match="Unknown .*recipe"):
         getattr(module, factory)(recipe="typo")
 
 
 def test_asset_instructions_are_inline_and_inactive():
     """Users can discover the full asset workflow without enabling sample business data."""
-    manifest = json.loads((FEATURES / "assets.json").read_text(encoding="utf-8"))
+    manifest = json.loads(template_text(FEATURES / "assets.json"))
     assert manifest["files"] == []
     instructions = "\n".join(manifest["_help"])
     assert "read_project_asset" in instructions
