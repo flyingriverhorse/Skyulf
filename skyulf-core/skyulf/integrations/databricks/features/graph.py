@@ -25,9 +25,23 @@ _JOB_CONTROLS = (
 )
 
 
+# Optional plan fields left at these defaults stay out of the digest, so plans written
+# before the fields existed keep the plan_sha256 their deployed feature jobs carry.
+_OPTIONAL_DEFAULTS = {
+    "base_transform": None,
+    "source_snapshot": "materialize",
+    "source_snapshot_schema": None,
+}
+
+
 def plan_digest(plan: FeaturePlan) -> str:
     """Identify the semantic feature graph and its ordered output schema."""
-    return hashlib.sha256(json.dumps(asdict(plan), sort_keys=True).encode()).hexdigest()
+    data = {
+        key: value
+        for key, value in asdict(plan).items()
+        if key not in _OPTIONAL_DEFAULTS or value != _OPTIONAL_DEFAULTS[key]
+    }
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
 
 def _task(name: str, phase: str, prototype: dict, parameters: dict) -> dict:

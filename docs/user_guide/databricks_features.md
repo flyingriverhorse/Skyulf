@@ -168,7 +168,9 @@ from every input and other output, with one owning producer.
 | `version` | Integer, required `1` | Feature configuration format. |
 | `groups` | Mapping, required; `{}` disables production unless `base_transform` is set | Up to 20 groups. Disabled configuration contains only version and groups. |
 | `base_table` | String, required when enabled | Existing observations and labels, used as they are unless `base_transform` is set. |
-| `base_transform` | Optional `src/features/module.py:function` | Runs on the pinned base before the joins and may derive the target and record keys; see [Derive labels and keys](#derive-labels-and-keys-with-base_transform). |
+| `base_transform` | Optional `src/features/groups/module.py:function` | Runs on the pinned base before the joins and may derive the target and record keys; see [Derive labels and keys](#derive-labels-and-keys-with-base_transform). |
+| `source_snapshot` | `materialize` default, or `fail` | Sources without Delta history (streaming tables, materialized views, views) are copied each run into an owned Delta snapshot that is pinned instead; `fail` stops with a message. |
+| `source_snapshot_schema` | Optional `catalog.schema`; default: the `output_table` schema | Where `skyulf_src_<hash>` snapshot tables are written. |
 | `output_table` | String, required when enabled | Destination for the merged base and features. |
 | `keys` | Nonempty distinct string list | Entity keys used by every group join. |
 | `timestamp` | String, required when enabled | A separate date/timestamp column, already typed consistently across inputs. |
@@ -179,6 +181,37 @@ from every input and other output, with one owning producer.
 | `lookup` | `exact` default, or `asof` | Exact matches key and time; asof selects the latest feature time at or before the base time. |
 | `allow_missing` | Boolean, default `false` | Permit unmatched observations with null features, or fail the merge. |
 
+### Lakeflow streaming tables and materialized views as sources
+
+Feature inputs are pinned to a Delta version so every task of a run, and any later
+repair, reads the same rows. Streaming tables, materialized views and views have no
+history to pin (Databricks also refuses `DESCRIBE HISTORY` on them from dedicated
+compute). The feature job therefore copies each such source once per run, with a
+plain read, into an owned Delta table `skyulf_src_<hash>` and pins that copy. No
+setting is needed:
+
+```yaml
+version: 1
+base_table: "workspace.bronze.observations_st"   # a streaming table: copied and pinned
+base_transform: src/features/groups/base.py:prepare  # only if the target or key must be derived
+output_table: "workspace.silver.observations"
+keys: [entity_id, observed_on]
+timestamp: observed_date
+groups: {}
+```
+
+The copy costs a full scan per run; regular Delta tables are never copied. After
+`merge_features` publishes the output, the job drops its copies. If the run fails
+they are kept, so repairing the failed task reads the same rows; the next run
+replaces them. A table with the snapshot name that Skyulf did not create is never
+replaced or dropped. `source_snapshot_schema: catalog.schema` chooses where the
+copies go (default: the output schema); `source_snapshot: fail` turns copying off.
+
+Train from `output_table`, a regular Delta table. To score, `ai_query` and the
+serving SQL function can read the streaming table itself, and REST callers send
+rows; only the batch `score` job needs a regular table with Change Data Feed, such
+as `output_table`. Training directly from a streaming table stops with a message.
+
 ### Derive labels and keys with base_transform
 
 When the raw source has no ready target or record key, for example a birth date
@@ -188,7 +221,7 @@ project function instead of a separate preparation job:
 ```yaml
 version: 1
 base_table: "workspace.demo.raw_observations"
-base_transform: src/features/base.py:prepare
+base_transform: src/features/groups/base.py:prepare
 output_table: "workspace.demo.observations"
 keys: [entity_id, observed_on]   # observed_on: a yyyy-MM-dd string made by prepare()
 timestamp: observed_date         # stays DATE for the feature grain and group joins
@@ -196,7 +229,7 @@ groups: {}                       # optional; groups still join on keys + timesta
 ```
 
 ```python
-# src/features/base.py
+# src/features/groups/base.py
 from pyspark.sql import functions as F
 
 

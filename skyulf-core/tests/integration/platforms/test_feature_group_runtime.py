@@ -110,6 +110,9 @@ class _FeatureSpark:
         import re
 
         self.operations.append(statement)
+        if statement.startswith("DESCRIBE TABLE EXTENDED"):
+            # Source kind lookup: every table here is a regular managed Delta table.
+            return SimpleNamespace(collect=lambda: [("Type", "MANAGED")])
         table = statement.split()[2].replace("`", "")
         if statement.startswith("DESCRIBE DETAIL"):
             state = self.tables[table]
@@ -370,13 +373,13 @@ def test_legacy_feature_snapshot_can_read_reuse_but_cannot_publish(feature_publi
 def _base_plan():
     """A raw base whose target and key come from one project function, without groups."""
     return FeaturePlan(
-        "c.s.raw", "c.s.merged", ("id", "day"), "at", (), "src/features/base.py:prepare"
+        "c.s.raw", "c.s.merged", ("id", "day"), "at", (), "src/features/groups/base.py:prepare"
     )
 
 
 def _base_project(tmp_path, body="    return [*frame, 'derived']\n"):
     """Write the project's base transform and return its root."""
-    path = tmp_path / "src/features/base.py"
+    path = tmp_path / "src/features/groups/base.py"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("def prepare(frame):\n" + body, encoding="utf-8")
     return tmp_path
@@ -418,7 +421,9 @@ def test_base_transform_edited_mid_run_is_rejected(tmp_path, monkeypatch):
 def test_initialize_pins_the_base_transform_code(tmp_path, monkeypatch):
     """The base code digest is fixed at initialize, like group transforms."""
     project = _base_project(tmp_path)
-    monkeypatch.setattr(runtime, "current_version", lambda spark, table: 7)
+    monkeypatch.setattr(
+        runtime, "pin_source", lambda spark, table, policy, snapshot_schema: (table, 7)
+    )
     monkeypatch.setattr(runtime, "publication_state", lambda spark, table: None)
     snapshot = runtime.initialize_features(None, project, _base_plan(), "*")
     expected = runtime.project_function_source(project, _base_plan().base_transform)[1]

@@ -93,7 +93,7 @@ def _base_only(**changes):
     config = {
         "version": 1,
         "base_table": "workspace.demo.raw_observations",
-        "base_transform": "src/features/base.py:prepare",
+        "base_transform": "src/features/groups/base.py:prepare",
         "output_table": "workspace.demo.observations",
         "keys": ["entity_id", "observed_on"],
         "timestamp": "observed_date",
@@ -107,17 +107,19 @@ def test_base_transform_needs_no_feature_groups():
     plan = parse_feature_config(_base_only())
     assert plan is not None
     assert plan.groups == ()
-    assert plan.base_transform == "src/features/base.py:prepare"
+    assert plan.base_transform == "src/features/groups/base.py:prepare"
 
 
 def test_base_transform_can_be_combined_with_groups(feature_config):
     """A derived base still joins regular feature groups on its keys."""
-    plan = parse_feature_config(feature_config | {"base_transform": "src/features/base.py:run"})
+    plan = parse_feature_config(
+        feature_config | {"base_transform": "src/features/groups/base.py:run"}
+    )
     assert plan is not None and len(plan.groups) == 2
 
 
 @pytest.mark.parametrize(
-    "value", ["src/features/groups/base.py:prepare", "../base.py:prepare", "base.py", 3]
+    "value", ["src/features/base.py:prepare", "../base.py:prepare", "base.py", 3]
 )
 def test_base_transform_path_is_a_project_function(value):
     """Only a function in src/features/<module>.py may run on the pinned base."""

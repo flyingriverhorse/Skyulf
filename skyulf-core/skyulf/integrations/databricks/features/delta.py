@@ -1,14 +1,17 @@
 """Persist keyed feature corrections without erasing earlier observation history."""
 
+import hashlib
 import json
 import re
 import uuid
 from typing import Any
 
+from ..data.delta_io.delta import UNVERSIONED_KINDS, table_kind
 from ..shared._contracts import column_name, table_name
 from .joins import validate_feature_frame
 
 _PUBLICATION_PROPERTY = "skyulf.features.publication"
+_SNAPSHOT_PROPERTY = "skyulf.source_snapshot"
 
 
 def _validate_intent(intent: Any) -> dict[str, Any]:
@@ -144,6 +147,46 @@ def current_version(spark: Any, table: str) -> int:
     if row is None:
         raise ValueError(f"Feature table has no Delta history: {table}.")
     return int(row[0])
+
+
+def pin_source(spark: Any, table: str, *, policy: str, snapshot_schema: str) -> tuple[str, int]:
+    """Return the table to read and its pinned version, snapshotting Lakeflow sources.
+
+    Regular Delta tables are pinned directly. Streaming tables, materialized views and
+    views have no history to pin: ``policy="materialize"`` (the default) copies the source
+    into an owned Delta snapshot and pins that, and ``policy="fail"`` raises instead.
+    """
+    kind = table_kind(spark, table)
+    if kind not in UNVERSIONED_KINDS:
+        return table, current_version(spark, table)
+    if policy != "materialize":
+        raise ValueError(
+            f"{table} is a {kind}. Feature inputs are version-pinned and Databricks has no "
+            "history for it; remove source_snapshot: fail from config/features.yml so it is "
+            "copied into a pinned snapshot, or use a regular Delta table."
+        )
+    digest = hashlib.sha256(table.lower().encode()).hexdigest()[:16]
+    snapshot = f"{snapshot_schema}.skyulf_src_{digest}"
+    if spark.catalog.tableExists(snapshot) and not _owned_snapshot(spark, snapshot, table):
+        raise ValueError(f"{snapshot} exists but is not a Skyulf snapshot of {table}.")
+    spark.sql(
+        f"CREATE OR REPLACE TABLE {snapshot} TBLPROPERTIES ('{_SNAPSHOT_PROPERTY}' = '{table}') "
+        f"AS SELECT * FROM {table_name(table)}"
+    )
+    return snapshot, current_version(spark, snapshot)
+
+
+def _owned_snapshot(spark: Any, snapshot: str, table: str) -> bool:
+    """Return True when ``snapshot`` carries the Skyulf tag naming ``table`` as its source."""
+    owner = spark.sql(f"SHOW TBLPROPERTIES {snapshot} ('{_SNAPSHOT_PROPERTY}')").first()
+    return owner is not None and owner[1] == table
+
+
+def drop_source_snapshots(spark: Any, snapshots: dict[str, str]) -> None:
+    """Drop this run's snapshot copies; tables without our tag are left alone."""
+    for table, snapshot in snapshots.items():
+        if spark.catalog.tableExists(snapshot) and _owned_snapshot(spark, snapshot, table):
+            spark.sql(f"DROP TABLE IF EXISTS {snapshot}")
 
 
 def read_version(spark: Any, table: str, version: int) -> Any:

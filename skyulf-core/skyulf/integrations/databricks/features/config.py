@@ -31,6 +31,15 @@ class FeaturePlan:
     groups: tuple[FeatureGroup, ...]
     # Optional src/features/<module>.py:<function> run on the pinned base before joins.
     base_transform: str | None = None
+    # materialize (default) | fail: sources without Delta history (Lakeflow tables, views)
+    # are copied into a pinned snapshot, or rejected.
+    source_snapshot: str = "materialize"
+    source_snapshot_schema: str | None = None
+
+    @property
+    def snapshot_schema(self) -> str:
+        """Return where materialized source snapshots go; default is the output schema."""
+        return self.source_snapshot_schema or self.output_table.rsplit(".", 1)[0]
 
     @property
     def record_keys(self) -> tuple[str, ...]:
@@ -98,14 +107,28 @@ def _group(name: str, value: Any) -> FeatureGroup:
     )
 
 
+def _snapshot_settings(data: dict) -> tuple[str, str | None]:
+    """Validate the snapshot policy and optional catalog.schema for snapshot tables."""
+    policy = data.get("source_snapshot", "materialize")
+    if policy not in {"fail", "materialize"}:
+        raise ValueError("source_snapshot must be fail or materialize.")
+    schema = data.get("source_snapshot_schema")
+    if schema is not None:
+        if type(schema) is not str or len(schema.split(".")) != 2:
+            raise ValueError("source_snapshot_schema must be catalog.schema.")
+        table_name(f"{schema}.probe")
+    return policy, schema
+
+
 def _base_transform(value: Any) -> str | None:
     """Accept an optional project function that derives labels and keys from the base."""
     if value is None:
         return None
     if type(value) is not str or not re.fullmatch(
-        r"src/features/[A-Za-z_]\w*\.py:[A-Za-z_]\w*", value
+        r"src/features/groups/[A-Za-z_]\w*\.py:[A-Za-z_]\w*", value
     ):
-        raise ValueError("base_transform must be src/features/<module>.py:<function>.")
+        # groups/ holds upstream Spark code and is kept out of model packages.
+        raise ValueError("base_transform must be src/features/groups/<module>.py:<function>.")
     return value
 
 
@@ -128,7 +151,8 @@ def _validate_domains(plan: FeaturePlan) -> None:
 def _config_header(value: Any) -> dict:
     """Validate the version and require no dormant settings for disabled features."""
     required = {"version", "groups"}
-    allowed = required | {"base_table", "output_table", "keys", "timestamp", "base_transform"}
+    optional = {"base_transform", "source_snapshot", "source_snapshot_schema"}
+    allowed = required | {"base_table", "output_table", "keys", "timestamp"} | optional
     data = _fields(value, allowed, required, "features")
     if type(data["version"]) is not int or data["version"] != 1:
         raise ValueError("Feature config version must be 1.")
@@ -139,7 +163,7 @@ def _config_header(value: Any) -> dict:
         if set(data) != required:
             raise ValueError("Disabled features must contain only version and empty groups.")
         return data
-    _fields(data, allowed, allowed - {"base_transform"}, "features")
+    _fields(data, allowed, allowed - optional, "features")
     return data
 
 
@@ -161,6 +185,7 @@ def parse_feature_config(value: Any) -> FeaturePlan | None:
         data["timestamp"],
         tuple(_group(name, group) for name, group in data["groups"].items()),
         _base_transform(data.get("base_transform")),
+        *_snapshot_settings(data),
     )
     _validate_domains(plan)
     return plan

@@ -11,6 +11,8 @@ from ..projects._project_files import read_source
 from .config import FeatureGroup, FeaturePlan, validate_feature_plan
 from .delta import (
     current_version,
+    drop_source_snapshots,
+    pin_source,
     publication_state,
     publish_feature_table,
     read_version,
@@ -103,16 +105,34 @@ def initialize_features(
     return {
         "plan_sha256": plan_digest(plan),
         "selected": sorted(selected),
-        "source_versions": {table: current_version(spark, table) for table in sorted(sources)},
+        **_pinned_sources(spark, plan, sources),
         "reused_versions": reused,
         "transform_sha256": {g.name: transform_source(project, g)[1] for g in plan.groups},
         "publication": _initialize_publication(spark, plan),
-        **(
-            {"base_transform_sha256": project_function_source(project, plan.base_transform)[1]}
-            if plan.base_transform
-            else {}
-        ),
+        **_base_transform_pin(project, plan),
     }
+
+
+def _pinned_sources(spark: Any, plan: FeaturePlan, sources: set[str]) -> dict[str, Any]:
+    """Pin each source version, recording snapshots taken for Lakeflow tables or views."""
+    pins = {
+        table: pin_source(
+            spark, table, policy=plan.source_snapshot, snapshot_schema=plan.snapshot_schema
+        )
+        for table in sorted(sources)
+    }
+    snapshots = {table: read for table, (read, _) in pins.items() if read != table}
+    return {
+        "source_versions": {table: version for table, (_, version) in pins.items()},
+        **({"source_snapshots": snapshots} if snapshots else {}),
+    }
+
+
+def _base_transform_pin(project: Path, plan: FeaturePlan) -> dict[str, str]:
+    """Pin the base_transform code digest when the plan has one."""
+    if not plan.base_transform:
+        return {}
+    return {"base_transform_sha256": project_function_source(project, plan.base_transform)[1]}
 
 
 def _publication_intent(plan: FeaturePlan, snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -177,9 +197,15 @@ def _project_function(source: str, reference: str) -> Any:
     return function
 
 
+def _read_source(spark: Any, snapshot: dict, table: str) -> Any:
+    """Read a pinned source, through its materialized snapshot when one was taken."""
+    read = snapshot.get("source_snapshots", {}).get(table, table)
+    return read_version(spark, read, snapshot["source_versions"][table])
+
+
 def _prepared_base(spark: Any, project: Path | None, plan: FeaturePlan, snapshot: dict) -> Any:
     """Read the pinned base and apply the optional base_transform from this run's code."""
-    base = read_version(spark, plan.base_table, snapshot["source_versions"][plan.base_table])
+    base = _read_source(spark, snapshot, plan.base_table)
     if plan.base_transform is None:
         return base
     if project is None:
@@ -214,9 +240,7 @@ def build_feature_group(
     else:
         _check_publication(spark, plan, snapshot, group.output_table)
         transform = _project_function(source, group.transform)
-        frame = read_version(
-            spark, group.source_table, snapshot["source_versions"][group.source_table]
-        )
+        frame = _read_source(spark, snapshot, group.source_table)
         result = transform(frame)
         expected = {*plan.record_keys, *group.columns}
         if set(result.columns) != expected:
@@ -261,7 +285,7 @@ def merge_feature_groups(
         frames[group.name] = read_version(spark, group.output_table, receipt["version"])
     base = _prepared_base(spark, project, plan, snapshot)
     merged = join_feature_groups(base, frames, plan)
-    return publish_feature_table(
+    receipt = publish_feature_table(
         spark,
         merged,
         plan.output_table,
@@ -269,3 +293,6 @@ def merge_feature_groups(
         plan.timestamp,
         publication=_check_publication(spark, plan, snapshot, plan.output_table),
     )
+    # The published output now holds the data; a failed merge keeps them for repair.
+    drop_source_snapshots(spark, snapshot.get("source_snapshots", {}))
+    return receipt
