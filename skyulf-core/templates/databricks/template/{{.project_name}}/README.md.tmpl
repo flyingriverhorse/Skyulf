@@ -42,7 +42,7 @@ exist yet or outcomes arrive separately.
 
 {{if ne .prediction_delivery "endpoint"}}Before training, choose `initial_scoring` in `config/inference.yml`:
 `full_snapshot` includes existing rows; `from_now` records a zero-row checkpoint
-and scores later inserts. Training may automatically start scoring, and this
+and scores later inserts. {{if eq .score_follow_champion "true"}}An approval or promotion starts scoring by itself{{else}}In this project scoring starts only when you run it{{end}}; this
 choice cannot change on an existing prediction target.
 
 {{end}}## First train and {{if eq .prediction_delivery "endpoint"}}serve{{else}}score{{end}}

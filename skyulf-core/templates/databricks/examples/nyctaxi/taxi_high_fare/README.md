@@ -38,7 +38,7 @@ exist yet or outcomes arrive separately.
 
 Before training, choose `initial_scoring` in `config/inference.yml`:
 `full_snapshot` includes existing rows; `from_now` records a zero-row checkpoint
-and scores later inserts. Training may automatically start scoring, and this
+and scores later inserts. An approval or promotion starts scoring by itself; this
 choice cannot change on an existing prediction target.
 
 ## First train and score

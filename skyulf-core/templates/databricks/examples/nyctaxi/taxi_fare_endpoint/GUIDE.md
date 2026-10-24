@@ -107,8 +107,10 @@ installing the local dependencies from README:
 python src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id YOUR_EXISTING_WAREHOUSE --catalog YOUR_CATALOG --input-schema YOUR_INPUT_SCHEMA --output-schema YOUR_OUTPUT_SCHEMA --metadata-schema YOUR_METADATA_SCHEMA
 ```
 
-`--warehouse-id` is a SQL warehouse ID (SQL Warehouses > your warehouse > Connection
-details). This is read-only, but uniqueness checks can scan tables. It checks the supplied
+It checks the tables named in `config/training.yml` and `config/inference.yml`: that
+they exist, their column types, unique and non-empty record keys, and Change Data
+Feed. `--warehouse-id` is a SQL warehouse ID (SQL Warehouses > your warehouse >
+Connection details). This is read-only, but uniqueness checks can scan tables. It checks the supplied
 profile's access, not another run identity or future data. Add the target's
 `--resource-suffix` when needed.
 
@@ -176,7 +178,9 @@ def log_feature(column):
     )
 ```
 
-Select it in a recipe; `params` become the factory's keyword arguments:
+Select it in a recipe as `<file>.<function>` (`my_rules.log_feature` is
+`src/features/my_rules.py`, function `log_feature`); `params` become the factory's
+keyword arguments:
 
 ```yaml
     - custom: my_rules.log_feature
@@ -208,7 +212,9 @@ read them with `read_project_asset`, and declare exact package pins in
 
 Spark workers and endpoints require admission for the exact saved recipe.
 Training checks every step and rule that Spark workers or an endpoint will run; a
-step is admitted only when that check passes, not because its code says it is row-local. Avoid index-dependent behavior
+step is admitted only when that check passes. You do nothing extra: if a step fails,
+the training report names it; make it depend only on its own row, or keep that
+project on local scoring. Avoid index-dependent behavior
 and mutable global caches. Group/window/global context cannot be treated as
 independent prediction rows. `probe_pipeline_for_serving: true` requests the
 training admission checks; Spark/online-feature routes already require them.
@@ -242,9 +248,8 @@ models:
     # no tuning block: these values are used as given
 ```
 
-The threshold is compared with the `metric` in the same `defaults` block (setup wrote
-this project's metric there; for example
-`heldout_accuracy`): error metrics such as RMSE must stay at or below it, scores such as
+The threshold is compared with the `metric` in the same `defaults` block (here
+`heldout_rmse`): error metrics such as RMSE must stay at or below it, scores such as
 accuracy must reach it. Choose it from what the business needs, before training. The
 [training field reference](https://www.skyulf.com/manual/user_guide/databricks_training_config.html)
 lists every model, its parameters and the tuning options.
@@ -279,15 +284,13 @@ Use [Serving requests](#serving-requests); the saved scoring-rule contract below
 also applies to endpoint predictions.
 
 In `config/scoring.yml`, `mode: pre_split` reuses saved eligibility; `custom`
-uses its declared lists; `combined` applies pre-split first and retains its first
+uses only its own rules, so the `pre_split.yml` filters do not run at scoring; `combined` applies pre-split first and retains its first
 exclusion reason. Target-reading filters require explicit
 `skip_target_pre_split_steps: true` when appropriate; the whole step is skipped,
 so separate target and feature filters when feature checks must remain.
 Built-ins include `required_values`, `value_range` and `prediction_band`.
 Custom rules use `custom: scoring.<function>` and declared output columns/dtypes.
-`mode: combined` runs the `pre_split.yml` filters first, then these rules. (A model
-set's separate `combined:` section computes one value from several models; it is not
-this mode.) Do not
+`mode: combined` runs the `pre_split.yml` filters first, then these rules. Do not
 add Python builders beside YAML; legacy builders remain valid without YAML.
 For example, to score only rows with a known, adult age:
 
@@ -362,6 +365,8 @@ and [online features](https://www.skyulf.com/manual/user_guide/databricks_online
 ## Monitoring
 
 To set it up:
+
+The `monitoring` job is generated even when setup had monitoring off.
 
 1. **Turn it on** for the target in `deployment/targets.yml`:
 
