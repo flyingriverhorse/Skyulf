@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyulf · Open tools that run on your own ground</title>
+<meta name="description" content="Skyulf is an independent, open-source family of products. Kayra builds machine learning pipelines you can verify. Koloni puts a colony of AI agents to work. Both run where your data lives.">
+<link rel="canonical" href="https://www.skyulf.com/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#0f1012">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Skyulf">
+<meta property="og:url" content="https://www.skyulf.com/">
+<meta property="og:title" content="Skyulf · Open tools that run on your own ground">
+<meta property="og:description" content="An independent, open-source family of products: Kayra for machine learning you can verify, Koloni for AI agents that work together.">
+<meta property="og:image" content="https://www.skyulf.com/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A wolf on a mountain above the clouds under a starry sky">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Skyulf · Open tools that run on your own ground">
+<meta name="twitter:description" content="Kayra for machine learning you can verify, Koloni for AI agents that work together. Open source, local first.">
+<meta name="twitter:image" content="https://www.skyulf.com/img/og.jpg">
+
+<link rel="icon" href="./logo/wolf-logo.svg" type="image/svg+xml">
+<link rel="icon" href="./img/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="./img/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.skyulf.com/#org","name":"Skyulf","url":"https://www.skyulf.com/","logo":"https://www.skyulf.com/img/logo-192.png","founder":{"@type":"Person","name":"Murat Unsal","sameAs":["https://www.linkedin.com/in/murat-u/"]},"sameAs":["https://github.com/flyingriverhorse","https://kayra.skyulf.com/","https://koloni.skyulf.com/"]},{"@type":"WebSite","@id":"https://www.skyulf.com/#website","url":"https://www.skyulf.com/","name":"Skyulf","publisher":{"@id":"https://www.skyulf.com/#org"},"inLanguage":"en"},{"@type":"SoftwareApplication","name":"Kayra","url":"https://kayra.skyulf.com/","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, Linux, macOS","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"author":{"@id":"https://www.skyulf.com/#org"}},{"@type":"SoftwareApplication","name":"Koloni","url":"https://koloni.skyulf.com/","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, Linux, macOS","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"author":{"@id":"https://www.skyulf.com/#org"}}]}</script>
+
+<style>
+:root{
+  --bg:#f5f4f0; --ink:#1a1a19; --soft:#55544f; --faint:#7a786f; --line:#e2e0d9;
+  --night:#0f1012; --paper:#e4e2dc; --muted:#d8d6cf; --footer-faint:#8a887f; --footer-line:#34332f;
+  /* product colours: one variable each, so a brand change is one line */
+  --kayra:oklch(0.80 0.13 65);
+  --koloni:oklch(0.78 0.11 300);
+  --sky:oklch(0.82 0.11 240);
+  --sky-deep:oklch(0.55 0.13 240);
+  --edge:clamp(20px,4vw,56px);
+  --sans:'Instrument Sans',system-ui,sans-serif;
+  --serif:'Instrument Serif',Georgia,serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+a:hover{opacity:.78}
+a:focus-visible{outline:2px solid var(--sky);outline-offset:3px;border-radius:4px}
+img{display:block;max-width:100%}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:16px;top:16px;z-index:10;background:var(--bg);color:var(--ink);padding:8px 12px}
+
+/* hero */
+.hero{position:relative;min-height:max(680px,100svh);display:flex;flex-direction:column;background:var(--night);color:var(--bg);overflow:hidden}
+.hero video,.hero .poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hero .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,16,18,.55) 0%,rgba(15,16,18,.05) 35%,rgba(15,16,18,.25) 60%,rgba(15,16,18,.88) 100%)}
+.top{position:relative;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px 32px;padding:22px var(--edge);border-bottom:1px solid rgba(245,244,240,.18);font-size:15px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:20px}
+.brand img{width:30px;height:30px}
+.top nav{display:flex;align-items:center;flex-wrap:wrap;gap:10px 28px}
+.top nav a{padding:4px 0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.dot.kayra{background:var(--kayra)} .dot.koloni{background:var(--koloni)}
+.hero .copy{position:relative;margin-top:auto;padding:0 var(--edge) clamp(40px,7vh,80px);display:flex;flex-direction:column;gap:28px}
+.eyebrow{font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:var(--muted)}
+h1{margin:0;font-family:var(--serif);font-weight:400;font-size:clamp(52px,9vw,148px);line-height:.92;letter-spacing:-.02em;max-width:1200px;text-wrap:balance}
+h1 em{color:var(--sky)}
+.hero .row{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:28px}
+.hero .lede{margin:0;font-size:clamp(17px,1.5vw,21px);line-height:1.5;color:var(--paper);max-width:620px;text-wrap:pretty}
+.ctas{display:flex;gap:12px;flex-wrap:wrap}
+.cta{display:flex;align-items:center;gap:10px;color:var(--ink);padding:14px 22px;border-radius:999px;font-weight:500;font-size:16px}
+.cta.kayra{background:var(--kayra)} .cta.koloni{background:var(--koloni)}
+
+/* family */
+.family{padding:clamp(64px,9vw,120px) var(--edge) 0;display:flex;flex-direction:column;gap:40px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:20px;padding-bottom:20px;border-bottom:1px solid var(--ink)}
+h2{margin:0;font-family:var(--serif);font-weight:400;font-size:clamp(40px,5vw,72px);line-height:1}
+.tag{font-family:var(--mono);font-size:13px;letter-spacing:.06em;color:var(--faint)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px}
+.card{color:var(--ink);border-radius:6px;padding:clamp(28px,3.5vw,48px);display:flex;flex-direction:column;gap:22px;overflow:hidden}
+.card:hover{opacity:1}
+.card:hover .shot{transform:translateY(-4px)}
+.card.kayra{background:var(--kayra)} .card.koloni{background:var(--koloni)}
+.card .meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:13px}
+.card .name{font-family:var(--serif);font-size:clamp(68px,8vw,120px);line-height:.9;letter-spacing:-.02em}
+.card .pitch{font-size:clamp(19px,1.7vw,23px);line-height:1.4;font-weight:500;max-width:480px;text-wrap:pretty}
+.card ul{list-style:none;margin:0;padding:18px 0 0;display:flex;flex-direction:column;gap:8px;font-family:var(--mono);font-size:14px;border-top:1px solid rgba(26,26,25,.3)}
+.shot{margin-top:auto;border-radius:4px;overflow:hidden;box-shadow:0 20px 40px -20px rgba(26,26,25,.5);aspect-ratio:16/9;background:var(--ink);transition:transform .25s ease}
+.shot img{width:100%;height:100%;object-fit:cover;object-position:top left}
+.koloni .shot{background:#fff}
+
+/* principles */
+.principles{padding:clamp(80px,10vw,140px) var(--edge);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:48px 40px}
+.principles div{display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--ink);padding-top:20px}
+.principles .n{font-family:var(--mono);font-size:13px;color:var(--faint)}
+.principles h3{margin:0;font-family:var(--serif);font-weight:400;font-size:36px;line-height:1.05}
+.principles p{margin:0;font-size:16px;line-height:1.55;color:var(--soft);text-wrap:pretty}
+
+/* name */
+.name-sec{margin:0 var(--edge) clamp(80px,10vw,140px);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:40px;align-items:end;padding-top:40px;border-top:1px solid var(--line)}
+.name-sec .big{font-family:var(--serif);font-size:clamp(76px,12vw,180px);line-height:.85;letter-spacing:-.03em}
+.name-sec .big em{color:var(--sky-deep)}
+.name-sec p{margin:0;font-size:19px;line-height:1.6;color:var(--soft);max-width:560px;text-wrap:pretty}
+
+/* footer */
+footer{background:var(--ink);color:var(--muted);padding:72px var(--edge) 32px;display:flex;flex-direction:column;gap:64px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:40px}
+.cols .about{display:flex;flex-direction:column;gap:14px}
+.cols .about .brand{color:var(--bg)}
+.cols .about .brand img{width:26px;height:26px}
+.cols .about .motto{font-family:var(--serif);font-size:24px;line-height:1.2;color:var(--bg);max-width:280px}
+.cols nav{display:flex;flex-direction:column;gap:12px;font-size:15px}
+.cols .k{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--footer-faint)}
+.bottom{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:24px;border-top:1px solid var(--footer-line);font-size:13px;color:var(--footer-faint)}
+
+@media (max-width:640px){
+  .top{padding-top:16px;padding-bottom:16px}
+  .cta{padding:12px 18px;font-size:15px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .shot{transition:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#family">Skip to products</a>
+
+<section class="hero" aria-label="Skyulf">
+  <img class="poster" src="./img/hero-poster.jpg" alt="" aria-hidden="true">
+  <video id="heroVideo" muted loop playsinline preload="none" poster="./img/hero-poster.jpg" aria-hidden="true"></video>
+  <div class="shade"></div>
+  <header class="top">
+    <a class="brand" href="./"><img src="./logo/wolf-logo.svg" alt="" width="30" height="30">Skyulf</a>
+    <nav aria-label="Main">
+      <a href="https://kayra.skyulf.com/"><span class="dot kayra"></span>Kayra</a>
+      <a href="https://koloni.skyulf.com/"><span class="dot koloni"></span>Koloni</a>
+    </nav>
+  </header>
+  <div class="copy">
+    <div class="eyebrow">SKY + ULF · INDEPENDENT, OPEN SOURCE</div>
+    <h1>Open tools that run on <em>your own ground.</em></h1>
+    <div class="row">
+      <p class="lede">Skyulf is an independent, open-source family of products. Kayra makes machine learning you can verify. Koloni puts a colony of agents to work together. Both run where your data already lives.</p>
+      <div class="ctas">
+        <a class="cta kayra" href="https://kayra.skyulf.com/">Kayra <span aria-hidden="true">→</span></a>
+        <a class="cta koloni" href="https://koloni.skyulf.com/">Koloni <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<main>
+<section class="family" id="family" aria-labelledby="family-title">
+  <div class="head">
+    <h2 id="family-title">The family</h2>
+    <span class="tag">TWO PRODUCTS · ONE PRINCIPLE</span>
+  </div>
+  <div class="cards">
+    <a class="card kayra" href="https://kayra.skyulf.com/">
+      <div class="meta"><span>01 · <span id="kayraVersion">v0.9.7</span></span><span>kayra.skyulf.com ↗</span></div>
+      <div class="name">Kayra</div>
+      <div class="pitch">Machine learning pipelines you can verify. On a canvas or in Python, locally or on Databricks.</div>
+      <ul>
+        <li>✓ Leakage checks before you train</li>
+        <li>✓ Training, tuning and run comparison</li>
+        <li>✓ Registry, deployment, drift monitoring</li>
+        <li>✓ Export a model as a standalone API</li>
+        <li>$ pip install skyulf-core</li>
+      </ul>
+      <div class="shot"><img src="./img/kayra.jpg" alt="The Kayra pipeline canvas" width="1600" height="900" loading="lazy"></div>
+    </a>
+    <a class="card koloni" href="https://koloni.skyulf.com/">
+      <div class="meta"><span>02 · alpha v0.1</span><span>koloni.skyulf.com ↗</span></div>
+      <div class="name">Koloni</div>
+      <div class="pitch">A colony of AI agents that work together and keep what they learn.</div>
+      <ul>
+        <li>✓ Chat, single agent, team or colony</li>
+        <li>✓ Diffs, previews and test evidence you approve</li>
+        <li>✓ Local models through llama.cpp</li>
+      </ul>
+      <div class="shot"><img src="./img/koloni.jpg" alt="The Koloni workspace" width="1536" height="1024" loading="lazy"></div>
+    </a>
+  </div>
+</section>
+
+<section class="principles" aria-label="Principles">
+  <div><span class="n">01</span><h3>Local first.</h3><p>Runs on your laptop or your own server. Your data never has to leave it.</p></div>
+  <div><span class="n">02</span><h3>Grows with you.</h3><p>Start on a laptop. Move to your own server or cloud when you need to, without starting over.</p></div>
+  <div><span class="n">03</span><h3>Open by default.</h3><p>Read every line, fork it, ship it. Apache-2.0 libraries, AGPLv3 platforms.</p></div>
+  <div><span class="n">04</span><h3>Evidence over claims.</h3><p>Every result comes with the record that produced it: artifacts, diffs, tests.</p></div>
+</section>
+
+<section class="name-sec" aria-label="The name">
+  <div class="big">Sky <em>+</em> Ulf</div>
+  <p>Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven.</p>
+</section>
+</main>
+
+<footer>
+  <div class="cols">
+    <div class="about">
+      <div class="brand"><img src="./logo/wolf-logo.svg" alt="" width="26" height="26">Skyulf</div>
+      <div class="motto">Open tools that run on your own ground.</div>
+    </div>
+    <nav aria-label="Products"><div class="k">PRODUCTS</div>
+      <a href="https://kayra.skyulf.com/"><span class="dot kayra"></span>Kayra</a>
+      <a href="https://koloni.skyulf.com/"><span class="dot koloni"></span>Koloni</a>
+    </nav>
+    <nav aria-label="Resources"><div class="k">RESOURCES</div>
+      <a href="https://kayra.skyulf.com/manual/index.html">Kayra docs</a>
+      <a href="https://github.com/flyingriverhorse/Kayra">Kayra on GitHub</a>
+      <a href="https://github.com/flyingriverhorse/Koloni">Koloni on GitHub</a>
+      <a href="https://pypi.org/project/skyulf-core/">PyPI</a>
+    </nav>
+    <nav aria-label="Social"><div class="k">SOCIAL</div>
+      <a href="https://www.linkedin.com/in/murat-u/">LinkedIn</a>
+    </nav>
+  </div>
+  <div class="bottom"><span>© 2025–2026 Murat Unsal</span><span>Libraries Apache-2.0 · Platforms AGPLv3</span></div>
+</footer>
+
+<script>
+// The hero video is large, so only wide screens without reduced motion or data saver load it.
+(function () {
+  var v = document.getElementById('heroVideo');
+  var wide = window.matchMedia('(min-width: 900px)').matches;
+  var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var saver = navigator.connection && navigator.connection.saveData;
+  if (!v || !wide || calm || saver) return;
+  v.src = './video/wolf.mp4';
+  v.play().catch(function () {});
+})();
+
+// Show the latest Kayra release from PyPI; the version written in the page stays if this fails.
+(function () {
+  var el = document.getElementById('kayraVersion');
+  if (!el || !window.fetch) return;
+  fetch('https://pypi.org/pypi/skyulf-core/json', { cache: 'no-cache' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) {
+      var version = data && data.info && data.info.version;
+      if (typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version)) el.textContent = 'v' + version;
+    })
+    .catch(function () {});
+})();
+</script>
+</body>
+</html>

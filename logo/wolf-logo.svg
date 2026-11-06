@@ -1,0 +1,122 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" fill="none" role="img" aria-labelledby="logo-title logo-desc" version="1.1">
+  <title id="logo-title">Wolf, crescent and star emblem</title>
+  <desc id="logo-desc">Editable vector reconstruction of the supplied blue wolf emblem, with a crescent and four-point star. Transparent background; all artwork consists of Bézier paths and SVG gradients.</desc>
+  <defs>
+    <linearGradient id="crescent-blue" gradientUnits="userSpaceOnUse" x1="350" y1="140" x2="415" y2="673">
+      <stop offset="0" stop-color="#00BCF1" />
+      <stop offset=".52" stop-color="#009AEE" />
+      <stop offset="1" stop-color="#087CE3" />
+    </linearGradient>
+    <linearGradient id="crescent-cyan" gradientUnits="userSpaceOnUse" x1="377" y1="165" x2="173" y2="653">
+      <stop offset="0" stop-color="#31DEF4" />
+      <stop offset=".47" stop-color="#24C4F2" />
+      <stop offset="1" stop-color="#009BFA" />
+    </linearGradient>
+    <linearGradient id="starlight" gradientUnits="userSpaceOnUse" x1="907" y1="168" x2="934" y2="433">
+      <stop offset="0" stop-color="#04D5F4" />
+      <stop offset=".51" stop-color="#00ACF2" />
+      <stop offset="1" stop-color="#0377DC" />
+    </linearGradient>
+    <radialGradient id="star-facet" gradientUnits="userSpaceOnUse" cx="944" cy="255" r="126">
+      <stop offset="0" stop-color="#46F4FB" />
+      <stop offset=".6" stop-color="#0AC6F2" />
+      <stop offset="1" stop-color="#0790E8" />
+    </radialGradient>
+    <linearGradient id="navy-edge" gradientUnits="userSpaceOnUse" x1="670" y1="254" x2="450" y2="1104">
+      <stop offset="0" stop-color="#062B4B" />
+      <stop offset=".43" stop-color="#00244D" />
+      <stop offset="1" stop-color="#001A43" />
+    </linearGradient>
+    <linearGradient id="rear-ear-blue" gradientUnits="userSpaceOnUse" x1="688" y1="356" x2="748" y2="444">
+      <stop offset="0" stop-color="#08417A" />
+      <stop offset="1" stop-color="#00204B" />
+    </linearGradient>
+    <linearGradient id="body-blue" gradientUnits="userSpaceOnUse" x1="531" y1="320" x2="563" y2="1167">
+      <stop offset="0" stop-color="#105895" />
+      <stop offset=".36" stop-color="#0B4A86" />
+      <stop offset=".65" stop-color="#01306B" />
+      <stop offset="1" stop-color="#053D73" />
+    </linearGradient>
+    <radialGradient id="body-shade" gradientUnits="userSpaceOnUse" cx="330" cy="1030" r="530" gradientTransform="matrix(1 0 0 .92 0 82.4)">
+      <stop offset="0" stop-color="#00123E" stop-opacity=".62" />
+      <stop offset=".65" stop-color="#00234A" stop-opacity=".12" />
+      <stop offset="1" stop-color="#003268" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="icy-face" gradientUnits="userSpaceOnUse" x1="380" y1="542" x2="838" y2="570">
+      <stop offset="0" stop-color="#2AB8F5" />
+      <stop offset=".42" stop-color="#51D8F7" />
+      <stop offset="1" stop-color="#99FAF4" />
+    </linearGradient>
+    <radialGradient id="cheek-glow" gradientUnits="userSpaceOnUse" cx="319" cy="793" r="202">
+      <stop offset="0" stop-color="#81FFEF" stop-opacity=".92" />
+      <stop offset=".59" stop-color="#58EAF7" stop-opacity=".58" />
+      <stop offset="1" stop-color="#46D7FD" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="muzzle-blue" gradientUnits="userSpaceOnUse" x1="707" y1="630" x2="705" y2="849">
+      <stop offset="0" stop-color="#159FF6" />
+      <stop offset=".58" stop-color="#018AEF" />
+      <stop offset="1" stop-color="#087DE9" />
+    </linearGradient>
+    <linearGradient id="muzzle-sheen" gradientUnits="userSpaceOnUse" x1="600" y1="737" x2="1004" y2="675">
+      <stop offset="0" stop-color="#10A5F9" />
+      <stop offset=".55" stop-color="#22B9F7" />
+      <stop offset="1" stop-color="#37CEEF" />
+    </linearGradient>
+    <linearGradient id="cheek-edge-blue" gradientUnits="userSpaceOnUse" x1="218" y1="856" x2="399" y2="1058">
+      <stop offset="0" stop-color="#56E1EE" />
+      <stop offset=".51" stop-color="#1FA8E7" />
+      <stop offset="1" stop-color="#025AA0" />
+    </linearGradient>
+    <linearGradient id="mane-front-blue" gradientUnits="userSpaceOnUse" x1="424" y1="820" x2="598" y2="1127">
+      <stop offset="0" stop-color="#049CEB" />
+      <stop offset=".5" stop-color="#17B1F5" />
+      <stop offset="1" stop-color="#0876CC" />
+    </linearGradient>
+    <linearGradient id="mane-rear-blue" gradientUnits="userSpaceOnUse" x1="631" y1="920" x2="782" y2="1150">
+      <stop offset="0" stop-color="#16B9FB" />
+      <stop offset=".57" stop-color="#06A0F9" />
+      <stop offset="1" stop-color="#056EDB" />
+    </linearGradient>
+    <linearGradient id="lower-blue" gradientUnits="userSpaceOnUse" x1="1000" y1="872" x2="929" y2="1098">
+      <stop offset="0" stop-color="#00B9F0" />
+      <stop offset=".5" stop-color="#009CF7" />
+      <stop offset="1" stop-color="#0082E9" />
+    </linearGradient>
+    <linearGradient id="lower-cyan" gradientUnits="userSpaceOnUse" x1="810" y1="1023" x2="1140" y2="866">
+      <stop offset="0" stop-color="#02B8F5" />
+      <stop offset=".65" stop-color="#00BEED" />
+      <stop offset="1" stop-color="#05D1F4" />
+    </linearGradient>
+    <clipPath id="body-clip">
+      <path d="M 576,288 L 617,440 L 773,510 Q 784,515 792,528 L 844,603 L 1077,689 C 1050,736 1011,777 984,788 C 925,790 855,780 795,787 C 703,797 646,832 640,868 C 631,898 658,934 692,969 C 752,1034 829,1093 891,1101 C 811,1141 720,1166 630,1172 C 423,1150 267,1046 160,861 C 177,769 229,676 294,625 C 239,637 188,664 144,697 C 203,620 295,545 388,476 Z" />
+    </clipPath>
+    <clipPath id="face-clip">
+      <path d="M 555,335 L 570,455 L 540,447 L 738,517 C 755,523 766,534 777,551 C 791,575 802,598 811,620 C 902,633 977,668 1022,703 C 1011,720 994,740 981,748 Q 976,752 966,750 C 892,747 836,735 778,745 C 694,757 620,796 566,847 C 604,791 657,739 716,704 C 612,711 472,751 399,819 C 444,745 529,663 667,627 C 539,601 377,683 232,843 C 271,915 332,998 405,1062 C 316,1009 244,943 201,858 C 254,741 371,639 477,587 C 431,583 375,585 321,593 C 395,549 492,525 592,519 L 469,476 Z" />
+    </clipPath>
+  </defs>
+  <g id="crescent">
+    <path id="upper-crescent" d="M 720,85 C 546,72 379,149 265,254 C 155,354 91,499 96,676 C 148,605 220,536 298,473 C 320,307 493,143 720,85 Z" fill="url(#crescent-blue)" />
+    <path id="upper-crescent-light" d="M 720,85 C 546,72 379,149 265,254 C 155,354 91,499 96,676 C 125,635 161,598 195,564 C 222,325 434,107 720,85 Z" fill="url(#crescent-cyan)" />
+    <path id="lower-crescent" d="M 728,1011 C 895,1041 1120,921 1168,750 C 1146,896 1037,1030 891,1101 L 804,1093 L 696,997 Z" fill="url(#lower-blue)" />
+    <path id="lower-crescent-light" d="M 728,1011 C 895,1041 1120,921 1168,750 C 1140,879 991,1039 784,1053 C 763,1037 745,1024 728,1011 Z" fill="url(#lower-cyan)" />
+  </g>
+  <g id="four-point-star">
+    <path id="star" d="M 918,134 C 909,231 890,260 784,277 C 886,294 908,326 918,433 C 930,329 950,294 1047,277 C 948,263 928,236 918,134 Z" fill="url(#starlight)" />
+    <path id="star-right" d="M 918,134 C 928,236 948,263 1047,277 C 950,294 930,329 918,433 Z" fill="url(#star-facet)" />
+  </g>
+  <g id="wolf">
+    <path id="rear-ear" d="M 658,405 L 743,340 L 747,447 Z" fill="url(#rear-ear-blue)" />
+    <path id="wolf-outline" d="M 589,242 L 643,416 L 818,505 L 870,576 L 1103,679 C 1084,729 1044,781 1001,807 C 948,809 871,801 814,805 C 730,810 678,839 671,887 C 661,944 723,1008 791,1057 C 830,1084 868,1099 891,1101 C 811,1141 720,1166 630,1172 C 423,1150 248,1045 143,860 C 149,807 172,749 195,705 C 154,719 118,738 88,763 C 121,658 220,553 363,460 Z" fill="url(#navy-edge)" />
+    <path id="wolf-body" d="M 576,288 L 617,440 L 773,510 Q 784,515 792,528 L 844,603 L 1077,689 C 1050,736 1011,777 984,788 C 925,790 855,780 795,787 C 703,797 646,832 640,868 C 631,898 658,934 692,969 C 752,1034 829,1093 891,1101 C 811,1141 720,1166 630,1172 C 423,1150 267,1046 160,861 C 177,769 229,676 294,625 C 239,637 188,664 144,697 C 203,620 295,545 388,476 Z" fill="url(#body-blue)" />
+    <path id="body-tonal-shading" d="M 576,288 L 617,440 L 773,510 Q 784,515 792,528 L 844,603 L 1077,689 C 1050,736 1011,777 984,788 C 925,790 855,780 795,787 C 703,797 646,832 640,868 C 631,898 658,934 692,969 C 752,1034 829,1093 891,1101 C 811,1141 720,1166 630,1172 C 423,1150 267,1046 160,861 C 177,769 229,676 294,625 C 239,637 188,664 144,697 C 203,620 295,545 388,476 Z" fill="url(#body-shade)" />
+    <path id="face" d="M 555,335 L 570,455 L 540,447 L 738,517 C 755,523 766,534 777,551 C 791,575 802,598 811,620 C 902,633 977,668 1022,703 C 1011,720 994,740 981,748 Q 976,752 966,750 C 892,747 836,735 778,745 C 694,757 620,796 566,847 C 604,791 657,739 716,704 C 612,711 472,751 399,819 C 444,745 529,663 667,627 C 539,601 377,683 232,843 C 271,915 332,998 405,1062 C 316,1009 244,943 201,858 C 254,741 371,639 477,587 C 431,583 375,585 321,593 C 395,549 492,525 592,519 L 469,476 Z" fill="url(#icy-face)" />
+    <path id="face-tonal-highlight" d="M 555,335 L 570,455 L 540,447 L 738,517 C 755,523 766,534 777,551 C 791,575 802,598 811,620 C 902,633 977,668 1022,703 C 1011,720 994,740 981,748 Q 976,752 966,750 C 892,747 836,735 778,745 C 694,757 620,796 566,847 C 604,791 657,739 716,704 C 612,711 472,751 399,819 C 444,745 529,663 667,627 C 539,601 377,683 232,843 C 271,915 332,998 405,1062 C 316,1009 244,943 201,858 C 254,741 371,639 477,587 C 431,583 375,585 321,593 C 395,549 492,525 592,519 L 469,476 Z" fill="url(#cheek-glow)" />
+    <path id="eye" d="M 628,530 C 679,543 722,547 751,564 C 777,580 797,601 811,620 L 708,607 Z" fill="url(#navy-edge)" />
+    <path id="muzzle" d="M 667,627 C 820,645 976,667 1022,703 C 1011,720 994,740 981,748 Q 976,752 966,750 C 892,747 836,735 778,745 C 694,757 620,796 566,847 C 604,791 657,739 716,704 C 612,711 472,751 399,819 C 444,745 529,663 667,627 Z" fill="url(#muzzle-blue)" />
+    <path id="muzzle-light" d="M 667,627 C 820,645 976,667 1022,703 C 1017,712 1010,723 1002,731 C 914,741 812,708 735,689 C 631,663 512,697 441,764 C 489,705 568,653 667,627 Z" fill="url(#muzzle-sheen)" />
+    <path id="cheek-edge" d="M 201,858 L 232,843 C 271,915 332,998 405,1062 C 316,1009 244,943 201,858 Z" fill="url(#cheek-edge-blue)" />
+    <path id="mane-front" d="M 544,778 C 507,822 480,865 466,905 C 482,980 573,1082 666,1128 C 551,1081 451,1017 400,911 C 438,859 489,817 544,778 Z" fill="url(#mane-front-blue)" />
+    <path id="mane-rear" d="M 594,884 C 607,973 682,1074 814,1134 L 793,1142 C 659,1114 587,1035 594,884 Z" fill="url(#mane-rear-blue)" />
+  </g>
+</svg>
